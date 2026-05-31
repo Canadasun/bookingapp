@@ -1,0 +1,70 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD, APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
+import { BullModule } from '@nestjs/bullmq';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { BusinessesModule } from './businesses/businesses.module';
+import { StaffModule } from './staff/staff.module';
+import { ServicesModule } from './services/services.module';
+import { AvailabilityModule } from './availability/availability.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { ClientsModule } from './clients/clients.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PaymentsModule } from './payments/payments.module';
+import { UsersModule } from './users/users.module';
+import { MessagesModule } from './messages/messages.module';
+import { OffersModule } from './offers/offers.module';
+import { ClientPortalModule } from './client-portal/client-portal.module';
+import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
+import { HealthModule } from './health/health.module';
+import { AdminModule } from './admin/admin.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        transport: process.env.NODE_ENV !== 'production'
+          ? { target: 'pino-pretty', options: { colorize: true } }
+          : undefined,
+        genReqId: (req) => req.headers['x-request-id'] ?? crypto.randomUUID(),
+      },
+    }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
+    BullModule.forRoot({
+      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+    }),
+    PrismaModule,
+    AuthModule,
+    UsersModule,
+    BusinessesModule,
+    StaffModule,
+    ServicesModule,
+    AvailabilityModule,
+    BookingsModule,
+    ClientsModule,
+    NotificationsModule,
+    PaymentsModule,
+    MessagesModule,
+    OffersModule,
+    ClientPortalModule,
+    CalendarSyncModule,
+    HealthModule,
+    AdminModule,
+  ],
+
+  providers: [
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
+    { provide: APP_PIPE, useValue: new ZodValidationPipe() },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
+})
+export class AppModule {}

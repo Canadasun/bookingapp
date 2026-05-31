@@ -1,0 +1,23 @@
+import { z } from 'zod';
+
+export const CreateAppointmentSchema = z.object({
+  staffId: z.string().min(1),
+  serviceId: z.string().min(1),
+  additionalServiceIds: z.array(z.string().min(1)).optional(),
+  clientId: z.string().min(1),
+  startsAt: z.string().datetime(),
+  notes: z.string().optional(),
+});
+
+export const RescheduleSchema = z.object({
+  startsAt: z.string().datetime(),
+});
+
+export const StatusSchema = z.object({
+  status: z.enum(['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']),
+  cancelReason: z.string().optional(),
+});
+
+export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
+export type RescheduleDto = z.infer<typeof RescheduleSchema>;
+export type StatusDto = z.infer<typeof StatusSchema>;

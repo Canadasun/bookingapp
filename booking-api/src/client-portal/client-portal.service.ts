@@ -1,0 +1,68 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class ClientPortalService {
+  constructor(private prisma: PrismaService) {}
+
+  async getAppointments(email: string) {
+    const clients = await this.prisma.client.findMany({
+      where: { email },
+      include: {
+        business: { select: { id: true, name: true, phone: true, address: true } },
+        appointments: {
+          include: {
+            service: true,
+            staff: { include: { user: { select: { name: true } } } },
+          },
+          orderBy: { startsAt: 'desc' },
+        },
+      },
+    });
+
+    return clients.flatMap((c) =>
+      c.appointments.map((a) => ({
+        ...a,
+        business: c.business,
+        client: { id: c.id, name: c.name, email: c.email, phone: c.phone },
+      }))
+    ).sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
+  }
+
+  async getMessages(email: string) {
+    const clients = await this.prisma.client.findMany({
+      where: { email },
+      include: {
+        business: { select: { id: true, name: true } },
+        messages: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+
+    return clients
+      .filter((c) => c.messages.length > 0)
+      .map((c) => ({
+        businessId: c.business.id,
+        businessName: c.business.name,
+        clientId: c.id,
+        messages: c.messages,
+      }));
+  }
+
+  async getOffers(email: string) {
+    const clients = await this.prisma.client.findMany({
+      where: { email },
+      select: { businessId: true },
+    });
+    const bizIds = [...new Set(clients.map((c) => c.businessId))];
+
+    return this.prisma.offer.findMany({
+      where: {
+        businessId: { in: bizIds },
+        active: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: { business: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+}

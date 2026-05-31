@@ -1,0 +1,190 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { format, isBefore, subHours } from 'date-fns';
+import Link from 'next/link';
+import { Calendar, Clock, User, Scissors, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AddToCalendar } from '@/components/AddToCalendar';
+import { api, Appointment } from '@/lib/api';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { StatusBadge } from '@/components/StatusBadge';
+import { toast } from 'sonner';
+
+export default function ManageAppointmentPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.appointments.get(id);
+      setAppointment(data);
+    } catch (e) {
+      toast.error('Failed to load appointment details');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function cancel() {
+    if (!appointment) return;
+
+    const windowHours = appointment.business.cancellationWindowHours;
+    const cutoff = subHours(new Date(appointment.startsAt), windowHours);
+    const withinWindow = !isBefore(new Date(), cutoff);
+
+    const msg = withinWindow
+      ? `You are within the ${windowHours}-hour cancellation window. A fee may apply. Proceed?`
+      : 'Are you sure you want to cancel this appointment?';
+    if (!confirm(msg)) return;
+
+    setCancelling(true);
+    try {
+      await api.appointments.publicCancel(id, 'Cancelled by client');
+      toast.success('Appointment cancelled');
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Cancellation failed');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>;
+  if (!appointment) return <div className="min-h-screen flex items-center justify-center text-gray-500">Appointment not found</div>;
+
+  const isCancelled = appointment.status === 'CANCELLED';
+  const canCancel = ['PENDING', 'CONFIRMED'].includes(appointment.status);
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Appointment</h1>
+          <p className="text-gray-500">Appointment ID: <code className="bg-gray-100 px-1.5 py-0.5 rounded">{id}</code></p>
+        </div>
+
+        <Card className="mb-6 overflow-hidden">
+          <div className={`h-2 ${isCancelled ? 'bg-red-500' : 'bg-violet-600'}`} />
+          <CardContent className="p-6 md:p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-full ${isCancelled ? 'bg-red-50 text-red-600' : 'bg-violet-50 text-violet-600'} flex items-center justify-center`}>
+                  {isCancelled ? <AlertCircle className="w-6 h-6" /> : <CheckCircle2 className="w-6 h-6" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {isCancelled ? 'Cancelled' : 'Upcoming Appointment'}
+                  </h2>
+                  <p className="text-sm text-gray-500">{appointment.business.name}</p>
+                </div>
+              </div>
+              <StatusBadge status={appointment.status} />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Scissors className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Service</p>
+                    <p className="text-gray-900 font-semibold">{appointment.service.name}</p>
+                    <p className="text-sm text-gray-500">{appointment.service.durationMinutes} minutes</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <User className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Staff</p>
+                    <p className="text-gray-900 font-semibold">{appointment.staff.user.name}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Date</p>
+                    <p className="text-gray-900 font-semibold">{format(new Date(appointment.startsAt), 'EEEE, MMMM do')}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Time</p>
+                    <p className="text-gray-900 font-semibold">{format(new Date(appointment.startsAt), 'h:mm a')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {!isCancelled && appointment.status !== 'COMPLETED' && (
+              <div className="border-t border-gray-100 pt-6 pb-2 flex justify-center">
+                <AddToCalendar
+                  appointmentId={appointment.id}
+                  title={`${appointment.service.name} at ${appointment.business.name}`}
+                  startsAt={appointment.startsAt}
+                  endsAt={appointment.endsAt}
+                  description={`With ${appointment.staff.user.name}`}
+                  location={appointment.business.address}
+                />
+              </div>
+            )}
+
+            {!isCancelled && (
+              <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row gap-4">
+                {canCancel && (
+                  <Button 
+                    variant="destructive" 
+                    className="flex-1 py-6 text-lg font-semibold"
+                    onClick={cancel}
+                    loading={cancelling}
+                  >
+                    Cancel Appointment
+                  </Button>
+                )}
+                <Button 
+                  variant="secondary" 
+                  className="flex-1 py-6 text-lg font-semibold"
+                  onClick={() => router.push(`/book/${appointment.business.slug}?reschedule=${id}`)}
+                >
+                  Reschedule
+                </Button>
+              </div>
+            )}
+            
+            {isCancelled && (
+              <div className="text-center pt-4">
+                <Button 
+                  variant="primary" 
+                  className="w-full py-6 text-lg font-semibold"
+                  onClick={() => router.push(`/book/${appointment.business.slug}`)}
+                >
+                  Book New Appointment
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="text-center space-y-2">
+          <Link href="/my/bookings"
+            className="inline-block text-sm text-violet-600 font-medium hover:underline">
+            ← View all my bookings
+          </Link>
+          <p className="text-sm text-gray-400">
+            Need help? Contact {appointment.business.name} at {appointment.business.phone || appointment.business.email}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

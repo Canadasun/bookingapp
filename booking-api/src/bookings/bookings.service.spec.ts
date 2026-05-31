@@ -1,0 +1,267 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BookingsService } from './bookings.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const SLOT_START = new Date('2024-03-04T14:00:00.000Z');
+const SLOT_END = new Date('2024-03-04T15:00:00.000Z');
+
+function makeAppointment(overrides = {}) {
+  return {
+    id: 'apt1',
+    businessId: 'biz1',
+    staffId: 'staff1',
+    serviceId: 'svc1',
+    clientId: 'client1',
+    startsAt: SLOT_START,
+    endsAt: SLOT_END,
+    status: 'PENDING',
+    depositCents: null,
+    stripePaymentIntentId: null,
+    notes: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    client: { id: 'client1', name: 'Jane Doe', email: 'jane@example.com', phone: null },
+    service: { id: 'svc1', name: 'Haircut', durationMinutes: 60 },
+    staff: { id: 'staff1', user: { name: 'Bob' } },
+    ...overrides,
+  };
+}
+
+function mockPrisma(options: { conflictExists?: boolean } = {}) {
+  const txMock = {
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    appointment: {
+      findFirst: jest.fn().mockResolvedValue(options.conflictExists ? { id: 'conflict' } : null),
+      create: jest.fn().mockResolvedValue(makeAppointment()),
+      update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
+    },
+  };
+
+  return {
+    service: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'svc1',
+        durationMinutes: 60,
+      }),
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60 }),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'svc1',
+        durationMinutes: 60,
+      }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60 }),
+    },
+    appointment: {
+      findMany: jest.fn().mockResolvedValue([makeAppointment()]),
+      findUnique: jest.fn().mockResolvedValue(makeAppointment()),
+      findFirst: jest.fn().mockImplementation(({ where }) => {
+        if (options.conflictExists && where.status) {
+          return Promise.resolve({ id: 'conflict' });
+        }
+        return Promise.resolve(makeAppointment());
+      }),
+      create: jest.fn().mockResolvedValue(makeAppointment()),
+      update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
+    },
+    auditLog: { create: jest.fn().mockResolvedValue({}) },
+    $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => {
+      return fn(txMock);
+    }),
+  };
+}
+
+async function buildService(prismaOverrides = {}, conflictExists = false) {
+  const prisma = { ...mockPrisma({ conflictExists }), ...prismaOverrides };
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [
+      BookingsService,
+      { provide: PrismaService, useValue: prisma },
+      {
+        provide: NotificationsService,
+        useValue: {
+          scheduleReminders: jest.fn(),
+          cancelReminders: jest.fn(),
+          sendCancellation: jest.fn(),
+          sendConfirmation: jest.fn().mockResolvedValue(undefined),
+          sendPendingNotification: jest.fn().mockResolvedValue(undefined),
+          sendAdminBookingAlert: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+    ],
+  }).compile();
+  return { svc: module.get<BookingsService>(BookingsService), prisma };
+}
+
+describe('BookingsService', () => {
+  describe('create', () => {
+    it('creates an appointment when slot is free', async () => {
+      const { svc } = await buildService();
+      const result = await svc.create('biz1', {
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        clientId: 'client1',
+        startsAt: SLOT_START.toISOString(),
+      });
+      expect(result.status).toBe('PENDING');
+    });
+
+    it('throws ConflictException when slot is taken', async () => {
+      const { svc } = await buildService({}, true);
+      await expect(
+        svc.create('biz1', {
+          staffId: 'staff1',
+          serviceId: 'svc1',
+          clientId: 'client1',
+          startsAt: SLOT_START.toISOString(),
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('throws NotFoundException when service does not exist', async () => {
+      const { svc } = await buildService({
+        service: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          findFirstOrThrow: jest.fn().mockRejectedValue(new NotFoundException()),
+          findUnique: jest.fn().mockResolvedValue(null),
+          findUniqueOrThrow: jest.fn().mockRejectedValue(new NotFoundException()),
+        },
+      });
+      await expect(
+        svc.create('biz1', {
+          staffId: 'staff1',
+          serviceId: 'nonexistent',
+          clientId: 'client1',
+          startsAt: SLOT_START.toISOString(),
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('concurrency — 50 simultaneous requests on the same slot', () => {
+    it('allows exactly one booking to succeed when slot is contested', async () => {
+      let booked = false;
+
+      const txMock = {
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        appointment: {
+          findFirst: jest.fn().mockImplementation(() => {
+            // Simulate the real race: first caller gets null, all subsequent get a conflict
+            if (!booked) {
+              booked = true;
+              return Promise.resolve(null);
+            }
+            return Promise.resolve({ id: 'existing' });
+          }),
+          create: jest.fn().mockResolvedValue(makeAppointment()),
+        },
+      };
+
+      const prisma = {
+        service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60 }) },
+        appointment: { findFirst: jest.fn().mockResolvedValue(makeAppointment()) },
+        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock)),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          BookingsService,
+          { provide: PrismaService, useValue: prisma },
+          {
+            provide: NotificationsService,
+            useValue: {
+              scheduleReminders: jest.fn(),
+              cancelReminders: jest.fn(),
+              sendConfirmation: jest.fn().mockResolvedValue(undefined),
+              sendPendingNotification: jest.fn().mockResolvedValue(undefined),
+              sendAdminBookingAlert: jest.fn().mockResolvedValue(undefined),
+            },
+          },
+        ],
+      }).compile();
+
+      const svc = module.get<BookingsService>(BookingsService);
+
+      const dto = {
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        clientId: 'client1',
+        startsAt: SLOT_START.toISOString(),
+      };
+
+      const results = await Promise.allSettled(
+        Array.from({ length: 50 }, () => svc.create('biz1', dto)),
+      );
+
+      const successes = results.filter((r) => r.status === 'fulfilled');
+      const conflicts = results.filter(
+        (r) => r.status === 'rejected' && r.reason instanceof ConflictException,
+      );
+
+      expect(successes).toHaveLength(1);
+      expect(conflicts).toHaveLength(49);
+    });
+  });
+
+  describe('admin alert', () => {
+    it('enqueues admin-alert job with correct appointmentId on successful booking', async () => {
+      const sendAdminBookingAlert = jest.fn().mockResolvedValue(undefined);
+      const sendConfirmation = jest.fn().mockResolvedValue(undefined);
+      const sendPendingNotification = jest.fn().mockResolvedValue(undefined);
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          BookingsService,
+          { provide: PrismaService, useValue: mockPrisma() },
+          {
+            provide: NotificationsService,
+            useValue: {
+              sendConfirmation,
+              sendPendingNotification,
+              sendAdminBookingAlert,
+              cancelReminders: jest.fn(),
+              scheduleReminders: jest.fn(),
+              sendCancellation: jest.fn(),
+            },
+          },
+        ],
+      }).compile();
+      const svc = module.get<BookingsService>(BookingsService);
+      await svc.create('biz1', {
+        staffId: 'staff1', serviceId: 'svc1',
+        clientId: 'client1', startsAt: SLOT_START.toISOString(),
+      });
+      expect(sendAdminBookingAlert).toHaveBeenCalledWith('apt1');
+      expect(sendPendingNotification).toHaveBeenCalled();
+    });
+  });
+
+  describe('confirm', () => {
+    it('updates status to CONFIRMED and schedules reminders', async () => {
+      const { svc } = await buildService();
+      const result = await svc.confirm('apt1', 'biz1');
+      expect(result.status).toBe('CONFIRMED');
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('cancels reminders when status set to CANCELLED', async () => {
+      const cancelReminders = jest.fn();
+      const sendCancellation = jest.fn();
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          BookingsService,
+          { provide: PrismaService, useValue: mockPrisma() },
+          {
+            provide: NotificationsService,
+            useValue: { scheduleReminders: jest.fn(), cancelReminders, sendCancellation },
+          },
+        ],
+      }).compile();
+      const svc = module.get<BookingsService>(BookingsService);
+      await svc.updateStatus('apt1', { status: 'CANCELLED' }, 'biz1');
+      expect(cancelReminders).toHaveBeenCalledWith('apt1');
+      expect(sendCancellation).toHaveBeenCalled();
+    });
+  });
+});

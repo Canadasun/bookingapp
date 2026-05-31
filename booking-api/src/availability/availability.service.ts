@@ -1,0 +1,168 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { GetSlotsDto, TimeSlot } from './dto/availability.dto';
+import {
+  addDays,
+  addMinutes,
+  isBefore,
+  isEqual,
+  parseISO,
+  format,
+  getDay,
+} from 'date-fns';
+import { fromZonedTime, toZonedTime, format as formatTZ } from 'date-fns-tz';
+import { AvailabilityRule, TimeOff, Appointment } from '@prisma/client';
+
+interface Interval {
+  start: Date;
+  end: Date;
+}
+
+@Injectable()
+export class AvailabilityService {
+  constructor(private prisma: PrismaService) {}
+
+  async getAvailableSlots(dto: GetSlotsDto): Promise<TimeSlot[]> {
+    const { staffId, serviceId, startDate, endDate, timezone } = dto;
+
+    const [service, staff] = await Promise.all([
+      this.prisma.service.findUnique({ where: { id: serviceId } }),
+      this.prisma.staff.findUnique({
+        where: { id: staffId },
+        include: { business: true },
+      }),
+    ]);
+
+    if (!service) throw new NotFoundException('Service not found');
+    if (!staff) throw new NotFoundException('Staff not found');
+
+    const businessTimezone = staff.business.timezone;
+
+    // Parse dates in the requested timezone
+    const rangeStart = fromZonedTime(`${startDate}T00:00:00`, timezone);
+    const rangeEnd = fromZonedTime(`${endDate}T23:59:59`, timezone);
+
+    const [rules, appointments, timeOffs] = await Promise.all([
+      this.prisma.availabilityRule.findMany({ where: { staffId } }),
+      this.prisma.appointment.findMany({
+        where: {
+          staffId,
+          status: { in: ['CONFIRMED', 'PENDING'] },
+          startsAt: { lt: rangeEnd },
+          endsAt: { gt: rangeStart },
+        },
+      }),
+      this.prisma.timeOff.findMany({
+        where: {
+          staffId,
+          startsAt: { lt: rangeEnd },
+          endsAt: { gt: rangeStart },
+        },
+      }),
+    ]);
+
+    const slots: TimeSlot[] = [];
+    let cursor = new Date(rangeStart);
+
+    while (isBefore(cursor, rangeEnd)) {
+      const localDay = toZonedTime(cursor, businessTimezone);
+      const dayOfWeek = getDay(localDay);
+      const dayRules = rules.filter((r) => r.dayOfWeek === dayOfWeek);
+
+      for (const rule of dayRules) {
+        const daySlots = this.generateDaySlots(
+          localDay,
+          rule,
+          service,
+          appointments,
+          timeOffs,
+          businessTimezone,
+          timezone,
+        );
+        slots.push(...daySlots);
+      }
+
+      cursor = addDays(cursor, 1);
+    }
+
+    return slots;
+  }
+
+  private generateDaySlots(
+    localDay: Date,
+    rule: AvailabilityRule,
+    service: { durationMinutes: number; bufferBeforeMin: number; bufferAfterMin: number },
+    appointments: Appointment[],
+    timeOffs: TimeOff[],
+    businessTimezone: string,
+    displayTimezone: string,
+  ): TimeSlot[] {
+    const dateStr = format(localDay, 'yyyy-MM-dd');
+
+    // Build window in UTC from the local times
+    const windowStart = fromZonedTime(`${dateStr}T${rule.startTime}:00`, businessTimezone);
+    const windowEnd = fromZonedTime(`${dateStr}T${rule.endTime}:00`, businessTimezone);
+
+    const { durationMinutes, bufferBeforeMin, bufferAfterMin } = service;
+    const totalSlotMinutes = bufferBeforeMin + durationMinutes + bufferAfterMin;
+
+    const slots: TimeSlot[] = [];
+
+    // First candidate: slot actual start (after buffer-before)
+    let candidateStart = addMinutes(windowStart, bufferBeforeMin);
+
+    while (true) {
+      const actualEnd = addMinutes(candidateStart, durationMinutes);
+      const occupiedStart = addMinutes(candidateStart, -bufferBeforeMin);
+      const occupiedEnd = addMinutes(actualEnd, bufferAfterMin);
+
+      // Stop if the occupied window exceeds the availability window
+      if (isBefore(windowEnd, occupiedEnd) || isEqual(windowEnd, occupiedEnd) === false && isBefore(windowEnd, occupiedEnd)) {
+        break;
+      }
+      if (!isBefore(occupiedEnd, windowEnd) && !isEqual(occupiedEnd, windowEnd)) {
+        break;
+      }
+
+      const blockedByAppointment = appointments.some(
+        (apt) => occupiedStart < apt.endsAt && occupiedEnd > apt.startsAt,
+      );
+
+      const blockedByTimeOff = timeOffs.some(
+        (to) => occupiedStart < to.endsAt && occupiedEnd > to.startsAt,
+      );
+
+      if (!blockedByAppointment && !blockedByTimeOff) {
+        slots.push({
+          startsAt: candidateStart,
+          endsAt: actualEnd,
+          startsAtLocal: formatTZ(toZonedTime(candidateStart, displayTimezone), 'yyyy-MM-dd\'T\'HH:mm:ssxxx', { timeZone: displayTimezone }),
+          endsAtLocal: formatTZ(toZonedTime(actualEnd, displayTimezone), 'yyyy-MM-dd\'T\'HH:mm:ssxxx', { timeZone: displayTimezone }),
+        });
+      }
+
+      candidateStart = addMinutes(candidateStart, totalSlotMinutes);
+    }
+
+    return slots;
+  }
+
+  // Used by BookingsService to validate a slot is still open (inside a transaction)
+  async isSlotAvailable(
+    staffId: string,
+    startsAt: Date,
+    endsAt: Date,
+    excludeAppointmentId?: string,
+  ): Promise<boolean> {
+    const conflict = await this.prisma.appointment.findFirst({
+      where: {
+        staffId,
+        status: { in: ['CONFIRMED', 'PENDING'] },
+        startsAt: { lt: endsAt },
+        endsAt: { gt: startsAt },
+        ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+      },
+    });
+    return conflict === null;
+  }
+}
