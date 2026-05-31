@@ -1,0 +1,73 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bookingapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bookingapp}
+      POSTGRES_DB: bookingapp
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bookingapp']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  booking-api:
+    build:
+      context: ./booking-api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    env_file: ./booking-api/.env.production
+    environment:
+      DATABASE_URL: postgresql://bookingapp:${POSTGRES_PASSWORD:-bookingapp}@postgres:5432/bookingapp?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3001/api/healthz || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  booking-web:
+    build:
+      context: ./booking-web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      API_INTERNAL_URL: http://booking-api:3001
+      NODE_ENV: production
+    env_file: ./booking-web/.env.production
+    depends_on:
+      booking-api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
