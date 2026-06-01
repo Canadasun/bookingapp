@@ -774,17 +774,111 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 }
 
 // ── More/Settings screen ─────────────────────────────────────────────────────
+type MoreView = 'menu' | 'services' | 'staff' | 'settings';
 function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
+  const [view, setView]         = useState<MoreView>('menu');
+  const [services, setServices] = useState<Service[] | null>(null);
+  const [staff, setStaff]       = useState<Staff[] | null>(null);
+  const [biz, setBiz]           = useState<any | null>(null);
+  const [loading, setLoading]   = useState(false);
+
+  async function open(v: MoreView) {
+    setView(v);
+    try {
+      if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${BIZ_ID}/services`)); }
+      else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${BIZ_ID}/staff`)); }
+      else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${BIZ_ID}`)); }
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }
+
+  const Head = ({ title }: { title:string }) => (
+    <View style={[s.header, view!=='menu' && { flexDirection:'row', alignItems:'center' }]}>
+      {view !== 'menu' && (
+        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+      )}
+      <Text style={s.headerTitle}>{title}</Text>
+    </View>
+  );
+  const Loader = () => <View style={{ padding:40, alignItems:'center' }}><ActivityIndicator color={PURPLE}/></View>;
+
+  if (view === 'services') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Services"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(services ?? []).filter(x=>x.active).map(sv => (
+            <View key={sv.id} style={ms.row}>
+              <View style={[ms.dot,{ backgroundColor: sv.color || PURPLE }]}/>
+              <View style={{ flex:1 }}>
+                <Text style={ms.rowTitle}>{sv.name}</Text>
+                <Text style={ms.rowMeta}>{sv.durationMinutes} min</Text>
+              </View>
+              <PriceTag cents={sv.priceCents}/>
+            </View>
+          ))}
+          {services && services.length===0 && <Text style={ms.empty}>No services yet.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  if (view === 'staff') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Team"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(staff ?? []).map(st => (
+            <View key={st.id} style={ms.row}>
+              <View style={s.avatar}><Text style={{ color:PURPLE, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+              <View style={{ flex:1 }}>
+                <Text style={ms.rowTitle}>{st.user.name}</Text>
+                <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
+              </View>
+            </View>
+          ))}
+          {staff && staff.length===0 && <Text style={ms.empty}>No team members yet.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  if (view === 'settings') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Settings"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          <View style={ms.card}>
+            <Text style={ms.cardLabel}>Business</Text>
+            <Text style={ms.cardValue}>{biz?.name ?? '—'}</Text>
+          </View>
+          <View style={ms.card}>
+            <Text style={ms.cardLabel}>Plan</Text>
+            <Text style={ms.cardValue}>{(biz as any)?.plan ?? 'FREE'}</Text>
+          </View>
+          <View style={ms.card}>
+            <Text style={ms.cardLabel}>Cancellation window</Text>
+            <Text style={ms.cardValue}>{(biz as any)?.cancellationWindowHours ?? 24} hours</Text>
+          </View>
+          <View style={ms.card}>
+            <Text style={ms.cardLabel}>Deposit required</Text>
+            <Text style={ms.cardValue}>{(biz as any)?.requireDeposit ? `Yes · ${(biz as any)?.depositPercent ?? 25}%` : 'No'}</Text>
+          </View>
+          <Text style={[ms.empty,{ marginTop:8 }]}>Editing settings is coming to the app — manage on the web dashboard for now.</Text>
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  // ── default menu ──
   const rows = [
-    { label:'Staff', icon:'people-outline' as const, onPress:()=>Alert.alert('Staff','Staff management is available on the web dashboard.') },
-    { label:'Services', icon:'cut-outline' as const, onPress:()=>Alert.alert('Services','Service management is available on the web dashboard.') },
-    { label:'Settings', icon:'settings-outline' as const, onPress:()=>Alert.alert('Settings','Full settings are available on the web dashboard.') },
-    { label:'Booking link', icon:'link-outline' as const, onPress:()=>Alert.alert('Booking link',`${API_BASE.replace('/api','')}/book`) },
+    { label:'Services', icon:'cut-outline' as const, v:'services' as MoreView },
+    { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
+    { label:'Settings', icon:'settings-outline' as const, v:'settings' as MoreView },
   ];
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>More</Text></View>
+      <Head title="More"/>
       <View style={s.listContent}>
         {user&&(
           <View style={s.profileCard}>
@@ -797,7 +891,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
         )}
         <View style={s.menuCard}>
           {rows.map((r,i)=>(
-            <TouchableOpacity key={r.label} style={[s.menuRow, i<rows.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}>
+            <TouchableOpacity key={r.label} style={[s.menuRow, i<rows.length-1&&s.menuRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
               <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={PURPLE}/></View>
               <Text style={s.menuLabel}>{r.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
@@ -814,6 +908,17 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 }
+
+const ms = StyleSheet.create({
+  row:       { flexDirection:'row', alignItems:'center', gap:12, backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10 },
+  dot:       { width:10, height:10, borderRadius:5 },
+  rowTitle:  { fontSize:15, fontWeight:'600', color:GRAY_900 },
+  rowMeta:   { fontSize:13, color:GRAY_500, marginTop:2 },
+  card:      { backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10 },
+  cardLabel: { fontSize:12, color:GRAY_500 },
+  cardValue: { fontSize:16, fontWeight:'700', color:GRAY_900, marginTop:2 },
+  empty:     { fontSize:13, color:GRAY_400, textAlign:'center', paddingVertical:12 },
+});
 
 // ── Login screen ─────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }: { onLogin:(t:string,r:string,u:User)=>void }) {
