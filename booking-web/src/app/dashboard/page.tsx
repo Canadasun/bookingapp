@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
-import { TrendingUp, Users, ChevronRight, ArrowRight } from "lucide-react";
+import { TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react";
 import { api, Appointment, ClientWithStats } from "@/lib/api";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
@@ -87,7 +87,7 @@ export default function OverviewPage() {
 
   if (loading) return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="grid grid-cols-2 gap-4"><SkeletonMetric /><SkeletonMetric /></div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4"><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /></div>
       <div className="grid md:grid-cols-5 gap-5">
         <div className="md:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-1">
           {Array.from({length:6}).map((_,i)=><SkeletonRow key={i}/>)}
@@ -113,9 +113,9 @@ export default function OverviewPage() {
     .filter((a) => ["PENDING","CONFIRMED"].includes(a.status) && !isToday(new Date(a.startsAt)) && new Date(a.startsAt) > now)
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
     .slice(0, 5);
-  const weekRevenue  = appointments
-    .filter((a) => a.status === "COMPLETED" && isThisWeek(new Date(a.startsAt)))
-    .reduce((s, a) => s + a.service.priceCents, 0);
+  const weekCompleted = appointments
+    .filter((a) => a.status === "COMPLETED" && isThisWeek(new Date(a.startsAt)));
+  const weekRevenue  = weekCompleted.reduce((s, a) => s + a.service.priceCents, 0);
   const newThisMonth = clients.filter((c) => isThisMonth(new Date(c.createdAt))).length;
   const greeting = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
 
@@ -138,9 +138,13 @@ export default function OverviewPage() {
 
       {/* Metrics */}
       {!isStaff && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard label="Revenue this week" value={formatPrice(weekRevenue)}
             icon={TrendingUp} accent="bg-emerald-50 text-emerald-600" />
+          <MetricCard label="Appointments today" value={today.length}
+            icon={CalendarDays} accent="bg-blue-50 text-blue-600" />
+          <MetricCard label="Completed this week" value={weekCompleted.length}
+            icon={CheckCircle2} accent="bg-amber-50 text-amber-600" />
           <MetricCard label="New clients this month" value={newThisMonth}
             icon={Users} accent="bg-violet-50 text-violet-600" />
         </div>
