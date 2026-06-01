@@ -20,6 +20,7 @@ import { OffersModule } from './offers/offers.module';
 import { ClientPortalModule } from './client-portal/client-portal.module';
 import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { HealthModule } from './health/health.module';
 import { AdminModule } from './admin/admin.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -59,6 +60,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     ClientPortalModule,
     CalendarSyncModule,
     WaitlistModule,
+    ReviewsModule,
     HealthModule,
     AdminModule,
   ],

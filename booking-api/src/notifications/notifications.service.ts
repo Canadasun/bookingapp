@@ -79,6 +79,11 @@ export class NotificationsService {
     await this.queue.add('waitlist-opening', { waitlistEntryId });
   }
 
+  // Post-visit: ask the client to leave a review.
+  async sendReviewRequest(apt: AppointmentWithRelations) {
+    await this.queue.add('review-request', { appointmentId: apt.id });
+  }
+
   async sendAdminBookingAlert(appointmentId: string) {
     const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
     if (!adminEmail) {

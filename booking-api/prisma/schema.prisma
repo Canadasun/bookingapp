@@ -88,6 +88,23 @@ model Business {
   offers             Offer[]
   transactions       Transaction[]
   waitlist           WaitlistEntry[]
+  reviews            Review[]
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  businessId    String
+  appointmentId String?  @unique  // one review per appointment
+  staffId       String?
+  clientName    String
+  rating        Int                // 1–5
+  comment       String?
+  published     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, published])
 }
 
 enum WaitlistStatus {

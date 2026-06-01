@@ -273,6 +273,12 @@ export class BookingsService {
       await this.notifyWaitlist(updated.businessId, updated.serviceId);
     }
 
+    if (dto.status === 'COMPLETED') {
+      // Post-visit review request.
+      const full = await this.findOne(id, businessId);
+      await this.notifications.sendReviewRequest(full);
+    }
+
     return updated;
   }
 

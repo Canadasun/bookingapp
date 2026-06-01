@@ -88,6 +88,19 @@ export class NotificationProcessor extends WorkerHost {
 
     switch (job.name) {
 
+      case 'review-request': {
+        await this.email.send({
+          to: apt.client.email,
+          subject: `How was your visit to ${apt.business.name}?`,
+          html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">How did we do? ⭐</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, thanks for visiting <strong>${apt.business.name}</strong>. We'd love your feedback on your ${apt.service.name} with ${apt.staff.user.name}.</p>
+<a href="${baseUrl}/review/${apt.id}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
+`),
+        });
+        break;
+      }
+
       case 'send-pending': {
         await this.email.send({
           to: apt.client.email,
