@@ -804,13 +804,14 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 }
 
 // ── More/Settings screen ─────────────────────────────────────────────────────
-type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'settings';
+type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'settings';
 function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const [view, setView]         = useState<MoreView>('menu');
   const [services, setServices] = useState<Service[] | null>(null);
   const [staff, setStaff]       = useState<Staff[] | null>(null);
   const [offers, setOffers]     = useState<any[] | null>(null);
+  const [waitlist, setWaitlist] = useState<any[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
 
@@ -820,6 +821,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
       if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${BIZ_ID}/services`)); }
       else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${BIZ_ID}/staff`)); }
       else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${BIZ_ID}/offers`)); }
+      else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${BIZ_ID}/waitlist`)); }
       else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${BIZ_ID}`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
@@ -896,6 +898,27 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'waitlist') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Waitlist"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(waitlist ?? []).map(w => (
+            <View key={w.id} style={ms.row}>
+              <View style={s.avatar}><Text style={{ color:PURPLE, fontWeight:'700' }}>{String(w.name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+              <View style={{ flex:1 }}>
+                <Text style={ms.rowTitle}>{w.name}</Text>
+                <Text style={ms.rowMeta} numberOfLines={1}>{w.email}{w.phone ? ` · ${w.phone}` : ''}</Text>
+              </View>
+            </View>
+          ))}
+          {waitlist && waitlist.length===0 && <Text style={ms.empty}>No one on the waitlist.</Text>}
+          {waitlist && waitlist.length>0 && <Text style={[ms.empty,{ marginTop:4 }]}>Waiting clients are emailed automatically when a spot opens.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
   if (view === 'settings') return (
     <SafeAreaView style={s.screen}>
       <Head title="Settings"/>
@@ -928,6 +951,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Services', icon:'cut-outline' as const, v:'services' as MoreView },
     { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
     { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
+    { label:'Waitlist', icon:'hourglass-outline' as const, v:'waitlist' as MoreView },
     { label:'Settings', icon:'settings-outline' as const, v:'settings' as MoreView },
   ];
   return (
