@@ -137,6 +137,17 @@ export interface TimeOff {
   id: string; staffId: string; startsAt: string; endsAt: string; reason?: string; createdAt: string;
 }
 
+export type CampaignChannel = "EMAIL" | "SMS";
+export type CampaignAudience = "ALL" | "RECENT" | "LAPSED";
+export interface Campaign {
+  id: string; businessId: string; name: string;
+  channel: CampaignChannel; audience: CampaignAudience;
+  subject?: string | null; body: string;
+  status: "DRAFT" | "SENDING" | "SENT";
+  recipientCount: number; sentCount: number;
+  createdAt: string; sentAt?: string | null;
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -186,6 +197,19 @@ export const api = {
       req<Array<{ id: string; clientName: string; rating: number; comment?: string | null; published: boolean; createdAt: string }>>(`/businesses/${businessId}/reviews/all`),
     moderate: (businessId: string, id: string, published: boolean) =>
       req<void>(`/businesses/${businessId}/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ published }) }),
+  },
+
+  campaigns: {
+    list: (businessId: string) =>
+      req<Campaign[]>(`/businesses/${businessId}/campaigns`),
+    audienceCount: (businessId: string, channel: CampaignChannel, audience: CampaignAudience) =>
+      req<{ count: number }>(`/businesses/${businessId}/campaigns/audience?channel=${channel}&audience=${audience}`),
+    create: (businessId: string, data: { name: string; channel: CampaignChannel; audience: CampaignAudience; subject?: string; body: string }) =>
+      req<Campaign>(`/businesses/${businessId}/campaigns`, { method: "POST", body: JSON.stringify(data) }),
+    send: (businessId: string, id: string) =>
+      req<Campaign>(`/businesses/${businessId}/campaigns/${id}/send`, { method: "POST" }),
+    remove: (businessId: string, id: string) =>
+      req<void>(`/businesses/${businessId}/campaigns/${id}`, { method: "DELETE" }),
   },
 
   business: {
