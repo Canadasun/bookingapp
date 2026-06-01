@@ -9,10 +9,18 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
+        "EXPO_PUBLIC_BUSINESS_ID": "cmpuorgdm0000wk5rkk4e4qsk"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
+        "EXPO_PUBLIC_BUSINESS_ID": "cmpuorgdm0000wk5rkk4e4qsk"
+      }
     }
   },
   "submit": {
