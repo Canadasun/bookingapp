@@ -173,6 +173,21 @@ export const api = {
       req<void>(`/businesses/${businessId}/waitlist/${id}`, { method: "DELETE" }),
   },
 
+  reviews: {
+    // Public — published reviews + aggregate (booking page social proof).
+    list: (businessId: string) =>
+      req<{ reviews: Array<{ id: string; clientName: string; rating: number; comment?: string | null; createdAt: string }>; average: number; count: number }>(
+        `/businesses/${businessId}/reviews`, undefined, null),
+    // Public — submit from the post-visit email link.
+    submit: (businessId: string, data: { appointmentId: string; rating: number; comment?: string }) =>
+      req<{ id: string }>(`/businesses/${businessId}/reviews`, { method: "POST", body: JSON.stringify(data) }, null),
+    // Owner — all reviews + moderation.
+    ownerList: (businessId: string) =>
+      req<Array<{ id: string; clientName: string; rating: number; comment?: string | null; published: boolean; createdAt: string }>>(`/businesses/${businessId}/reviews/all`),
+    moderate: (businessId: string, id: string, published: boolean) =>
+      req<void>(`/businesses/${businessId}/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ published }) }),
+  },
+
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),
