@@ -137,6 +137,16 @@ export interface TimeOff {
   id: string; staffId: string; startsAt: string; endsAt: string; reason?: string; createdAt: string;
 }
 
+export type GiftCardStatus = "ACTIVE" | "REDEEMED" | "VOID";
+export interface GiftCard {
+  id: string; businessId: string; code: string;
+  initialCents: number; balanceCents: number;
+  recipientName?: string | null; recipientEmail?: string | null;
+  purchaserName?: string | null; message?: string | null;
+  status: GiftCardStatus; createdAt: string; expiresAt?: string | null;
+  redemptions?: { id: string; amountCents: number; appointmentId?: string | null; createdAt: string }[];
+}
+
 export type CampaignChannel = "EMAIL" | "SMS";
 export type CampaignAudience = "ALL" | "RECENT" | "LAPSED";
 export interface Campaign {
@@ -197,6 +207,20 @@ export const api = {
       req<Array<{ id: string; clientName: string; rating: number; comment?: string | null; published: boolean; createdAt: string }>>(`/businesses/${businessId}/reviews/all`),
     moderate: (businessId: string, id: string, published: boolean) =>
       req<void>(`/businesses/${businessId}/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ published }) }),
+  },
+
+  giftCards: {
+    list: (businessId: string) =>
+      req<GiftCard[]>(`/businesses/${businessId}/gift-cards`),
+    issue: (businessId: string, data: { amountCents: number; recipientName?: string; recipientEmail?: string; purchaserName?: string; message?: string; expiresAt?: string }) =>
+      req<GiftCard>(`/businesses/${businessId}/gift-cards`, { method: "POST", body: JSON.stringify(data) }),
+    redeem: (businessId: string, data: { code: string; amountCents: number; appointmentId?: string }) =>
+      req<{ redeemedCents: number; balanceCents: number; status: GiftCardStatus }>(`/businesses/${businessId}/gift-cards/redeem`, { method: "POST", body: JSON.stringify(data) }),
+    void: (businessId: string, id: string) =>
+      req<GiftCard>(`/businesses/${businessId}/gift-cards/${id}/void`, { method: "POST" }),
+    // Public — client checks a balance by code.
+    balance: (businessId: string, code: string) =>
+      req<{ code: string; balanceCents: number; status: GiftCardStatus; expiresAt?: string | null }>(`/businesses/${businessId}/gift-cards/balance?code=${encodeURIComponent(code)}`, undefined, null),
   },
 
   campaigns: {
