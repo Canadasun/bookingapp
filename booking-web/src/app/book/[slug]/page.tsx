@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, Suspense, use } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, addDays, parseISO } from "date-fns";
-import { Check, ChevronLeft, Clock, ChevronRight, X, Plus, Minus, Calendar, Sun, Sunset, Moon, AlertCircle } from "lucide-react";
+import { Check, ChevronLeft, Clock, ChevronRight, X, Plus, Minus, Calendar, Sun, Sunset, Moon, AlertCircle, Star } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -127,6 +127,7 @@ function BookPageInner({ slug }: { slug: string }) {
   const [wl, setWl]                         = useState({ name: "", email: "" });
   const [wlSaving, setWlSaving]             = useState(false);
   const [wlDone, setWlDone]                 = useState(false);
+  const [revStats, setRevStats]             = useState<{ average: number; count: number; reviews: { id: string; clientName: string; rating: number; comment?: string | null }[] } | null>(null);
 
   // Load business by slug
   useEffect(() => {
@@ -146,6 +147,12 @@ function BookPageInner({ slug }: { slug: string }) {
   useEffect(() => {
     if (!bizId) return;
     api.services.list(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
+  }, [bizId]);
+
+  // Load reviews (social proof)
+  useEffect(() => {
+    if (!bizId) return;
+    api.reviews.list(bizId).then(setRevStats).catch(() => {});
   }, [bizId]);
 
   // Load staff when services selected
@@ -390,6 +397,25 @@ function BookPageInner({ slug }: { slug: string }) {
               <div className="px-6 pb-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Choose services</h2>
                 <p className="text-sm text-gray-400 mb-4">Select one or more services</p>
+
+                {revStats && revStats.count > 0 && (
+                  <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star key={n} className={n <= Math.round(revStats.average) ? "w-4 h-4 fill-amber-400 text-amber-400" : "w-4 h-4 text-gray-200"} />
+                        ))}
+                      </span>
+                      <span className="text-sm font-bold text-gray-900">{revStats.average.toFixed(1)}</span>
+                      <span className="text-xs text-gray-400">· {revStats.count} review{revStats.count === 1 ? "" : "s"}</span>
+                    </div>
+                    {revStats.reviews.find((r) => r.comment) && (
+                      <p className="text-xs text-gray-500 mt-1.5 italic line-clamp-2">
+                        &ldquo;{revStats.reviews.find((r) => r.comment)!.comment}&rdquo; — {revStats.reviews.find((r) => r.comment)!.clientName}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {allServices.length === 0 && (
                   <p className="text-sm text-gray-400 text-center py-8">No services available</p>
