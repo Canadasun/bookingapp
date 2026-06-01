@@ -74,6 +74,11 @@ export class NotificationsService {
     await this.queue.add('send-staff-cancellation', { appointmentId: apt.id });
   }
 
+  // Tell a waitlisted client that a spot opened up (auto-fill on cancellation).
+  async notifyWaitlistOpening(waitlistEntryId: string) {
+    await this.queue.add('waitlist-opening', { waitlistEntryId });
+  }
+
   async sendAdminBookingAlert(appointmentId: string) {
     const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
     if (!adminEmail) {

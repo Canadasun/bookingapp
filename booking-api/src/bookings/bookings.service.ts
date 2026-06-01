@@ -270,9 +270,26 @@ export class BookingsService {
       } else {
         await this.notifications.sendCancellation(updated);
       }
+      await this.notifyWaitlist(updated.businessId, updated.serviceId);
     }
 
     return updated;
+  }
+
+  // Auto-fill: when a slot opens (cancellation), notify the oldest waiting
+  // waitlist entry that matches the freed service (or has no service preference).
+  private async notifyWaitlist(businessId: string, serviceId: string) {
+    const entry = await this.prisma.waitlistEntry.findFirst({
+      where: {
+        businessId,
+        status: 'WAITING',
+        OR: [{ serviceId: null }, { serviceId }],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!entry) return;
+    await this.prisma.waitlistEntry.update({ where: { id: entry.id }, data: { status: 'NOTIFIED' } });
+    await this.notifications.notifyWaitlistOpening(entry.id);
   }
 
   private async logAction(entityType: string, entityId: string, action: string, changes?: any, userId?: string) {

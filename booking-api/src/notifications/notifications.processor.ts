@@ -50,9 +50,31 @@ export class NotificationProcessor extends WorkerHost {
     private configService: ConfigService,
   ) { super(); }
 
-  async process(job: Job<{ appointmentId: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string }>) {
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    // Waitlist opening — not tied to an appointment; email the waitlisted client.
+    if (job.name === 'waitlist-opening') {
+      const entry = await this.prisma.waitlistEntry.findUnique({
+        where: { id: job.data.waitlistEntryId! },
+        include: { business: true },
+      });
+      if (!entry) return;
+      const bookUrl = `${baseUrl}/book/${entry.business.slug}`;
+      await this.email.send({
+        to: entry.email,
+        subject: `A spot just opened at ${entry.business.name}`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A spot just opened up! 🎉</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${entry.name}, a time just became available at <strong>${entry.business.name}</strong>. Book now before someone else grabs it.</p>
+<a href="${bookUrl}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book now →</a>
+`),
+      });
+      return;
+    }
+
     const apt = await this.prisma.appointment.findUnique({
-      where: { id: job.data.appointmentId },
+      where: { id: job.data.appointmentId! },
       include: { client: true, service: true, staff: { include: { user: true } }, business: true },
     });
 
