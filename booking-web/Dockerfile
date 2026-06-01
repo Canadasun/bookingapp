@@ -4,12 +4,17 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# NEXT_PUBLIC_* are inlined into the client bundle at build time, so they must
-# be present here (Railway passes matching service variables as build args).
+# These must be present at BUILD time:
+#  - NEXT_PUBLIC_* are inlined into the client bundle.
+#  - API_INTERNAL_URL is baked into the /proxy rewrite destination (Next.js
+#    evaluates next.config rewrites at build time), so without it the proxy
+#    would point at localhost. Railway passes matching service vars as args.
 ARG NEXT_PUBLIC_BUSINESS_SLUG
 ARG NEXT_PUBLIC_BUSINESS_ID
+ARG API_INTERNAL_URL
 ENV NEXT_PUBLIC_BUSINESS_SLUG=$NEXT_PUBLIC_BUSINESS_SLUG
 ENV NEXT_PUBLIC_BUSINESS_ID=$NEXT_PUBLIC_BUSINESS_ID
+ENV API_INTERNAL_URL=$API_INTERNAL_URL
 ENV NODE_ENV=production
 RUN npm run build
 
