@@ -50,8 +50,33 @@ export class NotificationProcessor extends WorkerHost {
     private configService: ConfigService,
   ) { super(); }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    // Gift card issued — email the recipient their code.
+    if (job.name === 'gift-card-issued') {
+      const card = await this.prisma.giftCard.findUnique({
+        where: { id: job.data.giftCardId! },
+        include: { business: true },
+      });
+      if (!card || !card.recipientEmail) return;
+      const amount = `$${(card.initialCents / 100).toFixed(2)}`;
+      await this.email.send({
+        to: card.recipientEmail,
+        subject: `You've received a ${amount} gift card for ${card.business.name}! 🎁`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A gift just for you 🎁</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${card.purchaserName ? `${card.purchaserName} sent you` : "You've received"} a <strong>${amount}</strong> gift card for <strong>${card.business.name}</strong>.</p>
+${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">"${card.message}"</p>` : ''}
+<div style="background:#F5F3FF;border:1px dashed #7C3AED;border-radius:12px;padding:16px;text-align:center;margin:0 0 16px">
+  <p style="margin:0 0 4px;color:#6B7280;font-size:12px">Your gift card code</p>
+  <p style="margin:0;color:#7C3AED;font-size:22px;font-weight:700;letter-spacing:1px">${card.code}</p>
+</div>
+<p style="margin:0;color:#6B7280;font-size:13px">Present this code when you book or visit ${card.business.name}.</p>
+`),
+      });
+      return;
+    }
 
     // Marketing campaign — one job per recipient, not tied to an appointment.
     if (job.name === 'campaign-message') {

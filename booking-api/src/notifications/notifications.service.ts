@@ -84,6 +84,11 @@ export class NotificationsService {
     await this.queue.add('review-request', { appointmentId: apt.id });
   }
 
+  // Email the recipient of a freshly-issued gift card.
+  async sendGiftCardIssued(giftCardId: string) {
+    await this.queue.add('gift-card-issued', { giftCardId }, { removeOnComplete: true, attempts: 3 });
+  }
+
   // Marketing campaign — one job per recipient so the queue can retry individually.
   async sendCampaignMessage(campaignId: string, clientId: string) {
     await this.queue.add(

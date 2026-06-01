@@ -90,6 +90,7 @@ model Business {
   waitlist           WaitlistEntry[]
   reviews            Review[]
   campaigns          Campaign[]
+  giftCards          GiftCard[]
 }
 
 model Review {
@@ -106,6 +107,45 @@ model Review {
   business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, published])
+}
+
+enum GiftCardStatus {
+  ACTIVE
+  REDEEMED  // balance fully used
+  VOID
+}
+
+model GiftCard {
+  id            String         @id @default(cuid())
+  businessId    String
+  code          String         // human-readable, unique per business
+  initialCents  Int
+  balanceCents  Int
+  recipientName String?
+  recipientEmail String?
+  purchaserName String?
+  message       String?
+  status        GiftCardStatus @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  expiresAt     DateTime?
+
+  business      Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  redemptions   GiftCardRedemption[]
+
+  @@unique([businessId, code])
+  @@index([businessId, status])
+}
+
+model GiftCardRedemption {
+  id            String   @id @default(cuid())
+  giftCardId    String
+  amountCents   Int
+  appointmentId String?
+  createdAt     DateTime @default(now())
+
+  giftCard      GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+
+  @@index([giftCardId])
 }
 
 enum CampaignChannel {

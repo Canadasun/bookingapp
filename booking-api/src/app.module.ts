@@ -22,6 +22,7 @@ import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { GiftCardsModule } from './gift-cards/gift-cards.module';
 import { HealthModule } from './health/health.module';
 import { AdminModule } from './admin/admin.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -63,6 +64,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     WaitlistModule,
     ReviewsModule,
     CampaignsModule,
+    GiftCardsModule,
     HealthModule,
     AdminModule,
   ],
