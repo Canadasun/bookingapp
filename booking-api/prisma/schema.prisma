@@ -216,6 +216,8 @@ model Client {
   notes      String?
   // Link to User account if client has registered
   userId     String?
+  // Stripe Customer for saved cards (deposits / no-show auto-charge)
+  stripeCustomerId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -241,6 +243,8 @@ model Appointment {
   cancelReason         String?
   depositCents         Int?
   stripePaymentIntentId String?
+  // Saved card used for this booking (for no-show auto-charge, incl. card-on-file)
+  stripePaymentMethodId String?
   notes                String?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt

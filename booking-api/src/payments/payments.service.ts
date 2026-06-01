@@ -15,8 +15,8 @@ export class PaymentsService {
   ) {}
 
   // Lazily construct Stripe so a missing STRIPE_SECRET_KEY can't crash the app
-  // at boot. Only payment paths (deposits, webhook verification) reach this; if
-  // the key is unset they fail with a clear 400 instead of taking down the API.
+  // at boot. Only payment paths reach this; if the key is unset they fail with a
+  // clear 400 instead of taking down the API.
   private getStripe(): Stripe {
     if (!this.stripe) {
       const key = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -28,44 +28,83 @@ export class PaymentsService {
     return this.stripe;
   }
 
-  async createDepositIntent(appointmentId: string, user: { role: string; businessId: string | null }) {
-    const apt = await this.prisma.appointment.findFirst({
-      where: { 
-        id: appointmentId,
-        ...(user.role !== 'ADMIN' ? { businessId: user.businessId! } : {})
-      },
-      include: { service: true, client: true },
-    });
+  private publishableKey(): string {
+    return this.configService.get<string>('STRIPE_PUBLISHABLE_KEY') ?? '';
+  }
 
+  // Get-or-create a Stripe Customer for a client and persist the id so cards can
+  // be saved and re-charged (deposits / no-show protection).
+  private async ensureCustomer(clientId: string): Promise<string> {
+    const client = await this.prisma.client.findUniqueOrThrow({ where: { id: clientId } });
+    if (client.stripeCustomerId) return client.stripeCustomerId;
+    const customer = await this.getStripe().customers.create({
+      name: client.name,
+      email: client.email,
+      phone: client.phone ?? undefined,
+      metadata: { clientId: client.id, businessId: client.businessId },
+    });
+    await this.prisma.client.update({ where: { id: clientId }, data: { stripeCustomerId: customer.id } });
+    return customer.id;
+  }
+
+  /**
+   * Create the payment step for a booking, driven by the business settings:
+   *  - requireDeposit         → PaymentIntent for depositPercent of the price,
+   *                             with the card saved off_session for no-show charges.
+   *  - else noShowFeeCents>0  → SetupIntent (card-on-file, no upfront charge).
+   *  - else                   → nothing required.
+   * Returns the Stripe client secret + publishable key for Stripe.js on the client.
+   */
+  async createBookingIntent(appointmentId: string, businessId: string) {
+    const apt = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, businessId },
+      include: { service: true, client: true, business: true },
+    });
     if (!apt) throw new BadRequestException('Appointment not found');
 
-    const depositCents = Math.round(apt.service.priceCents * 0.25); // 25% deposit
+    const b = apt.business;
+    const customer = await this.ensureCustomer(apt.clientId);
 
-    const intent = await this.getStripe().paymentIntents.create({
-      amount: depositCents,
-      currency: 'usd',
-      metadata: { appointmentId },
-      description: `Deposit for ${apt.service.name}`,
-    });
+    if (b.requireDeposit) {
+      const depositCents = Math.max(50, Math.round(apt.service.priceCents * (b.depositPercent / 100)));
+      const intent = await this.getStripe().paymentIntents.create({
+        amount: depositCents,
+        currency: 'usd',
+        customer,
+        setup_future_usage: 'off_session', // save the card for a possible no-show charge
+        metadata: { appointmentId, businessId, kind: 'deposit' },
+        description: `Deposit — ${apt.service.name} @ ${b.name}`,
+      });
+      await this.prisma.appointment.update({
+        where: { id: appointmentId },
+        data: { stripePaymentIntentId: intent.id, depositCents },
+      });
+      return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey() };
+    }
 
-    await this.prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { stripePaymentIntentId: intent.id, depositCents },
-    });
+    if (b.noShowFeeCents > 0) {
+      const intent = await this.getStripe().setupIntents.create({
+        customer,
+        usage: 'off_session',
+        metadata: { appointmentId, businessId, kind: 'card_on_file' },
+      });
+      return { required: true, mode: 'setup' as const, clientSecret: intent.client_secret, amountCents: 0, publishableKey: this.publishableKey() };
+    }
 
-    return { clientSecret: intent.client_secret, depositCents };
+    return { required: false, mode: 'none' as const };
+  }
+
+  // Owner-initiated deposit (kept for dashboard use); same logic, ownership checked
+  // by the controller passing the business.
+  async createDepositIntent(appointmentId: string, businessId: string) {
+    return this.createBookingIntent(appointmentId, businessId);
   }
 
   async handleWebhook(rawBody: Buffer, signature: string) {
     const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') ?? '';
 
-    // TODO: re-enable webhook in a later update.
-    // Stripe webhooks are deferred for launch. Until a real "whsec_..." signing
-    // secret is configured, this endpoint is a safe no-op: it returns 200 (so
-    // Stripe never retry-storms) and can't error or block anything. Bookings are
-    // confirmed via the owner-approval flow (BookingsService.confirm), not here.
-    // Set STRIPE_WEBHOOK_SECRET to a real whsec_ value and full processing
-    // (payment_intent.succeeded → CONFIRMED) resumes automatically.
+    // Deferred until a real "whsec_..." secret is set: safe no-op (returns 200 so
+    // Stripe doesn't retry-storm). Set STRIPE_WEBHOOK_SECRET to enable.
     if (!webhookSecret.startsWith('whsec_')) {
       return { received: true, skipped: 'stripe webhook deferred — not configured' };
     }
@@ -77,38 +116,39 @@ export class PaymentsService {
       throw new BadRequestException('Invalid Stripe webhook signature');
     }
 
-    // Idempotency: check if we already processed this event
-    const eventId = event.id;
-
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const intent = event.data.object as Stripe.PaymentIntent;
         const appointmentId = intent.metadata.appointmentId;
         if (appointmentId) {
-          // Idempotent: only transition (and notify) on the first time we see a
-          // success for this intent. Stripe may redeliver the same event.
+          // Idempotent: only transition (and notify) on first success.
           const { count } = await this.prisma.appointment.updateMany({
-            where: {
-              id: appointmentId,
-              stripePaymentIntentId: intent.id,
-              status: { not: 'CONFIRMED' },
+            where: { id: appointmentId, stripePaymentIntentId: intent.id, status: { not: 'CONFIRMED' } },
+            data: {
+              status: 'CONFIRMED',
+              // Persist the saved card for a possible no-show charge later.
+              ...(typeof intent.payment_method === 'string' ? { stripePaymentMethodId: intent.payment_method } : {}),
             },
-            data: { status: 'CONFIRMED' },
           });
           if (count > 0) {
-            // Send the confirmation email + schedule reminders, same as an
-            // owner manually confirming the booking.
             const apt = await this.prisma.appointment.findUnique({
               where: { id: appointmentId },
-              include: {
-                client: true,
-                service: true,
-                staff: { include: { user: true } },
-                business: true,
-              },
+              include: { client: true, service: true, staff: { include: { user: true } }, business: true },
             });
             if (apt) await this.notifications.scheduleReminders(apt);
           }
+        }
+        break;
+      }
+      case 'setup_intent.succeeded': {
+        // Card-on-file (no deposit): save the payment method for no-show charges.
+        const si = event.data.object as Stripe.SetupIntent;
+        const appointmentId = si.metadata?.appointmentId;
+        if (appointmentId && typeof si.payment_method === 'string') {
+          await this.prisma.appointment.updateMany({
+            where: { id: appointmentId },
+            data: { stripePaymentMethodId: si.payment_method },
+          });
         }
         break;
       }
@@ -125,37 +165,43 @@ export class PaymentsService {
       }
     }
 
-    return { received: true, eventId };
+    return { received: true, eventId: event.id };
   }
 
-  async chargeNoShowFee(appointmentId: string, user: { role: string; businessId: string | null }) {
+  /**
+   * Real no-show charge: charges the saved card off_session for the business's
+   * configured no-show fee, then marks the appointment NO_SHOW. Requires a saved
+   * customer + payment method (captured at booking via deposit or card-on-file).
+   */
+  async chargeNoShowFee(appointmentId: string, businessId: string) {
     const apt = await this.prisma.appointment.findFirst({
-      where: { 
-        id: appointmentId,
-        ...(user.role !== 'ADMIN' ? { businessId: user.businessId! } : {})
-      },
-      include: { service: true },
+      where: { id: appointmentId, businessId },
+      include: { service: true, client: true, business: true },
     });
-
     if (!apt) throw new BadRequestException('Appointment not found');
 
-    if (!apt.stripePaymentIntentId) {
-      throw new BadRequestException('No payment intent on file for this appointment');
+    const feeCents = apt.business.noShowFeeCents > 0
+      ? apt.business.noShowFeeCents
+      : Math.round(apt.service.priceCents * 0.5); // fallback: 50% of service price
+
+    if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
+      // No saved card — can't auto-charge; mark NO_SHOW for manual collection.
+      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+      return { charged: false, feeCents, message: 'Marked NO_SHOW. No saved card on file — collect the fee manually.' };
     }
 
-    const noShowFeeCents = Math.round(apt.service.priceCents * 0.5);
-
-    // TODO: To auto-charge a no-show fee you need a saved Stripe Customer with an
-    // attached payment method. Steps:
-    //   1. Add stripeCustomerId to the Client schema field
-    //   2. Call stripe.customers.create() at deposit time and store the ID
-    //   3. Pass customer + payment_method here with confirm: true
-    // For now, mark the appointment NO_SHOW and return the fee amount for manual collection.
-    await this.prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { status: 'NO_SHOW' },
+    const intent = await this.getStripe().paymentIntents.create({
+      amount: feeCents,
+      currency: 'usd',
+      customer: apt.client.stripeCustomerId,
+      payment_method: apt.stripePaymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: { appointmentId, businessId, kind: 'no_show_fee' },
+      description: `No-show fee — ${apt.service.name} @ ${apt.business.name}`,
     });
 
-    return { noShowFeeCents, message: 'Appointment marked NO_SHOW. Charge the client manually or implement Stripe Customer flow.' };
+    await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+    return { charged: intent.status === 'succeeded', feeCents, paymentIntentId: intent.id, status: intent.status };
   }
 }
