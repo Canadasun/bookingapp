@@ -30,6 +30,7 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/services",     label: "Services" },
       { href: "/dashboard/staff",        label: "Staff" },
       { href: "/dashboard/offers",       label: "Offers" },
+      { href: "/dashboard/waitlist",     label: "Waitlist" },
       { href: "/dashboard/settings",     label: "Settings" },
     ],
   },

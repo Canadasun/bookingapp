@@ -163,6 +163,16 @@ export const api = {
       req<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${appointmentId}`, { method: "POST" }),
   },
 
+  waitlist: {
+    // Public — clients join when no slot fits.
+    join: (businessId: string, data: { name: string; email: string; phone?: string; serviceId?: string; staffId?: string; desiredDate?: string; notes?: string }) =>
+      req<{ id: string }>(`/businesses/${businessId}/waitlist`, { method: "POST", body: JSON.stringify(data) }, null),
+    list: (businessId: string) =>
+      req<Array<{ id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; createdAt: string }>>(`/businesses/${businessId}/waitlist`),
+    remove: (businessId: string, id: string) =>
+      req<void>(`/businesses/${businessId}/waitlist/${id}`, { method: "DELETE" }),
+  },
+
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),

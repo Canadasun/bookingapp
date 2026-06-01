@@ -124,6 +124,9 @@ function BookPageInner({ slug }: { slug: string }) {
   const [loadingBiz, setLoadingBiz]         = useState(true);
   const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string } | null>(null);
   const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
+  const [wl, setWl]                         = useState({ name: "", email: "" });
+  const [wlSaving, setWlSaving]             = useState(false);
+  const [wlDone, setWlDone]                 = useState(false);
 
   // Load business by slug
   useEffect(() => {
@@ -244,6 +247,22 @@ function BookPageInner({ slug }: { slug: string }) {
       }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Booking failed — slot may be taken"); }
     finally { setSubmitting(false); }
+  }
+
+  async function joinWaitlist() {
+    if (!wl.name.trim() || !/\S+@\S+\.\S+/.test(wl.email) || !bizId) { toast.error("Enter your name and a valid email"); return; }
+    setWlSaving(true);
+    try {
+      await api.waitlist.join(bizId, {
+        name: wl.name.trim(),
+        email: wl.email.trim(),
+        serviceId: selectedServices[0]?.id,
+        staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : undefined,
+        desiredDate: selectedDate ? selectedDate.toISOString() : undefined,
+      });
+      setWlDone(true);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not join the waitlist"); }
+    finally { setWlSaving(false); }
   }
 
   function reset() {
@@ -512,9 +531,30 @@ function BookPageInner({ slug }: { slug: string }) {
                     {loadingSlots ? (
                       <p className="text-sm text-gray-400 text-center py-4">Loading available times…</p>
                     ) : slots.length === 0 ? (
-                      <div className="text-center py-6">
-                        <p className="text-sm text-gray-500 font-medium">No availability on this date</p>
-                        <p className="text-xs text-gray-400 mt-1">Try a different date</p>
+                      <div className="py-4">
+                        <div className="text-center mb-4">
+                          <p className="text-sm text-gray-500 font-medium">No availability on this date</p>
+                          <p className="text-xs text-gray-400 mt-1">Try another date, or join the waitlist and we&apos;ll email you when a spot opens.</p>
+                        </div>
+                        {wlDone ? (
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
+                            <Check className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+                            <p className="text-sm font-medium text-emerald-700">You&apos;re on the waitlist!</p>
+                            <p className="text-xs text-emerald-600 mt-0.5">We&apos;ll email you the moment a matching spot frees up.</p>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Join the waitlist</p>
+                            <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-400"
+                              placeholder="Your name" value={wl.name} onChange={(e) => setWl((p) => ({ ...p, name: e.target.value }))} />
+                            <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-400"
+                              placeholder="you@example.com" type="email" value={wl.email} onChange={(e) => setWl((p) => ({ ...p, email: e.target.value }))} />
+                            <button type="button" onClick={joinWaitlist} disabled={wlSaving}
+                              className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg py-2.5 transition-colors">
+                              {wlSaving ? "Joining…" : "Notify me when a spot opens"}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-4">
