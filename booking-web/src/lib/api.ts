@@ -153,6 +153,16 @@ export const api = {
       req<{ ok: boolean }>("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
   },
 
+  payments: {
+    // Public — booking wizard asks whether a deposit / card-on-file is required.
+    bookingIntent: (appointmentId: string, businessId: string) =>
+      req<{ required: boolean; mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string }>(
+        "/payments/booking-intent", { method: "POST", body: JSON.stringify({ appointmentId, businessId }) }, null),
+    // Owner — charge the configured no-show fee on the saved card.
+    chargeNoShow: (appointmentId: string) =>
+      req<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${appointmentId}`, { method: "POST" }),
+  },
+
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),

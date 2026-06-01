@@ -11,7 +11,10 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { BookingPayment } from "@/components/BookingPayment";
 import "react-day-picker/dist/style.css";
+
+type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDuration(mins: number) {
@@ -108,6 +111,7 @@ function BookPageInner({ slug }: { slug: string }) {
   const [loadingSlots, setLoadingSlots]     = useState(false);
   const [loadingBiz, setLoadingBiz]         = useState(true);
   const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string } | null>(null);
+  const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
 
   // Load business by slug
   useEffect(() => {
@@ -217,7 +221,15 @@ function BookPageInner({ slug }: { slug: string }) {
         startsAt: selectedSlot.startsAt,
         notes: form.notes || undefined,
       });
-      setBooking(apt); setStep(4);
+      setBooking(apt);
+      // If the business requires a deposit / card-on-file, collect it before
+      // showing the confirmation. Otherwise (default) go straight to success.
+      const intent = await api.payments.bookingIntent(apt.id, bizId).catch(() => null);
+      if (intent?.required && intent.clientSecret && intent.publishableKey) {
+        setPayInfo(intent);
+      } else {
+        setStep(4);
+      }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Booking failed — slot may be taken"); }
     finally { setSubmitting(false); }
   }
@@ -234,6 +246,16 @@ function BookPageInner({ slug }: { slug: string }) {
       <h2 className="text-xl font-bold text-gray-900 mb-2">Business not found</h2>
       <p className="text-gray-500 mb-6">The booking page you're looking for doesn't exist.</p>
       <Link href="/" className="text-violet-600 font-medium hover:underline">Go home</Link>
+    </div>
+  );
+
+  // Payment step: only when the business requires a deposit / card-on-file
+  // (booking is already created as PENDING; this collects the deposit/card).
+  if (payInfo && booking) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <BookingPayment info={payInfo} onPaid={() => { setPayInfo(null); setStep(4); }} />
+      </div>
     </div>
   );
 
