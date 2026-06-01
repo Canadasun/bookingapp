@@ -19,6 +19,7 @@ import { MessagesModule } from './messages/messages.module';
 import { OffersModule } from './offers/offers.module';
 import { ClientPortalModule } from './client-portal/client-portal.module';
 import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
+import { WaitlistModule } from './waitlist/waitlist.module';
 import { HealthModule } from './health/health.module';
 import { AdminModule } from './admin/admin.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -57,6 +58,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     OffersModule,
     ClientPortalModule,
     CalendarSyncModule,
+    WaitlistModule,
     HealthModule,
     AdminModule,
   ],
