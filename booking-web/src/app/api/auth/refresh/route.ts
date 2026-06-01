@@ -26,15 +26,16 @@ export async function POST(req: NextRequest) {
     user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean };
   };
 
+  const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });
   res.cookies.set("booking_token", data.accessToken, {
-    httpOnly: false, sameSite: "lax", path: "/", maxAge: 60 * 15,
+    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
-    httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
   });
   res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
-    httpOnly: false, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
+    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
   });
   return res;
 }

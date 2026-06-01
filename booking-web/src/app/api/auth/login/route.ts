@@ -21,15 +21,18 @@ export async function POST(req: NextRequest) {
     user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean };
   };
 
+  const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });
   res.cookies.set("booking_token", data.accessToken, {
     httpOnly: false,
+    secure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true,
+    secure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
@@ -37,6 +40,7 @@ export async function POST(req: NextRequest) {
   // Readable user profile cookie so client JS knows who is logged in
   res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
     httpOnly: false,
+    secure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
