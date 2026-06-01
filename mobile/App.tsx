@@ -188,6 +188,7 @@ function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected]     = useState<Appointment|null>(null);
   const [acting, setActing]         = useState(false);
+  const [day, setDay]               = useState<string|null>(null); // null = All; else a toDateString() key
 
   const load = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
@@ -231,6 +232,34 @@ function AppointmentsScreen() {
   const upcoming = apts.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && new Date(a.startsAt) > new Date());
   const past     = apts.filter(a => !['PENDING','CONFIRMED'].includes(a.status) || new Date(a.startsAt) <= new Date());
 
+  // Week date-strip (scheduler feel): 14 days from today; tap to filter the list.
+  const dayKey = (iso:string) => new Date(iso).toDateString();
+  const stripDays = Array.from({length:14}, (_,i) => { const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+i); return d; });
+  const dayAppts = day ? apts.filter(a => dayKey(a.startsAt) === day).sort((a,b)=> +new Date(a.startsAt) - +new Date(b.startsAt)) : null;
+  const listData = dayAppts ?? [...upcoming, ...past];
+
+  function DateStrip() {
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:16, paddingVertical:10, gap:8 }}>
+        <TouchableOpacity onPress={()=>setDay(null)} style={[dst.chip, !day && dst.chipOn]}>
+          <Text style={[dst.chipDow, !day && dst.chipTextOn]}>All</Text>
+        </TouchableOpacity>
+        {stripDays.map(d => {
+          const key = d.toDateString();
+          const on = day === key;
+          const has = apts.some(a => dayKey(a.startsAt) === key && ['PENDING','CONFIRMED'].includes(a.status));
+          return (
+            <TouchableOpacity key={key} onPress={()=>setDay(on ? null : key)} style={[dst.chip, on && dst.chipOn]}>
+              <Text style={[dst.chipDow, on && dst.chipTextOn]}>{d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}</Text>
+              <Text style={[dst.chipNum, on && dst.chipTextOn]}>{d.getDate()}</Text>
+              {has && <View style={[dst.chipDot, on && { backgroundColor:'#fff' }]}/>}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    );
+  }
+
   function AptCard({ a }: { a:Appointment }) {
     const d = new Date(a.startsAt);
     return (
@@ -260,13 +289,14 @@ function AppointmentsScreen() {
   return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}><Text style={s.headerTitle}>Appointments</Text></View>
+      <DateStrip/>
       <FlatList
-        data={[...upcoming,...past]}
+        data={listData}
         keyExtractor={a=>a.id}
         renderItem={({item})=><AptCard a={item}/>}
         contentContainerStyle={s.listContent}
-        ListHeaderComponent={<Text style={s.sectionLabel}>Upcoming ({upcoming.length})</Text>}
-        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No appointments yet</Text></View>}
+        ListHeaderComponent={<Text style={s.sectionLabel}>{day ? `${new Date(day).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})} (${listData.length})` : `Upcoming (${upcoming.length})`}</Text>}
+        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>{day ? 'No appointments this day' : 'No appointments yet'}</Text></View>}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={PURPLE}/>}
         showsVerticalScrollIndicator={false}
       />
@@ -774,12 +804,13 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 }
 
 // ── More/Settings screen ─────────────────────────────────────────────────────
-type MoreView = 'menu' | 'services' | 'staff' | 'settings';
+type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'settings';
 function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const [view, setView]         = useState<MoreView>('menu');
   const [services, setServices] = useState<Service[] | null>(null);
   const [staff, setStaff]       = useState<Staff[] | null>(null);
+  const [offers, setOffers]     = useState<any[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
 
@@ -788,6 +819,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     try {
       if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${BIZ_ID}/services`)); }
       else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${BIZ_ID}/staff`)); }
+      else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${BIZ_ID}/offers`)); }
       else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${BIZ_ID}`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
@@ -843,6 +875,27 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'offers') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Offers"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(offers ?? []).map(of => (
+            <View key={of.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor:'#10B981' }]}>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                <Text style={ms.rowTitle}>{of.title}</Text>
+                {!!of.discount && <View style={[ms.dealChip]}><Text style={ms.dealChipText}>{of.discount}</Text></View>}
+              </View>
+              {!!of.description && <Text style={ms.rowMeta}>{of.description}</Text>}
+              {!!of.expiresAt && <Text style={[ms.rowMeta,{ color:GRAY_400 }]}>Expires {new Date(of.expiresAt).toLocaleDateString()}</Text>}
+            </View>
+          ))}
+          {offers && offers.length===0 && <Text style={ms.empty}>No active offers.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
   if (view === 'settings') return (
     <SafeAreaView style={s.screen}>
       <Head title="Settings"/>
@@ -874,6 +927,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const rows = [
     { label:'Services', icon:'cut-outline' as const, v:'services' as MoreView },
     { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
+    { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
     { label:'Settings', icon:'settings-outline' as const, v:'settings' as MoreView },
   ];
   return (
@@ -918,6 +972,17 @@ const ms = StyleSheet.create({
   cardLabel: { fontSize:12, color:GRAY_500 },
   cardValue: { fontSize:16, fontWeight:'700', color:GRAY_900, marginTop:2 },
   empty:     { fontSize:13, color:GRAY_400, textAlign:'center', paddingVertical:12 },
+  dealChip:  { backgroundColor:'#D1FAE5', borderRadius:6, paddingHorizontal:8, paddingVertical:3 },
+  dealChipText:{ fontSize:12, fontWeight:'700', color:'#065F46' },
+});
+
+const dst = StyleSheet.create({
+  chip:      { minWidth:46, alignItems:'center', paddingVertical:8, paddingHorizontal:10, borderRadius:12, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff' },
+  chipOn:    { backgroundColor:PURPLE, borderColor:PURPLE },
+  chipDow:   { fontSize:11, fontWeight:'700', color:GRAY_500 },
+  chipNum:   { fontSize:16, fontWeight:'800', color:GRAY_900, marginTop:2 },
+  chipTextOn:{ color:'#fff' },
+  chipDot:   { width:5, height:5, borderRadius:3, backgroundColor:PURPLE, marginTop:4 },
 });
 
 // ── Login screen ─────────────────────────────────────────────────────────────
