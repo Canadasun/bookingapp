@@ -216,10 +216,14 @@ export default function SettingsPage() {
                     </div>
                   </Field>
                 )}
-                <Field label="No-show fee (cents, 0 = disabled)">
-                  <Input type="number" min={0} value={(form.noShowFeeCents as number) ?? 0}
-                    onChange={(e) => f("noShowFeeCents", Number(e.target.value))} />
-                  <p className="text-xs text-gray-400 mt-1">Charge clients who miss their appointment.</p>
+                <Field label="No-show fee ($, 0 = disabled)">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 shrink-0">$</span>
+                    <Input type="number" min={0} step="0.01"
+                      value={(((form.noShowFeeCents as number) ?? 0) / 100).toString()}
+                      onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Charged to the card on file when you mark a confirmed appointment as a no-show.</p>
                 </Field>
               </div>
             )}

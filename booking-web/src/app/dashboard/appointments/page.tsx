@@ -192,6 +192,14 @@ export default function AppointmentsPage() {
       else if (action === "cancel") await api.appointments.updateStatus(bizId, id, "CANCELLED", extra?.cancelReason);
       else if (action === "complete") await api.appointments.updateStatus(bizId, id, "COMPLETED");
       else if (action === "noshow") await api.appointments.updateStatus(bizId, id, "NO_SHOW");
+      else if (action === "noshow-fee") {
+        const res = await api.payments.chargeNoShow(id);
+        if (res.charged) toast.success(`Charged no-show fee of ${formatPrice(res.feeCents)}`);
+        else toast.error(res.message ?? "Could not charge the no-show fee");
+        setSelected(null);
+        load();
+        return;
+      }
       toast.success("Updated");
       setSelected(null);
       load();
