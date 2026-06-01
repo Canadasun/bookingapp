@@ -137,6 +137,21 @@ export interface TimeOff {
   id: string; staffId: string; startsAt: string; endsAt: string; reason?: string; createdAt: string;
 }
 
+export interface Package {
+  id: string; businessId: string; name: string;
+  serviceId?: string | null; credits: number; priceCents: number;
+  active: boolean; createdAt: string;
+}
+export type PackageStatus = "ACTIVE" | "USED" | "EXPIRED" | "VOID";
+export interface ClientPackage {
+  id: string; businessId: string; packageId?: string | null; clientId: string;
+  name: string; serviceId?: string | null;
+  creditsTotal: number; creditsRemaining: number;
+  status: PackageStatus; expiresAt?: string | null; createdAt: string;
+  client?: { id: string; name: string; email: string };
+  redemptions?: { id: string; appointmentId?: string | null; createdAt: string }[];
+}
+
 export type GiftCardStatus = "ACTIVE" | "REDEEMED" | "VOID";
 export interface GiftCard {
   id: string; businessId: string; code: string;
@@ -207,6 +222,27 @@ export const api = {
       req<Array<{ id: string; clientName: string; rating: number; comment?: string | null; published: boolean; createdAt: string }>>(`/businesses/${businessId}/reviews/all`),
     moderate: (businessId: string, id: string, published: boolean) =>
       req<void>(`/businesses/${businessId}/reviews/${id}`, { method: "PATCH", body: JSON.stringify({ published }) }),
+  },
+
+  packages: {
+    // Package products (templates)
+    list: (businessId: string) =>
+      req<Package[]>(`/businesses/${businessId}/packages`),
+    create: (businessId: string, data: { name: string; serviceId?: string; credits: number; priceCents: number; active?: boolean }) =>
+      req<Package>(`/businesses/${businessId}/packages`, { method: "POST", body: JSON.stringify(data) }),
+    update: (businessId: string, id: string, data: Partial<{ name: string; serviceId: string; credits: number; priceCents: number; active: boolean }>) =>
+      req<Package>(`/businesses/${businessId}/packages/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    remove: (businessId: string, id: string) =>
+      req<void>(`/businesses/${businessId}/packages/${id}`, { method: "DELETE" }),
+    // Issued client packages
+    listIssued: (businessId: string, clientId?: string) =>
+      req<ClientPackage[]>(`/businesses/${businessId}/packages/issued/list${clientId ? `?clientId=${clientId}` : ""}`),
+    issue: (businessId: string, data: { clientId: string; packageId?: string; name?: string; serviceId?: string; credits?: number; expiresAt?: string }) =>
+      req<ClientPackage>(`/businesses/${businessId}/packages/issued`, { method: "POST", body: JSON.stringify(data) }),
+    redeem: (businessId: string, id: string, appointmentId?: string) =>
+      req<{ creditsRemaining: number; status: PackageStatus }>(`/businesses/${businessId}/packages/issued/${id}/redeem`, { method: "POST", body: JSON.stringify({ appointmentId }) }),
+    void: (businessId: string, id: string) =>
+      req<ClientPackage>(`/businesses/${businessId}/packages/issued/${id}/void`, { method: "POST" }),
   },
 
   giftCards: {

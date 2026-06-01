@@ -34,6 +34,7 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/reviews",      label: "Reviews" },
       { href: "/dashboard/marketing",    label: "Marketing" },
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
+      { href: "/dashboard/packages",     label: "Packages" },
       { href: "/dashboard/settings",     label: "Settings" },
     ],
   },
