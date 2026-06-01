@@ -804,7 +804,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 }
 
 // ── More/Settings screen ─────────────────────────────────────────────────────
-type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'settings';
+type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'settings';
 function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const [view, setView]         = useState<MoreView>('menu');
@@ -812,6 +812,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const [staff, setStaff]       = useState<Staff[] | null>(null);
   const [offers, setOffers]     = useState<any[] | null>(null);
   const [waitlist, setWaitlist] = useState<any[] | null>(null);
+  const [reviews, setReviews]   = useState<any | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
 
@@ -822,6 +823,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${BIZ_ID}/staff`)); }
       else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${BIZ_ID}/offers`)); }
       else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${BIZ_ID}/waitlist`)); }
+      else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${BIZ_ID}/reviews`)); }
       else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${BIZ_ID}`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
@@ -919,6 +921,38 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'reviews') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Reviews"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {reviews && reviews.count>0 && (
+            <View style={[ms.card,{ alignItems:'center', paddingVertical:16 }]}>
+              <Text style={{ fontSize:32, fontWeight:'800', color:GRAY_700 }}>{Number(reviews.average||0).toFixed(1)}</Text>
+              <View style={{ flexDirection:'row', marginTop:2 }}>
+                {[1,2,3,4,5].map(n => <Ionicons key={n} name={n<=Math.round(reviews.average||0)?'star':'star-outline'} size={16} color="#F59E0B"/>)}
+              </View>
+              <Text style={[ms.rowMeta,{ marginTop:4 }]}>{reviews.count} review{reviews.count===1?'':'s'}</Text>
+            </View>
+          )}
+          {(reviews?.reviews ?? []).map((r:any) => (
+            <View key={r.id} style={ms.card}>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                <Text style={ms.rowTitle}>{r.clientName}</Text>
+                <View style={{ flexDirection:'row' }}>
+                  {[1,2,3,4,5].map(n => <Ionicons key={n} name={n<=r.rating?'star':'star-outline'} size={13} color="#F59E0B"/>)}
+                </View>
+              </View>
+              {!!r.comment && <Text style={[ms.rowMeta,{ marginTop:4 }]}>{r.comment}</Text>}
+              <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>{new Date(r.createdAt).toLocaleDateString()}</Text>
+            </View>
+          ))}
+          {reviews && reviews.count===0 && <Text style={ms.empty}>No reviews yet.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
   if (view === 'settings') return (
     <SafeAreaView style={s.screen}>
       <Head title="Settings"/>
@@ -952,6 +986,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
     { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
     { label:'Waitlist', icon:'hourglass-outline' as const, v:'waitlist' as MoreView },
+    { label:'Reviews', icon:'star-outline' as const, v:'reviews' as MoreView },
     { label:'Settings', icon:'settings-outline' as const, v:'settings' as MoreView },
   ];
   return (
