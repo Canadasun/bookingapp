@@ -23,6 +23,7 @@ import { WaitlistModule } from './waitlist/waitlist.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { GiftCardsModule } from './gift-cards/gift-cards.module';
+import { PackagesModule } from './packages/packages.module';
 import { HealthModule } from './health/health.module';
 import { AdminModule } from './admin/admin.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -65,6 +66,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     ReviewsModule,
     CampaignsModule,
     GiftCardsModule,
+    PackagesModule,
     HealthModule,
     AdminModule,
   ],

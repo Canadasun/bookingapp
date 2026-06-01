@@ -91,6 +91,8 @@ model Business {
   reviews            Review[]
   campaigns          Campaign[]
   giftCards          GiftCard[]
+  packages           Package[]
+  clientPackages     ClientPackage[]
 }
 
 model Review {
@@ -146,6 +148,65 @@ model GiftCardRedemption {
   giftCard      GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
 
   @@index([giftCardId])
+}
+
+enum PackageStatus {
+  ACTIVE
+  USED     // all credits consumed
+  EXPIRED
+  VOID
+}
+
+// A reusable package product the owner defines, e.g. "5x Haircut — $200".
+model Package {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  serviceId  String?  // credits valid for this service; null = any service
+  credits    Int      // number of prepaid sessions
+  priceCents Int
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  clientPackages ClientPackage[]
+
+  @@index([businessId, active])
+}
+
+// A package issued to a specific client (snapshots name/service so editing the
+// template never changes what a client already holds).
+model ClientPackage {
+  id               String        @id @default(cuid())
+  businessId       String
+  packageId        String?
+  clientId         String
+  name             String        // snapshot
+  serviceId        String?       // snapshot
+  creditsTotal     Int
+  creditsRemaining Int
+  status           PackageStatus @default(ACTIVE)
+  expiresAt        DateTime?
+  createdAt        DateTime      @default(now())
+
+  business    Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  package     Package?             @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  client      Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  redemptions PackageRedemption[]
+
+  @@index([businessId, status])
+  @@index([clientId])
+}
+
+model PackageRedemption {
+  id              String   @id @default(cuid())
+  clientPackageId String
+  appointmentId   String?
+  createdAt       DateTime @default(now())
+
+  clientPackage ClientPackage @relation(fields: [clientPackageId], references: [id], onDelete: Cascade)
+
+  @@index([clientPackageId])
 }
 
 enum CampaignChannel {
@@ -345,6 +406,7 @@ model Client {
   business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   messages     Message[]
+  packages     ClientPackage[]
 
   @@unique([businessId, email])
   @@index([businessId])
