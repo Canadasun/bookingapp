@@ -89,6 +89,7 @@ model Business {
   transactions       Transaction[]
   waitlist           WaitlistEntry[]
   reviews            Review[]
+  campaigns          Campaign[]
 }
 
 model Review {
@@ -105,6 +106,42 @@ model Review {
   business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, published])
+}
+
+enum CampaignChannel {
+  EMAIL
+  SMS
+}
+
+enum CampaignAudience {
+  ALL      // every client with a contact on file
+  RECENT   // visited in the last 30 days
+  LAPSED   // no visit in the last 60 days — win them back
+}
+
+enum CampaignStatus {
+  DRAFT
+  SENDING
+  SENT
+}
+
+model Campaign {
+  id             String           @id @default(cuid())
+  businessId     String
+  name           String
+  channel        CampaignChannel  @default(EMAIL)
+  audience       CampaignAudience @default(ALL)
+  subject        String?          // email only
+  body           String           // supports {name} and {business} merge tags
+  status         CampaignStatus   @default(DRAFT)
+  recipientCount Int              @default(0)
+  sentCount      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  sentAt         DateTime?
+
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, status])
 }
 
 enum WaitlistStatus {

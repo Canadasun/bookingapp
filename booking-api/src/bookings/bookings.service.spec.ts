@@ -64,6 +64,10 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       create: jest.fn().mockResolvedValue(makeAppointment()),
       update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
     },
+    waitlistEntry: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+    },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => {
       return fn(txMock);
@@ -86,6 +90,10 @@ async function buildService(prismaOverrides = {}, conflictExists = false) {
           sendConfirmation: jest.fn().mockResolvedValue(undefined),
           sendPendingNotification: jest.fn().mockResolvedValue(undefined),
           sendAdminBookingAlert: jest.fn().mockResolvedValue(undefined),
+          sendReschedule: jest.fn().mockResolvedValue(undefined),
+          sendStaffCancellation: jest.fn().mockResolvedValue(undefined),
+          notifyWaitlistOpening: jest.fn().mockResolvedValue(undefined),
+          sendReviewRequest: jest.fn().mockResolvedValue(undefined),
         },
       },
     ],

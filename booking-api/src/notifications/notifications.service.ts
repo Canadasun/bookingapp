@@ -84,6 +84,15 @@ export class NotificationsService {
     await this.queue.add('review-request', { appointmentId: apt.id });
   }
 
+  // Marketing campaign — one job per recipient so the queue can retry individually.
+  async sendCampaignMessage(campaignId: string, clientId: string) {
+    await this.queue.add(
+      'campaign-message',
+      { campaignId, clientId },
+      { removeOnComplete: true, attempts: 3, backoff: { type: 'fixed', delay: 5000 } },
+    );
+  }
+
   async sendAdminBookingAlert(appointmentId: string) {
     const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
     if (!adminEmail) {

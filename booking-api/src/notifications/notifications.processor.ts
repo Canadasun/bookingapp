@@ -50,8 +50,30 @@ export class NotificationProcessor extends WorkerHost {
     private configService: ConfigService,
   ) { super(); }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    // Marketing campaign — one job per recipient, not tied to an appointment.
+    if (job.name === 'campaign-message') {
+      const [campaign, client] = await Promise.all([
+        this.prisma.campaign.findUnique({ where: { id: job.data.campaignId! }, include: { business: true } }),
+        this.prisma.client.findUnique({ where: { id: job.data.clientId! } }),
+      ]);
+      if (!campaign || !client) return;
+      const merge = (t: string) => t.replace(/\{name\}/g, client.name).replace(/\{business\}/g, campaign.business.name);
+
+      if (campaign.channel === 'SMS') {
+        if (client.phone) await this.sms.send({ to: client.phone, body: merge(campaign.body) });
+      } else {
+        await this.email.send({
+          to: client.email,
+          subject: merge(campaign.subject ?? `A note from ${campaign.business.name}`),
+          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${merge(campaign.body)}</div>`),
+        });
+      }
+      await this.prisma.campaign.update({ where: { id: campaign.id }, data: { sentCount: { increment: 1 } } });
+      return;
+    }
 
     // Waitlist opening — not tied to an appointment; email the waitlisted client.
     if (job.name === 'waitlist-opening') {
