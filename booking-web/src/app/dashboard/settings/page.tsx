@@ -42,6 +42,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [copied, setCopied]   = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
   const [section, setSection] = useState<Section>("profile");
   const [form, setForm]       = useState<Partial<Business>>({});
 
@@ -80,6 +81,13 @@ export default function SettingsPage() {
   if (loading) return <LoadingSpinner />;
 
   const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/book/${biz?.slug ?? ""}`;
+  const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const embedSnippet = `<script src="${embedOrigin}/embed.js" data-slug="${biz?.slug ?? ""}" async></script>`;
+  function copyEmbed() {
+    navigator.clipboard.writeText(embedSnippet);
+    setEmbedCopied(true);
+    setTimeout(() => setEmbedCopied(false), 2000);
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -236,6 +244,21 @@ export default function SettingsPage() {
                   </div>
                   <p className="text-xs text-violet-500 mt-2">Share this link on your website, Instagram bio, or Google Business profile.</p>
                 </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CreditCard className="w-4 h-4 text-gray-700" />
+                    <span className="text-sm font-semibold text-gray-900">Embed on your website</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It resizes automatically.</p>
+                  <div className="flex items-start gap-2 bg-gray-900 rounded-xl px-4 py-3">
+                    <code className="text-xs text-gray-100 flex-1 break-all font-mono">{embedSnippet}</code>
+                    <button type="button" onClick={copyEmbed} className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
+                      {embedCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Quick stats</p>
                   <div className="flex items-center justify-between text-sm">

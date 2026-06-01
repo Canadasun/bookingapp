@@ -90,7 +90,19 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
 function BookPageInner({ slug }: { slug: string }) {
   const searchParams  = useSearchParams();
   const rescheduleId  = searchParams.get("reschedule");
+  const isEmbed       = searchParams.get("embed") === "1"; // rendered inside the embeddable widget iframe
   const rescheduleLoaded = useRef(false);
+
+  // When embedded, report content height to the host page so embed.js can size
+  // the iframe with no inner scrollbar.
+  useEffect(() => {
+    if (!isEmbed || typeof window === "undefined") return;
+    const post = () => window.parent?.postMessage({ type: "bookingapp:height", height: document.body.scrollHeight }, "*");
+    post();
+    const ro = new ResizeObserver(post);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, [isEmbed]);
 
   const [step, setStep]               = useState(0);
   const [biz, setBiz]                 = useState<Business | null>(null);
@@ -266,8 +278,9 @@ function BookPageInner({ slug }: { slug: string }) {
   const policy      = biz?.cancellationPolicy ?? "Appointments cancelled within 24 hours may be subject to a cancellation fee.";
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA]">
-      {/* Nav */}
+    <div className={isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]"}>
+      {/* Nav — hidden in embed mode (the widget lives on the salon's own site) */}
+      {!isEmbed && (
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -285,6 +298,7 @@ function BookPageInner({ slug }: { slug: string }) {
           </div>
         </div>
       </nav>
+      )}
 
       <div className="max-w-2xl mx-auto px-5 py-8">
         {/* Confirmation screen */}
