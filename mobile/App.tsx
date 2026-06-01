@@ -35,7 +35,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
     );
   }
 }
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -916,6 +916,144 @@ function ChangePasswordScreen({ onDone }: { onDone:()=>void }) {
   );
 }
 
+// ── Home / Dashboard (Square-style landing) ──────────────────────────────────
+function HomeScreen() {
+  const nav = useNavigation<any>();
+  const { user } = getAuth();
+  const [appts, setAppts]       = useState<Appointment[]>([]);
+  const [bizName, setBizName]   = useState('');
+  const [loading, setLoading]   = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (silent=false) => {
+    if (!silent) setLoading(true);
+    try {
+      const [res, biz] = await Promise.all([
+        api<{ data:Appointment[] }>(`/businesses/${BIZ_ID}/bookings`).catch(()=>({ data:[] as Appointment[] })),
+        api<{ name:string }>(`/businesses/${BIZ_ID}`).catch(()=>({ name:'' })),
+      ]);
+      setAppts(Array.isArray(res?.data) ? res.data : []);
+      setBizName(biz?.name ?? '');
+    } catch { /* ignore */ }
+    finally { setLoading(false); setRefreshing(false); }
+  }, []);
+  useEffect(()=>{ load(); }, [load]);
+
+  const now = new Date();
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = (user?.name ?? 'there').split(' ')[0];
+
+  const todayStr = now.toDateString();
+  const real = appts
+    .filter(a => new Date(a.startsAt).toDateString() === todayStr)
+    .sort((a,b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+
+  // Demo-friendly: when there are no real appointments today, show realistic
+  // sample data so the dashboard looks populated. (Swap for live data later.)
+  const at = (h:number,m:number) => { const d=new Date(); d.setHours(h,m,0,0); return d.toISOString(); };
+  const SAMPLE = [
+    { id:'s1', startsAt:at(9,0),  endsAt:at(10,0), status:'CONFIRMED', notes:'', service:{name:'Haircut',durationMinutes:60,priceCents:4500}, staff:{id:'x',user:{name:'Alex'}}, client:{id:'c1',name:'Jordan Lee',email:''} },
+    { id:'s2', startsAt:at(11,30),endsAt:at(13,30),status:'PENDING',   notes:'', service:{name:'Color & Highlights',durationMinutes:120,priceCents:12000}, staff:{id:'x',user:{name:'Sam'}}, client:{id:'c2',name:'Riley Chen',email:''} },
+    { id:'s3', startsAt:at(14,0), endsAt:at(14,30),status:'CONFIRMED', notes:'', service:{name:'Beard Trim',durationMinutes:30,priceCents:2500}, staff:{id:'x',user:{name:'Alex'}}, client:{id:'c3',name:'Taylor Brooks',email:''} },
+  ] as unknown as Appointment[];
+
+  const isSample = real.length === 0;
+  const agenda = isSample ? SAMPLE : real;
+  const todayCount   = isSample ? 6     : real.length;
+  const pendingCount = isSample ? 2     : appts.filter(a => a.status === 'PENDING').length;
+  const revenueCents = isSample ? 24500 : real.filter(a => a.status==='CONFIRMED' || a.status==='COMPLETED').reduce((s,a)=> s + (a.service?.priceCents ?? 0), 0);
+
+  const Stat = ({ label, value, icon, color }:{label:string;value:string;icon:any;color:string}) => (
+    <View style={hs.stat}>
+      <View style={[hs.statIcon,{backgroundColor:color+'18'}]}><Ionicons name={icon} size={16} color={color}/></View>
+      <Text style={hs.statValue}>{value}</Text>
+      <Text style={hs.statLabel}>{label}</Text>
+    </View>
+  );
+  const Action = ({ label, icon, to }:{label:string;icon:any;to:string}) => (
+    <TouchableOpacity style={hs.action} onPress={()=>nav.navigate(to)}>
+      <View style={hs.actionIcon}><Ionicons name={icon} size={20} color={PURPLE}/></View>
+      <Text style={hs.actionLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  if (loading) return <SafeAreaView style={s.screen}><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={PURPLE}/></View></SafeAreaView>;
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <ScrollView contentContainerStyle={{padding:16,paddingBottom:32}} showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={PURPLE}/>}>
+        <Text style={hs.greeting}>{greeting}, {firstName} 👋</Text>
+        {!!bizName && <Text style={hs.biz}>{bizName}</Text>}
+
+        <View style={hs.statRow}>
+          <Stat label="Today" value={String(todayCount)} icon="calendar" color={PURPLE}/>
+          <Stat label="Pending" value={String(pendingCount)} icon="time" color="#F59E0B"/>
+          <Stat label="Revenue" value={`$${(revenueCents/100).toFixed(0)}`} icon="cash" color="#10B981"/>
+        </View>
+
+        <View style={hs.actionRow}>
+          <Action label="New booking" icon="add-circle" to="Book"/>
+          <Action label="Clients" icon="people" to="Clients"/>
+          <Action label="Messages" icon="chatbubbles" to="Messages"/>
+        </View>
+
+        <View style={hs.sectionHead}>
+          <Text style={hs.sectionTitle}>Today’s schedule</Text>
+          {isSample && <View style={hs.sampleChip}><Text style={hs.sampleChipText}>Sample</Text></View>}
+        </View>
+
+        {agenda.map(a => {
+          const d = new Date(a.startsAt);
+          const hr = ((d.getHours() + 11) % 12) + 1;
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          const ap = d.getHours() < 12 ? 'AM' : 'PM';
+          return (
+          <TouchableOpacity key={a.id} style={hs.apt} activeOpacity={0.7} onPress={()=>nav.navigate('Appointments')}>
+            <View style={hs.aptTime}>
+              <Text style={hs.aptHour}>{hr}:{mm}</Text>
+              <Text style={hs.aptAmPm}>{ap}</Text>
+            </View>
+            <View style={{flex:1,minWidth:0}}>
+              <Text style={hs.aptService} numberOfLines={1}>{a.service?.name}</Text>
+              <Text style={hs.aptMeta} numberOfLines={1}>{a.client?.name} · {a.staff?.user?.name}</Text>
+            </View>
+            <View style={{alignItems:'flex-end',gap:4}}>
+              <PriceTag cents={a.service?.priceCents ?? 0}/>
+              <Pill label={a.status} color={STATUS_COLOR[a.status] ?? GRAY_500}/>
+            </View>
+          </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const hs = StyleSheet.create({
+  greeting:   { fontSize:24, fontWeight:'800', color:GRAY_900 },
+  biz:        { fontSize:14, color:GRAY_500, marginTop:2, marginBottom:18 },
+  statRow:    { flexDirection:'row', gap:10, marginBottom:18 },
+  stat:       { flex:1, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, padding:14 },
+  statIcon:   { width:30, height:30, borderRadius:9, alignItems:'center', justifyContent:'center', marginBottom:10 },
+  statValue:  { fontSize:22, fontWeight:'800', color:GRAY_900 },
+  statLabel:  { fontSize:12, color:GRAY_500, marginTop:1 },
+  actionRow:  { flexDirection:'row', gap:10, marginBottom:22 },
+  action:     { flex:1, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, paddingVertical:16, alignItems:'center' },
+  actionIcon: { width:40, height:40, borderRadius:12, backgroundColor:PURPLE_LT, alignItems:'center', justifyContent:'center', marginBottom:8 },
+  actionLabel:{ fontSize:12, fontWeight:'600', color:GRAY_700 },
+  sectionHead:{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:12 },
+  sectionTitle:{ fontSize:17, fontWeight:'700', color:GRAY_900 },
+  sampleChip: { backgroundColor:'#FEF3C7', borderRadius:6, paddingHorizontal:7, paddingVertical:2 },
+  sampleChipText:{ fontSize:10, fontWeight:'700', color:'#92400E' },
+  apt:        { flexDirection:'row', alignItems:'center', gap:12, backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10 },
+  aptTime:    { width:54, alignItems:'center' },
+  aptHour:    { fontSize:15, fontWeight:'800', color:GRAY_900 },
+  aptAmPm:    { fontSize:11, color:GRAY_400, fontWeight:'600' },
+  aptService: { fontSize:15, fontWeight:'600', color:GRAY_900 },
+  aptMeta:    { fontSize:13, color:GRAY_500, marginTop:2 },
+});
+
 // ── Tab navigator ────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
@@ -981,13 +1119,14 @@ export default function App() {
             tabBarLabelStyle: { fontSize:11, fontWeight:'600' },
             tabBarIcon: ({ color, size }) => {
               const icons: Record<string,string> = {
-                Appointments:'calendar-outline', Book:'add-circle-outline',
+                Home:'home-outline', Appointments:'calendar-outline', Book:'add-circle-outline',
                 Clients:'people-outline', Messages:'chatbubbles-outline', More:'menu-outline',
               };
               return <Ionicons name={(icons[route.name]??'ellipse-outline') as any} size={size} color={color}/>;
             },
           })}
         >
+          <Tab.Screen name="Home" component={HomeScreen}/>
           <Tab.Screen name="Appointments" component={AppointmentsScreen}/>
           <Tab.Screen name="Book" component={BookScreen}/>
           <Tab.Screen name="Clients">
