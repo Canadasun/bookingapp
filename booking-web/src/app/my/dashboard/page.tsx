@@ -193,7 +193,7 @@ export default function ClientDashboard() {
                 </Card>
               ) : offers.map((o) => (
                 <Card key={o.id} className="overflow-hidden">
-                  <div className="h-1 bg-gradient-to-r from-violet-500 to-pink-500" />
+                  <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
                   <CardContent className="py-4 flex items-start gap-4">
                     <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
                       <Tag className="w-5 h-5 text-violet-600" />

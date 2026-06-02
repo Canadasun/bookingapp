@@ -35,7 +35,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="flex-1 bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <section className="flex-1 bg-gradient-to-br from-amber-50 via-white to-orange-50">
         <div className="max-w-6xl mx-auto px-6 py-28 text-center">
           <div className="inline-flex items-center gap-2 bg-indigo-100 text-indigo-700 text-sm font-medium px-4 py-1.5 rounded-full mb-8">
             <Star className="w-4 h-4" />
@@ -43,7 +43,7 @@ export default function LandingPage() {
           </div>
           <h1 className="text-5xl sm:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight mb-6">
             Booking made{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600">
               simple
             </span>
           </h1>
