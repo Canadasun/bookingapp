@@ -65,6 +65,7 @@ model Business {
   requireDeposit        Boolean @default(false)
   depositPercent        Int     @default(25)
   noShowFeeCents        Int     @default(0)
+  cancellationFeeCents  Int     @default(0)
   allowClientReschedule Boolean @default(true)
 
   // Subscription

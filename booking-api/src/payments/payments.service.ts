@@ -63,6 +63,10 @@ export class PaymentsService {
     if (!apt) throw new BadRequestException('Appointment not found');
 
     const b = apt.business;
+    // Deposits / card-on-file are a PAID-plan feature. Free tier never collects
+    // money at booking (and clients can cancel at will).
+    if (b.plan === 'FREE') return { required: false, mode: 'none' as const };
+
     const customer = await this.ensureCustomer(apt.clientId);
 
     if (b.requireDeposit) {
@@ -207,5 +211,39 @@ export class PaymentsService {
 
     await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
     return { charged: intent.status === 'succeeded', feeCents, paymentIntentId: intent.id, status: intent.status };
+  }
+
+  /**
+   * Late-cancellation fee: charges the saved card off_session for the business's
+   * configured cancellation fee. Best-effort — NEVER throws, so the cancellation
+   * itself always succeeds even if Stripe is unconfigured or the card declines.
+   * Does NOT change appointment status (the caller sets it to CANCELLED).
+   */
+  async chargeCancellationFee(appointmentId: string, businessId: string): Promise<{ charged: boolean; feeCents: number; reason?: string }> {
+    const apt = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, businessId },
+      include: { service: true, client: true, business: true },
+    });
+    if (!apt) return { charged: false, feeCents: 0, reason: 'not_found' };
+    const feeCents = apt.business.cancellationFeeCents;
+    if (feeCents <= 0) return { charged: false, feeCents: 0, reason: 'no_fee' };
+    if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
+      return { charged: false, feeCents, reason: 'no_card' };
+    }
+    try {
+      const intent = await this.getStripe().paymentIntents.create({
+        amount: feeCents,
+        currency: 'usd',
+        customer: apt.client.stripeCustomerId,
+        payment_method: apt.stripePaymentMethodId,
+        off_session: true,
+        confirm: true,
+        metadata: { appointmentId, businessId, kind: 'late_cancel_fee' },
+        description: `Late cancellation fee — ${apt.service.name} @ ${apt.business.name}`,
+      });
+      return { charged: intent.status === 'succeeded', feeCents, reason: intent.status };
+    } catch {
+      return { charged: false, feeCents, reason: 'charge_failed' };
+    }
   }
 }

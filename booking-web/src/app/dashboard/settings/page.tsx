@@ -175,7 +175,15 @@ export default function SettingsPage() {
                 <Field label="Cancellation window (hours)">
                   <Input type="number" min={0} value={(form.cancellationWindowHours as number) ?? 24}
                     onChange={(e) => f("cancellationWindowHours", Number(e.target.value))} />
-                  <p className="text-xs text-gray-400 mt-1">Clients warned when cancelling within this window.</p>
+                  <p className="text-xs text-gray-400 mt-1">Cancel before this window = free. Inside it = the cancellation fee applies (paid plans).</p>
+                </Field>
+                <Field label="Cancellation policy (clients agree to this before booking)">
+                  <textarea
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm min-h-[90px] focus:outline-none focus:ring-2 focus:ring-violet-200"
+                    value={(form.cancellationPolicy as string) ?? ""}
+                    onChange={(e) => f("cancellationPolicy", e.target.value)}
+                    placeholder="Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee…" />
+                  <p className="text-xs text-gray-400 mt-1">Shown on your booking page — clients must accept it before they can book.</p>
                 </Field>
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div>
@@ -194,9 +202,15 @@ export default function SettingsPage() {
               <div className="p-6 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Payments &amp; fees</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Configure deposit collection and no-show protection.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Configure deposit collection and no-show / cancellation protection.</p>
                 </div>
                 <hr className="border-gray-100" />
+                {(biz?.plan ?? "FREE") === "FREE" && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    🔒 Deposits, no-show & cancellation fees are a <span className="font-semibold">paid-plan</span> feature. On the Free plan no money is collected at booking and clients can cancel at any time for free.{" "}
+                    <button type="button" className="underline font-semibold" onClick={() => setSection("billing")}>Upgrade</button>
+                  </div>
+                )}
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div>
                     <p className="text-sm font-medium text-gray-700">Require deposit at booking</p>
@@ -224,6 +238,15 @@ export default function SettingsPage() {
                       onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Charged to the card on file when you mark a confirmed appointment as a no-show.</p>
+                </Field>
+                <Field label="Late-cancellation fee ($, 0 = disabled)">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 shrink-0">$</span>
+                    <Input type="number" min={0} step="0.01"
+                      value={(((form.cancellationFeeCents as number) ?? 0) / 100).toString()}
+                      onChange={(e) => f("cancellationFeeCents", Math.round(Number(e.target.value) * 100))} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Charged to the card on file when a client cancels <em>inside</em> the cancellation window (paid plans only). Free if they cancel earlier.</p>
                 </Field>
               </div>
             )}

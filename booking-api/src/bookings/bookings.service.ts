@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PaymentsService } from '../payments/payments.service';
 import { CreateAppointmentDto, RescheduleDto, StatusDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { Prisma } from '@prisma/client';
@@ -15,6 +16,7 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private payments: PaymentsService,
   ) {}
 
   async findAll(
@@ -277,8 +279,22 @@ export class BookingsService {
 
     await this.logAction('APPOINTMENT', id, 'UPDATE_STATUS', { status: dto.status });
 
+    let cancelFee: { charged: boolean; feeCents: number; reason?: string } | undefined;
     if (dto.status === 'CANCELLED') {
       await this.notifications.cancelReminders(id);
+
+      // Late-cancellation fee. PAID plans only; client-initiated cancels only
+      // (byStaff=false — an owner/staff cancel never charges the client). It's a
+      // "late" cancel when we're already inside the cancellation window. Free tier
+      // and early cancels are always free. Best-effort: never blocks the cancel.
+      const biz = updated.business;
+      if (!byStaff && biz && biz.plan !== 'FREE' && biz.cancellationFeeCents > 0) {
+        const cutoff = new Date(updated.startsAt.getTime() - biz.cancellationWindowHours * 3600 * 1000);
+        if (new Date() > cutoff) {
+          cancelFee = await this.payments.chargeCancellationFee(id, updated.businessId);
+        }
+      }
+
       if (byStaff) {
         await this.notifications.sendStaffCancellation(updated);
       } else {
@@ -293,7 +309,7 @@ export class BookingsService {
       await this.notifications.sendReviewRequest(full);
     }
 
-    return updated;
+    return { ...updated, cancelFee };
   }
 
   // Auto-fill: when a slot opens (cancellation), notify the oldest waiting

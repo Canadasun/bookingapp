@@ -170,8 +170,9 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 
     if (!apt) return;
 
-    // Gate SMS reminders behind PRO plan
-    const isPro = apt.business.plan === 'PRO';
+    // SMS reminders are a PAID-plan feature (BASIC + PRO). Free tier gets email
+    // reminders only — no texts to clients.
+    const smsEnabled = apt.business.plan !== 'FREE';
 
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     // HMAC manage token so the link proves the recipient got the email (the
@@ -243,7 +244,7 @@ ${aptDetails(apt)}
 
       case 'reminder-2h': {
         if (apt.status === 'CANCELLED') break;
-        if (apt.client.phone && isPro) {
+        if (apt.client.phone && smsEnabled) {
           await this.sms.send({
             to: apt.client.phone,
             body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${format(apt.startsAt, 'h:mm a')}. ${manageUrl}`,

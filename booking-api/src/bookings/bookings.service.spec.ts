@@ -3,6 +3,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PaymentsService } from '../payments/payments.service';
 
 const SLOT_START = new Date('2024-03-04T14:00:00.000Z');
 const SLOT_END = new Date('2024-03-04T15:00:00.000Z');
@@ -80,6 +81,7 @@ async function buildService(prismaOverrides = {}, conflictExists = false) {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       BookingsService,
+      { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
       { provide: PrismaService, useValue: prisma },
       {
         provide: NotificationsService,
@@ -175,6 +177,7 @@ describe('BookingsService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           BookingsService,
+          { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: PrismaService, useValue: prisma },
           {
             provide: NotificationsService,
@@ -220,6 +223,7 @@ describe('BookingsService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           BookingsService,
+          { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: PrismaService, useValue: mockPrisma() },
           {
             provide: NotificationsService,
@@ -259,6 +263,7 @@ describe('BookingsService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           BookingsService,
+          { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: PrismaService, useValue: mockPrisma() },
           {
             provide: NotificationsService,
