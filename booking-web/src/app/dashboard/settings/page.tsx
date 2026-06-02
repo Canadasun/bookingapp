@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -17,7 +17,7 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
-type Section = "profile" | "booking" | "payments" | "online" | "notifications" | "billing";
+type Section = "profile" | "booking" | "payments" | "online" | "notifications" | "security" | "billing";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
@@ -25,6 +25,7 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: str
   { id: "payments",      label: "Payments & fees",    icon: DollarSign,  desc: "Deposits, no-show fees" },
   { id: "online",        label: "Online booking",     icon: Globe,       desc: "Booking page link, availability" },
   { id: "notifications", label: "Notifications",      icon: Bell,        desc: "Emails & SMS sent to clients" },
+  { id: "security",      label: "Security",           icon: ShieldCheck, desc: "Two-factor sign-in, password" },
   { id: "billing",       label: "Billing & plan",     icon: CreditCard,  desc: "Subscription plan, upgrade" },
 ];
 
@@ -48,6 +49,26 @@ export default function SettingsPage() {
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
+
+  // Two-factor: seeded from the session, updated optimistically on toggle.
+  const [twoFA, setTwoFA] = useState<boolean>(user?.twoFactorEnabled ?? false);
+  const [twoFAMethod, setTwoFAMethod] = useState<"EMAIL" | "SMS">(user?.twoFactorMethod ?? "EMAIL");
+  const [twoFASaving, setTwoFASaving] = useState(false);
+
+  async function saveTwoFactor(enabled: boolean, method: "EMAIL" | "SMS") {
+    setTwoFASaving(true);
+    const prev = { enabled: twoFA, method: twoFAMethod };
+    setTwoFA(enabled); setTwoFAMethod(method);
+    try {
+      await api.auth.setTwoFactor(enabled, method);
+      toast.success(enabled ? "Two-factor sign-in enabled" : "Two-factor sign-in turned off");
+    } catch (err) {
+      setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
+      toast.error(err instanceof Error ? err.message : "Could not update two-factor");
+    } finally {
+      setTwoFASaving(false);
+    }
+  }
 
   useEffect(() => {
     if (!bizId) {
@@ -354,6 +375,82 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {section === "security" && (
+              <div className="p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Security</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Protect your account with a second step at sign-in.</p>
+                </div>
+                <hr className="border-gray-100" />
+
+                <div className="flex items-start justify-between gap-4 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Two-factor sign-in</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      After your password, we&apos;ll ask for a one-time code before letting you in.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={twoFA}
+                    disabled={twoFASaving}
+                    onClick={() => saveTwoFactor(!twoFA, twoFAMethod)}
+                    className={cn(
+                      "relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50",
+                      twoFA ? "bg-violet-600" : "bg-gray-300",
+                    )}
+                  >
+                    <span className={cn(
+                      "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform",
+                      twoFA && "translate-x-5",
+                    )} />
+                  </button>
+                </div>
+
+                {twoFA && (
+                  <div className="pt-1">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Send the code by</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["EMAIL", "SMS"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          disabled={twoFASaving}
+                          onClick={() => saveTwoFactor(true, m)}
+                          className={cn(
+                            "rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
+                            twoFAMethod === m
+                              ? "border-violet-300 bg-violet-50 text-violet-700"
+                              : "border-gray-200 text-gray-600 hover:border-gray-300",
+                          )}
+                        >
+                          {m === "EMAIL" ? "Email" : "Text message"}
+                        </button>
+                      ))}
+                    </div>
+                    {twoFAMethod === "SMS" && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Make sure your account has a mobile number on file — codes fall back to email otherwise.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <hr className="border-gray-100" />
+                <div className="flex items-start justify-between gap-4 py-1">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Password</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Change the password you use to sign in.</p>
+                  </div>
+                  <a href="/change-password"
+                    className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors shrink-0">
+                    Change
+                  </a>
+                </div>
+              </div>
+            )}
+
             {section === "billing" && (
               <div className="p-6 space-y-5">
                 <div>
@@ -440,7 +537,7 @@ export default function SettingsPage() {
             )}
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-              {section !== "billing" && section !== "notifications" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
+              {section !== "billing" && section !== "notifications" && section !== "security" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
             </div>
           </form>
         </div>

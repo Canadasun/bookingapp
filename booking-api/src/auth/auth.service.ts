@@ -118,8 +118,50 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    // Opt-in 2FA: password ok, but require a one-time code before issuing tokens.
+    if (user.twoFactorEnabled) {
+      const challengeId = await this.createLoginChallenge(user);
+      return { twoFactorRequired: true as const, challengeId, method: user.twoFactorMethod };
+    }
+
     await this.recordLoginAndMaybeAlert(user, ctx);
     return this.issueTokens(user);
+  }
+
+  // ── 2FA (one-time code) ─────────────────────────────────────────────────────
+  private async createLoginChallenge(user: User): Promise<string> {
+    const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+    const codeHash = createHash('sha256').update(code).digest('hex');
+    const ch = await this.prisma.otpChallenge.create({
+      data: { userId: user.id, codeHash, method: user.twoFactorMethod, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+    });
+    await this.notifications.sendOtp(user.id, code, user.twoFactorMethod);
+    return ch.id;
+  }
+
+  async verifyTwoFactor(challengeId: string, code: string, ctx?: { ip?: string; userAgent?: string }) {
+    const ch = await this.prisma.otpChallenge.findUnique({ where: { id: challengeId } });
+    if (!ch || ch.consumedAt || ch.expiresAt < new Date() || ch.attempts >= 5) {
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+    const codeHash = createHash('sha256').update(code).digest('hex');
+    if (codeHash !== ch.codeHash) {
+      await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { attempts: { increment: 1 } } });
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+    await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { consumedAt: new Date() } });
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ch.userId } });
+    await this.recordLoginAndMaybeAlert(user, ctx);
+    return this.issueTokens(user);
+  }
+
+  async setTwoFactor(userId: string, enabled: boolean, method?: 'EMAIL' | 'SMS') {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: enabled, ...(method ? { twoFactorMethod: method } : {}) },
+    });
+    return { ok: true, twoFactorEnabled: enabled };
   }
 
   // Record the sign-in and, if it's from a NEW device (but not the user's very
@@ -208,6 +250,8 @@ export class AuthService {
         businessId: user.businessId,
         staffId,
         mustResetPassword: user.mustResetPassword,
+        twoFactorEnabled: user.twoFactorEnabled,
+        twoFactorMethod: user.twoFactorMethod,
       },
     };
   }

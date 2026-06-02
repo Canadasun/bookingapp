@@ -190,6 +190,9 @@ export const api = {
       ),
     changePassword: (currentPassword: string, newPassword: string) =>
       req<{ ok: boolean }>("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
+    // Turn two-factor sign-in on/off and pick the delivery method.
+    setTwoFactor: (enabled: boolean, method?: "EMAIL" | "SMS") =>
+      req<{ ok: boolean; twoFactorEnabled: boolean }>("/auth/2fa", { method: "POST", body: JSON.stringify({ enabled, method }) }),
   },
 
   payments: {

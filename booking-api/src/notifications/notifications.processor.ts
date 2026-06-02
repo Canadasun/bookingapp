@@ -51,8 +51,32 @@ export class NotificationProcessor extends WorkerHost {
     private configService: ConfigService,
   ) { super(); }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    // 2FA one-time code (email, or SMS if the method is SMS and a phone exists).
+    if (job.name === 'otp') {
+      const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
+      if (!user || !job.data.otpCode) return;
+      const code = job.data.otpCode;
+      if (job.data.otpMethod === 'SMS' && user.phone) {
+        await this.sms.send({ to: user.phone, body: `Your Pulse verification code is ${code}. It expires in 10 minutes.` });
+      } else {
+        await this.email.send({
+          to: user.email,
+          subject: `Your Pulse verification code: ${code}`,
+          html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Your verification code</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, enter this code to finish signing in. It expires in 10 minutes.</p>
+<div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:18px;text-align:center;margin:0 0 8px">
+  <p style="margin:0;color:#E9A23C;font-size:30px;font-weight:800;letter-spacing:6px">${code}</p>
+</div>
+<p style="margin:0;color:#9CA3AF;font-size:12px">If you didn't try to sign in, you can ignore this email.</p>
+`),
+        });
+      }
+      return;
+    }
 
     // Welcome email — new owner just registered.
     if (job.name === 'welcome') {

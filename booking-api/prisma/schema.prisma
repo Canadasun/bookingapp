@@ -282,12 +282,15 @@ model User {
   businessId   String?
   refreshToken String?
   mustResetPassword Boolean @default(false)
+  twoFactorEnabled  Boolean @default(false)
+  twoFactorMethod   String  @default("EMAIL") // EMAIL | SMS
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
   staff    Staff?
   loginEvents LoginEvent[]
+  otpChallenges OtpChallenge[]
 
   @@index([email])
   @@index([businessId])
@@ -306,6 +309,21 @@ model LoginEvent {
 
   @@index([userId])
   @@index([userId, deviceKey])
+}
+
+// Short-lived one-time code for 2FA login step-up. Code is stored hashed.
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  userId     String
+  codeHash   String
+  method     String    @default("EMAIL")
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Staff {

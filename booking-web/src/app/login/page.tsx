@@ -19,6 +19,14 @@ function LoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 2FA step: set once the password check passes for an account with 2FA on.
+  const [challenge, setChallenge] = useState<{ id: string; method: string } | null>(null);
+  const [code, setCode] = useState("");
+
+  function go() {
+    router.push(next.startsWith("/") ? next : "/dashboard");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !password) return;
@@ -33,12 +41,70 @@ function LoginForm() {
         const body = await res.json() as { message?: string };
         throw new Error(body.message ?? "Invalid credentials");
       }
-      router.push(next.startsWith("/") ? next : "/dashboard");
+      const data = await res.json() as { twoFactorRequired?: boolean; challengeId?: string; method?: string };
+      if (data.twoFactorRequired && data.challengeId) {
+        setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL" });
+        return;
+      }
+      go();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challenge || code.trim().length < 4) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/2fa-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId: challenge.id, code: code.trim() }),
+      });
+      if (!res.ok) {
+        const body = await res.json() as { message?: string };
+        throw new Error(body.message ?? "Invalid or expired code");
+      }
+      go();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <form onSubmit={handleVerify} className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Enter your verification code</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            We sent a 6-digit code to your {challenge.method === "SMS" ? "phone" : "email"}. It expires in 10 minutes.
+          </p>
+        </div>
+        <Input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="123456"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          required
+          autoFocus
+          className="text-center text-lg tracking-[0.4em]"
+        />
+        <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
+        <button
+          type="button"
+          onClick={() => { setChallenge(null); setCode(""); }}
+          className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
+        >
+          ← Back to sign in
+        </button>
+      </form>
+    );
   }
 
   return (

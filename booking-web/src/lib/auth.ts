@@ -5,6 +5,8 @@ export interface SessionUser {
   role: "ADMIN" | "OWNER" | "STAFF" | "CLIENT";
   businessId: string | null;
   staffId: string | null;
+  twoFactorEnabled?: boolean;
+  twoFactorMethod?: "EMAIL" | "SMS";
 }
 
 export function getUser(): SessionUser | null {

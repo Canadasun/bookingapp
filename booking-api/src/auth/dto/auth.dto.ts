@@ -38,7 +38,19 @@ export const ResetPasswordSchema = z.object({
   newPassword: z.string().min(8),
 });
 
+export const VerifyTwoFactorSchema = z.object({
+  challengeId: z.string().min(1),
+  code: z.string().trim().min(4).max(8),
+});
+
+export const SetTwoFactorSchema = z.object({
+  enabled: z.boolean(),
+  method: z.enum(['EMAIL', 'SMS']).optional(),
+});
+
 export type RegisterDto = z.infer<typeof RegisterSchema>;
+export type VerifyTwoFactorDto = z.infer<typeof VerifyTwoFactorSchema>;
+export type SetTwoFactorDto = z.infer<typeof SetTwoFactorSchema>;
 export type LoginDto = z.infer<typeof LoginSchema>;
 export type RefreshDto = z.infer<typeof RefreshSchema>;
 export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;

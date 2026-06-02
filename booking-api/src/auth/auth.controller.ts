@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterSchema, LoginSchema, ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema, RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
+import { RegisterSchema, LoginSchema, ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyTwoFactorSchema, SetTwoFactorSchema, RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto, VerifyTwoFactorDto, SetTwoFactorDto } from './dto/auth.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -28,6 +28,25 @@ export class AuthController {
     const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
     const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
     return this.authService.login(dto, { ip: fwd || req.ip, userAgent });
+  }
+
+  // Public — second factor: exchange a valid OTP (from the login challenge) for
+  // tokens. Throttled like login.
+  @Post('2fa/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  verifyTwoFactor(@Body(new ZodValidationPipe(VerifyTwoFactorSchema)) dto: VerifyTwoFactorDto, @Req() req: Request) {
+    const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+    const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
+    return this.authService.verifyTwoFactor(dto.challengeId, dto.code, { ip: fwd || req.ip, userAgent });
+  }
+
+  // Authenticated — turn 2FA on/off and pick the delivery method.
+  @Post('2fa')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  setTwoFactor(@CurrentUser() user: User, @Body(new ZodValidationPipe(SetTwoFactorSchema)) dto: SetTwoFactorDto) {
+    return this.authService.setTwoFactor(user.id, dto.enabled, dto.method);
   }
 
   @Post('refresh')

@@ -1131,18 +1131,65 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [showPw, setShowPw]     = useState(false);
+  // 2FA: set once a password passes for an account with two-factor enabled.
+  const [challenge, setChallenge] = useState<{id:string;method:string}|null>(null);
+  const [code, setCode]         = useState('');
 
   async function login() {
     if (!email||!password) return;
     setLoading(true);
     try {
-      const res = await api<{accessToken:string;refreshToken:string;user:User}>('/auth/login',{
+      const res = await api<{accessToken?:string;refreshToken?:string;user?:User;twoFactorRequired?:boolean;challengeId?:string;method?:string}>('/auth/login',{
         method:'POST', body:JSON.stringify({email,password}),
       });
-      onLogin(res.accessToken, res.refreshToken, res.user);
+      if (res.twoFactorRequired && res.challengeId) {
+        setChallenge({ id: res.challengeId, method: res.method ?? 'EMAIL' });
+        return;
+      }
+      onLogin(res.accessToken!, res.refreshToken!, res.user!);
     } catch {
       Alert.alert('Sign in failed','Check your email and password and try again.');
     } finally { setLoading(false); }
+  }
+
+  async function verify() {
+    if (!challenge || code.trim().length<4) return;
+    setLoading(true);
+    try {
+      const res = await api<{accessToken:string;refreshToken:string;user:User}>('/auth/2fa/verify',{
+        method:'POST', body:JSON.stringify({ challengeId: challenge.id, code: code.trim() }),
+      });
+      onLogin(res.accessToken, res.refreshToken, res.user);
+    } catch {
+      Alert.alert('Verification failed','That code is invalid or expired. Please try again.');
+    } finally { setLoading(false); }
+  }
+
+  if (challenge) {
+    return (
+      <SafeAreaView style={s.screen}>
+        <KeyboardAvoidingView style={s.loginWrap} behavior={Platform.OS==='ios'?'padding':'height'}>
+          <View style={s.loginLogo}>
+            <View style={s.logoIcon}><Ionicons name="shield-checkmark" size={28} color="#fff"/></View>
+            <Text style={s.logoText}>Pulse</Text>
+          </View>
+          <Text style={s.loginTitle}>Enter your code</Text>
+          <Text style={s.loginSub}>We sent a 6-digit code to your {challenge.method==='SMS'?'phone':'email'}. It expires in 10 minutes.</Text>
+
+          <Text style={[s.fieldLabel,{marginTop:12}]}>Verification code</Text>
+          <TextInput style={[s.input,{textAlign:'center',letterSpacing:8,fontSize:20}]} placeholder="123456" placeholderTextColor={GRAY_400}
+            keyboardType="number-pad" value={code} onChangeText={(t)=>setCode(t.replace(/\D/g,'').slice(0,6))} onSubmitEditing={verify} autoFocus/>
+
+          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||code.trim().length<4} onPress={verify}>
+            {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Verify &amp; sign in</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={()=>{setChallenge(null);setCode('');}}>
+            <Text style={s.authSwitchLink}>← Back to sign in</Text>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
   }
 
   return (

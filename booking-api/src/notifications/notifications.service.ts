@@ -110,6 +110,11 @@ export class NotificationsService {
     );
   }
 
+  // 2FA one-time code, by email or SMS.
+  async sendOtp(userId: string, code: string, method: string) {
+    await this.queue.add('otp', { userId, otpCode: code, otpMethod: method }, { removeOnComplete: true, attempts: 3 });
+  }
+
   // Marketing campaign — one job per recipient so the queue can retry individually.
   async sendCampaignMessage(campaignId: string, clientId: string) {
     await this.queue.add(

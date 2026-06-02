@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API = (process.env.API_INTERNAL_URL ?? "http://localhost:3001") + "/api";
 
+// Second factor: exchange the OTP from the login challenge for session cookies.
+// Mirrors /api/auth/login's cookie handling exactly.
 export async function POST(req: NextRequest) {
-  const body = await req.json() as { email: string; password: string };
-  const upstream = await fetch(`${API}/auth/login`, {
+  const body = await req.json() as { challengeId: string; code: string };
+  const upstream = await fetch(`${API}/auth/2fa/verify`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // Forward the real client device/IP so the API can detect new-device logins.
       "x-client-user-agent": req.headers.get("user-agent") ?? "",
       "x-forwarded-for": req.headers.get("x-forwarded-for") ?? "",
     },
@@ -29,8 +30,6 @@ export async function POST(req: NextRequest) {
   const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });
   res.cookies.set("booking_token", data.accessToken, {
-    // HttpOnly: the browser sends it automatically to the same-origin /proxy and
-    // the API reads it from the cookie — client JS never touches it (XSS-safe).
     httpOnly: true,
     secure,
     sameSite: "lax",
@@ -44,7 +43,6 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
-  // Readable user profile cookie so client JS knows who is logged in
   res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
     httpOnly: false,
     secure,
