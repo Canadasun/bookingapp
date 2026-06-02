@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 // Public marketing/legal site (where Terms & Privacy live).
-const WEB_URL = 'https://idowu.fyi';
+const WEB_URL = 'https://www.pulseappointments.com';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; error?: Error }

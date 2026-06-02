@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           </section>
           <section>
             <h2 className="text-base font-semibold text-slate-900 mb-2">6. Your choices</h2>
-            <p>You can access, correct, or delete your data, and opt out of non-essential messages. Contact us at support@idowu.fyi to make a request.</p>
+            <p>You can access, correct, or delete your data, and opt out of non-essential messages. Contact us at support@pulseappointments.com to make a request.</p>
           </section>
         </div>
 

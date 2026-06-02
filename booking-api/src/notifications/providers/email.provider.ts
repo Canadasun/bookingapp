@@ -18,7 +18,7 @@ export class ResendEmailProvider implements EmailProvider {
       return;
     }
 
-    const verifiedFrom  = process.env.RESEND_VERIFIED_FROM;      // noreply@idowu.fyi (once DNS verified)
+    const verifiedFrom  = process.env.RESEND_VERIFIED_FROM;      // noreply@pulseappointments.com (once DNS verified)
     const sharedFrom    = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
     const testRedirect  = process.env.RESEND_TEST_REDIRECT === 'true';
     const adminEmail    = process.env.ADMIN_ALERT_EMAIL;
@@ -34,7 +34,7 @@ export class ResendEmailProvider implements EmailProvider {
     const redirectBanner = shouldRedirect
       ? `<tr><td style="padding:8px 32px;background:#FEF3C7;border-bottom:2px dashed #F59E0B">
           <p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ TEST REDIRECT — real recipient: <span style="color:#1D4ED8">${payload.to}</span></p>
-          <p style="margin:2px 0 0;font-size:11px;color:#78350F">Domain idowu.fyi DNS pending — add records in Porkbun to send directly.</p>
+          <p style="margin:2px 0 0;font-size:11px;color:#78350F">Domain pulseappointments.com DNS pending — verify it in Resend to send directly.</p>
          </td></tr>`
       : '';
 

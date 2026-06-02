@@ -41,7 +41,7 @@ export default function TermsPage() {
           </section>
           <section>
             <h2 className="text-base font-semibold text-slate-900 mb-2">7. Contact</h2>
-            <p>Questions about these Terms? Contact us at support@idowu.fyi.</p>
+            <p>Questions about these Terms? Contact us at support@pulseappointments.com.</p>
           </section>
         </div>
 
