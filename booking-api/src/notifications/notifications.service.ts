@@ -89,6 +89,17 @@ export class NotificationsService {
     await this.queue.add('gift-card-issued', { giftCardId }, { removeOnComplete: true, attempts: 3 });
   }
 
+  // Welcome a newly-registered owner.
+  async sendWelcome(userId: string) {
+    await this.queue.add('welcome', { userId }, { removeOnComplete: true, attempts: 3 });
+  }
+
+  // Email a password-reset link. The token is single-use (signed against the
+  // current password hash) and short-lived — see AuthService.
+  async sendPasswordReset(userId: string, resetToken: string) {
+    await this.queue.add('password-reset', { userId, resetToken }, { removeOnComplete: true, attempts: 3 });
+  }
+
   // Marketing campaign — one job per recipient so the queue can retry individually.
   async sendCampaignMessage(campaignId: string, clientId: string) {
     await this.queue.add(

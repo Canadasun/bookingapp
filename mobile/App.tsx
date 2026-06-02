@@ -6,8 +6,11 @@ import React, { useEffect, useState, useCallback, useRef, Component } from 'reac
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, ScrollView,
   StyleSheet, ActivityIndicator, Alert, SafeAreaView, Platform,
-  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler,
+  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler, Linking,
 } from 'react-native';
+
+// Public marketing/legal site (where Terms & Privacy live).
+const WEB_URL = 'https://idowu.fyi';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; error?: Error }
@@ -1123,7 +1126,7 @@ const dst = StyleSheet.create({
 });
 
 // ── Login screen ─────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin, onRegister }: { onLogin:(t:string,r:string,u:User)=>void; onRegister:()=>void }) {
+function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:string,u:User)=>void; onRegister:()=>void; onForgot:()=>void }) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
@@ -1169,6 +1172,10 @@ function LoginScreen({ onLogin, onRegister }: { onLogin:(t:string,r:string,u:Use
           {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Sign in</Text>}
         </TouchableOpacity>
 
+        <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={onForgot}>
+          <Text style={s.authSwitchLink}>Forgot password?</Text>
+        </TouchableOpacity>
+
         <View style={s.authSwitch}>
           <Text style={s.authSwitchText}>New here? </Text>
           <TouchableOpacity onPress={onRegister}>
@@ -1176,6 +1183,58 @@ function LoginScreen({ onLogin, onRegister }: { onLogin:(t:string,r:string,u:Use
           </TouchableOpacity>
         </View>
 
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+// ── Forgot password: emails a reset link (reset completes on the web page) ────
+function ForgotPasswordScreen({ onBack }: { onBack:()=>void }) {
+  const [email, setEmail]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent]     = useState(false);
+
+  async function submit() {
+    if (!email.trim()) { Alert.alert('Email','Enter your account email.'); return; }
+    setLoading(true);
+    try {
+      await api('/auth/forgot-password', { method:'POST', body: JSON.stringify({ email: email.trim() }) });
+      setSent(true); // always succeeds (server never reveals if the email exists)
+    } catch (e) {
+      Alert.alert('Something went wrong', e instanceof Error ? e.message : 'Try again.');
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <KeyboardAvoidingView style={s.loginWrap} behavior={Platform.OS==='ios'?'padding':'height'}>
+        <View style={s.loginLogo}>
+          <View style={s.logoIcon}><Ionicons name="key" size={24} color="#fff"/></View>
+          <Text style={s.logoText}>BookingApp</Text>
+        </View>
+        <Text style={s.loginTitle}>Reset password</Text>
+        {sent ? (
+          <>
+            <Text style={s.loginSub}>If an account exists for {email.trim()}, we’ve emailed a reset link. It expires in 30 minutes.</Text>
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={onBack}>
+              <Text style={s.btnPrimaryText}>Back to sign in</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={s.loginSub}>Enter your email and we’ll send you a reset link.</Text>
+            <Text style={s.fieldLabel}>Email</Text>
+            <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
+              keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} onSubmitEditing={submit}/>
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||!email} onPress={submit}>
+              {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Send reset link</Text>}
+            </TouchableOpacity>
+            <View style={s.authSwitch}>
+              <Text style={s.authSwitchText}>Remembered it? </Text>
+              <TouchableOpacity onPress={onBack}><Text style={s.authSwitchLink}>Sign in</Text></TouchableOpacity>
+            </View>
+          </>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1189,6 +1248,7 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
   const [phone, setPhone]           = useState('');
   const [password, setPassword]     = useState('');
   const [showPw, setShowPw]         = useState(false);
+  const [terms, setTerms]           = useState(false);
   const [loading, setLoading]       = useState(false);
 
   async function submit() {
@@ -1196,6 +1256,7 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
     if (businessName.trim().length < 2) { Alert.alert('Business name','Enter your business name.'); return; }
     if (!email.trim()) { Alert.alert('Email','Enter your email.'); return; }
     if (password.length < 8) { Alert.alert('Weak password','Password must be at least 8 characters.'); return; }
+    if (!terms) { Alert.alert('Terms required','Please accept the Terms of Service & Privacy Policy to continue.'); return; }
     let normalizedPhone: string | undefined;
     if (phone.trim()) {
       const np = normalizePhoneClient(phone);
@@ -1257,7 +1318,19 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading} onPress={submit}>
+          <TouchableOpacity style={[s.policyCheck,{marginTop:18}]} activeOpacity={0.7} onPress={()=>setTerms(t=>!t)}>
+            <View style={[s.checkbox, terms&&s.checkboxActive]}>
+              {terms&&<Ionicons name="checkmark" size={12} color="#fff"/>}
+            </View>
+            <Text style={s.policyCheckText}>
+              I agree to the{' '}
+              <Text style={s.authSwitchLink} onPress={()=>Linking.openURL(`${WEB_URL}/terms`)}>Terms of Service</Text>
+              {' '}&amp;{' '}
+              <Text style={s.authSwitchLink} onPress={()=>Linking.openURL(`${WEB_URL}/privacy`)}>Privacy Policy</Text>
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.btnPrimary,{marginTop:18, opacity:terms?1:0.6}]} disabled={loading} onPress={submit}>
             {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Create account</Text>}
           </TouchableOpacity>
 
@@ -1469,7 +1542,7 @@ export default function App() {
   const [msgClient, setMsgClient]     = useState<Client|null>(null);
   const [_, forceRender]              = useState(0);
   const [booting, setBooting]         = useState(true);
-  const [authView, setAuthView]       = useState<'login'|'register'>('login');
+  const [authView, setAuthView]       = useState<'login'|'register'|'forgot'>('login');
 
   useEffect(()=>{ const unsub=()=>forceRender(n=>n+1); listeners.add(unsub); return ()=>{ listeners.delete(unsub); }; },[]);
 
@@ -1503,7 +1576,9 @@ export default function App() {
     <ErrorBoundary>
       {authView === 'register'
         ? <RegisterScreen onRegistered={handleLogin} onBack={()=>setAuthView('login')}/>
-        : <LoginScreen onLogin={handleLogin} onRegister={()=>setAuthView('register')}/>}
+        : authView === 'forgot'
+        ? <ForgotPasswordScreen onBack={()=>setAuthView('login')}/>
+        : <LoginScreen onLogin={handleLogin} onRegister={()=>setAuthView('register')} onForgot={()=>setAuthView('forgot')}/>}
     </ErrorBoundary>
   );
 

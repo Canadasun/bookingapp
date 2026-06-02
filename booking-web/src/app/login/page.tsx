@@ -49,7 +49,10 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)} required autoFocus />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-sm font-medium text-slate-700">Password</label>
+          <Link href="/forgot-password" className="text-xs text-violet-600 hover:underline font-medium">Forgot password?</Link>
+        </div>
         <div className="relative">
           <Input type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
             onChange={(e) => setPassword(e.target.value)} required className="pr-10" />

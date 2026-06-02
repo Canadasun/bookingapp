@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcrypt';
 import { User } from '@prisma/client';
@@ -15,6 +16,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -58,7 +60,56 @@ export class AuthService {
       return user;
     });
 
+    // Welcome the new owner (best-effort — never block signup on email).
+    if (result.role === 'OWNER') {
+      this.notifications.sendWelcome(result.id).catch(() => {});
+    }
+
     return this.issueTokens(result);
+  }
+
+  // ── Self-service password reset ─────────────────────────────────────────────
+  // The reset token is a short-lived JWT signed with JWT_SECRET + the user's
+  // CURRENT password hash. That makes it single-use for free: once the password
+  // changes the hash changes, so the signature no longer verifies. The userId is
+  // carried in the (readable) payload so we can look up the hash to verify.
+  private resetSecret(passwordHash: string): string {
+    return `${process.env.JWT_SECRET ?? ''}${passwordHash}`;
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Always succeed so we never reveal whether an email is registered.
+    if (user) {
+      const token = this.jwt.sign(
+        { sub: user.id, kind: 'reset' },
+        { secret: this.resetSecret(user.passwordHash), expiresIn: '30m' },
+      );
+      await this.notifications.sendPasswordReset(user.id, token);
+    }
+    return { ok: true };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    if (newPassword.length < 8) throw new BadRequestException('New password must be at least 8 characters');
+    // Decode (unverified) to find which user the token is for, then verify with
+    // that user's hash-derived secret.
+    const decoded = this.jwt.decode(token) as { sub?: string; kind?: string } | null;
+    if (!decoded?.sub || decoded.kind !== 'reset') throw new BadRequestException('Invalid or expired reset link');
+    const user = await this.prisma.user.findUnique({ where: { id: decoded.sub } });
+    if (!user) throw new BadRequestException('Invalid or expired reset link');
+    try {
+      this.jwt.verify(token, { secret: this.resetSecret(user.passwordHash) });
+    } catch {
+      throw new BadRequestException('Invalid or expired reset link');
+    }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      // Clear the refresh token so existing sessions are logged out, and clear any
+      // forced-reset flag since the user has now set a fresh password.
+      data: { passwordHash: await bcrypt.hash(newPassword, 10), refreshToken: null, mustResetPassword: false },
+    });
+    return { ok: true };
   }
 
   async login(dto: LoginDto) {

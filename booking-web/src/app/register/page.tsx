@@ -11,7 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [form, setForm] = useState({ name: "", businessName: "", phone: "", email: "", password: "", confirm: "" });
+  const [terms, setTerms] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errs, setErrs] = useState<Partial<typeof form>>({});
@@ -19,10 +20,12 @@ export default function RegisterPage() {
   function validate() {
     const e: Partial<typeof form> = {};
     if (!form.name.trim()) e.name = "Required";
+    if (!form.businessName.trim()) e.businessName = "Required";
     if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
     if (form.password.length < 8) e.password = "At least 8 characters";
     if (form.password !== form.confirm) e.confirm = "Passwords don't match";
     setErrs(e);
+    if (!terms) { toast.error("Please accept the Terms of Service & Privacy Policy"); return false; }
     return Object.keys(e).length === 0;
   }
 
@@ -35,7 +38,11 @@ export default function RegisterPage() {
       const regRes = await fetch("/proxy/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, role: "OWNER" }),
+        body: JSON.stringify({
+          name: form.name, email: form.email, password: form.password, role: "OWNER",
+          businessName: form.businessName,
+          ...(form.phone.trim() ? { businessPhone: form.phone.trim() } : {}),
+        }),
       });
       if (!regRes.ok) {
         const body = await regRes.json().catch(() => ({})) as Record<string, unknown>;
@@ -76,10 +83,20 @@ export default function RegisterPage() {
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Full name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Your name</label>
                 <Input placeholder="Jane Smith" value={form.name} onChange={(e) => f("name", e.target.value)}
                   className={errs.name ? "border-red-400" : ""} autoFocus />
                 {errs.name && <p className="text-xs text-red-500 mt-1">{errs.name}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Business name</label>
+                <Input placeholder="Jane's Salon" value={form.businessName} onChange={(e) => f("businessName", e.target.value)}
+                  className={errs.businessName ? "border-red-400" : ""} />
+                {errs.businessName && <p className="text-xs text-red-500 mt-1">{errs.businessName}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Business phone <span className="text-slate-400 font-normal">(optional)</span></label>
+                <Input type="tel" placeholder="+1 555 123 4567" value={form.phone} onChange={(e) => f("phone", e.target.value)} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
@@ -105,7 +122,18 @@ export default function RegisterPage() {
                   onChange={(e) => f("confirm", e.target.value)} className={errs.confirm ? "border-red-400" : ""} />
                 {errs.confirm && <p className="text-xs text-red-500 mt-1">{errs.confirm}</p>}
               </div>
-              <Button type="submit" loading={loading} className="w-full" size="lg">Create account</Button>
+              <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+                <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-violet-600" />
+                <span className="text-xs text-slate-500 leading-relaxed">
+                  I agree to the{" "}
+                  <Link href="/terms" target="_blank" className="text-violet-600 hover:underline">Terms of Service</Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" target="_blank" className="text-violet-600 hover:underline">Privacy Policy</Link>.
+                </span>
+              </label>
+
+              <Button type="submit" loading={loading} disabled={!terms} className="w-full" size="lg">Create account</Button>
             </form>
 
             <p className="text-center text-sm text-slate-500 mt-6">
@@ -114,10 +142,6 @@ export default function RegisterPage() {
             </p>
           </CardContent>
         </Card>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          By registering you accept our Terms of Service and Privacy Policy.
-        </p>
       </div>
     </div>
   );

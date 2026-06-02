@@ -29,7 +29,18 @@ export const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8),
 });
 
+export const ForgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
 export type RegisterDto = z.infer<typeof RegisterSchema>;
 export type LoginDto = z.infer<typeof LoginSchema>;
 export type RefreshDto = z.infer<typeof RefreshSchema>;
 export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
+export type ForgotPasswordDto = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordDto = z.infer<typeof ResetPasswordSchema>;

@@ -50,8 +50,50 @@ export class NotificationProcessor extends WorkerHost {
     private configService: ConfigService,
   ) { super(); }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    // Welcome email — new owner just registered.
+    if (job.name === 'welcome') {
+      const user = await this.prisma.user.findUnique({
+        where: { id: job.data.userId! },
+        include: { business: true },
+      });
+      if (!user) return;
+      const bizName = user.business?.name ?? 'your business';
+      await this.email.send({
+        to: user.email,
+        subject: `Welcome to BookingApp, ${user.name.split(' ')[0]}! 🎉`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Welcome aboard! 🎉</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, your account for <strong>${bizName}</strong> is ready. Here's how to get set up:</p>
+<ol style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.7">
+  <li>Add your services and prices</li>
+  <li>Add your team and their availability</li>
+  <li>Share your booking link and take your first appointment</li>
+</ol>
+<a href="${baseUrl}/dashboard" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Open your dashboard →</a>
+`),
+      });
+      return;
+    }
+
+    // Password reset — email the single-use reset link.
+    if (job.name === 'password-reset') {
+      const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
+      if (!user || !job.data.resetToken) return;
+      const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}`;
+      await this.email.send({
+        to: user.email,
+        subject: 'Reset your BookingApp password',
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Reset your password</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, we received a request to reset your password. This link expires in 30 minutes. If you didn't ask for this, you can safely ignore this email.</p>
+<a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset password →</a>
+`),
+      });
+      return;
+    }
 
     // Gift card issued — email the recipient their code.
     if (job.name === 'gift-card-issued') {
