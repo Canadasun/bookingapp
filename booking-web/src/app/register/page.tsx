@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errs, setErrs] = useState<Partial<typeof form>>({});
+  const [emailExists, setEmailExists] = useState(false);
 
   function validate() {
     const e: Partial<typeof form> = {};
@@ -47,7 +48,14 @@ export default function RegisterPage() {
       if (!regRes.ok) {
         const body = await regRes.json().catch(() => ({})) as Record<string, unknown>;
         const msg = typeof body.message === "string" ? body.message : "Registration failed";
-        toast.error(msg);
+        // Duplicate email: don't create a second account — point them to sign in
+        // or reset their password instead.
+        if (regRes.status === 409 || /already registered|already exists/i.test(msg)) {
+          setEmailExists(true);
+          toast.error("That email already has an account.");
+        } else {
+          toast.error(msg);
+        }
         return;
       }
       // Use the login route to set cookies properly
@@ -66,7 +74,7 @@ export default function RegisterPage() {
     }
   }
 
-  const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); };
+  const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); if (k === "email") setEmailExists(false); };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4">
@@ -81,6 +89,13 @@ export default function RegisterPage() {
 
         <Card>
           <CardContent className="pt-6">
+            {emailExists && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                An account with <span className="font-medium">{form.email}</span> already exists.{" "}
+                <Link href={`/login`} className="font-semibold underline">Sign in</Link>{" "}or{" "}
+                <Link href={`/forgot-password`} className="font-semibold underline">reset your password</Link>.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Your name</label>
