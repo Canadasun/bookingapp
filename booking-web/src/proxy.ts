@@ -16,7 +16,7 @@ function userFromCookie(req: NextRequest): { role?: string; mustResetPassword?: 
   }
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get("booking_token")?.value;
   const user = userFromCookie(req);

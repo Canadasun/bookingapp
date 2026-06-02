@@ -72,6 +72,9 @@ export class PaymentsService {
         currency: 'usd',
         customer,
         setup_future_usage: 'off_session', // save the card for a possible no-show charge
+        // Card-only: no redirect-based methods, so the client can confirm without
+        // supplying a return_url.
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { appointmentId, businessId, kind: 'deposit' },
         description: `Deposit — ${apt.service.name} @ ${b.name}`,
       });
@@ -86,6 +89,7 @@ export class PaymentsService {
       const intent = await this.getStripe().setupIntents.create({
         customer,
         usage: 'off_session',
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { appointmentId, businessId, kind: 'card_on_file' },
       });
       return { required: true, mode: 'setup' as const, clientSecret: intent.client_secret, amountCents: 0, publishableKey: this.publishableKey() };
