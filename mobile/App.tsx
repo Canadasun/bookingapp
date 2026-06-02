@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback, useRef, Component } from 'reac
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, ScrollView,
   StyleSheet, ActivityIndicator, Alert, SafeAreaView, Platform,
-  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler, Linking,
+  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler, Linking, Switch,
 } from 'react-native';
 
 // Public marketing/legal site (where Terms & Privacy live).
@@ -79,7 +79,7 @@ const GRAY_700   = '#374151';
 const GRAY_900   = '#111827';
 
 // ── Types ────────────────────────────────────────────────────────────────────
-interface User { id:string; name:string; email:string; role:string; staffId:string|null; businessId:string|null; mustResetPassword?:boolean }
+interface User { id:string; name:string; email:string; role:string; staffId:string|null; businessId:string|null; mustResetPassword?:boolean; twoFactorEnabled?:boolean; twoFactorMethod?:'EMAIL'|'SMS' }
 interface Appointment { id:string; startsAt:string; endsAt:string; status:string; notes?:string; cancelReason?:string; service:{name:string;durationMinutes:number;priceCents:number}; staff:{id:string;user:{name:string}}; client:{id:string;name:string;email:string;phone?:string} }
 interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
 interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null }
@@ -875,7 +875,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 }
 
 // ── More/Settings screen ─────────────────────────────────────────────────────
-type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'settings';
+type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'marketing' | 'giftcards' | 'packages' | 'settings';
 function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const [view, setView]         = useState<MoreView>('menu');
@@ -884,8 +884,27 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const [offers, setOffers]     = useState<any[] | null>(null);
   const [waitlist, setWaitlist] = useState<any[] | null>(null);
   const [reviews, setReviews]   = useState<any | null>(null);
+  const [campaigns, setCampaigns] = useState<any[] | null>(null);
+  const [giftcards, setGiftcards] = useState<any[] | null>(null);
+  const [packages, setPackages] = useState<any[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
+  // Two-factor sign-in (seeded from the session, updated optimistically).
+  const [twoFA, setTwoFA]       = useState<boolean>(getAuth().user?.twoFactorEnabled ?? false);
+  const [twoFAMethod, setTwoFAMethod] = useState<'EMAIL'|'SMS'>(getAuth().user?.twoFactorMethod ?? 'EMAIL');
+  const [twoFASaving, setTwoFASaving] = useState(false);
+
+  async function saveTwoFA(enabled: boolean, method: 'EMAIL'|'SMS') {
+    setTwoFASaving(true);
+    const prev = { enabled: twoFA, method: twoFAMethod };
+    setTwoFA(enabled); setTwoFAMethod(method);
+    try {
+      await api('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method }) });
+    } catch (e) {
+      setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
+      Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setTwoFASaving(false); }
+  }
 
   // Hardware back (Android) pops a sub-view back to the menu instead of leaving
   // the app. iOS keeps the on-screen ‹ back button in <Head/>.
@@ -905,6 +924,9 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${bizId()}/offers`)); }
       else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${bizId()}/waitlist`)); }
       else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${bizId()}/reviews`)); }
+      else if (v === 'marketing' && !campaigns){ setLoading(true); setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`)); }
+      else if (v === 'giftcards' && !giftcards){ setLoading(true); setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`)); }
+      else if (v === 'packages' && !packages){ setLoading(true); setPackages(await api<any[]>(`/businesses/${bizId()}/packages`)); }
       else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
@@ -1034,6 +1056,82 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'marketing') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Marketing"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(campaigns ?? []).map(c => (
+            <View key={c.id} style={ms.card}>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                <Text style={ms.rowTitle}>{c.name}</Text>
+                <View style={[ms.dealChip,{ backgroundColor: c.status==='SENT' ? '#D1FAE5' : c.status==='SENDING' ? '#FEF3C7' : GRAY_100 }]}>
+                  <Text style={[ms.dealChipText,{ color: c.status==='SENT' ? '#065F46' : GRAY_700 }]}>{c.status}</Text>
+                </View>
+              </View>
+              <Text style={[ms.rowMeta,{ marginTop:2 }]}>{c.channel} · {c.audience.toLowerCase()} audience</Text>
+              {!!c.subject && <Text style={[ms.rowMeta,{ marginTop:2 }]} numberOfLines={1}>{c.subject}</Text>}
+              <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>
+                {c.status==='SENT' ? `Sent to ${c.sentCount} of ${c.recipientCount}` : `${c.recipientCount} recipients`}
+                {c.sentAt ? ` · ${new Date(c.sentAt).toLocaleDateString()}` : ''}
+              </Text>
+            </View>
+          ))}
+          {campaigns && campaigns.length===0 && <Text style={ms.empty}>No campaigns yet. Create one on the web dashboard.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  if (view === 'giftcards') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Gift cards"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(giftcards ?? []).map(g => (
+            <View key={g.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor: g.status==='ACTIVE' ? '#10B981' : GRAY_200 }]}>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                <Text style={[ms.rowTitle,{ fontVariant:['tabular-nums'] }]}>{g.code}</Text>
+                <View style={[ms.dealChip,{ backgroundColor: g.status==='ACTIVE' ? '#D1FAE5' : GRAY_100 }]}>
+                  <Text style={[ms.dealChipText,{ color: g.status==='ACTIVE' ? '#065F46' : GRAY_700 }]}>{g.status}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop:6 }}>
+                <Text style={ms.rowMeta}>Balance</Text>
+                <PriceTag cents={g.balanceCents}/>
+              </View>
+              <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>
+                {g.recipientName ? `For ${g.recipientName} · ` : ''}of ${(g.initialCents/100).toFixed(2)} issued
+              </Text>
+            </View>
+          ))}
+          {giftcards && giftcards.length===0 && <Text style={ms.empty}>No gift cards issued yet.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  if (view === 'packages') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Packages"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {(packages ?? []).map(p => (
+            <View key={p.id} style={ms.row}>
+              <View style={[ms.dot,{ backgroundColor: p.active ? BRAND : GRAY_200 }]}/>
+              <View style={{ flex:1 }}>
+                <Text style={ms.rowTitle}>{p.name}</Text>
+                <Text style={ms.rowMeta}>{p.credits} credit{p.credits===1?'':'s'}{p.active ? '' : ' · inactive'}</Text>
+              </View>
+              <PriceTag cents={p.priceCents}/>
+            </View>
+          ))}
+          {packages && packages.length===0 && <Text style={ms.empty}>No packages yet. Create one on the web dashboard.</Text>}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
   if (view === 'settings') return (
     <SafeAreaView style={s.screen}>
       <Head title="Settings"/>
@@ -1055,7 +1153,38 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
             <Text style={ms.cardLabel}>Deposit required</Text>
             <Text style={ms.cardValue}>{(biz as any)?.requireDeposit ? `Yes · ${(biz as any)?.depositPercent ?? 25}%` : 'No'}</Text>
           </View>
-          <Text style={[ms.empty,{ marginTop:8 }]}>Editing settings is coming to the app — manage on the web dashboard for now.</Text>
+
+          <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>SECURITY</Text>
+          <View style={ms.card}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <View style={{ flex:1, paddingRight:12 }}>
+                <Text style={ms.cardValue}>Two-factor sign-in</Text>
+                <Text style={[ms.rowMeta,{ marginTop:2 }]}>Ask for a one-time code after your password.</Text>
+              </View>
+              <Switch
+                value={twoFA}
+                disabled={twoFASaving}
+                onValueChange={(v)=>saveTwoFA(v, twoFAMethod)}
+                trackColor={{ true: BRAND, false: GRAY_200 }}
+                thumbColor="#fff"
+              />
+            </View>
+            {twoFA && (
+              <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
+                {(['EMAIL','SMS'] as const).map(m => (
+                  <TouchableOpacity key={m} disabled={twoFASaving} onPress={()=>saveTwoFA(true, m)}
+                    style={[ms.methodChip, twoFAMethod===m && ms.methodChipOn]}>
+                    <Text style={[ms.methodChipText, twoFAMethod===m && { color:BRAND }]}>{m==='EMAIL'?'Email':'Text message'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {twoFA && twoFAMethod==='SMS' && (
+              <Text style={[ms.rowMeta,{ color:'#B45309', marginTop:8 }]}>Add a mobile number to your account — codes fall back to email otherwise.</Text>
+            )}
+          </View>
+
+          <Text style={[ms.empty,{ marginTop:8 }]}>Editing business settings is coming to the app — manage those on the web dashboard for now.</Text>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -1068,6 +1197,9 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
     { label:'Waitlist', icon:'hourglass-outline' as const, v:'waitlist' as MoreView },
     { label:'Reviews', icon:'star-outline' as const, v:'reviews' as MoreView },
+    { label:'Marketing', icon:'megaphone-outline' as const, v:'marketing' as MoreView },
+    { label:'Gift cards', icon:'gift-outline' as const, v:'giftcards' as MoreView },
+    { label:'Packages', icon:'cube-outline' as const, v:'packages' as MoreView },
     { label:'Settings', icon:'settings-outline' as const, v:'settings' as MoreView },
   ];
   return (
@@ -1105,6 +1237,9 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
 
 const ms = StyleSheet.create({
   row:       { flexDirection:'row', alignItems:'center', gap:12, backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10 },
+  methodChip:  { flex:1, alignItems:'center', paddingVertical:10, borderRadius:12, borderWidth:1, borderColor:GRAY_200 },
+  methodChipOn:{ borderColor:BRAND, backgroundColor:BRAND_LT },
+  methodChipText:{ fontSize:14, fontWeight:'600', color:GRAY_700 },
   dot:       { width:10, height:10, borderRadius:5 },
   rowTitle:  { fontSize:15, fontWeight:'600', color:GRAY_900 },
   rowMeta:   { fontSize:13, color:GRAY_500, marginTop:2 },
