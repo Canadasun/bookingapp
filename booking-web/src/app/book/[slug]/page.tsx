@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, Suspense, use } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState, useRef, Suspense, use } from "react";
+import { useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, addDays, parseISO } from "date-fns";
-import { Check, ChevronLeft, Clock, ChevronRight, X, Plus, Minus, Calendar, Sun, Sunset, Moon, AlertCircle, Star } from "lucide-react";
+import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -282,7 +282,7 @@ function BookPageInner({ slug }: { slug: string }) {
   if (!biz) return (
     <div className="min-h-screen flex flex-col items-center justify-center p-5 text-center">
       <h2 className="text-xl font-bold text-gray-900 mb-2">Business not found</h2>
-      <p className="text-gray-500 mb-6">The booking page you're looking for doesn't exist.</p>
+      <p className="text-gray-500 mb-6">The booking page you&apos;re looking for doesn&apos;t exist.</p>
       <Link href="/" className="text-violet-600 font-medium hover:underline">Go home</Link>
     </div>
   );
@@ -492,7 +492,7 @@ function BookPageInner({ slug }: { slug: string }) {
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Choose a provider</h2>
-                <p className="text-sm text-gray-400 mb-4">Pick who you'd like to see, or let us choose</p>
+                <p className="text-sm text-gray-400 mb-4">Pick who you&apos;d like to see, or let us choose</p>
 
                 <div className="space-y-2">
                   {/* Any available */}

@@ -5,6 +5,7 @@ import {
   CreateAppointmentSchema, CreateAppointmentDto,
   RescheduleSchema, RescheduleDto,
   StatusSchema, StatusDto,
+  PublicStatusSchema, PublicStatusDto,
 } from './dto/appointment.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,12 +21,13 @@ export class PublicBookingsController {
     return this.bookingsService.findOne(id);
   }
 
-  // Public cancel/status — used by the client manage page (no login required).
-  // Only allows CANCELLED status to prevent abuse.
+  // Public cancel — used by the client manage page (no login required).
+  // PublicStatusSchema enforces status === 'CANCELLED', so this endpoint can't be
+  // used to confirm/complete/no-show a booking by guessing its id.
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(StatusSchema)) dto: StatusDto,
+    @Body(new ZodValidationPipe(PublicStatusSchema)) dto: PublicStatusDto,
   ) {
     return this.bookingsService.updateStatus(id, dto);
   }

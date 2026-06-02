@@ -25,7 +25,7 @@ export default function ManageAppointmentPage() {
     try {
       const data = await api.appointments.get(id);
       setAppointment(data);
-    } catch (e) {
+    } catch {
       toast.error('Failed to load appointment details');
     } finally {
       setLoading(false);

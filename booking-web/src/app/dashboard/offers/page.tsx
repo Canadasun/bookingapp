@@ -50,7 +50,7 @@ export default function OffersPage() {
     if (!bizId) return;
     setSaving(true);
     try {
-      const data: any = { title: form.title, description: form.description, discount: form.discount || undefined, active: true };
+      const data: Record<string, unknown> = { title: form.title, description: form.description, discount: form.discount || undefined, active: true };
       if (form.expiresAt) data.expiresAt = new Date(form.expiresAt).toISOString();
       if (editing) await api.offers.update(bizId, editing.id, data);
       else await api.offers.create(bizId, data);

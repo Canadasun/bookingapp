@@ -10,10 +10,6 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 
-function fmtPrice(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-}
-
 export default function GuestLookupPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const [biz, setBiz]               = useState<Business | null>(null);

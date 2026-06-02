@@ -46,7 +46,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Status */}
           <div className="flex items-center gap-2">
             <StatusBadge status={apt.status} />
-            {apt.cancelReason && <span className="text-xs text-gray-500 italic">"{apt.cancelReason}"</span>}
+            {apt.cancelReason && <span className="text-xs text-gray-500 italic">&quot;{apt.cancelReason}&quot;</span>}
           </div>
 
           {/* Datetime */}

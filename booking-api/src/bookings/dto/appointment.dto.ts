@@ -18,6 +18,15 @@ export const StatusSchema = z.object({
   cancelReason: z.string().optional(),
 });
 
+// The unauthenticated client "manage" page may ONLY cancel — never confirm /
+// complete / no-show (which are owner actions). Keeps the public endpoint from
+// being used to bypass the approval flow or fake completions.
+export const PublicStatusSchema = z.object({
+  status: z.literal('CANCELLED'),
+  cancelReason: z.string().optional(),
+});
+
 export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
 export type RescheduleDto = z.infer<typeof RescheduleSchema>;
 export type StatusDto = z.infer<typeof StatusSchema>;
+export type PublicStatusDto = z.infer<typeof PublicStatusSchema>;

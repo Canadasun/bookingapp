@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, Calendar, Settings, Users, Scissors,
-  LogOut, Menu, X, UserCircle2, ChevronRight, ChevronDown,
-  MessageSquare, Tag, Menu as MenuIcon, CreditCard,
+  LayoutDashboard, Calendar, Users,
+  LogOut, X, ChevronRight, ChevronDown,
+  MessageSquare, Menu as MenuIcon, CreditCard,
 } from "lucide-react";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";

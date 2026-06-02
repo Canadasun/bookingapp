@@ -4,14 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { format, addDays, startOfDay } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { parseISO } from "date-fns";
-import { Search, Check, Clock, User, ChevronRight, CheckCircle2, X, Plus, Minus } from "lucide-react";
+import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Client, Slot, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
 import "react-day-picker/dist/style.css";
 
 function fmtDuration(mins: number) {

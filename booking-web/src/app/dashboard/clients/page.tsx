@@ -156,7 +156,7 @@ export default function ClientsPage() {
                   { label: "Total visits", value: selected.totalVisits, icon: Calendar },
                   { label: "Total spent",  value: formatPrice(selected.totalSpentCents ?? 0), icon: DollarSign },
                   { label: "Member since", value: format(new Date(selected.createdAt), "MMM yyyy"), icon: Calendar },
-                ].map(({ label, value, icon: Icon }) => (
+                ].map(({ label, value }) => (
                   <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
                     <p className="text-base font-bold text-gray-900">{value}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{label}</p>

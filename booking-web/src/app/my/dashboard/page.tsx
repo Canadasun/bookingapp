@@ -254,8 +254,8 @@ function AptCard({ apt }: { apt: Appointment }) {
           <p className="text-xs text-gray-400 mt-0.5 truncate">
             {format(start, "h:mm a")} · {apt.staff?.user?.name}
           </p>
-          {(apt as any).business?.name && (
-            <p className="text-xs text-violet-500 mt-0.5">{(apt as any).business.name}</p>
+          {(apt as { business?: { name?: string } }).business?.name && (
+            <p className="text-xs text-violet-500 mt-0.5">{(apt as { business?: { name?: string } }).business!.name}</p>
           )}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">

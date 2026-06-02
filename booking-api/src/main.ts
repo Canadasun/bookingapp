@@ -13,28 +13,37 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.use(helmet());
   app.setGlobalPrefix('api');
+  // Drain connections + run onModuleDestroy (Prisma disconnect, BullMQ workers)
+  // on SIGTERM/SIGINT (e.g. Railway redeploys) for a graceful shutdown.
+  app.enableShutdownHooks();
+
+  const isProd = process.env.NODE_ENV === 'production';
 
   // Allowlist origins from env (comma-separated), falling back to NEXT_PUBLIC_WEB_URL.
-  // If neither is set we reflect the request origin so local dev / curl / Swagger
-  // keep working. In production set CORS_ALLOWED_ORIGINS to your web URL(s).
+  // In production we FAIL CLOSED: if nothing is configured, allow no cross-origin
+  // requests rather than reflecting any origin with credentials. Outside production
+  // we reflect the request origin so local dev / curl / Swagger keep working.
   const corsOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? process.env.NEXT_PUBLIC_WEB_URL ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
   app.enableCors({
-    origin: corsOrigins.length ? corsOrigins : true,
+    origin: corsOrigins.length ? corsOrigins : !isProd,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'],
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('BookingApp API')
-    .setDescription('Appointment booking API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
+  // Swagger exposes the full API surface — only mount it outside production.
+  if (!isProd) {
+    const config = new DocumentBuilder()
+      .setTitle('BookingApp API')
+      .setDescription('Appointment booking API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
+  }
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
