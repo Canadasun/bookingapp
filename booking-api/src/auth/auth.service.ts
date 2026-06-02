@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -152,11 +152,13 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET,
-      expiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
+      // @nestjs/jwt v11 types expiresIn as number | ms.StringValue; env strings
+      // like "15m" are valid at runtime, so cast past the stricter literal type.
+      expiresIn: (process.env.JWT_EXPIRES_IN ?? '15m') as unknown as number,
     });
     const refreshToken = this.jwt.sign(payload, {
       secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as unknown as number,
     });
     await this.prisma.user.update({
       where: { id: user.id },

@@ -35,7 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         cookieExtractor,
       ]),
-      secretOrKey: JWT_SECRET,
+      secretOrKey: JWT_SECRET!, // guaranteed non-null by the startup guard above
     });
   }
 

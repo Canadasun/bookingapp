@@ -13,7 +13,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
   constructor(private prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
-      secretOrKey: JWT_REFRESH_SECRET,
+      secretOrKey: JWT_REFRESH_SECRET!, // guaranteed non-null by the startup guard above
       passReqToCallback: true,
     });
   }
