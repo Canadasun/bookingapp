@@ -367,6 +367,10 @@ export const api = {
     get: (id: string) => req<Appointment>(`/bookings/${id}`),
     create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
+    // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
+    // and sends the client their confirmation immediately (skips approval).
+    createManual: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string }) =>
+      req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),
     updateStatus: (businessId: string, id: string, status: string, cancelReason?: string) =>

@@ -114,17 +114,38 @@ export class ClientsService {
     return client;
   }
 
-  // Used by the public booking wizard — returns existing client if email already registered
-  findOrCreate(businessId: string, dto: CreateClientDto) {
-    return this.prisma.client.upsert({
-      where: { businessId_email: { businessId, email: dto.email } },
-      create: { ...dto, businessId },
-      update: {
-        name: dto.name,
-        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+  // Used by the public booking wizard + walk-in/owner flows. Dedups on email OR
+  // phone within the business so the same person isn't duplicated when they book
+  // again with a slightly different detail. Returns the client with a `matched`
+  // flag so the UI can tell the user it synced to an existing profile.
+  async findOrCreate(businessId: string, dto: CreateClientDto) {
+    const existing = await this.prisma.client.findFirst({
+      where: {
+        businessId,
+        OR: [
+          { email: { equals: dto.email, mode: 'insensitive' as const } },
+          ...(dto.phone ? [{ phone: dto.phone }] : []),
+        ],
       },
     });
+
+    if (existing) {
+      // Merge in the freshest details. Don't overwrite the email when we matched
+      // on phone (avoids colliding with the businessId_email unique constraint);
+      // fill phone in if it was missing before.
+      const updated = await this.prisma.client.update({
+        where: { id: existing.id },
+        data: {
+          name: dto.name,
+          ...(dto.phone && dto.phone !== existing.phone ? { phone: dto.phone } : {}),
+          ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        },
+      });
+      return { ...updated, matched: true as const };
+    }
+
+    const created = await this.prisma.client.create({ data: { ...dto, businessId } });
+    return { ...created, matched: false as const };
   }
 
   create(businessId: string, dto: CreateClientDto) {

@@ -17,7 +17,7 @@ import { formatPrice, cn } from "@/lib/utils";
 import { OwnerOnly } from "@/components/OwnerOnly";
 
 const COLORS = [
-  "#7C3AED","#6366f1","#8b5cf6","#ec4899","#f43f5e",
+  "#E9A23C","#EFAA44","#8b5cf6","#ec4899","#f43f5e",
   "#f97316","#eab308","#22c55e","#14b8a6","#0ea5e9","#64748b",
 ];
 
@@ -35,7 +35,7 @@ interface ServiceFormState {
 }
 const EMPTY_SVC: ServiceFormState = {
   name: "", description: "", durationMinutes: "60", priceCents: "",
-  bufferBeforeMin: "0", bufferAfterMin: "0", color: "#6366f1", active: true, categoryId: "",
+  bufferBeforeMin: "0", bufferAfterMin: "0", color: "#E9A23C", active: true, categoryId: "",
 };
 
 interface ServiceModalProps {
@@ -148,7 +148,7 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
 }
 
 // ── Category form modal ───────────────────────────────────────────────────────
-const CAT_COLORS = ["#7C3AED","#6366f1","#ec4899","#f43f5e","#f97316","#22c55e","#14b8a6","#0ea5e9","#64748b"];
+const CAT_COLORS = ["#E9A23C","#EFAA44","#ec4899","#f43f5e","#f97316","#22c55e","#14b8a6","#0ea5e9","#64748b"];
 
 interface CategoryModalProps {
   bizId: string;
@@ -159,7 +159,7 @@ interface CategoryModalProps {
 function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps) {
   const [name, setName] = useState(editing?.name ?? "");
   const [desc, setDesc] = useState(editing?.description ?? "");
-  const [color, setColor] = useState(editing?.color ?? "#7C3AED");
+  const [color, setColor] = useState(editing?.color ?? "#E9A23C");
   const [saving, setSaving] = useState(false);
 
   async function save() {

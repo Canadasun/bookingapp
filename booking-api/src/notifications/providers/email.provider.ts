@@ -39,7 +39,7 @@ export class ResendEmailProvider implements EmailProvider {
       : '';
 
     const finalHtml = redirectBanner
-      ? payload.html.replace(/(<table[^>]*>[\s\S]*?)(<tr><td style="background:#7C3AED)/, `$1${redirectBanner}$2`)
+      ? payload.html.replace(/(<table[^>]*>[\s\S]*?)(<tr><td style="background:#E9A23C)/, `$1${redirectBanner}$2`)
       : payload.html;
 
     const resend = new Resend(apiKey);
@@ -75,7 +75,7 @@ export class ResendEmailProvider implements EmailProvider {
             adminEmail,
             `[DNS PENDING → ${payload.to}] ${payload.subject}`,
             payload.html.replace(
-              /(<table[^>]*>[\s\S]*?)(<tr><td style="background:#7C3AED)/,
+              /(<table[^>]*>[\s\S]*?)(<tr><td style="background:#E9A23C)/,
               `$1<tr><td style="padding:8px 32px;background:#FEF3C7"><p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ DNS PENDING — would go to: ${payload.to}</p></td></tr>$2`
             ),
           );

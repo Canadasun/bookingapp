@@ -6,7 +6,7 @@ import React, { useEffect, useState, useCallback, useRef, Component } from 'reac
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, ScrollView,
   StyleSheet, ActivityIndicator, Alert, SafeAreaView, Platform,
-  StatusBar, KeyboardAvoidingView, RefreshControl,
+  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler,
 } from 'react-native';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
           {this.state.error?.message ?? 'An unexpected error occurred.'}
         </Text>
         <TouchableOpacity
-          style={{ backgroundColor:'#7C3AED', paddingHorizontal:24, paddingVertical:12, borderRadius:12 }}
+          style={{ backgroundColor:'#E9A23C', paddingHorizontal:24, paddingVertical:12, borderRadius:12 }}
           onPress={() => this.setState({ hasError: false, error: undefined })}>
           <Text style={{ color:'#fff', fontWeight:'700', fontSize:15 }}>Try again</Text>
         </TouchableOpacity>
@@ -65,8 +65,8 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 const BIZ_ID   = process.env.EXPO_PUBLIC_BUSINESS_ID ?? '';
-const PURPLE     = '#7C3AED';
-const PURPLE_LT  = '#EDE9FE';
+const BRAND     = '#E9A23C'; // amber/gold brand
+const BRAND_LT  = '#FBE8CF'; // light tint for selected backgrounds
 const GRAY_50    = '#F9FAFB';
 const GRAY_100   = '#F3F4F6';
 const GRAY_200   = '#E5E7EB';
@@ -103,6 +103,28 @@ const setAuth = (token: string|null, user: User|null, refresh?: string|null) => 
   notify();
 };
 const getAuth = () => ({ token: _token, user: _user, refresh: _refresh });
+
+// The active business is the one the signed-in owner/staff belongs to. Each
+// account is fully isolated — we never assume the baked EXPO_PUBLIC_BUSINESS_ID
+// (kept only as a fallback for the unauthenticated/demo case).
+const bizId = (): string => getAuth().user?.businessId || BIZ_ID;
+
+// Client-side phone normalization to E.164 (mirrors the API). North-America-first:
+// a bare 10-digit number becomes +1…; already-international (+…) numbers are kept.
+// Returns null when the input can't be a complete number so the UI can flag it.
+function normalizePhoneClient(input?: string|null): string|null {
+  if (input == null) return null;
+  const raw = input.trim();
+  if (!raw) return null;
+  if (raw.startsWith('+')) {
+    const digits = raw.slice(1).replace(/\D/g, '');
+    return /^[1-9]\d{7,14}$/.test(digits) ? `+${digits}` : null;
+  }
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return null;
+}
 
 // Persist the current session to the device keychain (or clear it). Wrapped in
 // try/catch because SecureStore is unavailable on web — there we stay in-memory.
@@ -193,7 +215,7 @@ function AppointmentsScreen() {
   const load = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await api<{data: Appointment[]}>(`/businesses/${BIZ_ID}/bookings`);
+      const res = await api<{data: Appointment[]}>(`/businesses/${bizId()}/bookings`);
       const all = res.data;
       const filtered = user?.role==='STAFF' && user?.staffId
         ? all.filter(a => a.staff.id === user.staffId)
@@ -205,9 +227,19 @@ function AppointmentsScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Hardware back (Android) closes the open appointment detail instead of leaving
+  // the app; the overlay also has an on-screen close for iOS.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selected) { setSelected(null); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [selected]);
+
   async function confirm(id:string) {
     setActing(true);
-    try { await api(`/businesses/${BIZ_ID}/bookings/${id}/confirm`,{method:'PATCH'}); load(true); setSelected(null); Alert.alert('Done','Appointment confirmed'); }
+    try { await api(`/businesses/${bizId()}/bookings/${id}/confirm`,{method:'PATCH'}); load(true); setSelected(null); Alert.alert('Done','Appointment confirmed'); }
     catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
     finally { setActing(false); }
   }
@@ -216,7 +248,7 @@ function AppointmentsScreen() {
       {text:'No',style:'cancel'},
       {text:'Cancel it',style:'destructive',onPress:async()=>{
         setActing(true);
-        try { await api(`/businesses/${BIZ_ID}/bookings/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'CANCELLED'})}); load(true); setSelected(null); }
+        try { await api(`/businesses/${bizId()}/bookings/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'CANCELLED'})}); load(true); setSelected(null); }
         catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
         finally { setActing(false); }
       }},
@@ -224,9 +256,29 @@ function AppointmentsScreen() {
   }
   async function complete(id:string) {
     setActing(true);
-    try { await api(`/businesses/${BIZ_ID}/bookings/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'COMPLETED'})}); load(true); setSelected(null); }
+    try { await api(`/businesses/${bizId()}/bookings/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'COMPLETED'})}); load(true); setSelected(null); }
     catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
     finally { setActing(false); }
+  }
+  // No-show protection: marks NO_SHOW and charges the client's saved card off-session
+  // for the business's no-show fee (Stripe). If no card is on file the backend just
+  // marks NO_SHOW and tells us to collect manually.
+  function noShow(id:string) {
+    Alert.alert('Mark as no-show?','This marks the appointment NO_SHOW and charges the no-show fee to the card on file, if any.',[
+      {text:'Cancel',style:'cancel'},
+      {text:'Mark no-show',style:'destructive',onPress:async()=>{
+        setActing(true);
+        try {
+          const r = await api<{charged:boolean; feeCents:number; message?:string}>(`/payments/no-show/${id}`,{method:'POST'});
+          load(true); setSelected(null);
+          Alert.alert(
+            r.charged ? 'No-show fee charged' : 'Marked no-show',
+            r.charged ? `Charged $${(r.feeCents/100).toFixed(2)} to the card on file.` : (r.message || 'No saved card — collect the fee manually.'),
+          );
+        } catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
+        finally { setActing(false); }
+      }},
+    ]);
   }
 
   const upcoming = apts.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && new Date(a.startsAt) > new Date());
@@ -284,7 +336,7 @@ function AppointmentsScreen() {
     );
   }
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={PURPLE}/></View>;
+  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
 
   return (
     <SafeAreaView style={s.screen}>
@@ -297,7 +349,7 @@ function AppointmentsScreen() {
         contentContainerStyle={s.listContent}
         ListHeaderComponent={<Text style={s.sectionLabel}>{day ? `${new Date(day).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})} (${listData.length})` : `Upcoming (${upcoming.length})`}</Text>}
         ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>{day ? 'No appointments this day' : 'No appointments yet'}</Text></View>}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={PURPLE}/>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}
         showsVerticalScrollIndicator={false}
       />
 
@@ -336,6 +388,7 @@ function AppointmentsScreen() {
             <View style={s.sheetActions}>
               {selected.status==='PENDING' && <TouchableOpacity style={s.btnPrimary} disabled={acting} onPress={()=>confirm(selected.id)}><Text style={s.btnPrimaryText}>Confirm</Text></TouchableOpacity>}
               {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>complete(selected.id)}><Text style={s.btnSecondaryText}>Mark completed</Text></TouchableOpacity>}
+              {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>noShow(selected.id)}><Text style={s.btnSecondaryText}>No-show &amp; charge fee</Text></TouchableOpacity>}
               {['PENDING','CONFIRMED'].includes(selected.status) && (
                 <TouchableOpacity style={s.btnDanger} disabled={acting} onPress={()=>cancel(selected.id)}><Text style={s.btnDangerText}>Cancel</Text></TouchableOpacity>
               )}
@@ -389,7 +442,7 @@ function BookScreen() {
   }
 
   useEffect(()=>{
-    api<Service[]>(`/businesses/${BIZ_ID}/services`).then(s=>setServices(s.filter(x=>x.active))).catch(()=>{});
+    api<Service[]>(`/businesses/${bizId()}/services`).then(s=>setServices(s.filter(x=>x.active))).catch(()=>{});
   },[]);
 
   function toggleSvc(sv: Service) {
@@ -400,7 +453,7 @@ function BookScreen() {
     if (selectedSvcs.length === 0) return;
     try {
       const ids = new Set(selectedSvcs.map(s=>s.id));
-      const all = await api<Staff[]>(`/businesses/${BIZ_ID}/staff`);
+      const all = await api<Staff[]>(`/businesses/${bizId()}/staff`);
       setStaffList(all.filter(st=>st.staffServices.some(ss=>ids.has(ss.serviceId))));
       setStep('staff');
     } catch { Alert.alert('Error','Could not load staff'); }
@@ -419,17 +472,30 @@ function BookScreen() {
   }
 
   async function book() {
-    if (!form.name||!form.email){ Alert.alert('Required','Name and email are required'); return; }
+    if (form.name.trim().length < 2){ Alert.alert('Name required','Enter the client’s full name.'); return; }
+    if (!form.email.trim()){ Alert.alert('Email required','Enter the client’s email.'); return; }
+    // Phone is optional, but if given it must be a complete number so SMS can send.
+    let normalizedPhone: string | undefined;
+    if (form.phone.trim()) {
+      const np = normalizePhoneClient(form.phone);
+      if (!np){ Alert.alert('Check the phone number','Enter a complete number, e.g. +1 555 123 4567, or leave it blank.'); return; }
+      normalizedPhone = np;
+    }
     if (!policyAccepted){ Alert.alert('Policy required','Please accept the cancellation policy to continue.'); return; }
     setLoading(true);
     try {
       const staffId = staff && staff !== 'any' ? staff.id : (staffList[0]?.id ?? '');
-      const client = await api<{id:string}>(`/businesses/${BIZ_ID}/clients`, {
-        method:'POST', body: JSON.stringify({name:form.name,email:form.email,phone:form.phone||undefined}),
+      const client = await api<{id:string; matched?:boolean}>(`/businesses/${bizId()}/clients`, {
+        method:'POST', body: JSON.stringify({name:form.name.trim(),email:form.email.trim(),phone:normalizedPhone}),
       });
-      const apt = await api<{id:string}>(`/businesses/${BIZ_ID}/bookings`, {
+      // Owner/staff booking from the app → confirmed immediately (the /manual
+      // endpoint skips approval and sends the client their confirmation).
+      const apt = await api<{id:string}>(`/businesses/${bizId()}/bookings/manual`, {
         method:'POST', body: JSON.stringify({staffId, serviceId:selectedSvcs[0].id, clientId:client.id, startsAt:slot!.startsAt}),
       });
+      if (client.matched) {
+        Alert.alert('Existing client', 'We matched this booking to an existing client profile and synced their details.');
+      }
       setBookedId(apt.id); setStep('done');
     } catch(e){ Alert.alert('Booking failed', e instanceof Error ? e.message : 'Please try again'); }
     finally { setLoading(false); }
@@ -478,7 +544,7 @@ function BookScreen() {
                 <View key={group.catId ?? '__none__'} style={{marginBottom: 16}}>
                   {group.label && (
                     <View style={{flexDirection:'row', alignItems:'center', marginBottom:8, gap:8}}>
-                      <View style={{width:8, height:8, borderRadius:4, backgroundColor: group.color ?? PURPLE}}/>
+                      <View style={{width:8, height:8, borderRadius:4, backgroundColor: group.color ?? BRAND}}/>
                       <Text style={[s.sectionLabel, {marginBottom:0}]}>{group.label}</Text>
                     </View>
                   )}
@@ -486,11 +552,11 @@ function BookScreen() {
                     const sel = selectedSvcs.some(s=>s.id===sv.id);
                     return (
                       <TouchableOpacity key={sv.id} activeOpacity={0.7}
-                        style={[s.card, sel && {borderColor:PURPLE,backgroundColor:PURPLE_LT}]}
+                        style={[s.card, sel && {borderColor:BRAND,backgroundColor:BRAND_LT}]}
                         onPress={()=>toggleSvc(sv)}>
                         <View style={[s.svcDot,{backgroundColor:sv.color}]}/>
                         <View style={{flex:1}}>
-                          <Text style={[s.clientName, sel&&{color:PURPLE}]}>{sv.name}</Text>
+                          <Text style={[s.clientName, sel&&{color:BRAND}]}>{sv.name}</Text>
                           {sv.description && <Text style={s.sub}>{sv.description}</Text>}
                           <Text style={s.sub}>{sv.durationMinutes} min</Text>
                         </View>
@@ -518,7 +584,7 @@ function BookScreen() {
           {step==='staff' && <>
             <TouchableOpacity style={s.backBtn} onPress={()=>setStep('service')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Choose a provider</Text>
-            <TouchableOpacity style={[s.card, staff==='any'&&{borderColor:PURPLE,backgroundColor:PURPLE_LT}]}
+            <TouchableOpacity style={[s.card, staff==='any'&&{borderColor:BRAND,backgroundColor:BRAND_LT}]}
               activeOpacity={0.7} onPress={()=>{setStaff('any');setStep('date');}}>
               <View style={[s.avatar,{backgroundColor:GRAY_100}]}><Text style={{fontSize:18}}>✨</Text></View>
               <View style={{flex:1}}>
@@ -529,7 +595,7 @@ function BookScreen() {
             </TouchableOpacity>
             {staffList.length===0&&<Text style={[s.emptyText,{marginTop:8}]}>No staff available for selected services</Text>}
             {staffList.map(st=>(
-              <TouchableOpacity key={st.id} style={[s.card, (staff&&staff!=='any'&&(staff as Staff).id===st.id)&&{borderColor:PURPLE,backgroundColor:PURPLE_LT}]}
+              <TouchableOpacity key={st.id} style={[s.card, (staff&&staff!=='any'&&(staff as Staff).id===st.id)&&{borderColor:BRAND,backgroundColor:BRAND_LT}]}
                 activeOpacity={0.7} onPress={()=>{setStaff(st);setStep('date');}}>
                 <View style={s.avatar}><Text style={s.avatarText}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
                 <View style={{flex:1}}>
@@ -559,7 +625,7 @@ function BookScreen() {
                 );
               })}
             </ScrollView>
-            {loading&&<ActivityIndicator color={PURPLE} style={{marginTop:20}}/>}
+            {loading&&<ActivityIndicator color={BRAND} style={{marginTop:20}}/>}
           </>}
 
           {/* ── Time slots ─────────────────────────────────────────── */}
@@ -567,7 +633,7 @@ function BookScreen() {
             <TouchableOpacity style={s.backBtn} onPress={()=>setStep('date')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Available times</Text>
             <Text style={[s.sub,{marginBottom:12}]}>{new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</Text>
-            {loading&&<ActivityIndicator color={PURPLE} style={{marginTop:20}}/>}
+            {loading&&<ActivityIndicator color={BRAND} style={{marginTop:20}}/>}
             {!loading&&slots.length===0&&<Text style={s.emptyText}>No availability on this date — try another</Text>}
             <View style={s.slotGrid}>
               {slots.map(sl=>(
@@ -592,16 +658,18 @@ function BookScreen() {
               <Text style={[s.summarySub,{marginTop:4}]}>{totalDuration(selectedSvcs)} · {totalPrice(selectedSvcs)}</Text>
             </View>
             {[
-              {k:'name',   label:'Full name *',    type:'default' as const},
-              {k:'email',  label:'Email *',         type:'email-address' as const},
-              {k:'phone',  label:'Phone (optional)',type:'phone-pad' as const},
-            ].map(({k,label,type})=>(
+              {k:'name',   label:'Full name *',    type:'default' as const,       ph:'Jane Doe'},
+              {k:'email',  label:'Email *',         type:'email-address' as const, ph:'you@example.com'},
+              {k:'phone',  label:'Phone (optional)',type:'phone-pad' as const,     ph:'+1 555 123 4567'},
+            ].map(({k,label,type,ph})=>(
               <View key={k} style={{marginBottom:12}}>
                 <Text style={s.fieldLabel}>{label}</Text>
-                <TextInput style={s.input} placeholder={label} placeholderTextColor={GRAY_400}
+                <TextInput style={s.input} placeholder={ph} placeholderTextColor={GRAY_400}
                   keyboardType={type} autoCapitalize={k==='name'?'words':'none'}
                   value={form[k as keyof typeof form]}
-                  onChangeText={v=>setForm(p=>({...p,[k]:v}))}/>
+                  onChangeText={v=>setForm(p=>({...p,[k]:v}))}
+                  onBlur={k==='phone'?()=>{ const np=normalizePhoneClient(form.phone); if(np) setForm(p=>({...p,phone:np})); }:undefined}/>
+                {k==='phone' && <Text style={s.fieldHint}>Used for SMS reminders. Leave blank if none.</Text>}
               </View>
             ))}
             {/* Cancellation policy */}
@@ -649,7 +717,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
   const load = useCallback(async (silent=false, q='') => {
     if (!silent) setLoading(true);
     try {
-      const res = await api<{data: Client[]}>(`/businesses/${BIZ_ID}/clients${q?`?search=${encodeURIComponent(q)}`:''}`);
+      const res = await api<{data: Client[]}>(`/businesses/${bizId()}/clients${q?`?search=${encodeURIComponent(q)}`:''}`);
       setClients(res.data);
     } catch {}
     finally { setLoading(false); setRefreshing(false); }
@@ -661,7 +729,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
     return ()=>clearTimeout(t);
   },[search, load]);
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={PURPLE}/></View>;
+  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
 
   return (
     <SafeAreaView style={s.screen}>
@@ -676,7 +744,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
         keyExtractor={c=>c.id}
         contentContainerStyle={s.listContent}
         ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No clients found</Text></View>}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true,search);}} tintColor={PURPLE}/>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true,search);}} tintColor={BRAND}/>}
         showsVerticalScrollIndicator={false}
         renderItem={({item:c})=>(
           <View style={s.card}>
@@ -688,7 +756,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
               {c.totalVisits!==undefined&&<Text style={s.sub}>{c.totalVisits} visit{c.totalVisits!==1?'s':''}</Text>}
             </View>
             <TouchableOpacity style={s.msgBtn} onPress={()=>onMessage(c)}>
-              <Ionicons name="chatbubble-outline" size={18} color={PURPLE}/>
+              <Ionicons name="chatbubble-outline" size={18} color={BRAND}/>
             </TouchableOpacity>
           </View>
         )}
@@ -708,7 +776,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
   const scrollRef = useRef<ScrollView>(null);
 
   const loadThreads = useCallback(async () => {
-    try { setThreads(await api(`/businesses/${BIZ_ID}/messages`)); }
+    try { setThreads(await api(`/businesses/${bizId()}/messages`)); }
     catch {}
     finally { setLoading(false); }
   }, []);
@@ -721,9 +789,9 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
   async function openThread(c:Client) {
     setSelected(c);
     try {
-      const data = await api<Message[]>(`/businesses/${BIZ_ID}/clients/${c.id}/messages`);
+      const data = await api<Message[]>(`/businesses/${bizId()}/clients/${c.id}/messages`);
       setMsgs(data);
-      await api(`/businesses/${BIZ_ID}/clients/${c.id}/messages/read`,{method:'PATCH'});
+      await api(`/businesses/${bizId()}/clients/${c.id}/messages/read`,{method:'PATCH'});
     } catch {}
     setTimeout(()=>scrollRef.current?.scrollToEnd({animated:false}),100);
   }
@@ -732,11 +800,11 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
     if (!reply.trim()||!selected) return;
     setSending(true);
     try {
-      await api(`/businesses/${BIZ_ID}/clients/${selected.id}/messages/reply`,{
+      await api(`/businesses/${bizId()}/clients/${selected.id}/messages/reply`,{
         method:'POST', body:JSON.stringify({content:reply.trim()}),
       });
       setReply('');
-      const data = await api<Message[]>(`/businesses/${BIZ_ID}/clients/${selected.id}/messages`);
+      const data = await api<Message[]>(`/businesses/${bizId()}/clients/${selected.id}/messages`);
       setMsgs(data);
       setTimeout(()=>scrollRef.current?.scrollToEnd({animated:true}),50);
     } catch(e){ Alert.alert('Error','Could not send message'); }
@@ -776,7 +844,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
   return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}><Text style={s.headerTitle}>Messages</Text></View>
-      {loading?<ActivityIndicator color={PURPLE} style={{marginTop:40}}/>:(
+      {loading?<ActivityIndicator color={BRAND} style={{marginTop:40}}/>:(
         <FlatList
           data={threads}
           keyExtractor={t=>t.clientId}
@@ -816,15 +884,25 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
 
+  // Hardware back (Android) pops a sub-view back to the menu instead of leaving
+  // the app. iOS keeps the on-screen ‹ back button in <Head/>.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (view !== 'menu') { setView('menu'); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [view]);
+
   async function open(v: MoreView) {
     setView(v);
     try {
-      if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${BIZ_ID}/services`)); }
-      else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${BIZ_ID}/staff`)); }
-      else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${BIZ_ID}/offers`)); }
-      else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${BIZ_ID}/waitlist`)); }
-      else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${BIZ_ID}/reviews`)); }
-      else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${BIZ_ID}`)); }
+      if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${bizId()}/services`)); }
+      else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${bizId()}/staff`)); }
+      else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${bizId()}/offers`)); }
+      else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${bizId()}/waitlist`)); }
+      else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${bizId()}/reviews`)); }
+      else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
 
@@ -836,7 +914,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
       <Text style={s.headerTitle}>{title}</Text>
     </View>
   );
-  const Loader = () => <View style={{ padding:40, alignItems:'center' }}><ActivityIndicator color={PURPLE}/></View>;
+  const Loader = () => <View style={{ padding:40, alignItems:'center' }}><ActivityIndicator color={BRAND}/></View>;
 
   if (view === 'services') return (
     <SafeAreaView style={s.screen}>
@@ -845,7 +923,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(services ?? []).filter(x=>x.active).map(sv => (
             <View key={sv.id} style={ms.row}>
-              <View style={[ms.dot,{ backgroundColor: sv.color || PURPLE }]}/>
+              <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{sv.name}</Text>
                 <Text style={ms.rowMeta}>{sv.durationMinutes} min</Text>
@@ -866,7 +944,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(staff ?? []).map(st => (
             <View key={st.id} style={ms.row}>
-              <View style={s.avatar}><Text style={{ color:PURPLE, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+              <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{st.user.name}</Text>
                 <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
@@ -907,7 +985,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(waitlist ?? []).map(w => (
             <View key={w.id} style={ms.row}>
-              <View style={s.avatar}><Text style={{ color:PURPLE, fontWeight:'700' }}>{String(w.name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+              <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{String(w.name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{w.name}</Text>
                 <Text style={ms.rowMeta} numberOfLines={1}>{w.email}{w.phone ? ` · ${w.phone}` : ''}</Text>
@@ -1005,7 +1083,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
         <View style={s.menuCard}>
           {rows.map((r,i)=>(
             <TouchableOpacity key={r.label} style={[s.menuRow, i<rows.length-1&&s.menuRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
-              <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={PURPLE}/></View>
+              <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
               <Text style={s.menuLabel}>{r.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
             </TouchableOpacity>
@@ -1037,15 +1115,15 @@ const ms = StyleSheet.create({
 
 const dst = StyleSheet.create({
   chip:      { minWidth:46, alignItems:'center', paddingVertical:8, paddingHorizontal:10, borderRadius:12, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff' },
-  chipOn:    { backgroundColor:PURPLE, borderColor:PURPLE },
+  chipOn:    { backgroundColor:BRAND, borderColor:BRAND },
   chipDow:   { fontSize:11, fontWeight:'700', color:GRAY_500 },
   chipNum:   { fontSize:16, fontWeight:'800', color:GRAY_900, marginTop:2 },
   chipTextOn:{ color:'#fff' },
-  chipDot:   { width:5, height:5, borderRadius:3, backgroundColor:PURPLE, marginTop:4 },
+  chipDot:   { width:5, height:5, borderRadius:3, backgroundColor:BRAND, marginTop:4 },
 });
 
 // ── Login screen ─────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }: { onLogin:(t:string,r:string,u:User)=>void }) {
+function LoginScreen({ onLogin, onRegister }: { onLogin:(t:string,r:string,u:User)=>void; onRegister:()=>void }) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
@@ -1091,6 +1169,105 @@ function LoginScreen({ onLogin }: { onLogin:(t:string,r:string,u:User)=>void }) 
           {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Sign in</Text>}
         </TouchableOpacity>
 
+        <View style={s.authSwitch}>
+          <Text style={s.authSwitchText}>New here? </Text>
+          <TouchableOpacity onPress={onRegister}>
+            <Text style={s.authSwitchLink}>Create your business</Text>
+          </TouchableOpacity>
+        </View>
+
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+// ── Business-owner sign up: creates an OWNER + a fresh, empty business ────────
+function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:string,u:User)=>void; onBack:()=>void }) {
+  const [name, setName]             = useState('');
+  const [businessName, setBizName]  = useState('');
+  const [email, setEmail]           = useState('');
+  const [phone, setPhone]           = useState('');
+  const [password, setPassword]     = useState('');
+  const [showPw, setShowPw]         = useState(false);
+  const [loading, setLoading]       = useState(false);
+
+  async function submit() {
+    if (name.trim().length < 2) { Alert.alert('Your name','Enter your full name.'); return; }
+    if (businessName.trim().length < 2) { Alert.alert('Business name','Enter your business name.'); return; }
+    if (!email.trim()) { Alert.alert('Email','Enter your email.'); return; }
+    if (password.length < 8) { Alert.alert('Weak password','Password must be at least 8 characters.'); return; }
+    let normalizedPhone: string | undefined;
+    if (phone.trim()) {
+      const np = normalizePhoneClient(phone);
+      if (!np) { Alert.alert('Check the phone number','Enter a complete number, e.g. +1 555 123 4567, or leave it blank.'); return; }
+      normalizedPhone = np;
+    }
+    setLoading(true);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await api<{accessToken:string;refreshToken:string;user:User}>('/auth/register',{
+        method:'POST',
+        body: JSON.stringify({
+          name: name.trim(), email: email.trim(), password, role:'OWNER',
+          businessName: businessName.trim(),
+          ...(normalizedPhone ? { businessPhone: normalizedPhone } : {}),
+          ...(tz ? { timezone: tz } : {}),
+        }),
+      });
+      onRegistered(res.accessToken, res.refreshToken, res.user);
+    } catch (e) {
+      Alert.alert('Could not create account', e instanceof Error ? e.message : 'Try again.');
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <KeyboardAvoidingView style={s.loginWrap} behavior={Platform.OS==='ios'?'padding':'height'}>
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={s.loginLogo}>
+            <View style={s.logoIcon}><Ionicons name="storefront" size={26} color="#fff"/></View>
+            <Text style={s.logoText}>BookingApp</Text>
+          </View>
+          <Text style={s.loginTitle}>Create your business</Text>
+          <Text style={s.loginSub}>Set up your account — you’ll add services and staff next.</Text>
+
+          <Text style={s.fieldLabel}>Your name</Text>
+          <TextInput style={s.input} placeholder="Jane Doe" placeholderTextColor={GRAY_400}
+            autoCapitalize="words" value={name} onChangeText={setName}/>
+
+          <Text style={[s.fieldLabel,{marginTop:12}]}>Business name</Text>
+          <TextInput style={s.input} placeholder="Jane’s Salon" placeholderTextColor={GRAY_400}
+            autoCapitalize="words" value={businessName} onChangeText={setBizName}/>
+
+          <Text style={[s.fieldLabel,{marginTop:12}]}>Email</Text>
+          <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
+            keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail}/>
+
+          <Text style={[s.fieldLabel,{marginTop:12}]}>Business phone (optional)</Text>
+          <TextInput style={s.input} placeholder="+1 555 123 4567" placeholderTextColor={GRAY_400}
+            keyboardType="phone-pad" value={phone} onChangeText={setPhone}
+            onBlur={()=>{ const np=normalizePhoneClient(phone); if(np) setPhone(np); }}/>
+
+          <Text style={[s.fieldLabel,{marginTop:12}]}>Password</Text>
+          <View style={{position:'relative'}}>
+            <TextInput style={s.input} placeholder="At least 8 characters" placeholderTextColor={GRAY_400}
+              secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={submit}/>
+            <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)}>
+              <Ionicons name={showPw?'eye-off-outline':'eye-outline'} size={18} color={GRAY_400}/>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading} onPress={submit}>
+            {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Create account</Text>}
+          </TouchableOpacity>
+
+          <View style={s.authSwitch}>
+            <Text style={s.authSwitchText}>Already have an account? </Text>
+            <TouchableOpacity onPress={onBack}>
+              <Text style={s.authSwitchLink}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1158,8 +1335,8 @@ function HomeScreen() {
     if (!silent) setLoading(true);
     try {
       const [res, biz] = await Promise.all([
-        api<{ data:Appointment[] }>(`/businesses/${BIZ_ID}/bookings`).catch(()=>({ data:[] as Appointment[] })),
-        api<{ name:string }>(`/businesses/${BIZ_ID}`).catch(()=>({ name:'' })),
+        api<{ data:Appointment[] }>(`/businesses/${bizId()}/bookings`).catch(()=>({ data:[] as Appointment[] })),
+        api<{ name:string }>(`/businesses/${bizId()}`).catch(()=>({ name:'' })),
       ]);
       setAppts(Array.isArray(res?.data) ? res.data : []);
       setBizName(biz?.name ?? '');
@@ -1201,22 +1378,22 @@ function HomeScreen() {
   );
   const Action = ({ label, icon, to }:{label:string;icon:any;to:string}) => (
     <TouchableOpacity style={hs.action} onPress={()=>nav.navigate(to)}>
-      <View style={hs.actionIcon}><Ionicons name={icon} size={20} color={PURPLE}/></View>
+      <View style={hs.actionIcon}><Ionicons name={icon} size={20} color={BRAND}/></View>
       <Text style={hs.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
 
-  if (loading) return <SafeAreaView style={s.screen}><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={PURPLE}/></View></SafeAreaView>;
+  if (loading) return <SafeAreaView style={s.screen}><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={BRAND}/></View></SafeAreaView>;
 
   return (
     <SafeAreaView style={s.screen}>
       <ScrollView contentContainerStyle={{padding:16,paddingBottom:32}} showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={PURPLE}/>}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}>
         <Text style={hs.greeting}>{greeting}, {firstName} 👋</Text>
         {!!bizName && <Text style={hs.biz}>{bizName}</Text>}
 
         <View style={hs.statRow}>
-          <Stat label="Today" value={String(todayCount)} icon="calendar" color={PURPLE}/>
+          <Stat label="Today" value={String(todayCount)} icon="calendar" color={BRAND}/>
           <Stat label="Pending" value={String(pendingCount)} icon="time" color="#F59E0B"/>
           <Stat label="Revenue" value={`$${(revenueCents/100).toFixed(0)}`} icon="cash" color="#10B981"/>
         </View>
@@ -1269,7 +1446,7 @@ const hs = StyleSheet.create({
   statLabel:  { fontSize:12, color:GRAY_500, marginTop:1 },
   actionRow:  { flexDirection:'row', gap:10, marginBottom:22 },
   action:     { flex:1, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, paddingVertical:16, alignItems:'center' },
-  actionIcon: { width:40, height:40, borderRadius:12, backgroundColor:PURPLE_LT, alignItems:'center', justifyContent:'center', marginBottom:8 },
+  actionIcon: { width:40, height:40, borderRadius:12, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center', marginBottom:8 },
   actionLabel:{ fontSize:12, fontWeight:'600', color:GRAY_700 },
   sectionHead:{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:12 },
   sectionTitle:{ fontSize:17, fontWeight:'700', color:GRAY_900 },
@@ -1292,6 +1469,7 @@ export default function App() {
   const [msgClient, setMsgClient]     = useState<Client|null>(null);
   const [_, forceRender]              = useState(0);
   const [booting, setBooting]         = useState(true);
+  const [authView, setAuthView]       = useState<'login'|'register'>('login');
 
   useEffect(()=>{ const unsub=()=>forceRender(n=>n+1); listeners.add(unsub); return ()=>{ listeners.delete(unsub); }; },[]);
 
@@ -1315,7 +1493,7 @@ export default function App() {
     <ErrorBoundary>
       <SafeAreaView style={s.screen}>
         <View style={{flex:1,alignItems:'center',justifyContent:'center'}}>
-          <ActivityIndicator color={PURPLE}/>
+          <ActivityIndicator color={BRAND}/>
         </View>
       </SafeAreaView>
     </ErrorBoundary>
@@ -1323,7 +1501,9 @@ export default function App() {
 
   if (!token) return (
     <ErrorBoundary>
-      <LoginScreen onLogin={handleLogin}/>
+      {authView === 'register'
+        ? <RegisterScreen onRegistered={handleLogin} onBack={()=>setAuthView('login')}/>
+        : <LoginScreen onLogin={handleLogin} onRegister={()=>setAuthView('register')}/>}
     </ErrorBoundary>
   );
 
@@ -1342,7 +1522,7 @@ export default function App() {
         <Tab.Navigator
           screenOptions={({ route }) => ({
             headerShown: false,
-            tabBarActiveTintColor: PURPLE,
+            tabBarActiveTintColor: BRAND,
             tabBarInactiveTintColor: GRAY_400,
             tabBarStyle: { backgroundColor:'#fff', borderTopColor:GRAY_100, height:60, paddingBottom:8 },
             tabBarLabelStyle: { fontSize:11, fontWeight:'600' },
@@ -1390,7 +1570,7 @@ const s = StyleSheet.create({
   dot:             { width:10, height:10, borderRadius:5 },
   clientName:      { fontSize:14, fontWeight:'600', color:GRAY_900 },
   sub:             { fontSize:12, color:GRAY_500, marginTop:2 },
-  dateText:        { fontSize:12, color:PURPLE, fontWeight:'500', marginTop:3 },
+  dateText:        { fontSize:12, color:BRAND, fontWeight:'500', marginTop:3 },
   price:           { fontSize:13, fontWeight:'700', color:GRAY_700 },
   pill:            { paddingHorizontal:8, paddingVertical:3, borderRadius:99, borderWidth:1 },
   pillText:        { fontSize:10, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.5 },
@@ -1408,7 +1588,7 @@ const s = StyleSheet.create({
   notesBox:        { backgroundColor:GRAY_50, borderRadius:10, padding:12, marginTop:12 },
   notesText:       { fontSize:13, color:GRAY_700 },
   sheetActions:    { gap:8, marginTop:20 },
-  btnPrimary:      { backgroundColor:PURPLE, borderRadius:12, padding:14, alignItems:'center' },
+  btnPrimary:      { backgroundColor:BRAND, borderRadius:12, padding:14, alignItems:'center' },
   btnPrimaryText:  { color:'#fff', fontWeight:'700', fontSize:15 },
   btnSecondary:    { backgroundColor:GRAY_100, borderRadius:12, padding:14, alignItems:'center' },
   btnSecondaryText:{ color:GRAY_700, fontWeight:'600', fontSize:15 },
@@ -1419,27 +1599,31 @@ const s = StyleSheet.create({
   // Book
   stepLabel:       { fontSize:16, fontWeight:'700', color:GRAY_900, marginBottom:6 },
   backBtn:         { marginBottom:12 },
-  backText:        { color:PURPLE, fontSize:14, fontWeight:'500' },
+  backText:        { color:BRAND, fontSize:14, fontWeight:'500' },
   svcDot:          { width:12, height:12, borderRadius:99, marginRight:4 },
-  avatar:          { width:40, height:40, borderRadius:20, backgroundColor:PURPLE_LT, alignItems:'center', justifyContent:'center' },
-  avatarText:      { color:PURPLE, fontWeight:'700', fontSize:13 },
+  avatar:          { width:40, height:40, borderRadius:20, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
+  avatarText:      { color:BRAND, fontWeight:'700', fontSize:13 },
   checkbox:        { width:20, height:20, borderRadius:10, borderWidth:2, borderColor:GRAY_200, alignItems:'center', justifyContent:'center', marginLeft:8 },
-  checkboxActive:  { borderColor:PURPLE, backgroundColor:PURPLE },
-  cartBar:         { backgroundColor:PURPLE_LT, borderRadius:12, padding:12, marginTop:8, alignItems:'center' },
-  cartText:        { color:PURPLE, fontWeight:'700', fontSize:14 },
+  checkboxActive:  { borderColor:BRAND, backgroundColor:BRAND },
+  cartBar:         { backgroundColor:BRAND_LT, borderRadius:12, padding:12, marginTop:8, alignItems:'center' },
+  cartText:        { color:BRAND, fontWeight:'700', fontSize:14 },
   datePill:        { width:52, marginRight:8, borderRadius:12, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff', paddingVertical:10, alignItems:'center' },
-  datePillActive:  { backgroundColor:PURPLE, borderColor:PURPLE },
+  datePillActive:  { backgroundColor:BRAND, borderColor:BRAND },
   datePillDay:     { fontSize:11, color:GRAY_500, fontWeight:'600' },
   datePillNum:     { fontSize:17, fontWeight:'700', color:GRAY_900, marginTop:2 },
   slotGrid:        { flexDirection:'row', flexWrap:'wrap', gap:10, marginTop:8 },
   slotBtn:         { borderWidth:1, borderColor:GRAY_200, borderRadius:10, paddingVertical:10, paddingHorizontal:14, backgroundColor:'#fff' },
-  slotBtnActive:   { borderColor:PURPLE, backgroundColor:PURPLE_LT },
+  slotBtnActive:   { borderColor:BRAND, backgroundColor:BRAND_LT },
   slotText:        { color:GRAY_700, fontSize:13, fontWeight:'500' },
-  slotTextActive:  { color:PURPLE, fontWeight:'700' },
-  summaryBox:      { backgroundColor:PURPLE_LT, borderRadius:14, padding:14, marginBottom:20 },
-  summaryTitle:    { fontSize:15, fontWeight:'700', color:PURPLE },
+  slotTextActive:  { color:BRAND, fontWeight:'700' },
+  summaryBox:      { backgroundColor:BRAND_LT, borderRadius:14, padding:14, marginBottom:20 },
+  summaryTitle:    { fontSize:15, fontWeight:'700', color:BRAND },
   summarySub:      { fontSize:13, color:'#5B21B6', marginTop:3 },
   fieldLabel:      { fontSize:13, fontWeight:'600', color:GRAY_700, marginBottom:6 },
+  fieldHint:       { fontSize:11, color:GRAY_400, marginTop:5 },
+  authSwitch:      { flexDirection:'row', justifyContent:'center', alignItems:'center', marginTop:20 },
+  authSwitchText:  { fontSize:13, color:GRAY_500 },
+  authSwitchLink:  { fontSize:13, color:BRAND, fontWeight:'700' },
   input:           { borderWidth:1, borderColor:GRAY_200, borderRadius:12, padding:13, fontSize:15, color:GRAY_900, backgroundColor:'#fff' },
   policyBox:       { backgroundColor:GRAY_50, borderRadius:14, borderWidth:1, borderColor:GRAY_200, padding:14, marginBottom:16 },
   policyTitle:     { fontSize:13, fontWeight:'700', color:GRAY_900, marginBottom:6 },
@@ -1447,7 +1631,7 @@ const s = StyleSheet.create({
   policyCheck:     { flexDirection:'row', alignItems:'center', marginTop:12 },
   policyCheckText: { fontSize:13, color:GRAY_700, fontWeight:'500', marginLeft:10, flex:1 },
   doneBox:         { alignItems:'center', paddingTop:40 },
-  doneIcon:        { width:72, height:72, borderRadius:36, backgroundColor:PURPLE, alignItems:'center', justifyContent:'center', marginBottom:16 },
+  doneIcon:        { width:72, height:72, borderRadius:36, backgroundColor:BRAND, alignItems:'center', justifyContent:'center', marginBottom:16 },
   doneTitle:       { fontSize:22, fontWeight:'700', color:GRAY_900 },
   doneSub:         { fontSize:14, color:GRAY_500, marginTop:6 },
   doneRef:         { fontSize:12, color:GRAY_400, marginTop:4, fontFamily:Platform.OS==='ios'?'Menlo':'monospace' },
@@ -1458,36 +1642,36 @@ const s = StyleSheet.create({
   // Messages
   bubble:          { maxWidth:'78%', borderRadius:14, padding:12, marginBottom:8 },
   bubbleLeft:      { backgroundColor:GRAY_100, alignSelf:'flex-start', borderBottomLeftRadius:4 },
-  bubbleRight:     { backgroundColor:PURPLE, alignSelf:'flex-end', borderBottomRightRadius:4 },
+  bubbleRight:     { backgroundColor:BRAND, alignSelf:'flex-end', borderBottomRightRadius:4 },
   bubbleText:      { fontSize:14 },
   bubbleTextLeft:  { color:GRAY_900 },
   bubbleTextRight: { color:'#fff' },
   bubbleTime:      { fontSize:10, color:GRAY_400, marginTop:4, alignSelf:'flex-end' },
   composeRow:      { flexDirection:'row', alignItems:'flex-end', padding:12, borderTopWidth:1, borderTopColor:GRAY_100, gap:8, backgroundColor:'#fff' },
   composeInput:    { flex:1, borderWidth:1, borderColor:GRAY_200, borderRadius:20, paddingHorizontal:16, paddingVertical:10, fontSize:14, color:GRAY_900, maxHeight:100 },
-  sendBtn:         { width:42, height:42, borderRadius:21, backgroundColor:PURPLE, alignItems:'center', justifyContent:'center' },
-  unreadDot:       { width:8, height:8, borderRadius:4, backgroundColor:PURPLE, marginLeft:6 },
+  sendBtn:         { width:42, height:42, borderRadius:21, backgroundColor:BRAND, alignItems:'center', justifyContent:'center' },
+  unreadDot:       { width:8, height:8, borderRadius:4, backgroundColor:BRAND, marginLeft:6 },
   msgTime:         { fontSize:11, color:GRAY_400 },
   // More
   profileCard:     { flexDirection:'row', alignItems:'center', gap:14, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, padding:16, marginBottom:16, shadowColor:'#000', shadowOpacity:0.04, shadowRadius:4, shadowOffset:{width:0,height:1} },
-  avatarLg:        { width:52, height:52, borderRadius:26, backgroundColor:PURPLE_LT, alignItems:'center', justifyContent:'center' },
-  avatarLgText:    { color:PURPLE, fontWeight:'700', fontSize:18 },
+  avatarLg:        { width:52, height:52, borderRadius:26, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
+  avatarLgText:    { color:BRAND, fontWeight:'700', fontSize:18 },
   profileName:     { fontSize:16, fontWeight:'700', color:GRAY_900 },
   profileRole:     { fontSize:13, color:GRAY_500, textTransform:'capitalize', marginTop:2 },
   menuCard:        { backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, marginBottom:16, overflow:'hidden', shadowColor:'#000', shadowOpacity:0.04, shadowRadius:4, shadowOffset:{width:0,height:1} },
   menuRow:         { flexDirection:'row', alignItems:'center', padding:16, gap:12 },
   menuRowBorder:   { borderBottomWidth:1, borderBottomColor:GRAY_100 },
-  menuIcon:        { width:36, height:36, borderRadius:10, backgroundColor:PURPLE_LT, alignItems:'center', justifyContent:'center' },
+  menuIcon:        { width:36, height:36, borderRadius:10, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
   menuLabel:       { flex:1, fontSize:15, fontWeight:'500', color:GRAY_900 },
   logoutBtn:       { flexDirection:'row', alignItems:'center', justifyContent:'center', padding:16, backgroundColor:'#FEF2F2', borderRadius:14, borderWidth:1, borderColor:'#FCA5A5' },
   // Login
   loginWrap:       { flex:1, padding:28, justifyContent:'center' },
   loginLogo:       { flexDirection:'row', alignItems:'center', gap:12, marginBottom:32 },
-  logoIcon:        { width:48, height:48, borderRadius:14, backgroundColor:PURPLE, alignItems:'center', justifyContent:'center' },
+  logoIcon:        { width:48, height:48, borderRadius:14, backgroundColor:BRAND, alignItems:'center', justifyContent:'center' },
   logoText:        { fontSize:24, fontWeight:'800', color:GRAY_900, letterSpacing:-0.5 },
   loginTitle:      { fontSize:28, fontWeight:'800', color:GRAY_900, letterSpacing:-0.5 },
   loginSub:        { fontSize:14, color:GRAY_500, marginTop:4, marginBottom:24 },
   pwToggle:        { position:'absolute', right:14, top:14 },
   // Search
-  unreadCount:     { fontSize:11, color:'#fff', backgroundColor:PURPLE, borderRadius:99, paddingHorizontal:6, paddingVertical:1, fontWeight:'700' },
+  unreadCount:     { fontSize:11, color:'#fff', backgroundColor:BRAND, borderRadius:99, paddingHorizontal:6, paddingVertical:1, fontWeight:'700' },
 });

@@ -9,11 +9,11 @@ import { randomBytes } from 'crypto';
  * Passwords come ONLY from environment variables — none are hardcoded here or
  * generated-and-stored:
  *   OWNER_PASSWORD  (required to create the demo owner login)
- *   ADMIN_PASSWORD  (required to create the platform admin; the admin is created
- *                    with mustResetPassword=true so this is just a one-time
- *                    bootstrap value the admin must change on first login)
  * Optional overrides: SEED_BUSINESS_SLUG, SEED_BUSINESS_NAME, OWNER_EMAIL,
- *   ADMIN_EMAIL, STAFF_EMAIL.
+ *   STAFF_EMAIL.
+ *
+ * The platform-admin role / dashboard has been removed from the product, so this
+ * seed no longer provisions an admin user.
  */
 const prisma = new PrismaClient();
 
@@ -22,8 +22,6 @@ async function main() {
   const name = process.env.SEED_BUSINESS_NAME || 'Demo Salon';
   const ownerEmail = process.env.OWNER_EMAIL || 'owner@demo-salon.com';
   const ownerPassword = process.env.OWNER_PASSWORD;
-  const adminEmail = process.env.ADMIN_EMAIL || 'pmayeni1@icloud.com';
-  const adminPassword = process.env.ADMIN_PASSWORD;
   const staffEmail = process.env.STAFF_EMAIL || 'stylist@demo-salon.com';
 
   // ── Business (idempotent by slug) ──────────────────────────────────────────
@@ -36,7 +34,7 @@ async function main() {
       phone: '+15550001234',
       timezone: 'America/New_York',
       address: '123 Main St',
-      bookingPageSettings: { primaryColor: '#6366f1', allowOnlineBooking: true },
+      bookingPageSettings: { primaryColor: '#E9A23C', allowOnlineBooking: true },
     },
   });
   console.log('business:', business.slug, '->', business.id);
@@ -51,17 +49,6 @@ async function main() {
       console.log('owner CREATED:', ownerEmail);
     } else console.log('owner exists (unchanged):', ownerEmail);
   } else console.log('OWNER_PASSWORD not set — owner skipped');
-
-  // ── Admin with forced reset (password strictly from env; never generated) ──
-  if (adminPassword) {
-    const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
-    if (!existing) {
-      await prisma.user.create({
-        data: { name: 'Platform Admin', email: adminEmail, passwordHash: await bcrypt.hash(adminPassword, 10), role: 'ADMIN', mustResetPassword: true },
-      });
-      console.log('admin CREATED (must reset password on first login):', adminEmail);
-    } else console.log('admin exists (unchanged):', adminEmail);
-  } else console.log('ADMIN_PASSWORD not set — admin skipped (set it to bootstrap the admin with forced reset)');
 
   // ── Services (idempotent by stable id) ─────────────────────────────────────
   const svc = (id: string, sname: string, dur: number, price: number, extra = {}) =>

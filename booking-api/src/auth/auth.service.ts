@@ -27,12 +27,19 @@ export class AuthService {
       let businessId = dto.businessId;
 
       if (dto.role === "OWNER" && !businessId) {
-        const baseSlug = dto.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "salon";
+        // Brand the new (empty) business from the signup form, falling back to
+        // the owner's name. The account starts empty — no staff/services/clients —
+        // the owner sets it up in-app.
+        const businessName = dto.businessName?.trim() || `${dto.name}'s Business`;
+        const slugSource = (dto.businessName?.trim() || dto.name).toLowerCase();
+        const baseSlug = slugSource.replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "business";
         const business = await tx.business.create({
           data: {
-            name: `${dto.name}'s Salon`,
+            name: businessName,
             slug: `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`,
             email: dto.email,
+            phone: dto.businessPhone?.trim() || undefined,
+            timezone: dto.timezone?.trim() || undefined,
           },
         });
         businessId = business.id;

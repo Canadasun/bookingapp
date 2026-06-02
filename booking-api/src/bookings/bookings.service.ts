@@ -65,7 +65,7 @@ export class BookingsService {
    * Creates an appointment with SERIALIZABLE isolation + SELECT FOR UPDATE
    * to guarantee exactly-once booking under concurrent requests.
    */
-  async create(businessId: string, dto: CreateAppointmentDto) {
+  async create(businessId: string, dto: CreateAppointmentDto, opts: { confirmed?: boolean } = {}) {
     const primaryService = await this.prisma.service.findFirst({
       where: { id: dto.serviceId, businessId },
     });
@@ -134,6 +134,9 @@ export class BookingsService {
               startsAt,
               endsAt,
               notes: notesWithServices,
+              // Owner/staff-initiated bookings skip the approval queue and are
+              // confirmed immediately; public self-service stays PENDING.
+              ...(opts.confirmed ? { status: 'CONFIRMED' as const } : {}),
             },
             include: { client: true, service: true, staff: { include: { user: true } }, business: true },
           });
@@ -162,13 +165,22 @@ export class BookingsService {
       }
     }
 
-    await this.logAction('APPOINTMENT', appointment.id, 'CREATE', { startsAt: appointment.startsAt });
+    await this.logAction('APPOINTMENT', appointment.id, 'CREATE', {
+      startsAt: appointment.startsAt,
+      confirmed: !!opts.confirmed,
+    });
 
-    // Notify client that booking is PENDING approval; alert owner to act
-    await Promise.allSettled([
-      this.notifications.sendPendingNotification(appointment),
-      this.notifications.sendAdminBookingAlert(appointment.id),
-    ]);
+    if (opts.confirmed) {
+      // Owner/staff booking: confirm immediately, send the real confirmation to
+      // the client and schedule reminders. No pending notice, no owner alert.
+      await this.notifications.scheduleReminders(appointment);
+    } else {
+      // Public self-service: notify client it's PENDING approval; alert owner to act.
+      await Promise.allSettled([
+        this.notifications.sendPendingNotification(appointment),
+        this.notifications.sendAdminBookingAlert(appointment.id),
+      ]);
+    }
 
     return appointment;
   }

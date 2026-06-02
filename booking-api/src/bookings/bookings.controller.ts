@@ -80,13 +80,30 @@ export class BookingsController {
     return this.appointmentService.findOne(id, businessId);
   }
 
-  // Public — called from the unauthenticated booking wizard
+  // Public — called from the unauthenticated booking wizard. Goes PENDING and
+  // waits for owner approval.
   @Post()
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,
   ) {
     return this.appointmentService.create(businessId, dto);
+  }
+
+  // Owner/staff-initiated booking (dashboard / mobile app). Authenticated and
+  // ownership-checked, so it skips approval: created CONFIRMED, and the client
+  // gets a confirmation immediately.
+  @Post('manual')
+  @UseGuards(JwtAuthGuard)
+  createManual(
+    @Param('businessId') businessId: string,
+    @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.appointmentService.create(businessId, dto, { confirmed: true });
   }
 
   @Patch(':id/confirm')

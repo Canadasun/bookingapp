@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const STAFF_PROTECTED  = ["/dashboard"];
-const ADMIN_PROTECTED  = ["/admin"];
 const CLIENT_PROTECTED = ["/my/dashboard", "/my/messages"];
 const AUTH_ONLY        = ["/login", "/register"];
 const CLIENT_AUTH_ONLY = ["/my/login", "/my/register"];
@@ -23,10 +22,10 @@ export function middleware(req: NextRequest) {
   const user = userFromCookie(req);
 
   // Forced first-login password reset: until the flag clears, keep the user on
-  // /change-password and out of the dashboard/admin areas.
+  // /change-password and out of the dashboard area.
   if (
     token && user?.mustResetPassword && pathname !== "/change-password" &&
-    (pathname.startsWith("/dashboard") || pathname.startsWith("/admin"))
+    pathname.startsWith("/dashboard")
   ) {
     return NextResponse.redirect(new URL("/change-password", req.url));
   }
@@ -36,19 +35,6 @@ export function middleware(req: NextRequest) {
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
-  }
-
-  // Platform super-admin area: require auth AND the ADMIN role.
-  if (ADMIN_PROTECTED.some((p) => pathname.startsWith(p))) {
-    if (!token) {
-      const url = req.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
-    }
-    if (user?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
   }
 
   if (STAFF_PROTECTED.some((p) => pathname.startsWith(p)) && !token) {
@@ -79,7 +65,6 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
-    "/admin/:path*", "/admin",
     "/change-password",
     "/my/dashboard", "/my/messages",
     "/my/login", "/my/register",

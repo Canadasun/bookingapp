@@ -120,12 +120,12 @@ export default function CheckoutPage() {
       const client = await createOrGetClient();
       if (!client) return;
       const staffId = selectedStaff && selectedStaff !== "any" ? selectedStaff.id : staffList[0]?.id;
-      const apt = await api.appointments.create(bizId, {
+      const apt = await api.appointments.createManual(bizId, {
         staffId, serviceId: selectedServices[0].id,
         clientId: client.id, startsAt: selectedSlot.startsAt,
       });
       setBooked(apt);
-      toast.success("Appointment booked!");
+      toast.success("Appointment booked & confirmed!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Booking failed");
     } finally { setSubmitting(false); }

@@ -12,12 +12,12 @@ function emailWrap(content: string) {
 <body style="margin:0;padding:0;background:#F8F9FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table width="100%" style="max-width:520px;background:#fff;border-radius:16px;border:1px solid #E5E7EB;overflow:hidden">
-  <tr><td style="background:#7C3AED;padding:24px 32px">
+  <tr><td style="background:#E9A23C;padding:24px 32px">
     <p style="margin:0;color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px">BookingApp</p>
   </td></tr>
   <tr><td style="padding:32px">${content}</td></tr>
   <tr><td style="padding:16px 32px;border-top:1px solid #F3F4F6;background:#FAFAFA">
-    <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center">© BookingApp · <a href="#" style="color:#7C3AED;text-decoration:none">Manage preferences</a></p>
+    <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center">© BookingApp · <a href="#" style="color:#E9A23C;text-decoration:none">Manage preferences</a></p>
   </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -68,9 +68,9 @@ export class NotificationProcessor extends WorkerHost {
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A gift just for you 🎁</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">${card.purchaserName ? `${card.purchaserName} sent you` : "You've received"} a <strong>${amount}</strong> gift card for <strong>${card.business.name}</strong>.</p>
 ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">"${card.message}"</p>` : ''}
-<div style="background:#F5F3FF;border:1px dashed #7C3AED;border-radius:12px;padding:16px;text-align:center;margin:0 0 16px">
+<div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:16px;text-align:center;margin:0 0 16px">
   <p style="margin:0 0 4px;color:#6B7280;font-size:12px">Your gift card code</p>
-  <p style="margin:0;color:#7C3AED;font-size:22px;font-weight:700;letter-spacing:1px">${card.code}</p>
+  <p style="margin:0;color:#E9A23C;font-size:22px;font-weight:700;letter-spacing:1px">${card.code}</p>
 </div>
 <p style="margin:0;color:#6B7280;font-size:13px">Present this code when you book or visit ${card.business.name}.</p>
 `),
@@ -114,7 +114,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A spot just opened up! 🎉</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${entry.name}, a time just became available at <strong>${entry.business.name}</strong>. Book now before someone else grabs it.</p>
-<a href="${bookUrl}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book now →</a>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book now →</a>
 `),
       });
       return;
@@ -142,7 +142,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">How did we do? ⭐</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, thanks for visiting <strong>${apt.business.name}</strong>. We'd love your feedback on your ${apt.service.name} with ${apt.staff.user.name}.</p>
-<a href="${baseUrl}/review/${apt.id}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
+<a href="${baseUrl}/review/${apt.id}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
 `),
         });
         break;
@@ -157,7 +157,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your booking request has been received and is awaiting approval from <strong>${apt.business.name}</strong>. You'll get a confirmation email once it's approved.</p>
 ${aptDetails(apt)}
 <p style="margin:8px 0 0;color:#6B7280;font-size:13px">We'll notify you as soon as your appointment is confirmed.</p>
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
           `),
         });
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
@@ -173,7 +173,7 @@ ${aptDetails(apt)}
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your appointment is confirmed.</p>
 ${aptDetails(apt)}
 <p style="margin:0;color:#6B7280;font-size:13px">You'll receive a reminder 24 hours before your appointment.</p>
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
@@ -189,7 +189,7 @@ ${aptDetails(apt)}
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">See you tomorrow!</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, just a friendly reminder about your upcoming appointment.</p>
 ${aptDetails(apt)}
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SENT');
@@ -217,7 +217,7 @@ ${aptDetails(apt)}
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your appointment has been cancelled.</p>
 ${aptDetails(apt)}
 ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Reason: <em>${apt.cancelReason}</em></p>` : ''}
-<a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
+<a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
           `),
         });
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
@@ -233,7 +233,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, ${apt.business.name} has cancelled your appointment. We apologise for the inconvenience.</p>
 ${aptDetails(apt)}
 ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>Reason:</strong> ${apt.cancelReason}</p></div>` : ''}
-<a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
+<a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
           `),
         });
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
@@ -245,10 +245,10 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
           to: apt.client.email,
           subject: `Appointment rescheduled — ${apt.service.name}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#7C3AED;font-size:20px;font-weight:700">Appointment rescheduled</h2>
+<h2 style="margin:0 0 4px;color:#E9A23C;font-size:20px;font-weight:700">Appointment rescheduled</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your appointment has been moved to a new time.</p>
 ${aptDetails(apt)}
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
           `),
         });
         await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SENT');
@@ -270,7 +270,7 @@ ${aptDetails(apt)}
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.client.name} (${apt.client.email}${apt.client.phone ? ', ' + apt.client.phone : ''})</td></tr>
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Booking ID</td><td style="color:#111827;font-size:12px;font-family:monospace">${apt.id}</td></tr>
 </table>
-<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View in dashboard →</a>
+<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View in dashboard →</a>
           `),
         });
         break;
