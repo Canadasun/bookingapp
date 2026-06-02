@@ -108,6 +108,42 @@ export class PaymentsService {
     return this.createBookingIntent(appointmentId, businessId);
   }
 
+  /**
+   * In-person custom charge (mobile Checkout → Tap to Pay on iPhone).
+   * Creates a PaymentIntent for an arbitrary amount so the transaction is recorded
+   * in Stripe and shows on the dashboard. The contactless capture is performed by
+   * the in-app reader: the Stripe Terminal "Tap to Pay on iPhone" SDK collects the
+   * card and confirms THIS intent (drop-in once the Apple proximity-reader
+   * entitlement is granted). We return the client secret + publishable key so that
+   * hook can confirm without another round-trip.
+   */
+  async createCustomCharge(
+    businessId: string,
+    input: { amountCents: number; description?: string; clientId?: string },
+  ) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    const intent = await this.getStripe().paymentIntents.create({
+      amount: input.amountCents,
+      currency: 'usd',
+      // Card-only, no redirect methods — the reader confirms on-device.
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+      metadata: {
+        businessId,
+        kind: 'tap_to_pay',
+        ...(input.clientId ? { clientId: input.clientId } : {}),
+      },
+      description: input.description?.trim() || `In-person charge — ${business.name}`,
+    });
+    return {
+      paymentIntentId: intent.id,
+      clientSecret: intent.client_secret,
+      amountCents: input.amountCents,
+      currency: 'usd',
+      status: intent.status,
+      publishableKey: this.publishableKey(),
+    };
+  }
+
   async handleWebhook(rawBody: Buffer, signature: string) {
     const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') ?? '';
 

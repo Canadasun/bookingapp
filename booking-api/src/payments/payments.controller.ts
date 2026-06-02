@@ -13,6 +13,13 @@ const BookingIntentSchema = z.object({
   businessId: z.string().min(1),
 });
 
+const CustomChargeSchema = z.object({
+  // $0.50 min (Stripe) up to $100,000 per charge.
+  amountCents: z.number().int().min(50).max(10_000_000),
+  description: z.string().max(200).optional(),
+  clientId: z.string().optional(),
+});
+
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
@@ -48,6 +55,20 @@ export class PaymentsController {
   ) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.paymentService.chargeNoShowFee(appointmentId, user.businessId);
+  }
+
+  // In-person custom charge (mobile Checkout → Tap to Pay). Scoped to the owner's business.
+  @Post('charge')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  createCharge(
+    @Body() body: unknown,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    const parsed = CustomChargeSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('A valid amountCents (>= 50) is required');
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.createCustomCharge(user.businessId, parsed.data);
   }
 
   @Post('webhook/stripe')
