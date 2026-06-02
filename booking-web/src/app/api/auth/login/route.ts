@@ -6,7 +6,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json() as { email: string; password: string };
   const upstream = await fetch(`${API}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      // Forward the real client device/IP so the API can detect new-device logins.
+      "x-client-user-agent": req.headers.get("user-agent") ?? "",
+      "x-forwarded-for": req.headers.get("x-forwarded-for") ?? "",
+    },
     body: JSON.stringify(body),
   });
 

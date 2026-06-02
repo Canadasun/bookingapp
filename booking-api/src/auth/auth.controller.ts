@@ -1,4 +1,5 @@
-import { Controller, Post, Body, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, HttpCode, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -21,8 +22,12 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5/min/IP on top of the global throttle
-  login(@Body(new ZodValidationPipe(LoginSchema)) dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body(new ZodValidationPipe(LoginSchema)) dto: LoginDto, @Req() req: Request) {
+    // The web proxies login server-side, so it forwards the real client UA/IP via
+    // x-client-user-agent / x-forwarded-for; mobile hits us directly.
+    const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+    const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
+    return this.authService.login(dto, { ip: fwd || req.ip, userAgent });
   }
 
   @Post('refresh')

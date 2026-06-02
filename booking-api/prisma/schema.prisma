@@ -287,9 +287,25 @@ model User {
 
   business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
   staff    Staff?
+  loginEvents LoginEvent[]
 
   @@index([email])
   @@index([businessId])
+}
+
+// One row per successful sign-in. Used to detect logins from a new device and
+// fire a security alert. deviceKey = hash of the user-agent (per-user).
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  deviceKey String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, deviceKey])
 }
 
 model Staff {

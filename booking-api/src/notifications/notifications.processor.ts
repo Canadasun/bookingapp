@@ -51,7 +51,7 @@ export class NotificationProcessor extends WorkerHost {
     private configService: ConfigService,
   ) { super(); }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
 
     // Welcome email — new owner just registered.
@@ -91,6 +91,27 @@ export class NotificationProcessor extends WorkerHost {
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Reset your password</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, we received a request to reset your password. This link expires in 30 minutes. If you didn't ask for this, you can safely ignore this email.</p>
 <a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset password →</a>
+`),
+      });
+      return;
+    }
+
+    // Security alert — sign-in from a new device.
+    if (job.name === 'security-alert') {
+      const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
+      if (!user) return;
+      const resetUrl = job.data.resetToken ? `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}` : `${baseUrl}/forgot-password`;
+      const device = (job.data.userAgent || 'an unrecognized device').slice(0, 120);
+      const ip = job.data.ip ? ` (IP ${job.data.ip})` : '';
+      await this.email.send({
+        to: user.email,
+        subject: '🔐 New sign-in to your Pulse account',
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">New sign-in detected</h2>
+<p style="margin:0 0 12px;color:#6B7280;font-size:14px">Hi ${user.name}, your Pulse account was just signed into from a device we haven't seen before:</p>
+<p style="margin:0 0 16px;color:#374151;font-size:13px;background:#F8F9FA;border-radius:10px;padding:12px">${device}${ip}</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px"><strong>If this was you</strong>, you can ignore this email. <strong>If it wasn't</strong>, reset your password right away to secure your account.</p>
+<a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset my password →</a>
 `),
       });
       return;
@@ -206,6 +227,7 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
           `),
         });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}. Awaiting approval.`);
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
         break;
       }
@@ -222,6 +244,7 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
         break;
       }
@@ -238,6 +261,7 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${format(apt.startsAt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SENT');
         break;
       }
@@ -251,6 +275,7 @@ ${aptDetails(apt)}
           });
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SENT');
         }
+        await this.addInAppMessage(apt.businessId, apt.clientId, `🔔 Reminder: Your appointment for ${apt.service.name} is in 2 hours.`);
         break;
       }
 
@@ -266,6 +291,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
           `),
         });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
         break;
       }
@@ -282,6 +308,7 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
           `),
         });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Your appointment for ${apt.service.name} was cancelled by ${apt.business.name}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
         break;
       }
@@ -297,6 +324,7 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
           `),
         });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SENT');
         break;
       }
@@ -335,5 +363,11 @@ ${aptDetails(apt)}
     return this.prisma.notificationLog.create({
       data: { appointmentId, channel, type, status, errorMessage },
     });
+  }
+
+  private async addInAppMessage(businessId: string, clientId: string, content: string) {
+    await this.prisma.message.create({
+      data: { businessId, clientId, content, fromClient: false },
+    }).catch(err => console.error('Failed to add in-app message:', err));
   }
 }

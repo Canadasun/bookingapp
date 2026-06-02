@@ -100,6 +100,16 @@ export class NotificationsService {
     await this.queue.add('password-reset', { userId, resetToken }, { removeOnComplete: true, attempts: 3 });
   }
 
+  // Security alert: a sign-in from a new device. Includes a reset link so the
+  // user can lock the account if it wasn't them.
+  async sendSecurityAlert(userId: string, info: { ip?: string; userAgent?: string; resetToken: string }) {
+    await this.queue.add(
+      'security-alert',
+      { userId, ip: info.ip, userAgent: info.userAgent, resetToken: info.resetToken },
+      { removeOnComplete: true, attempts: 3 },
+    );
+  }
+
   // Marketing campaign — one job per recipient so the queue can retry individually.
   async sendCampaignMessage(campaignId: string, clientId: string) {
     await this.queue.add(

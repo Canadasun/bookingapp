@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -112,12 +113,37 @@ export class AuthService {
     return { ok: true };
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string }) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
+    await this.recordLoginAndMaybeAlert(user, ctx);
     return this.issueTokens(user);
+  }
+
+  // Record the sign-in and, if it's from a NEW device (but not the user's very
+  // first login), email a security alert with a password-reset link. Wrapped in
+  // try/catch so this plumbing can never block a legitimate login.
+  private async recordLoginAndMaybeAlert(user: User, ctx?: { ip?: string; userAgent?: string }) {
+    try {
+      const ua = ctx?.userAgent ?? '';
+      const deviceKey = createHash('sha256').update(ua).digest('hex').slice(0, 32);
+      const [priorSameDevice, total] = await Promise.all([
+        this.prisma.loginEvent.findFirst({ where: { userId: user.id, deviceKey } }),
+        this.prisma.loginEvent.count({ where: { userId: user.id } }),
+      ]);
+      await this.prisma.loginEvent.create({
+        data: { userId: user.id, deviceKey, ip: ctx?.ip?.slice(0, 64) || null, userAgent: ua.slice(0, 256) || null },
+      });
+      if (total > 0 && !priorSameDevice) {
+        const resetToken = this.jwt.sign(
+          { sub: user.id, kind: 'reset' },
+          { secret: this.resetSecret(user.passwordHash), expiresIn: '30m' },
+        );
+        await this.notifications.sendSecurityAlert(user.id, { ip: ctx?.ip, userAgent: ua, resetToken });
+      }
+    } catch { /* never block login on the alert path */ }
   }
 
   async refresh(user: User) {
