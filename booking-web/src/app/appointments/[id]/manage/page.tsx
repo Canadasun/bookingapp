@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { format, isBefore, subHours } from 'date-fns';
 import Link from 'next/link';
 import { Calendar, Clock, User, Scissors, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 export default function ManageAppointmentPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const token = useSearchParams().get('token') ?? undefined;
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -23,14 +24,14 @@ export default function ManageAppointmentPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.appointments.get(id);
+      const data = await api.appointments.get(id, token);
       setAppointment(data);
     } catch {
       toast.error('Failed to load appointment details');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, token]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -48,7 +49,7 @@ export default function ManageAppointmentPage() {
 
     setCancelling(true);
     try {
-      await api.appointments.publicCancel(id, 'Cancelled by client');
+      await api.appointments.publicCancel(id, 'Cancelled by client', token);
       toast.success('Appointment cancelled');
       load();
     } catch (e) {
@@ -154,7 +155,7 @@ export default function ManageAppointmentPage() {
                 <Button 
                   variant="secondary" 
                   className="flex-1 py-6 text-lg font-semibold"
-                  onClick={() => router.push(`/book/${appointment.business.slug}?reschedule=${id}`)}
+                  onClick={() => router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `&token=${encodeURIComponent(token)}` : ''}`)}
                 >
                   Reschedule
                 </Button>

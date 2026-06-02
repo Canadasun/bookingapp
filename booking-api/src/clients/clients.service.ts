@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto, UpdateClientDto } from './dto/client.dto';
+import { signAppointmentToken } from '../common/util/appointment-token';
 
 @Injectable()
 export class ClientsService {
@@ -111,7 +112,13 @@ export class ClientsService {
         },
       },
     });
-    return client;
+    if (!client) return null;
+    // Attach a manage token to each booking so the guest-lookup page can build
+    // valid manage links (the lookup itself proves ownership via email/phone).
+    return {
+      ...client,
+      appointments: client.appointments.map((a) => ({ ...a, manageToken: signAppointmentToken(a.id) })),
+    };
   }
 
   // Used by the public booking wizard + walk-in/owner flows. Dedups on email OR

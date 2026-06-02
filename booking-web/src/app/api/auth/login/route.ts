@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
   const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });
   res.cookies.set("booking_token", data.accessToken, {
-    httpOnly: false,
+    // HttpOnly: the browser sends it automatically to the same-origin /proxy and
+    // the API reads it from the cookie — client JS never touches it (XSS-safe).
+    httpOnly: true,
     secure,
     sameSite: "lax",
     path: "/",

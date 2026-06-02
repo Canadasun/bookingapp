@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
+import { verifyAppointmentToken } from '../common/util/appointment-token';
 import {
   CreateAppointmentSchema, CreateAppointmentDto,
   RescheduleSchema, RescheduleDto,
@@ -16,29 +17,41 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class PublicBookingsController {
   constructor(private bookingsService: BookingsService) {}
 
+  // Every public-by-id route requires the HMAC manage token from the emailed
+  // link, so knowing an appointment id alone isn't enough to read or change it.
+  private assertToken(id: string, token?: string) {
+    if (!verifyAppointmentToken(id, token)) {
+      throw new ForbiddenException('Invalid or missing manage token');
+    }
+  }
+
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string, @Query('token') token?: string) {
+    this.assertToken(id, token);
     return this.bookingsService.findOne(id);
   }
 
   // Public cancel — used by the client manage page (no login required).
   // PublicStatusSchema enforces status === 'CANCELLED', so this endpoint can't be
-  // used to confirm/complete/no-show a booking by guessing its id.
+  // used to confirm/complete/no-show a booking even with a valid token.
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(PublicStatusSchema)) dto: PublicStatusDto,
+    @Query('token') token?: string,
   ) {
+    this.assertToken(id, token);
     return this.bookingsService.updateStatus(id, dto);
   }
 
   // Public reschedule — used by the client manage page redirect to booking wizard.
-  // The actual reschedule is handled in the booking wizard as a new slot pick + PATCH.
   @Patch(':id/reschedule')
   reschedule(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
+    @Query('token') token?: string,
   ) {
+    this.assertToken(id, token);
     return this.bookingsService.reschedule(id, dto);
   }
 }

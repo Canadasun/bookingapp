@@ -214,7 +214,7 @@ function BookingCard({ apt, past = false }: { apt: Appointment; past?: boolean }
 
       {/* Action */}
       {canManage && (
-        <Link href={`/appointments/${apt.id}/manage`}
+        <Link href={`/appointments/${apt.id}/manage${apt.manageToken ? `?token=${encodeURIComponent(apt.manageToken)}` : ''}`}
           className="flex items-center gap-1 text-xs text-violet-600 font-medium hover:underline shrink-0 mt-1">
           Manage <ChevronRight className="w-3 h-3" />
         </Link>

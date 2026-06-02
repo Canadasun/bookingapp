@@ -31,6 +31,7 @@ export class CampaignsService {
     return this.prisma.campaign.findMany({
       where: { businessId },
       orderBy: { createdAt: 'desc' },
+      take: 500, // bound the result set
     });
   }
 

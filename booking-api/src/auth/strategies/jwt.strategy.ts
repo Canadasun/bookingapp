@@ -14,11 +14,27 @@ export interface JwtPayload {
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET is not set — refusing to start.');
 
+// The web app sends the access token as an HttpOnly `booking_token` cookie
+// (immune to XSS theft); the same-origin /proxy forwards it here. Mobile keeps
+// using the Authorization: Bearer header. Try the header first, then the cookie.
+function cookieExtractor(req: { headers?: { cookie?: string } }): string | null {
+  const raw = req?.headers?.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === 'booking_token') return decodeURIComponent(v.join('='));
+  }
+  return null;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(private prisma: PrismaService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        cookieExtractor,
+      ]),
       secretOrKey: JWT_SECRET,
     });
   }

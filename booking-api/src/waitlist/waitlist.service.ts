@@ -25,6 +25,7 @@ export class WaitlistService {
     return this.prisma.waitlistEntry.findMany({
       where: { businessId, status: 'WAITING' },
       orderBy: { createdAt: 'asc' },
+      take: 500, // bound the result set
     });
   }
 

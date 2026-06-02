@@ -15,7 +15,7 @@ export class PackagesService {
   }
 
   listPackages(businessId: string) {
-    return this.prisma.package.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.package.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' }, take: 500 });
   }
 
   private async getPackage(businessId: string, id: string) {
@@ -70,6 +70,7 @@ export class PackagesService {
       where: { businessId, ...(clientId ? { clientId } : {}) },
       include: { client: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: 'desc' },
+      take: 1000, // bound the result set
     });
   }
 

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { signAppointmentToken } from '../common/util/appointment-token';
 
 @Injectable()
 export class ClientPortalService {
@@ -25,6 +26,7 @@ export class ClientPortalService {
         ...a,
         business: c.business,
         client: { id: c.id, name: c.name, email: c.email, phone: c.phone },
+        manageToken: signAppointmentToken(a.id),
       }))
     ).sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
   }

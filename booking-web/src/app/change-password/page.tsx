@@ -24,8 +24,10 @@ export default function ChangePasswordPage() {
     setLoading(true);
     try {
       await api.auth.changePassword(currentPassword, newPassword);
-      // Sign the user out so they re-authenticate with the new password and a
-      // fresh session cookie (mustResetPassword cleared).
+      // Sign the user out server-side so the HttpOnly token cookie is actually
+      // cleared (clearSession alone can't remove an HttpOnly cookie), then
+      // re-authenticate with the new password.
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
       clearSession();
       toast.success("Password updated — please sign in again");
       router.push("/login");

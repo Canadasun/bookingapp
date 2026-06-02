@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ResendEmailProvider } from './providers/email.provider';
 import { TwilioSmsProvider } from './providers/sms.provider';
 import { NOTIFICATION_QUEUE } from './notifications.service';
+import { signAppointmentToken } from '../common/util/appointment-token';
 import { format } from 'date-fns';
 
 function emailWrap(content: string) {
@@ -173,7 +174,9 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     const isPro = apt.business.plan === 'PRO';
 
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
-    const manageUrl = `${webUrl}/appointments/${apt.id}/manage`;
+    // HMAC manage token so the link proves the recipient got the email (the
+    // public booking endpoints reject an id without a valid token).
+    const manageUrl = `${webUrl}/appointments/${apt.id}/manage?token=${signAppointmentToken(apt.id)}`;
 
     switch (job.name) {
 

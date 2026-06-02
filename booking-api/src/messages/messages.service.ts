@@ -9,6 +9,7 @@ export class MessagesService {
     return this.prisma.message.findMany({
       where: { businessId, clientId },
       orderBy: { createdAt: 'asc' },
+      take: 1000, // bound a single conversation
     });
   }
 
@@ -33,6 +34,7 @@ export class MessagesService {
       },
       include: { client: { select: { id: true, name: true, email: true, phone: true } } },
       orderBy: { createdAt: 'desc' },
+      take: 2000, // bound: newest messages are enough to surface active threads
     });
 
     // Group by clientId — return latest message per thread

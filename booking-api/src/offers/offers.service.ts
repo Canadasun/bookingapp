@@ -9,6 +9,7 @@ export class OffersService {
     return this.prisma.offer.findMany({
       where: { businessId, active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
       orderBy: { createdAt: 'desc' },
+      take: 500, // bound the result set
     });
   }
 

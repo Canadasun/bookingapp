@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });
   res.cookies.set("booking_token", data.accessToken, {
-    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
+    httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,

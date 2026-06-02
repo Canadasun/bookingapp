@@ -131,6 +131,9 @@ export interface Appointment {
   service: Service;
   staff: StaffMember;
   business: Business;
+  // HMAC token for the public manage link (present on client-facing responses:
+  // booking confirmation, guest lookup, client portal).
+  manageToken?: string;
 }
 
 export interface TimeOff {
@@ -364,7 +367,8 @@ export const api = {
       req<{ data: Appointment[]; total: number; page: number; pages: number }>(
         `/businesses/${businessId}/bookings?page=${page}&limit=${limit}`
       ),
-    get: (id: string) => req<Appointment>(`/bookings/${id}`),
+    // Public-by-id — requires the HMAC manage token from the emailed link.
+    get: (id: string, token?: string) => req<Appointment>(`/bookings/${id}${token ? `?token=${encodeURIComponent(token)}` : ""}`, undefined, null),
     create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
@@ -378,14 +382,14 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ status, ...(cancelReason ? { cancelReason } : {}) }),
       }),
-    // Public — used by the client-facing manage page (no auth required)
-    publicCancel: (id: string, cancelReason?: string) =>
-      req<Appointment>(`/bookings/${id}/status`, {
+    // Public — used by the client-facing manage page (no auth; HMAC token required)
+    publicCancel: (id: string, cancelReason?: string, token?: string) =>
+      req<Appointment>(`/bookings/${id}/status${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "CANCELLED", ...(cancelReason ? { cancelReason } : {}) }),
       }, null),
-    publicReschedule: (id: string, startsAt: string) =>
-      req<Appointment>(`/bookings/${id}/reschedule`, {
+    publicReschedule: (id: string, startsAt: string, token?: string) =>
+      req<Appointment>(`/bookings/${id}/reschedule${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
         method: "PATCH",
         body: JSON.stringify({ startsAt }),
       }, null),

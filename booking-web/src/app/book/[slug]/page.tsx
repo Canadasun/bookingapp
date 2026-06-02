@@ -90,6 +90,7 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
 function BookPageInner({ slug }: { slug: string }) {
   const searchParams  = useSearchParams();
   const rescheduleId  = searchParams.get("reschedule");
+  const rescheduleToken = searchParams.get("token") ?? undefined; // HMAC manage token for the public reschedule
   const isEmbed       = searchParams.get("embed") === "1"; // rendered inside the embeddable widget iframe
   const rescheduleLoaded = useRef(false);
 
@@ -122,7 +123,7 @@ function BookPageInner({ slug }: { slug: string }) {
   const [submitting, setSubmitting]         = useState(false);
   const [loadingSlots, setLoadingSlots]     = useState(false);
   const [loadingBiz, setLoadingBiz]         = useState(true);
-  const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string } | null>(null);
+  const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string } | null>(null);
   const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
   const [wl, setWl]                         = useState({ name: "", email: "" });
   const [wlSaving, setWlSaving]             = useState(false);
@@ -168,13 +169,13 @@ function BookPageInner({ slug }: { slug: string }) {
   useEffect(() => {
     if (!rescheduleId || rescheduleLoaded.current || allServices.length === 0) return;
     rescheduleLoaded.current = true;
-    api.appointments.get(rescheduleId).then((apt) => {
+    api.appointments.get(rescheduleId, rescheduleToken).then((apt) => {
       const svc = allServices.find((s) => s.id === apt.service.id);
       if (svc) setSelectedServices([svc]);
       setStep(2);
       toast.success("Select a new date and time");
     }).catch(() => {});
-  }, [rescheduleId, allServices]);
+  }, [rescheduleId, rescheduleToken, allServices]);
 
   function toggleService(svc: Service) {
     setSelectedServices((prev) =>
@@ -225,7 +226,7 @@ function BookPageInner({ slug }: { slug: string }) {
         : staffList[0]?.id;
 
       if (rescheduleId) {
-        const apt = await api.appointments.publicReschedule(rescheduleId, selectedSlot.startsAt);
+        const apt = await api.appointments.publicReschedule(rescheduleId, selectedSlot.startsAt, rescheduleToken);
         setBooking(apt); setStep(4);
         return;
       }
@@ -371,7 +372,7 @@ function BookPageInner({ slug }: { slug: string }) {
             </div>
 
             <div className="flex gap-3 mb-4">
-              <Link href={`/appointments/${booking.id}/manage`}
+              <Link href={`/appointments/${booking.id}/manage${booking.manageToken ? `?token=${encodeURIComponent(booking.manageToken)}` : ''}`}
                 className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 text-center transition-colors">
                 Manage booking
               </Link>

@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAppointmentDto, RescheduleDto, StatusDto } from './dto/appointment.dto';
+import { signAppointmentToken } from '../common/util/appointment-token';
 import { Prisma } from '@prisma/client';
 import { addMinutes } from 'date-fns';
 
@@ -182,7 +183,8 @@ export class BookingsService {
       ]);
     }
 
-    return appointment;
+    // Manage token so the confirmation screen can link straight to the manage page.
+    return { ...appointment, manageToken: signAppointmentToken(appointment.id) };
   }
 
   async confirm(id: string, businessId?: string) {
