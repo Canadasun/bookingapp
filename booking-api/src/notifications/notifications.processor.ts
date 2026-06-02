@@ -9,16 +9,16 @@ import { signAppointmentToken } from '../common/util/appointment-token';
 import { format } from 'date-fns';
 
 function emailWrap(content: string) {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BookingApp</title></head>
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse</title></head>
 <body style="margin:0;padding:0;background:#F8F9FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table width="100%" style="max-width:520px;background:#fff;border-radius:16px;border:1px solid #E5E7EB;overflow:hidden">
   <tr><td style="background:#E9A23C;padding:24px 32px">
-    <p style="margin:0;color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px">BookingApp</p>
+    <p style="margin:0;color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.3px">Pulse</p>
   </td></tr>
   <tr><td style="padding:32px">${content}</td></tr>
   <tr><td style="padding:16px 32px;border-top:1px solid #F3F4F6;background:#FAFAFA">
-    <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center">© BookingApp · <a href="#" style="color:#E9A23C;text-decoration:none">Manage preferences</a></p>
+    <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center">© Pulse · <a href="#" style="color:#E9A23C;text-decoration:none">Manage preferences</a></p>
   </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -64,7 +64,7 @@ export class NotificationProcessor extends WorkerHost {
       const bizName = user.business?.name ?? 'your business';
       await this.email.send({
         to: user.email,
-        subject: `Welcome to BookingApp, ${user.name.split(' ')[0]}! 🎉`,
+        subject: `Welcome to Pulse, ${user.name.split(' ')[0]}! 🎉`,
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Welcome aboard! 🎉</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, your account for <strong>${bizName}</strong> is ready. Here's how to get set up:</p>
@@ -86,7 +86,7 @@ export class NotificationProcessor extends WorkerHost {
       const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}`;
       await this.email.send({
         to: user.email,
-        subject: 'Reset your BookingApp password',
+        subject: 'Reset your Pulse password',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Reset your password</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, we received a request to reset your password. This link expires in 30 minutes. If you didn't ask for this, you can safely ignore this email.</p>

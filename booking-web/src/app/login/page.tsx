@@ -74,7 +74,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <Calendar className="w-8 h-8 text-indigo-600" />
-            <span className="text-2xl font-bold text-slate-900">BookingApp</span>
+            <span className="text-2xl font-bold text-slate-900">Pulse</span>
           </Link>
           <p className="text-slate-500 mt-2 text-sm">Sign in to your dashboard</p>
         </div>
@@ -89,8 +89,8 @@ export default function LoginPage() {
               Want to book an appointment?{" "}
               <Link href="/book" className="text-violet-600 hover:underline font-medium">Book here</Link>
             </p>
-            <p className="text-center text-xs text-gray-300 mt-3">
-              <Link href="/register" className="hover:text-gray-400 transition-colors">Create business account</Link>
+            <p className="text-center text-xs text-gray-500 mt-3">
+              <Link href="/register" className="text-violet-600 hover:underline font-medium transition-colors">Create business account</Link>
             </p>
           </CardContent>
         </Card>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Calendar } from "lucide-react";
 
-export const metadata = { title: "Privacy Policy — BookingApp" };
+export const metadata = { title: "Privacy Policy — Pulse" };
 
 export default function PrivacyPage() {
   return (
@@ -9,7 +9,7 @@ export default function PrivacyPage() {
       <div className="max-w-2xl mx-auto px-6 py-12">
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
           <Calendar className="w-7 h-7 text-violet-600" />
-          <span className="text-xl font-bold text-slate-900">BookingApp</span>
+          <span className="text-xl font-bold text-slate-900">Pulse</span>
         </Link>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Privacy Policy</h1>
         <p className="text-sm text-slate-400 mb-8">Last updated: June 2026</p>

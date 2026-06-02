@@ -1150,7 +1150,7 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
       <KeyboardAvoidingView style={s.loginWrap} behavior={Platform.OS==='ios'?'padding':'height'}>
         <View style={s.loginLogo}>
           <View style={s.logoIcon}><Ionicons name="calendar" size={28} color="#fff"/></View>
-          <Text style={s.logoText}>BookingApp</Text>
+          <Text style={s.logoText}>Pulse</Text>
         </View>
         <Text style={s.loginTitle}>Sign in</Text>
         <Text style={s.loginSub}>Enter your credentials to continue</Text>
@@ -1210,7 +1210,7 @@ function ForgotPasswordScreen({ onBack }: { onBack:()=>void }) {
       <KeyboardAvoidingView style={s.loginWrap} behavior={Platform.OS==='ios'?'padding':'height'}>
         <View style={s.loginLogo}>
           <View style={s.logoIcon}><Ionicons name="key" size={24} color="#fff"/></View>
-          <Text style={s.logoText}>BookingApp</Text>
+          <Text style={s.logoText}>Pulse</Text>
         </View>
         <Text style={s.loginTitle}>Reset password</Text>
         {sent ? (
@@ -1287,7 +1287,7 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={s.loginLogo}>
             <View style={s.logoIcon}><Ionicons name="storefront" size={26} color="#fff"/></View>
-            <Text style={s.logoText}>BookingApp</Text>
+            <Text style={s.logoText}>Pulse</Text>
           </View>
           <Text style={s.loginTitle}>Create your business</Text>
           <Text style={s.loginSub}>Set up your account — you’ll add services and staff next.</Text>
@@ -1370,7 +1370,7 @@ function ChangePasswordScreen({ onDone }: { onDone:()=>void }) {
       <KeyboardAvoidingView style={s.loginWrap} behavior={Platform.OS==='ios'?'padding':'height'}>
         <View style={s.loginLogo}>
           <View style={s.logoIcon}><Ionicons name="lock-closed" size={26} color="#fff"/></View>
-          <Text style={s.logoText}>BookingApp</Text>
+          <Text style={s.logoText}>Pulse</Text>
         </View>
         <Text style={s.loginTitle}>Set a new password</Text>
         <Text style={s.loginSub}>For your security, choose a new password before continuing.</Text>

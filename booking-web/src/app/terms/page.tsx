@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Calendar } from "lucide-react";
 
-export const metadata = { title: "Terms of Service — BookingApp" };
+export const metadata = { title: "Terms of Service — Pulse" };
 
 export default function TermsPage() {
   return (
@@ -9,7 +9,7 @@ export default function TermsPage() {
       <div className="max-w-2xl mx-auto px-6 py-12">
         <Link href="/" className="inline-flex items-center gap-2 mb-8">
           <Calendar className="w-7 h-7 text-violet-600" />
-          <span className="text-xl font-bold text-slate-900">BookingApp</span>
+          <span className="text-xl font-bold text-slate-900">Pulse</span>
         </Link>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Terms of Service</h1>
         <p className="text-sm text-slate-400 mb-8">Last updated: June 2026</p>
@@ -17,7 +17,7 @@ export default function TermsPage() {
         <div className="space-y-6 text-sm text-slate-600 leading-relaxed">
           <section>
             <h2 className="text-base font-semibold text-slate-900 mb-2">1. Acceptance</h2>
-            <p>By creating an account or using BookingApp (the “Service”) you agree to these Terms. If you are using the Service on behalf of a business, you represent that you are authorized to bind that business.</p>
+            <p>By creating an account or using Pulse (the “Service”) you agree to these Terms. If you are using the Service on behalf of a business, you represent that you are authorized to bind that business.</p>
           </section>
           <section>
             <h2 className="text-base font-semibold text-slate-900 mb-2">2. Your account</h2>

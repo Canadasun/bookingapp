@@ -133,7 +133,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
             <Calendar className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-gray-900 tracking-tight">BookingApp</span>
+          <span className="font-bold text-gray-900 tracking-tight">Pulse</span>
         </div>
 
         {/* Nav */}

@@ -21,7 +21,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-6 h-6 text-indigo-600" />
-            <span className="text-lg font-bold text-slate-900">BookingApp</span>
+            <span className="text-lg font-bold text-slate-900">Pulse</span>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">
@@ -105,7 +105,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 text-center">
           <Shield className="w-10 h-10 text-indigo-300 mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-white mb-4">Ready to simplify your scheduling?</h2>
-          <p className="text-indigo-200 mb-8">Join thousands of businesses using BookingApp.</p>
+          <p className="text-indigo-200 mb-8">Join thousands of businesses using Pulse.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/book"
               className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
@@ -125,7 +125,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-slate-500">
             <Calendar className="w-4 h-4" />
-            <span className="text-sm">© {new Date().getFullYear()} BookingApp</span>
+            <span className="text-sm">© {new Date().getFullYear()} Pulse</span>
           </div>
           <div className="flex gap-6 text-sm text-slate-500">
             <Link href="/book" className="hover:text-indigo-600 transition-colors">Book</Link>

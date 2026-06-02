@@ -309,14 +309,14 @@ function BookPageInner({ slug }: { slug: string }) {
       {/* Nav — hidden in embed mode (the widget lives on the salon's own site) */}
       {!isEmbed && (
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-violet-600 flex items-center justify-center">
+        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
               <Calendar className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-gray-900">{biz?.name ?? "BookingApp"}</span>
+            <span className="font-bold text-gray-900 truncate">{biz?.name ?? "Pulse"}</span>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm shrink-0">
             <Link href="/my/bookings"
               className="text-xs font-medium text-gray-500 hover:text-violet-600 transition-colors border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg">
               Find my bookings
@@ -700,7 +700,7 @@ function BookPageInner({ slug }: { slug: string }) {
         )}
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          Powered by <span className="text-violet-500 font-medium">BookingApp</span>
+          Powered by <span className="text-violet-500 font-medium">Pulse</span>
         </p>
       </div>
     </div>

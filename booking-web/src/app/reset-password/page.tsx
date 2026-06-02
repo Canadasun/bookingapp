@@ -83,7 +83,7 @@ export default function ResetPasswordPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <Calendar className="w-8 h-8 text-violet-600" />
-            <span className="text-2xl font-bold text-slate-900">BookingApp</span>
+            <span className="text-2xl font-bold text-slate-900">Pulse</span>
           </Link>
           <p className="text-slate-500 mt-2 text-sm">Choose a new password</p>
         </div>

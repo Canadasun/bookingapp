@@ -37,7 +37,7 @@ async function bootstrap() {
   // Swagger exposes the full API surface — only mount it outside production.
   if (!isProd) {
     const config = new DocumentBuilder()
-      .setTitle('BookingApp API')
+      .setTitle('Pulse API')
       .setDescription('Appointment booking API')
       .setVersion('1.0')
       .addBearerAuth()
