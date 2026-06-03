@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Param, Body, Headers, RawBodyRequest, Req, UseGuards, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { PaymentsService } from './payments.service';
@@ -18,6 +19,7 @@ const CustomChargeSchema = z.object({
   amountCents: z.number().int().min(50).max(10_000_000),
   description: z.string().max(200).optional(),
   clientId: z.string().optional(),
+  idempotencyKey: z.string().trim().min(8).max(120).optional(),
 });
 
 const RefundSchema = z.object({
@@ -34,6 +36,7 @@ export class PaymentsController {
   // Public — the unauthenticated booking wizard collects the deposit / card-on-file
   // for a just-created PENDING appointment. Scoped to the appointment's business.
   @Post('booking-intent')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   bookingIntent(@Body() body: unknown) {
     const parsed = BookingIntentSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('appointmentId and businessId are required');
@@ -44,6 +47,7 @@ export class PaymentsController {
   @Post('deposit/:appointmentId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   createDeposit(
     @Param('appointmentId') appointmentId: string,
     @CurrentUser() user: { role: string; businessId: string | null },
@@ -55,6 +59,7 @@ export class PaymentsController {
   @Post('no-show/:appointmentId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   chargeNoShow(
     @Param('appointmentId') appointmentId: string,
     @CurrentUser() user: { role: string; businessId: string | null },
@@ -67,6 +72,7 @@ export class PaymentsController {
   @Post('charge')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   createCharge(
     @Body() body: unknown,
     @CurrentUser() user: { role: string; businessId: string | null },
@@ -90,6 +96,7 @@ export class PaymentsController {
   @Post(':paymentId/refund')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   refund(
     @Param('paymentId') paymentId: string,
     @Body() body: unknown,
@@ -102,6 +109,7 @@ export class PaymentsController {
   }
 
   @Post('webhook/stripe')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   stripeWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') sig: string,

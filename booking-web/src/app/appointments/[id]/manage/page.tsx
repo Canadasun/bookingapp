@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatusBadge } from '@/components/StatusBadge';
+import { ClientMessaging } from '@/components/ClientMessaging';
 import { toast } from 'sonner';
 
 export default function ManageAppointmentPage() {
@@ -197,6 +198,17 @@ export default function ManageAppointmentPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Messaging Section */}
+        <div className="mb-8">
+          <ClientMessaging 
+            businessId={appointment.businessId} 
+            clientId={appointment.client.id} 
+            businessName={appointment.business.name}
+            appointmentId={id}
+            token={token}
+          />
+        </div>
 
         <div className="text-center space-y-2">
           <Link href="/my/bookings"

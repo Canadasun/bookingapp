@@ -15,6 +15,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   register(@Body(new ZodValidationPipe(RegisterSchema)) dto: RegisterDto) {
     return this.authService.register(dto);
   }

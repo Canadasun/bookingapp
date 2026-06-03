@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { InboxService } from './inbox.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,6 +21,22 @@ export class InboxController {
   @Get('unread-count')
   async unread(@CurrentUser() user: User) {
     return { count: await this.inbox.unreadCount(user.id) };
+  }
+
+  @Get('deliveries')
+  deliveries(
+    @CurrentUser() user: User,
+    @Query('status') status?: string,
+    @Query('channel') channel?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.inbox.deliveryLogs(user, {
+      status,
+      channel,
+      search,
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
   }
 
   @Post('read-all')

@@ -4,6 +4,7 @@ import { BookingsService } from './bookings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
+import { EventsGateway } from '../events/events.gateway';
 
 // 7 days out: within the default 60-day max-advance and past the 120-min notice
 // window, so public-booking policy checks pass.
@@ -106,6 +107,7 @@ async function buildService(prismaOverrides = {}, conflictExists = false) {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       BookingsService,
+      { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
       { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
       { provide: PrismaService, useValue: prisma },
       {
@@ -206,6 +208,7 @@ describe('BookingsService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           BookingsService,
+          { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: PrismaService, useValue: prisma },
           {
@@ -252,6 +255,7 @@ describe('BookingsService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           BookingsService,
+          { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: PrismaService, useValue: mockPrisma() },
           {
@@ -339,6 +343,7 @@ describe('BookingsService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           BookingsService,
+          { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: PrismaService, useValue: mockPrisma() },
           {

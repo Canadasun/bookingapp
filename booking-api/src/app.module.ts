@@ -27,6 +27,8 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { GiftCardsModule } from './gift-cards/gift-cards.module';
 import { PackagesModule } from './packages/packages.module';
 import { HealthModule } from './health/health.module';
+import { EventsModule } from './events/events.module';
+import { LoyaltyModule } from './loyalty/loyalty.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 
@@ -71,6 +73,8 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     GiftCardsModule,
     PackagesModule,
     HealthModule,
+    EventsModule,
+    LoyaltyModule,
   ],
 
   providers: [

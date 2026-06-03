@@ -162,14 +162,16 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center brand-shell px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <Calendar className="w-8 h-8 text-indigo-600" />
-            <span className="text-2xl font-bold text-slate-900">Pulse</span>
+            <span className="w-11 h-11 rounded-2xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-white" />
+            </span>
+            <span className="text-2xl font-bold text-ink">Pulse</span>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">Sign in to your dashboard</p>
+          <p className="text-slate-600 mt-3 text-sm">Sign in to your dashboard</p>
         </div>
 
         <Card>

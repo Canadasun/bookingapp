@@ -13,6 +13,47 @@ export class MessagesService {
     });
   }
 
+  getBusiness(id: string) {
+    return this.prisma.business.findUnique({
+      where: { id },
+      select: { id: true, plan: true },
+    });
+  }
+
+  async verifyAppointmentClient(appointmentId: string, businessId: string, clientId: string) {
+    const apt = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: { businessId: true, clientId: true },
+    });
+    return apt && apt.businessId === businessId && apt.clientId === clientId;
+  }
+
+  async verifyUserClient(userId: string, businessId: string, clientId: string) {
+    const [client, user] = await Promise.all([
+      this.prisma.client.findUnique({
+        where: { id: clientId },
+        select: { businessId: true, userId: true, email: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, emailVerified: true },
+      }),
+    ]);
+    if (!client || client.businessId !== businessId || !user) return false;
+    if (client.userId === userId) return true;
+
+    // Existing client rows may predate account linking. A verified account with
+    // the same email can claim only that matching client row, in that business.
+    if (user.emailVerified && client.email.toLowerCase() === user.email.toLowerCase()) {
+      await this.prisma.client.update({
+        where: { id: clientId },
+        data: { userId },
+      }).catch(() => {});
+      return true;
+    }
+    return false;
+  }
+
   send(businessId: string, clientId: string, content: string, fromClient: boolean) {
     return this.prisma.message.create({
       data: { businessId, clientId, content, fromClient },

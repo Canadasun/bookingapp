@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const RegisterSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
+  name: z.string().trim().min(1),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8),
   // Public self-signup is restricted to business owners and clients only.
   // STAFF are created by an owner via the staff-invite endpoint; ADMIN via seed.
@@ -10,13 +10,17 @@ export const RegisterSchema = z.object({
   businessId: z.string().cuid().optional(),
   // OWNER signup only — brand the new (empty) business. All optional; falls back
   // to "<name>'s Business" / America/New_York when omitted.
-  businessName: z.string().min(1).max(120).optional(),
-  businessPhone: z.string().min(3).max(20).optional(),
-  timezone: z.string().min(1).max(64).optional(),
+  businessName: z.string().trim().min(1).max(120).optional(),
+  businessPhone: z.string().trim().min(3).max(20).optional(),
+  timezone: z.string().trim().min(1).max(64).optional(),
+  privacyConsentAccepted: z.literal(true),
+  marketingConsent: z.boolean().default(false),
+  trackingConsent: z.boolean().default(false),
+  consentVersion: z.string().trim().min(1).max(40).default('2026-06-03'),
 });
 
 export const LoginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
 });
 

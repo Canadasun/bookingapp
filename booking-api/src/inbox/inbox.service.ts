@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationKind } from '@prisma/client';
+import { DeliveryChannel, NotificationKind, NotificationStatus, Prisma, User } from '@prisma/client';
 
 interface NotifyInput {
   kind?: NotificationKind;
@@ -38,6 +38,41 @@ export class InboxService {
 
   unreadCount(userId: string) {
     return this.prisma.notification.count({ where: { userId, read: false } });
+  }
+
+  deliveryLogs(
+    user: User,
+    filters: { limit?: number; status?: string; channel?: string; search?: string } = {},
+  ) {
+    if (user.role !== 'ADMIN' && !user.businessId) return [];
+    const limit = Number.isFinite(filters.limit) ? Math.min(Math.max(filters.limit ?? 50, 1), 100) : 50;
+    const where: Prisma.NotificationDeliveryWhereInput =
+      user.role === 'ADMIN' ? {} : { businessId: user.businessId };
+
+    if (filters.status && Object.values(NotificationStatus).includes(filters.status as NotificationStatus)) {
+      where.status = filters.status as NotificationStatus;
+    }
+    if (filters.channel && Object.values(DeliveryChannel).includes(filters.channel as DeliveryChannel)) {
+      where.channel = filters.channel as DeliveryChannel;
+    }
+    const search = filters.search?.trim();
+    if (search) {
+      where.OR = [
+        { recipient: { contains: search, mode: 'insensitive' } },
+        { type: { contains: search, mode: 'insensitive' } },
+        { error: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    return this.prisma.notificationDelivery.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }).then((rows) => rows.map((row) => ({
+      ...row,
+      canRetry: false,
+      retryReason: row.status === 'FAILED' ? 'Original delivery payload is not stored; resend from the source workflow.' : null,
+    })));
   }
 
   // Scoped to the user so one can't mark another user's notification read.

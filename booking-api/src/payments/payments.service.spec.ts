@@ -55,7 +55,10 @@ describe('PaymentsService.refundPayment', () => {
   it('full refund (no amount) → REFUNDED of the remaining balance', async () => {
     const { svc, refundsCreate } = await build(makePayment({ refundedCents: 1000 }));
     const res = await svc.refundPayment('biz1', 'pay1', {});
-    expect(refundsCreate).toHaveBeenCalledWith(expect.objectContaining({ amount: 4000 })); // 5000 - 1000
+    expect(refundsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 4000 }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^pulse:/) }),
+    ); // 5000 - 1000
     expect(res.status).toBe('REFUNDED');
     expect(res.refundedCents).toBe(5000);
   });

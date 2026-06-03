@@ -10,6 +10,9 @@ function build() {
       count: jest.fn().mockResolvedValue(3),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
+    notificationDelivery: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     user: { findMany: jest.fn().mockResolvedValue([{ id: 'owner1' }, { id: 'owner2' }]) },
   };
   return { svc: new InboxService(prisma as unknown as PrismaService), prisma };
@@ -40,5 +43,15 @@ describe('InboxService', () => {
     const arg = prisma.notification.createMany.mock.calls[0][0];
     expect(arg.data).toHaveLength(2);
     expect(arg.data[0]).toMatchObject({ userId: 'owner1', title: 'New booking' });
+  });
+
+  it('deliveryLogs scopes owner delivery history to their business', async () => {
+    const { svc, prisma } = build();
+    await svc.deliveryLogs({ id: 'u1', role: 'OWNER', businessId: 'biz1' } as any);
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith({
+      where: { businessId: 'biz1' },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   });
 });

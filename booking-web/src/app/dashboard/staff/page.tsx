@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, UserX, Check } from "lucide-react";
+import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -14,6 +14,12 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 
 const initials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+
+const staffPermissionSummary = [
+  { label: "Own schedule", icon: CalendarClock },
+  { label: "Assigned services", icon: Check },
+  { label: "Scoped messages", icon: MessageCircle },
+];
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -138,6 +144,14 @@ export default function StaffPage() {
                       })}
                     </div>
                   )}
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {staffPermissionSummary.map(({ label, icon: Icon }) => (
+                      <span key={label} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <Icon className="h-3 w-3" />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Link href={`/dashboard/staff/${s.id}`}><Button size="sm" variant="ghost" className="text-xs">Schedule</Button></Link>
@@ -192,6 +206,17 @@ export default function StaffPage() {
                     ))}
                   </div>
                 )}
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                  <ShieldCheck className="h-4 w-4" />
+                  Staff access
+                </div>
+                <div className="mt-2 grid gap-1.5 text-xs text-emerald-800">
+                  <p>Staff accounts are limited to this business.</p>
+                  <p>Owner-only settings, billing, and staff management stay protected.</p>
+                  <p>Booking access follows assigned services and availability.</p>
+                </div>
               </div>
               {!editing && (
                 <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">

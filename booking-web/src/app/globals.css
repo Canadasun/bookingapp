@@ -4,16 +4,19 @@
 @variant dark (&:is(.dark *));
 
 :root {
-  --background: #ffffff;
-  --surface:    #F8F9FA;
-  --foreground: #111827;
-  --muted:      #F4F5F7;
-  --muted-foreground: #4B5563; /* Medium gray */
-  --border:     #E5E7EB;
+  --background: #FFF9F0;
+  --surface:    #FFFDF8;
+  --foreground: #17202A;
+  --muted:      #F6EFE3;
+  --muted-foreground: #5F6670;
+  --border:     #E9DDCB;
   --card:       #ffffff;
-  --primary:    #E9A23C; /* Amber/gold brand */
+  --primary:    #E9A23C;
   --primary-foreground: #ffffff;
   --primary-light: #FEF7EC;
+  --accent:     #167C80;
+  --accent-soft:#E6F4F3;
+  --ink:        #19212B;
   --radius: 0.75rem;
   color-scheme: light;
 }
@@ -29,6 +32,9 @@
   --color-primary:          var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-light:    var(--primary-light);
+  --color-accent:           var(--accent);
+  --color-accent-soft:      var(--accent-soft);
+  --color-ink:              var(--ink);
   --font-sans:              var(--font-inter);
   --radius:                 var(--radius);
 
@@ -61,10 +67,32 @@
 * { border-color: var(--border); box-sizing: border-box; }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(233, 162, 60, 0.18), transparent 34rem),
+    radial-gradient(circle at 100% 12%, rgba(22, 124, 128, 0.12), transparent 30rem),
+    linear-gradient(180deg, #fffaf1 0%, #fffdf8 42%, #f8fbfa 100%);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #F6CB8C;
+  color: #17202A;
+}
+
+.brand-shell {
+  background:
+    linear-gradient(135deg, rgba(255, 249, 240, 0.98), rgba(255, 255, 255, 0.92)),
+    radial-gradient(circle at 12% 10%, rgba(233, 162, 60, 0.22), transparent 28rem),
+    radial-gradient(circle at 88% 16%, rgba(22, 124, 128, 0.16), transparent 26rem);
+}
+
+.brand-panel {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(233, 221, 203, 0.88);
+  box-shadow: 0 20px 60px rgba(42, 35, 24, 0.08);
+  backdrop-filter: blur(18px);
 }
 
 /* react-day-picker */

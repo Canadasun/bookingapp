@@ -73,9 +73,13 @@ export class AvailabilityService {
     ]);
 
     const slots: TimeSlot[] = [];
-    let cursor = new Date(rangeStart);
+    
+    // To catch all possible slots that overlap with the UTC range [rangeStart, rangeEnd],
+    // we search from 1 day before the start to 1 day after the end in the business timezone.
+    let cursor = addDays(new Date(rangeStart), -1);
+    const searchEnd = addDays(new Date(rangeEnd), 1);
 
-    while (isBefore(cursor, rangeEnd)) {
+    while (isBefore(cursor, searchEnd)) {
       const localDay = toZonedTime(cursor, businessTimezone);
       const dayOfWeek = getDay(localDay);
       const dayRules = rules.filter((r) => r.dayOfWeek === dayOfWeek);
@@ -90,7 +94,13 @@ export class AvailabilityService {
           businessTimezone,
           timezone,
         );
-        slots.push(...daySlots);
+        
+        // Filter slots to ensure they are strictly within the requested UTC window.
+        const filtered = daySlots.filter(s => 
+          (isEqual(s.startsAt, rangeStart) || s.startsAt > rangeStart) &&
+          (isEqual(s.endsAt, rangeEnd) || s.endsAt < rangeEnd)
+        );
+        slots.push(...filtered);
       }
 
       cursor = addDays(cursor, 1);
@@ -128,10 +138,7 @@ export class AvailabilityService {
       const occupiedEnd = addMinutes(actualEnd, bufferAfterMin);
 
       // Stop if the occupied window exceeds the availability window
-      if (isBefore(windowEnd, occupiedEnd) || isEqual(windowEnd, occupiedEnd) === false && isBefore(windowEnd, occupiedEnd)) {
-        break;
-      }
-      if (!isBefore(occupiedEnd, windowEnd) && !isEqual(occupiedEnd, windowEnd)) {
+      if (occupiedEnd > windowEnd) {
         break;
       }
 

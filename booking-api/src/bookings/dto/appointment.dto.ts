@@ -11,6 +11,7 @@ export const CreateAppointmentSchema = z.object({
 
 export const RescheduleSchema = z.object({
   startsAt: z.string().datetime(),
+  staffId: z.string().optional(),
 });
 
 export const StatusSchema = z.object({

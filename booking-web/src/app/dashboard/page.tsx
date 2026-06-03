@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
-import { TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2 } from "lucide-react";
-import { api, Appointment, ClientWithStats } from "@/lib/api";
+import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset } from "lucide-react";
+import { api, Appointment, ClientWithStats, NotificationDelivery } from "@/lib/api";
+import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
 import { formatPrice } from "@/lib/utils";
@@ -58,6 +59,11 @@ export default function OverviewPage() {
   const [clients, setClients]   = useState<ClientWithStats[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [failedPayments, setFailedPayments] = useState(0);
+  const [waitlistCount, setWaitlistCount] = useState(0);
+  const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
 
   const user    = getUser();
   const isStaff = user?.role === "STAFF";
@@ -70,18 +76,32 @@ export default function OverviewPage() {
     }
     setLoading(true); setError("");
     try {
-      const [aptsRes, clsRes] = await Promise.all([
+      const [aptsRes, clsRes, notifRes, threadsRes, paymentsRes, waitlistRes, deliveryRes] = await Promise.all([
         api.appointments.list(bizId),
         isStaff ? Promise.resolve({ data: [] as ClientWithStats[] }) : api.clients.list(bizId),
+        api.notifications.unreadCount().catch(() => ({ count: 0 })),
+        api.messages.threads(bizId).catch(() => []),
+        isStaff ? Promise.resolve([]) : api.payments.list().catch(() => []),
+        isStaff ? Promise.resolve([]) : api.waitlist.list(bizId).catch(() => []),
+        api.notifications.deliveries({ status: "FAILED", limit: 10 }).catch(() => []),
       ]);
       const filtered = isStaff && user?.staffId
         ? aptsRes.data.filter((a) => a.staff.id === user.staffId)
         : aptsRes.data;
       setAppointments(filtered); setClients(clsRes.data);
+      setUnreadNotifications(notifRes.count);
+      setUnreadMessages(threadsRes.filter((t) => t.fromClient && !t.read).length);
+      setFailedPayments(paymentsRes.filter((p) => p.status === "FAILED").length);
+      setWaitlistCount(waitlistRes.length);
+      setFailedDeliveries(deliveryRes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally { setLoading(false); }
   }, [isStaff, user?.staffId, bizId]);
+
+  useEvents(useCallback(() => {
+    load();
+  }, [load]));
 
   useEffect(() => { load(); }, [load]);
 
@@ -118,6 +138,22 @@ export default function OverviewPage() {
   const weekRevenue  = weekCompleted.reduce((s, a) => s + a.service.priceCents, 0);
   const newThisMonth = clients.filter((c) => isThisMonth(new Date(c.createdAt))).length;
   const greeting = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
+  const pendingBookings = appointments.filter((a) => a.status === "PENDING").length;
+  const cancelledThisWeek = appointments.filter((a) => a.status === "CANCELLED" && isThisWeek(new Date(a.startsAt))).length;
+  const noShowsThisMonth = appointments.filter((a) => a.status === "NO_SHOW" && isThisMonth(new Date(a.startsAt))).length;
+  const serviceCounts = weekCompleted.reduce<Record<string, number>>((acc, apt) => {
+    acc[apt.service.name] = (acc[apt.service.name] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topService = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0];
+  const actions = [
+    { label: "Pending bookings", value: pendingBookings, href: "/dashboard/appointments", icon: CalendarDays, tone: "bg-amber-50 text-amber-700" },
+    { label: "Unread messages", value: unreadMessages, href: "/dashboard/messages", icon: MessageSquare, tone: "bg-violet-50 text-violet-700" },
+    { label: "Unread alerts", value: unreadNotifications, href: "/dashboard/notifications", icon: Bell, tone: "bg-blue-50 text-blue-700" },
+    { label: "Failed payments", value: failedPayments, href: "/dashboard/transactions", icon: CreditCard, tone: "bg-red-50 text-red-700" },
+    { label: "Waiting clients", value: waitlistCount, href: "/dashboard/waitlist", icon: TimerReset, tone: "bg-emerald-50 text-emerald-700" },
+    { label: "Failed deliveries", value: failedDeliveries.length, href: "/dashboard/notifications", icon: MailWarning, tone: "bg-red-50 text-red-700" },
+  ].filter((a) => a.value > 0);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -147,6 +183,43 @@ export default function OverviewPage() {
             icon={CheckCircle2} accent="bg-amber-50 text-amber-600" />
           <MetricCard label="New clients this month" value={newThisMonth}
             icon={Users} accent="bg-violet-50 text-violet-600" />
+        </div>
+      )}
+
+      {!isStaff && (
+        <div className="grid md:grid-cols-4 gap-4">
+          {[
+            { label: "Cancelled this week", value: cancelledThisWeek },
+            { label: "No-shows this month", value: noShowsThisMonth },
+            { label: "Top service this week", value: topService ? `${topService[0]} (${topService[1]})` : "—" },
+            { label: "Waitlist", value: waitlistCount },
+          ].map((m) => (
+            <div key={m.label} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-gray-400">{m.label}</p>
+              <p className="mt-1 text-lg font-bold text-gray-900 truncate">{m.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {actions.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Action needed</h3>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {actions.map(({ label, value, href, icon: Icon, tone }) => (
+              <Link key={label} href={href}
+                className="rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 p-3 transition-colors">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tone}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <p className="mt-3 text-2xl font-bold text-gray-900">{value}</p>
+                <p className="text-xs font-medium text-gray-500">{label}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

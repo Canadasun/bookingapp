@@ -20,6 +20,7 @@ export default function MessagesPage() {
   const [reply, setReply]       = useState("");
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
+  const [plan, setPlan]         = useState<string>("FREE");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const user = getUser();
@@ -30,7 +31,14 @@ export default function MessagesPage() {
       setLoading(false);
       return;
     }
-    try { setThreads(await api.messages.threads(bizId)); }
+    try {
+      const [threadData, bizData] = await Promise.all([
+        api.messages.threads(bizId),
+        api.business.get(bizId).catch(() => ({ plan: "FREE" }))
+      ]);
+      setThreads(threadData);
+      setPlan(bizData.plan);
+    }
     catch { toast.error("Failed to load messages"); }
     finally { setLoading(false); }
   }, [bizId]);
@@ -51,6 +59,10 @@ export default function MessagesPage() {
 
   async function send() {
     if (!reply.trim() || !selected || !bizId) return;
+    if (plan === "FREE") {
+      toast.error("Messaging is a paid feature. Please upgrade to reply.");
+      return;
+    }
     setSending(true);
     try {
       await api.messages.reply(bizId, selected.clientId, reply.trim());
@@ -151,16 +163,26 @@ export default function MessagesPage() {
 
             {/* Compose */}
             <div className="px-4 py-3 border-t border-gray-100 flex items-end gap-2">
-              <Input
-                placeholder="Type a reply…"
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                className="flex-1"
-              />
-              <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()}>
-                <Send className="w-4 h-4" />
-              </Button>
+              {plan === "FREE" ? (
+                <div className="flex-1 bg-gray-50 border border-dashed border-gray-200 rounded-xl px-4 py-3 text-center">
+                  <p className="text-sm text-gray-500">
+                    🔒 Messaging is a paid-plan feature. Upgrade to <span className="font-semibold">Basic</span> or <span className="font-semibold">Pro</span> to reply to clients.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    placeholder="Type a reply…"
+                    value={reply}
+                    onChange={(e) => setReply(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
             </div>
           </>
         )}

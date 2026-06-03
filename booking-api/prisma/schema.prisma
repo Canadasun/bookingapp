@@ -55,6 +55,21 @@ enum NotificationStatus {
   SKIPPED
 }
 
+enum PrivacyConsentType {
+  TERMS
+  PRIVACY_POLICY
+  MARKETING
+  TRACKING
+}
+
+enum DataErasureStatus {
+  REQUESTED
+  VERIFYING
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
 model Business {
   id          String   @id @default(cuid())
   name        String
@@ -106,6 +121,8 @@ model Business {
   refunds            Refund[]
   uploads            UploadedFile[]
   subscription       Subscription?
+  privacyConsents    PrivacyConsent[]
+  dataErasureRequests DataErasureRequest[]
 }
 
 model Review {
@@ -306,9 +323,61 @@ model User {
   loginEvents LoginEvent[]
   otpChallenges OtpChallenge[]
   notifications Notification[]
+  deviceTokens DeviceToken[]
+  privacyConsents PrivacyConsent[]
+  dataErasureRequests DataErasureRequest[]
 
   @@index([email])
   @@index([businessId])
+}
+
+model PrivacyConsent {
+  id         String             @id @default(cuid())
+  userId     String
+  businessId String?
+  type       PrivacyConsentType
+  granted    Boolean
+  version    String
+  source     String             @default("registration")
+  createdAt  DateTime           @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@index([userId, type, createdAt])
+  @@index([businessId, type, createdAt])
+}
+
+model DataErasureRequest {
+  id          String            @id @default(cuid())
+  userId      String
+  businessId  String?
+  status      DataErasureStatus @default(REQUESTED)
+  reason      String?
+  requestedAt DateTime          @default(now())
+  completedAt DateTime?
+  notes       String?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([businessId, status])
+  @@index([requestedAt])
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String
+  token     String   @unique
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // One row per successful sign-in. Used to detect logins from a new device and

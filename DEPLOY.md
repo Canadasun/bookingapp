@@ -32,19 +32,25 @@ JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@yourdomain.com
+RESEND_VERIFIED_FROM=noreply@yourdomain.com
+RESEND_TEST_REDIRECT=
 ADMIN_ALERT_EMAIL=idowu@icloud.com
 
 TWILIO_ACCOUNT_SID=AC...
 TWILIO_AUTH_TOKEN=...
 TWILIO_FROM_NUMBER=+1...
+TWILIO_API_KEY=
 
 PORT=3001
 NODE_ENV=production
 NEXT_PUBLIC_WEB_URL=https://your-web-domain.vercel.app
+API_INTERNAL_URL=https://your-api-domain.com
+CORS_ALLOWED_ORIGINS=https://your-web-domain.vercel.app
 ```
 
 Railway auto-injects `DATABASE_URL` and `REDIS_URL` from the managed services.
@@ -119,8 +125,12 @@ NODE_ENV=production npm run start:prod
 # Run migrations manually
 npx prisma migrate deploy
 
-# Reset demo data
-npm run seed
+# Local-only demo seed. Do not run this against production data.
+NODE_ENV=development npm run seed
+
+# Production starter seed, only when intentionally creating an initial owner.
+# Set OWNER_PASSWORD to a strong unique password first.
+OWNER_PASSWORD=<strong-password> npm run seed:prod
 ```
 
 ---

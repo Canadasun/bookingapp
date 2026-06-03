@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiBase } from "@/lib/server-api";
 
-const API = (process.env.API_INTERNAL_URL ?? "http://localhost:3001") + "/api";
+const API = apiBase();
 
 export async function POST(req: NextRequest) {
   const token = req.cookies.get("booking_token")?.value;

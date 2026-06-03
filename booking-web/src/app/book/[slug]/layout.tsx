@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { apiBase } from "@/lib/server-api";
 
-const API = (process.env.API_INTERNAL_URL ?? "http://localhost:3001") + "/api";
+const API = apiBase();
 
 async function getBusinessName(slug: string): Promise<string | null> {
   try {

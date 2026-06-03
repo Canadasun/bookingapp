@@ -80,13 +80,19 @@ const GRAY_900   = '#111827';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface User { id:string; name:string; email:string; role:string; staffId:string|null; businessId:string|null; mustResetPassword?:boolean; twoFactorEnabled?:boolean; twoFactorMethod?:'EMAIL'|'SMS' }
-interface Appointment { id:string; startsAt:string; endsAt:string; status:string; notes?:string; cancelReason?:string; service:{name:string;durationMinutes:number;priceCents:number}; staff:{id:string;user:{name:string}}; client:{id:string;name:string;email:string;phone?:string} }
+interface Appointment { id:string; startsAt:string; endsAt:string; status:string; notes?:string; cancelReason?:string; service:{id:string;name:string;durationMinutes:number;priceCents:number}; staff:{id:string;user:{name:string}}; client:{id:string;name:string;email:string;phone?:string} }
 interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
 interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null }
-interface Staff { id:string; user:{name:string}; staffServices:{serviceId:string}[]; bio?:string }
+interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:number; startTime:string; endTime:string }
+interface Staff { id:string; user:{name:string; email?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string }
 interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }
 interface Client { id:string; name:string; email:string; phone?:string; totalVisits?:number; lastVisit?:string }
 interface Message { id:string; content:string; fromClient:boolean; read:boolean; createdAt:string }
+interface NotificationItem { id:string; kind:'BOOKING_NEW'|'BOOKING_UPDATE'|'PAYMENT'|'SYSTEM'; title:string; body?:string|null; linkUrl?:string|null; read:boolean; createdAt:string }
+interface NotificationDelivery { id:string; channel:'EMAIL'|'SMS'|'PUSH'; recipient:string; type:string; status:'SENT'|'FAILED'|'SKIPPED'; error?:string|null; createdAt:string; retryReason?:string|null }
+interface ClientPortalAppointment extends Appointment { business:{id:string;name:string;slug?:string;phone?:string;address?:string}; manageToken?:string }
+interface ClientPortalMessageThread { businessId:string; businessName:string; clientId:string; messages:Message[] }
+interface ClientPortalOffer { id:string; title:string; description?:string; discount?:string; expiresAt?:string; business:{id:string;name:string;slug?:string} }
 
 const STATUS_COLOR: Record<string,string> = {
   PENDING:'#F59E0B', CONFIRMED:'#10B981', CANCELLED:'#EF4444', COMPLETED:'#6B7280', NO_SHOW:'#1F2937',
@@ -193,6 +199,31 @@ async function api<T>(path: string, init?: RequestInit, _retried = false): Promi
   return res.json() as Promise<T>;
 }
 
+async function registerPushNotifications() {
+  const { token, user } = getAuth();
+  if (!token || !user) return;
+  try {
+    // Optional at runtime so local type-checks do not require the native module
+    // before dependencies are installed. EAS installs expo-notifications from package.json.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Notifications = require('expo-notifications');
+    const current = await Notifications.getPermissionsAsync();
+    const finalStatus = current.status === 'granted'
+      ? current.status
+      : (await Notifications.requestPermissionsAsync()).status;
+    if (finalStatus !== 'granted') return;
+    const result = await Notifications.getExpoPushTokenAsync();
+    const pushToken = result?.data;
+    if (!pushToken) return;
+    await api('/users/me/device-token', {
+      method:'POST',
+      body: JSON.stringify({ token: pushToken, platform: Platform.OS.toUpperCase() }),
+    }).catch(() => {});
+  } catch {
+    // Push is best-effort; never block login or app launch.
+  }
+}
+
 // ── Tiny components ──────────────────────────────────────────────────────────
 function Pill({ label, color }: { label:string; color:string }) {
   return (
@@ -213,6 +244,9 @@ function CalendarScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected]     = useState<Appointment|null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL'|'PENDING'|'CONFIRMED'|'COMPLETED'|'CANCELLED'|'NO_SHOW'>('ALL');
+  const [staffFilter, setStaffFilter] = useState<string>('ALL');
+  const [reschedule, setReschedule] = useState<{ appointment:Appointment; date:string; slots:Slot[]; loading:boolean }|null>(null);
   const [acting, setActing]         = useState(false);
 
   const load = useCallback(async (silent=false) => {
@@ -263,6 +297,49 @@ function CalendarScreen() {
     catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
     finally { setActing(false); }
   }
+  async function syncCalendar(id:string) {
+    setActing(true);
+    try {
+      await api(`/calendar-sync/${id}`, { method:'POST' });
+      Alert.alert('Calendar sync queued', 'This appointment was sent to the calendar sync service.');
+    } catch(e) {
+      Alert.alert('Sync failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setActing(false); }
+  }
+  async function openReschedule(a: Appointment) {
+    const today = new Date().toISOString().slice(0, 10);
+    setSelected(null);
+    setReschedule({ appointment: a, date: today, slots: [], loading: true });
+    await loadRescheduleSlots(a, today);
+  }
+
+  async function loadRescheduleSlots(a: Appointment, d: string) {
+    setReschedule(prev => prev ? { ...prev, date: d, loading: true, slots: [] } : prev);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const data = await api<Slot[]>(`/availability/slots?staffId=${a.staff.id}&serviceId=${a.service.id}&startDate=${d}&endDate=${d}&timezone=${tz}`);
+      setReschedule(prev => prev ? { ...prev, date: d, slots: data, loading: false } : prev);
+    } catch(e) {
+      setReschedule(prev => prev ? { ...prev, loading: false } : prev);
+      Alert.alert('Could not load slots', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function saveReschedule(startsAt: string) {
+    if (!reschedule) return;
+    setActing(true);
+    try {
+      await api(`/businesses/${bizId()}/bookings/${reschedule.appointment.id}/reschedule`, {
+        method:'PATCH',
+        body: JSON.stringify({ startsAt }),
+      });
+      setReschedule(null);
+      load(true);
+      Alert.alert('Rescheduled', 'The appointment was moved and the client was notified.');
+    } catch(e) {
+      Alert.alert('Could not reschedule', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setActing(false); }
+  }
   // No-show protection: marks NO_SHOW and charges the client's saved card off-session
   // for the business's no-show fee (Stripe). If no card is on file the backend just
   // marks NO_SHOW and tells us to collect manually.
@@ -288,7 +365,11 @@ function CalendarScreen() {
   const TODAY_KEY = new Date().toDateString();
   const dayKey = (iso:string) => new Date(iso).toDateString();
   const byDay = new Map<string, Appointment[]>();
-  for (const a of apts) {
+  const visibleApts = apts.filter(a =>
+    (statusFilter === 'ALL' || a.status === statusFilter) &&
+    (staffFilter === 'ALL' || a.staff.id === staffFilter)
+  );
+  for (const a of visibleApts) {
     const k = dayKey(a.startsAt);
     if (!byDay.has(k)) byDay.set(k, []);
     byDay.get(k)!.push(a);
@@ -316,6 +397,7 @@ function CalendarScreen() {
   }
 
   const monthLabel = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const staffOptions = Array.from(new Map(apts.map(a => [a.staff.id, a.staff.user.name])).entries());
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
 
@@ -334,6 +416,25 @@ function CalendarScreen() {
           <Ionicons name="add" size={26} color={BRAND}/>
         </TouchableOpacity>
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
+        {(['ALL','PENDING','CONFIRMED','COMPLETED','CANCELLED','NO_SHOW'] as const).map(status => (
+          <TouchableOpacity key={status} onPress={()=>setStatusFilter(status)}
+            style={[cal.filterChip, statusFilter===status && cal.filterChipOn]}>
+            <Text style={[cal.filterText, statusFilter===status && cal.filterTextOn]}>{status.replace('_',' ')}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
+        <TouchableOpacity onPress={()=>setStaffFilter('ALL')} style={[cal.filterChip, staffFilter==='ALL' && cal.filterChipOn]}>
+          <Text style={[cal.filterText, staffFilter==='ALL' && cal.filterTextOn]}>All staff</Text>
+        </TouchableOpacity>
+        {staffOptions.map(([id,name]) => (
+          <TouchableOpacity key={id} onPress={()=>setStaffFilter(id)} style={[cal.filterChip, staffFilter===id && cal.filterChipOn]}>
+            <Text style={[cal.filterText, staffFilter===id && cal.filterTextOn]}>{name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       <SectionList
         sections={sections}
@@ -404,6 +505,8 @@ function CalendarScreen() {
               {selected.status==='PENDING' && <TouchableOpacity style={s.btnPrimary} disabled={acting} onPress={()=>confirm(selected.id)}><Text style={s.btnPrimaryText}>Confirm</Text></TouchableOpacity>}
               {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>complete(selected.id)}><Text style={s.btnSecondaryText}>Mark completed</Text></TouchableOpacity>}
               {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>noShow(selected.id)}><Text style={s.btnSecondaryText}>No-show &amp; charge fee</Text></TouchableOpacity>}
+              {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openReschedule(selected)}><Text style={s.btnSecondaryText}>Reschedule</Text></TouchableOpacity>}
+              {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>syncCalendar(selected.id)}><Text style={s.btnSecondaryText}>Sync calendar</Text></TouchableOpacity>}
               {['PENDING','CONFIRMED'].includes(selected.status) && (
                 <TouchableOpacity style={s.btnDanger} disabled={acting} onPress={()=>cancel(selected.id)}><Text style={s.btnDangerText}>Cancel</Text></TouchableOpacity>
               )}
@@ -412,6 +515,40 @@ function CalendarScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       )}
+
+      <Modal visible={!!reschedule} animationType="slide" onRequestClose={()=>setReschedule(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setReschedule(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Reschedule</Text>
+          </View>
+          {reschedule && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.stepLabel}>{reschedule.appointment.client.name}</Text>
+              <Text style={s.sub}>{reschedule.appointment.service.name} with {reschedule.appointment.staff.user.name}</Text>
+              <Text style={[s.fieldLabel,{ marginTop:16 }]}>Date</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingVertical:8 }}>
+                {Array.from({ length:21 }, (_,i) => { const d = new Date(); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); }).map(d => (
+                  <TouchableOpacity key={d} style={[s.datePill, reschedule.date===d && s.datePillActive]} onPress={()=>loadRescheduleSlots(reschedule.appointment, d)}>
+                    <Text style={[s.datePillDay, reschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').toLocaleDateString('en-US',{ weekday:'short' })}</Text>
+                    <Text style={[s.datePillNum, reschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').getDate()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              {reschedule.loading ? <ActivityIndicator color={BRAND} style={{ marginTop:20 }}/> : (
+                <View style={s.slotGrid}>
+                  {reschedule.slots.map(sl => (
+                    <TouchableOpacity key={sl.startsAt} style={s.slotBtn} disabled={acting} onPress={()=>saveReschedule(sl.startsAt)}>
+                      <Text style={s.slotText}>{new Date(sl.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {reschedule.slots.length===0 && <Text style={s.emptyText}>No available times for this date.</Text>}
+                </View>
+              )}
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -980,10 +1117,18 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
   const [reply, setReply]       = useState('');
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
+  const [plan, setPlan]         = useState<string>('FREE');
   const scrollRef = useRef<ScrollView>(null);
 
   const loadThreads = useCallback(async () => {
-    try { setThreads(await api(`/businesses/${bizId()}/messages`)); }
+    try {
+      const [threadData, bizData] = await Promise.all([
+        api<any[]>(`/businesses/${bizId()}/messages`),
+        api<any>(`/businesses/${bizId()}`).catch(() => ({ plan: 'FREE' }))
+      ]);
+      setThreads(threadData);
+      setPlan(bizData.plan);
+    }
     catch {}
     finally { setLoading(false); }
   }, []);
@@ -1005,6 +1150,10 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 
   async function send() {
     if (!reply.trim()||!selected) return;
+    if (plan === 'FREE') {
+      Alert.alert('Upgrade Required', 'Messaging is a paid feature. Please upgrade to BASIC or PRO to reply to clients.');
+      return;
+    }
     setSending(true);
     try {
       await api(`/businesses/${bizId()}/clients/${selected.id}/messages/reply`,{
@@ -1026,7 +1175,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{selected.name}</Text>
       </View>
-      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={88}>
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={Platform.OS==='ios'?88:0}>
         <ScrollView ref={scrollRef} contentContainerStyle={{padding:16}} showsVerticalScrollIndicator={false}>
           {msgs.length===0&&<Text style={[s.emptyText,{textAlign:'center',marginTop:40}]}>No messages yet</Text>}
           {msgs.map(m=>(
@@ -1037,12 +1186,22 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
           ))}
         </ScrollView>
         <View style={s.composeRow}>
-          <TextInput style={s.composeInput} placeholder="Type a message…" placeholderTextColor={GRAY_400}
-            value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={send}/>
-          <TouchableOpacity style={[s.sendBtn, (!reply.trim()||sending)&&{opacity:0.4}]}
-            disabled={!reply.trim()||sending} onPress={send}>
-            <Ionicons name="send" size={18} color="#fff"/>
-          </TouchableOpacity>
+          {plan === 'FREE' ? (
+            <View style={{flex:1, backgroundColor:GRAY_50, borderRadius:12, padding:12, alignItems:'center', borderStyle:'dashed', borderWidth:1, borderColor:GRAY_200}}>
+              <Text style={{fontSize:12, color:GRAY_500, textAlign:'center'}}>
+                🔒 Messaging is a paid feature. Upgrade to BASIC or PRO to reply to clients.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <TextInput style={s.composeInput} placeholder="Type a message…" placeholderTextColor={GRAY_400}
+                value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={send}/>
+              <TouchableOpacity style={[s.sendBtn, (!reply.trim()||sending)&&{opacity:0.4}]}
+                disabled={!reply.trim()||sending} onPress={send}>
+                <Ionicons name="send" size={18} color="#fff"/>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1078,12 +1237,96 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
   );
 }
 
+function NotificationsScreen() {
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<'all'|'unread'>('all');
+
+  const load = useCallback(async (silent=false) => {
+    if (!silent) setLoading(true);
+    try { setItems(await api<NotificationItem[]>('/notifications')); }
+    catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed to load notifications'); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function open(item: NotificationItem) {
+    if (!item.read) {
+      setItems(prev => prev.map(n => n.id === item.id ? { ...n, read:true } : n));
+      await api(`/notifications/${item.id}/read`, { method:'POST' }).catch(() => {});
+    }
+    if (item.linkUrl) Alert.alert(item.title, item.body || 'Open this item from the web dashboard for the linked detail.');
+  }
+
+  async function markAll() {
+    setItems(prev => prev.map(n => ({ ...n, read:true })));
+    await api('/notifications/read-all', { method:'POST' }).catch(() => {});
+  }
+
+  const unread = items.filter(n => !n.read).length;
+  const visible = filter === 'unread' ? items.filter(n => !n.read) : items;
+  const iconFor = (kind: NotificationItem['kind']) =>
+    kind === 'PAYMENT' ? 'card-outline' :
+    kind === 'SYSTEM' ? 'shield-checkmark-outline' :
+    kind === 'BOOKING_NEW' ? 'calendar-outline' : 'chatbubble-ellipses-outline';
+
+  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Alerts</Text>
+        {unread > 0 && (
+          <TouchableOpacity onPress={markAll}>
+            <Text style={{ color:BRAND, fontSize:12, fontWeight:'700' }}>Mark all read</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <View style={{ flexDirection:'row', gap:8, paddingHorizontal:16, paddingTop:12 }}>
+        {(['all','unread'] as const).map(k => (
+          <TouchableOpacity key={k} onPress={()=>setFilter(k)}
+            style={{ paddingHorizontal:14, paddingVertical:8, borderRadius:99, backgroundColor:filter===k?BRAND:GRAY_100 }}>
+            <Text style={{ fontSize:12, fontWeight:'700', color:filter===k?'#fff':GRAY_700 }}>
+              {k === 'all' ? `All (${items.length})` : `Unread (${unread})`}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <FlatList
+        data={visible}
+        keyExtractor={i=>i.id}
+        contentContainerStyle={[s.listContent, visible.length===0 && { flexGrow:1, justifyContent:'center' }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}
+        ListEmptyComponent={<Text style={s.emptyText}>No alerts to show.</Text>}
+        renderItem={({item})=>(
+          <TouchableOpacity style={[s.card, !item.read && { borderColor:BRAND_LT, backgroundColor:'#FFFBF6' }]} onPress={()=>open(item)}>
+            <View style={{ width:36, height:36, borderRadius:12, backgroundColor:item.read?GRAY_100:BRAND_LT, alignItems:'center', justifyContent:'center' }}>
+              <Ionicons name={iconFor(item.kind) as any} size={18} color={item.read?GRAY_500:BRAND}/>
+            </View>
+            <View style={s.cardBody}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:6 }}>
+                <Text style={[s.clientName, { flex:1 }]} numberOfLines={1}>{item.title}</Text>
+                {!item.read && <View style={{ width:8, height:8, borderRadius:4, backgroundColor:BRAND }}/>}
+              </View>
+              {!!item.body && <Text style={s.sub} numberOfLines={2}>{item.body}</Text>}
+              <Text style={s.dateText}>{new Date(item.createdAt).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+    </SafeAreaView>
+  );
+}
+
 // ── Menu / Settings hub ──────────────────────────────────────────────────────
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'soon';
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
+  const nav = useNavigation<any>();
   const [view, setView]         = useState<MoreView>('menu');
   const [soonLabel, setSoonLabel] = useState('');
   const [services, setServices] = useState<Service[] | null>(null);
@@ -1096,8 +1339,18 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [packages, setPackages] = useState<any[] | null>(null);
   const [appts, setAppts]       = useState<Appointment[] | null>(null); // for Reports
   const [payments, setPayments] = useState<any[] | null>(null);
+  const [deliveries, setDeliveries] = useState<NotificationDelivery[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
+  const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean }|null>(null);
+  const [settingsEditor, setSettingsEditor] = useState<{ name:string; email:string; phone:string; address:string; minNoticeMinutes:string; maxAdvanceDays:string; cancellationWindowHours:string; requireDeposit:boolean; depositPercent:string }|null>(null);
+  const [timeOffEditor, setTimeOffEditor] = useState<{ staffId:string; name:string; startsAt:string; endsAt:string; reason:string }|null>(null);
+  const [staffServiceEditor, setStaffServiceEditor] = useState<{ staffId:string; name:string; serviceIds:string[] }|null>(null);
+  const [availabilityEditor, setAvailabilityEditor] = useState<{
+    staffId:string;
+    name:string;
+    days:Array<{ dayOfWeek:number; enabled:boolean; startTime:string; endTime:string }>;
+  }|null>(null);
   // Two-factor sign-in (seeded from the session, updated optimistically).
   const [twoFA, setTwoFA]       = useState<boolean>(getAuth().user?.twoFactorEnabled ?? false);
   const [twoFAMethod, setTwoFAMethod] = useState<'EMAIL'|'SMS'>(getAuth().user?.twoFactorMethod ?? 'EMAIL');
@@ -1142,11 +1395,172 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     ]);
   }
 
+  async function saveService() {
+    if (!serviceEditor?.name.trim()) return;
+    const durationMinutes = Number.parseInt(serviceEditor.durationMinutes, 10);
+    const priceCents = Math.round(Number.parseFloat(serviceEditor.price || '0') * 100);
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0 || !Number.isFinite(priceCents) || priceCents < 0) {
+      Alert.alert('Check service', 'Enter a valid duration and price.');
+      return;
+    }
+    try {
+      const payload = {
+        name: serviceEditor.name.trim(),
+        durationMinutes,
+        priceCents,
+        color: BRAND,
+        active: serviceEditor.active,
+      };
+      if (serviceEditor.id) await api(`/businesses/${bizId()}/services/${serviceEditor.id}`, { method:'PATCH', body: JSON.stringify(payload) });
+      else await api(`/businesses/${bizId()}/services`, { method:'POST', body: JSON.stringify(payload) });
+      setServices(await api<Service[]>(`/businesses/${bizId()}/services`));
+      setServiceEditor(null);
+    } catch(e) {
+      Alert.alert('Could not save service', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function saveSettings() {
+    if (!settingsEditor) return;
+    try {
+      const payload = {
+        name: settingsEditor.name.trim(),
+        email: settingsEditor.email.trim().toLowerCase(),
+        phone: settingsEditor.phone.trim() || undefined,
+        address: settingsEditor.address.trim() || undefined,
+        minNoticeMinutes: Number.parseInt(settingsEditor.minNoticeMinutes, 10),
+        maxAdvanceDays: Number.parseInt(settingsEditor.maxAdvanceDays, 10),
+        cancellationWindowHours: Number.parseInt(settingsEditor.cancellationWindowHours, 10),
+        requireDeposit: settingsEditor.requireDeposit,
+        depositPercent: Number.parseInt(settingsEditor.depositPercent, 10),
+      };
+      if (!payload.name || !payload.email || !Number.isFinite(payload.minNoticeMinutes) || !Number.isFinite(payload.maxAdvanceDays)) {
+        Alert.alert('Check settings', 'Business name, email, notice, and advance window are required.');
+        return;
+      }
+      const updated = await api<any>(`/businesses/${bizId()}`, { method:'PATCH', body: JSON.stringify(payload) });
+      setBiz(updated);
+      setSettingsEditor(null);
+      Alert.alert('Saved', 'Business settings were updated.');
+    } catch(e) {
+      Alert.alert('Could not save settings', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function saveTimeOff() {
+    if (!timeOffEditor) return;
+    try {
+      await api(`/businesses/${bizId()}/staff/${timeOffEditor.staffId}/time-off`, {
+        method:'POST',
+        body: JSON.stringify({
+          startsAt: new Date(timeOffEditor.startsAt).toISOString(),
+          endsAt: new Date(timeOffEditor.endsAt).toISOString(),
+          reason: timeOffEditor.reason.trim() || undefined,
+        }),
+      });
+      setTimeOffEditor(null);
+      Alert.alert('Saved', 'Time off was added.');
+    } catch(e) {
+      Alert.alert('Could not add time off', e instanceof Error ? e.message : 'Use a valid date/time, for example 2026-06-05 14:00.');
+    }
+  }
+
+  function openAvailabilityEditor(st: Staff) {
+    const rules = st.availabilityRules ?? [];
+    const days = [0,1,2,3,4,5,6].map((dayOfWeek) => {
+      const rule = rules.find((r) => r.dayOfWeek === dayOfWeek);
+      return {
+        dayOfWeek,
+        enabled: !!rule,
+        startTime: rule?.startTime ?? (dayOfWeek === 0 || dayOfWeek === 6 ? '10:00' : '09:00'),
+        endTime: rule?.endTime ?? (dayOfWeek === 0 || dayOfWeek === 6 ? '16:00' : '17:00'),
+      };
+    });
+    setAvailabilityEditor({ staffId: st.id, name: st.user.name, days });
+  }
+
+  async function saveAvailability() {
+    if (!availabilityEditor) return;
+    const validTime = /^\d{2}:\d{2}$/;
+    const rules = availabilityEditor.days
+      .filter((d) => d.enabled)
+      .map((d) => ({ dayOfWeek: d.dayOfWeek, startTime: d.startTime.trim(), endTime: d.endTime.trim() }));
+    const invalid = rules.some((r) =>
+      !validTime.test(r.startTime) ||
+      !validTime.test(r.endTime) ||
+      r.startTime >= r.endTime
+    );
+    if (invalid) {
+      Alert.alert('Check hours', 'Use 24-hour HH:mm times, and make sure each start time is before the end time.');
+      return;
+    }
+    try {
+      await api(`/businesses/${bizId()}/staff/${availabilityEditor.staffId}/availability`, {
+        method:'POST',
+        body: JSON.stringify(rules),
+      });
+      setStaff(await api<Staff[]>(`/businesses/${bizId()}/staff/all`));
+      setAvailabilityEditor(null);
+      Alert.alert('Saved', 'Recurring availability was updated.');
+    } catch(e) {
+      Alert.alert('Could not save availability', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  function openStaffServices(st: Staff) {
+    if (!services) {
+      Alert.alert('Services unavailable', 'Open Services once, then try again.');
+      return;
+    }
+    setStaffServiceEditor({
+      staffId: st.id,
+      name: st.user.name,
+      serviceIds: st.staffServices.map(ss => ss.serviceId),
+    });
+  }
+
+  async function saveStaffServices() {
+    if (!staffServiceEditor) return;
+    try {
+      await api(`/businesses/${bizId()}/staff/${staffServiceEditor.staffId}/services`, {
+        method:'POST',
+        body: JSON.stringify({ serviceIds: staffServiceEditor.serviceIds }),
+      });
+      setStaff(await api<Staff[]>(`/businesses/${bizId()}/staff/all`));
+      setStaffServiceEditor(null);
+      Alert.alert('Saved', 'Staff services were updated.');
+    } catch(e) {
+      Alert.alert('Could not save services', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function removeWaitlistEntry(id: string) {
+    Alert.alert('Remove from waitlist', 'Remove this person from the active waitlist?', [
+      { text:'Cancel', style:'cancel' },
+      { text:'Remove', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/waitlist/${id}`, { method:'DELETE' });
+          setWaitlist(await api<any[]>(`/businesses/${bizId()}/waitlist`));
+        } catch(e) {
+          Alert.alert('Could not remove', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
   async function open(v: MoreView) {
     setView(v);
     try {
       if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${bizId()}/services`)); }
-      else if (v === 'staff' && !staff)  { setLoading(true); setStaff(await api<Staff[]>(`/businesses/${bizId()}/staff`)); }
+      else if (v === 'staff' && (!staff || !services))  {
+        setLoading(true);
+        const [staffRows, serviceRows] = await Promise.all([
+          api<Staff[]>(`/businesses/${bizId()}/staff/all`),
+          api<Service[]>(`/businesses/${bizId()}/services`),
+        ]);
+        setStaff(staffRows);
+        setServices(serviceRows);
+      }
       else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${bizId()}/offers`)); }
       else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${bizId()}/waitlist`)); }
       else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${bizId()}/reviews`)); }
@@ -1154,7 +1568,16 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'giftcards' && !giftcards){ setLoading(true); setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`)); }
       else if (v === 'packages' && !packages){ setLoading(true); setPackages(await api<any[]>(`/businesses/${bizId()}/packages`)); }
       else if ((v === 'settings' || v === 'booking' || v === 'subscriptions' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
-      else if (v === 'reports' && !appts) { setLoading(true); setAppts((await api<{data:Appointment[]}>(`/businesses/${bizId()}/bookings`)).data); }
+      else if (v === 'notifications' && !deliveries) { setLoading(true); setDeliveries(await api<NotificationDelivery[]>(`/notifications/deliveries?limit=50`)); }
+      else if (v === 'reports' && !appts) {
+        setLoading(true);
+        const [bookingRows, paymentRows] = await Promise.all([
+          api<{data:Appointment[]}>(`/businesses/${bizId()}/bookings`),
+          api<any[]>(`/payments`).catch(() => []),
+        ]);
+        setAppts(bookingRows.data);
+        setPayments(paymentRows);
+      }
       else if (v === 'transactions') { setLoading(true); setPayments(await api<any[]>(`/payments`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
@@ -1171,22 +1594,57 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'services') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Services"/>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <Text style={s.headerTitle}>Services</Text>
+        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true })}>
+          <Ionicons name="add" size={24} color={BRAND}/>
+        </TouchableOpacity>
+      </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
-          {(services ?? []).filter(x=>x.active).map(sv => (
-            <View key={sv.id} style={ms.row}>
+          {(services ?? []).map(sv => (
+            <TouchableOpacity key={sv.id} style={ms.row} onPress={()=>setServiceEditor({
+              id: sv.id,
+              name: sv.name,
+              durationMinutes: String(sv.durationMinutes),
+              price: (sv.priceCents / 100).toFixed(2),
+              active: sv.active,
+            })}>
               <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{sv.name}</Text>
-                <Text style={ms.rowMeta}>{sv.durationMinutes} min</Text>
+                <Text style={ms.rowMeta}>{sv.durationMinutes} min{sv.active ? '' : ' · inactive'}</Text>
               </View>
               <PriceTag cents={sv.priceCents}/>
-            </View>
+            </TouchableOpacity>
           ))}
           {services && services.length===0 && <Text style={ms.empty}>No services yet.</Text>}
         </ScrollView>
       )}
+      <Modal visible={!!serviceEditor} animationType="slide" onRequestClose={()=>setServiceEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setServiceEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>{serviceEditor?.id ? 'Edit service' : 'New service'}</Text>
+          </View>
+          {serviceEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.fieldLabel}>Name</Text>
+              <TextInput style={s.input} value={serviceEditor.name} onChangeText={name=>setServiceEditor({...serviceEditor,name})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Duration minutes</Text>
+              <TextInput style={s.input} value={serviceEditor.durationMinutes} keyboardType="number-pad" onChangeText={durationMinutes=>setServiceEditor({...serviceEditor,durationMinutes})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Price</Text>
+              <TextInput style={s.input} value={serviceEditor.price} keyboardType="decimal-pad" onChangeText={price=>setServiceEditor({...serviceEditor,price})}/>
+              <View style={[ms.card,{ marginTop:14, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
+                <Text style={ms.rowTitle}>Active</Text>
+                <Switch value={serviceEditor.active} onValueChange={active=>setServiceEditor({...serviceEditor,active})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
+              </View>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:14 }]} onPress={saveService}><Text style={s.btnPrimaryText}>Save service</Text></TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
@@ -1202,11 +1660,153 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <Text style={ms.rowTitle}>{st.user.name}</Text>
                 <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
               </View>
+              <TouchableOpacity style={ms.smallAction} onPress={()=>setTimeOffEditor({
+                staffId: st.id,
+                name: st.user.name,
+                startsAt: '',
+                endsAt: '',
+                reason: '',
+              })}>
+                <Text style={ms.smallActionText}>Time off</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={ms.smallAction} onPress={()=>openAvailabilityEditor(st)}>
+                <Text style={ms.smallActionText}>Hours</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={ms.smallAction} onPress={()=>openStaffServices(st)}>
+                <Text style={ms.smallActionText}>Services</Text>
+              </TouchableOpacity>
             </View>
           ))}
           {staff && staff.length===0 && <Text style={ms.empty}>No team members yet.</Text>}
+          <Text style={[ms.empty,{ marginTop:4 }]}>Use Hours for weekly recurring availability and Time off for one-off blocked time.</Text>
         </ScrollView>
       )}
+      <Modal visible={!!timeOffEditor} animationType="slide" onRequestClose={()=>setTimeOffEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setTimeOffEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Add time off</Text>
+          </View>
+          {timeOffEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={ms.cardLabel}>{timeOffEditor.name}</Text>
+              <Text style={[s.fieldLabel,{ marginTop:14 }]}>Starts</Text>
+              <TextInput style={s.input} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400}
+                value={timeOffEditor.startsAt} onChangeText={startsAt=>setTimeOffEditor({...timeOffEditor,startsAt})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Ends</Text>
+              <TextInput style={s.input} placeholder="2026-06-05 17:00" placeholderTextColor={GRAY_400}
+                value={timeOffEditor.endsAt} onChangeText={endsAt=>setTimeOffEditor({...timeOffEditor,endsAt})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Reason</Text>
+              <TextInput style={s.input} placeholder="Optional" placeholderTextColor={GRAY_400}
+                value={timeOffEditor.reason} onChangeText={reason=>setTimeOffEditor({...timeOffEditor,reason})}/>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveTimeOff}><Text style={s.btnPrimaryText}>Save time off</Text></TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+      <Modal visible={!!availabilityEditor} animationType="slide" onRequestClose={()=>setAvailabilityEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setAvailabilityEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Weekly hours</Text>
+          </View>
+          {availabilityEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={ms.cardLabel}>{availabilityEditor.name}</Text>
+              {availabilityEditor.days.map((d) => {
+                const label = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.dayOfWeek];
+                return (
+                  <View key={d.dayOfWeek} style={ms.card}>
+                    <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                      <View>
+                        <Text style={ms.rowTitle}>{label}</Text>
+                        <Text style={ms.rowMeta}>{d.enabled ? `${d.startTime} to ${d.endTime}` : 'Closed'}</Text>
+                      </View>
+                      <Switch
+                        value={d.enabled}
+                        onValueChange={(enabled)=>setAvailabilityEditor({
+                          ...availabilityEditor,
+                          days: availabilityEditor.days.map(x => x.dayOfWeek === d.dayOfWeek ? { ...x, enabled } : x),
+                        })}
+                        trackColor={{ true: BRAND, false: GRAY_200 }}
+                        thumbColor="#fff"
+                      />
+                    </View>
+                    {d.enabled && (
+                      <View style={{ flexDirection:'row', gap:10, marginTop:12 }}>
+                        <View style={{ flex:1 }}>
+                          <Text style={s.fieldLabel}>Start</Text>
+                          <TextInput
+                            style={s.input}
+                            placeholder="09:00"
+                            placeholderTextColor={GRAY_400}
+                            value={d.startTime}
+                            onChangeText={(startTime)=>setAvailabilityEditor({
+                              ...availabilityEditor,
+                              days: availabilityEditor.days.map(x => x.dayOfWeek === d.dayOfWeek ? { ...x, startTime } : x),
+                            })}
+                          />
+                        </View>
+                        <View style={{ flex:1 }}>
+                          <Text style={s.fieldLabel}>End</Text>
+                          <TextInput
+                            style={s.input}
+                            placeholder="17:00"
+                            placeholderTextColor={GRAY_400}
+                            value={d.endTime}
+                            onChangeText={(endTime)=>setAvailabilityEditor({
+                              ...availabilityEditor,
+                              days: availabilityEditor.days.map(x => x.dayOfWeek === d.dayOfWeek ? { ...x, endTime } : x),
+                            })}
+                          />
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveAvailability}>
+                <Text style={s.btnPrimaryText}>Save weekly hours</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+      <Modal visible={!!staffServiceEditor} animationType="slide" onRequestClose={()=>setStaffServiceEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setStaffServiceEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Staff services</Text>
+          </View>
+          {staffServiceEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={ms.cardLabel}>{staffServiceEditor.name}</Text>
+              {(services ?? []).map(sv => {
+                const selected = staffServiceEditor.serviceIds.includes(sv.id);
+                return (
+                  <TouchableOpacity key={sv.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]}
+                    onPress={()=>setStaffServiceEditor({
+                      ...staffServiceEditor,
+                      serviceIds: selected
+                        ? staffServiceEditor.serviceIds.filter(id => id !== sv.id)
+                        : [...staffServiceEditor.serviceIds, sv.id],
+                    })}>
+                    <View style={[ms.dot,{ backgroundColor:sv.color || BRAND }]}/>
+                    <View style={{ flex:1 }}>
+                      <Text style={ms.rowTitle}>{sv.name}</Text>
+                      <Text style={ms.rowMeta}>{sv.durationMinutes} min · ${(sv.priceCents/100).toFixed(2)}</Text>
+                    </View>
+                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? BRAND : GRAY_400}/>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffServices}>
+                <Text style={s.btnPrimaryText}>Save services</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
@@ -1237,11 +1837,21 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(waitlist ?? []).map(w => (
-            <View key={w.id} style={ms.row}>
+            <View key={w.id} style={[ms.card,{ gap:10 }]}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
               <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{String(w.name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{w.name}</Text>
                 <Text style={ms.rowMeta} numberOfLines={1}>{w.email}{w.phone ? ` · ${w.phone}` : ''}</Text>
+                {!!w.notes && <Text style={ms.rowMeta} numberOfLines={2}>{w.notes}</Text>}
+              </View>
+              </View>
+              <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8 }}>
+                {!!w.phone && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`tel:${w.phone}`)}><Text style={ms.smallActionText}>Call</Text></TouchableOpacity>}
+                {!!w.email && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}`)}><Text style={ms.smallActionText}>Email</Text></TouchableOpacity>}
+                <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}?subject=${encodeURIComponent('A spot is available')}`)}><Text style={ms.smallActionText}>Notify</Text></TouchableOpacity>
+                <TouchableOpacity style={ms.smallAction} onPress={()=>{ setView('menu'); nav.navigate('Book'); }}><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
+                <TouchableOpacity style={ms.smallAction} onPress={()=>removeWaitlistEntry(w.id)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Remove</Text></TouchableOpacity>
               </View>
             </View>
           ))}
@@ -1420,6 +2030,22 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             </View>
           </View>
           <Text style={[ms.empty,{ marginTop:10 }]}>Client texts are a paid-plan feature. Free-tier salons don&apos;t send client SMS.</Text>
+          <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>RECENT DELIVERY LOGS</Text>
+          <View style={ms.card}>
+            {(deliveries ?? []).slice(0, 12).map((d,i,arr)=>(
+              <View key={d.id} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]}>
+                <View style={{ flex:1, paddingRight:10 }}>
+                  <Text style={ms.rowTitle}>{d.channel} · {d.type}</Text>
+                  <Text style={ms.rowMeta} numberOfLines={1}>{d.recipient}</Text>
+                  {!!d.error && <Text style={[ms.rowMeta,{ color:'#DC2626' }]} numberOfLines={2}>{d.error}</Text>}
+                </View>
+                <View style={[ms.dealChip,{ backgroundColor:d.status==='FAILED'?'#FEE2E2':d.status==='SENT'?'#D1FAE5':GRAY_100 }]}>
+                  <Text style={[ms.dealChipText,{ color:d.status==='FAILED'?'#991B1B':d.status==='SENT'?'#065F46':GRAY_700 }]}>{d.status}</Text>
+                </View>
+              </View>
+            ))}
+            {deliveries && deliveries.length===0 && <Text style={ms.empty}>No delivery attempts logged yet.</Text>}
+          </View>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -1432,12 +2058,27 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const todayCount = list.filter(a => new Date(a.startsAt).toDateString()===todayKey).length;
     const upcoming = list.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > now).length;
     const completed = list.filter(a => a.status==='COMPLETED');
-    const revenueCents = completed.reduce((sum,a)=> sum + (a.service?.priceCents ?? 0), 0);
+    const paymentRows = payments ?? [];
+    const revenueCents = paymentRows
+      .filter(p => p.status === 'SUCCEEDED' || p.status === 'PARTIALLY_REFUNDED')
+      .reduce((sum,p)=> sum + (p.amountCents ?? 0) - (p.refundedCents ?? 0), 0);
+    const failedPayments = paymentRows.filter(p => p.status === 'FAILED').length;
+    const noShows = list.filter(a => a.status==='NO_SHOW').length;
+    const cancelled = list.filter(a => a.status==='CANCELLED').length;
+    const byService = completed.reduce((map,a)=>{
+      const key = a.service?.name ?? 'Unknown';
+      map[key] = (map[key] ?? 0) + 1;
+      return map;
+    }, {} as Record<string,number>);
+    const topService = Object.entries(byService).sort((a,b)=>b[1]-a[1])[0];
     const stats = [
       { label:"Today's appointments", value:String(todayCount) },
       { label:'Upcoming', value:String(upcoming) },
       { label:'Completed (all time)', value:String(completed.length) },
-      { label:'Revenue (completed)', value:`$${(revenueCents/100).toFixed(2)}` },
+      { label:'Collected revenue', value:`$${(revenueCents/100).toFixed(2)}` },
+      { label:'Cancelled / no-show', value:`${cancelled} / ${noShows}` },
+      { label:'Failed payments', value:String(failedPayments) },
+      { label:'Top service', value:topService ? `${topService[0]} (${topService[1]})` : '—' },
     ];
     return (
       <SafeAreaView style={s.screen}>
@@ -1566,6 +2207,44 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <Text style={ms.cardLabel}>Deposit required</Text>
             <Text style={ms.cardValue}>{(biz as any)?.requireDeposit ? `Yes · ${(biz as any)?.depositPercent ?? 25}%` : 'No'}</Text>
           </View>
+          <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setSettingsEditor({
+            name: biz?.name ?? '',
+            email: biz?.email ?? '',
+            phone: biz?.phone ?? '',
+            address: biz?.address ?? '',
+            minNoticeMinutes: String(biz?.minNoticeMinutes ?? 120),
+            maxAdvanceDays: String(biz?.maxAdvanceDays ?? 60),
+            cancellationWindowHours: String(biz?.cancellationWindowHours ?? 24),
+            requireDeposit: !!biz?.requireDeposit,
+            depositPercent: String(biz?.depositPercent ?? 25),
+          })}>
+            <Text style={s.btnPrimaryText}>Edit business settings</Text>
+          </TouchableOpacity>
+
+          <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>WEB DASHBOARD</Text>
+          <View style={ms.card}>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings`)}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
+                <Ionicons name="storefront-outline" size={20} color={BRAND}/>
+                <Text style={ms.rowTitle}>Business settings</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings?tab=billing`)}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
+                <Ionicons name="card-outline" size={20} color={BRAND}/>
+                <Text style={ms.rowTitle}>Billing and plan</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+            <TouchableOpacity style={ms.notifRow} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/notifications`)}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
+                <Ionicons name="notifications-outline" size={20} color={BRAND}/>
+                <Text style={ms.rowTitle}>Delivery logs</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+          </View>
 
           <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>SECURITY</Text>
           <View style={ms.card}>
@@ -1615,25 +2294,57 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             </View>
           )}
 
-          <Text style={[ms.empty,{ marginTop:8 }]}>Editing business settings is coming to the app — manage those on the web dashboard for now.</Text>
+          <Text style={[ms.empty,{ marginTop:8 }]}>Advanced business settings, billing, and delivery-log controls are available on the web dashboard.</Text>
         </ScrollView>
       )}
+      <Modal visible={!!settingsEditor} animationType="slide" onRequestClose={()=>setSettingsEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setSettingsEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Business settings</Text>
+          </View>
+          {settingsEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.fieldLabel}>Business name</Text>
+              <TextInput style={s.input} value={settingsEditor.name} onChangeText={name=>setSettingsEditor({...settingsEditor,name})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Email</Text>
+              <TextInput style={s.input} value={settingsEditor.email} autoCapitalize="none" keyboardType="email-address" onChangeText={email=>setSettingsEditor({...settingsEditor,email})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Phone</Text>
+              <TextInput style={s.input} value={settingsEditor.phone} keyboardType="phone-pad" onChangeText={phone=>setSettingsEditor({...settingsEditor,phone})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Address</Text>
+              <TextInput style={s.input} value={settingsEditor.address} onChangeText={address=>setSettingsEditor({...settingsEditor,address})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Minimum notice minutes</Text>
+              <TextInput style={s.input} value={settingsEditor.minNoticeMinutes} keyboardType="number-pad" onChangeText={minNoticeMinutes=>setSettingsEditor({...settingsEditor,minNoticeMinutes})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Maximum advance days</Text>
+              <TextInput style={s.input} value={settingsEditor.maxAdvanceDays} keyboardType="number-pad" onChangeText={maxAdvanceDays=>setSettingsEditor({...settingsEditor,maxAdvanceDays})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Cancellation window hours</Text>
+              <TextInput style={s.input} value={settingsEditor.cancellationWindowHours} keyboardType="number-pad" onChangeText={cancellationWindowHours=>setSettingsEditor({...settingsEditor,cancellationWindowHours})}/>
+              <View style={[ms.card,{ marginTop:14, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
+                <Text style={ms.rowTitle}>Require deposit</Text>
+                <Switch value={settingsEditor.requireDeposit} onValueChange={requireDeposit=>setSettingsEditor({...settingsEditor,requireDeposit})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
+              </View>
+              {settingsEditor.requireDeposit && (
+                <>
+                  <Text style={s.fieldLabel}>Deposit percent</Text>
+                  <TextInput style={s.input} value={settingsEditor.depositPercent} keyboardType="number-pad" onChangeText={depositPercent=>setSettingsEditor({...settingsEditor,depositPercent})}/>
+                </>
+              )}
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveSettings}><Text style={s.btnPrimaryText}>Save settings</Text></TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
   // ── default menu (exact spec order) ──
-  const goSoon = (label:string) => { setSoonLabel(label); setView('soon'); };
   const MENU: Array<{ label:string; icon:any; onPress:()=>void }> = [
     { label:'Items & Services', icon:'pricetags-outline',       onPress:()=>open('services') },
     { label:'Online Booking',   icon:'globe-outline',           onPress:()=>open('booking') },
     { label:'Waitlist',         icon:'hourglass-outline',       onPress:()=>open('waitlist') },
     { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
-    { label:'Invoices',         icon:'document-text-outline',   onPress:()=>goSoon('Invoices') },
-    { label:'Estimates',        icon:'calculator-outline',      onPress:()=>goSoon('Estimates') },
     { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
-    { label:'Orders',           icon:'cart-outline',            onPress:()=>goSoon('Orders') },
     { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
-    { label:'Money',            icon:'cash-outline',            onPress:()=>goSoon('Money') },
     { label:'Add-ons',          icon:'extension-puzzle-outline',onPress:()=>open('addons') },
     { label:'Subscriptions',    icon:'card-outline',            onPress:()=>open('subscriptions') },
     { label:'Support',          icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
@@ -1678,6 +2389,10 @@ const cal = StyleSheet.create({
   topBtn:        { width:32, height:32, alignItems:'center', justifyContent:'center' },
   monthWrap:     { flexDirection:'row', alignItems:'center' },
   monthText:     { fontSize:17, fontWeight:'700', color:GRAY_900 },
+  filterChip:    { borderWidth:1, borderColor:GRAY_200, borderRadius:999, paddingHorizontal:12, paddingVertical:7, backgroundColor:'#fff' },
+  filterChipOn:  { borderColor:BRAND, backgroundColor:BRAND },
+  filterText:    { fontSize:12, fontWeight:'700', color:GRAY_500 },
+  filterTextOn:  { color:'#fff' },
   dateHeader:    { backgroundColor:GRAY_50, paddingHorizontal:16, paddingVertical:8 },
   dateHeaderToday:{ backgroundColor:'#EFF6FF' },
   dateHeaderText:{ fontSize:12, fontWeight:'700', color:GRAY_500, letterSpacing:0.5 },
@@ -1727,6 +2442,8 @@ const ms = StyleSheet.create({
   methodChip:  { flex:1, alignItems:'center', paddingVertical:10, borderRadius:12, borderWidth:1, borderColor:GRAY_200 },
   methodChipOn:{ borderColor:BRAND, backgroundColor:BRAND_LT },
   methodChipText:{ fontSize:14, fontWeight:'600', color:GRAY_700 },
+  smallAction: { borderWidth:1, borderColor:GRAY_200, borderRadius:10, paddingHorizontal:10, paddingVertical:7 },
+  smallActionText:{ fontSize:12, fontWeight:'700', color:GRAY_700 },
   notifRow:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:14, paddingHorizontal:4 },
   notifRowBorder:{ borderBottomWidth:1, borderBottomColor:GRAY_50 },
   statusOn:    { flexDirection:'row', alignItems:'center', gap:6 },
@@ -1970,8 +2687,9 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
       const res = await api<{accessToken:string;refreshToken:string;user:User}>('/auth/register',{
         method:'POST',
         body: JSON.stringify({
-          name: name.trim(), email: email.trim(), password, role:'OWNER',
+          name: name.trim(), email: email.trim().toLowerCase(), password, role:'OWNER',
           businessName: businessName.trim(),
+          privacyConsentAccepted: true,
           ...(normalizedPhone ? { businessPhone: normalizedPhone } : {}),
           ...(tz ? { timezone: tz } : {}),
         }),
@@ -2096,6 +2814,379 @@ function ChangePasswordScreen({ onDone }: { onDone:()=>void }) {
   );
 }
 
+// ── Client portal: bookings, messages, and offers for CLIENT users ───────────
+function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
+  const { user } = getAuth();
+  const [tab, setTab] = useState<'bookings'|'messages'|'offers'>('bookings');
+  const [appointments, setAppointments] = useState<ClientPortalAppointment[]>([]);
+  const [threads, setThreads] = useState<ClientPortalMessageThread[]>([]);
+  const [offers, setOffers] = useState<ClientPortalOffer[]>([]);
+  const [selectedThread, setSelectedThread] = useState<ClientPortalMessageThread|null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<ClientPortalAppointment|null>(null);
+  const [clientReschedule, setClientReschedule] = useState<{ appointment:ClientPortalAppointment; date:string; slots:Slot[]; loading:boolean }|null>(null);
+  const [reply, setReply] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [emailBlocked, setEmailBlocked] = useState(false);
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const load = useCallback(async (silent=false) => {
+    if (!silent) setLoading(true);
+    setEmailBlocked(false);
+    try {
+      const [apts, msgs, activeOffers] = await Promise.all([
+        api<ClientPortalAppointment[]>('/my/appointments'),
+        api<ClientPortalMessageThread[]>('/my/messages'),
+        api<ClientPortalOffer[]>('/my/offers'),
+      ]);
+      setAppointments(apts);
+      setThreads(msgs);
+      setOffers(activeOffers);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.includes('EMAIL_NOT_VERIFIED') || msg.toLowerCase().includes('verify')) setEmailBlocked(true);
+      else Alert.alert('Could not load account', msg || 'Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function resendVerification() {
+    try {
+      await api('/auth/resend-verification', { method:'POST' });
+      Alert.alert('Verification sent', 'Check your email for a new verification link.');
+    } catch (e) {
+      Alert.alert('Could not send email', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function sendClientMessage() {
+    if (!reply.trim() || !selectedThread) return;
+    setSending(true);
+    try {
+      await api(`/businesses/${selectedThread.businessId}/clients/${selectedThread.clientId}/messages`, {
+        method:'POST',
+        body: JSON.stringify({ content: reply.trim() }),
+      });
+      setReply('');
+      const messages = await api<Message[]>(`/businesses/${selectedThread.businessId}/clients/${selectedThread.clientId}/messages`);
+      const updated = { ...selectedThread, messages };
+      setSelectedThread(updated);
+      setThreads(prev => prev.map(t => t.businessId === updated.businessId && t.clientId === updated.clientId ? updated : t));
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated:true }), 50);
+    } catch (e) {
+      Alert.alert('Could not send message', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function manageUrl(a: ClientPortalAppointment) {
+    return a.manageToken ? `${WEB_URL}/appointments/${a.id}/manage?token=${encodeURIComponent(a.manageToken)}` : null;
+  }
+
+  async function cancelClientAppointment(a: ClientPortalAppointment) {
+    if (!a.manageToken) {
+      Alert.alert('Manage link unavailable', 'Open this appointment from your confirmation email to cancel it.');
+      return;
+    }
+    Alert.alert('Cancel appointment', 'Cancel this booking?', [
+      { text:'No', style:'cancel' },
+      { text:'Cancel booking', style:'destructive', onPress: async () => {
+        try {
+          await api(`/bookings/${a.id}/status?token=${encodeURIComponent(a.manageToken!)}`, {
+            method:'PATCH',
+            body: JSON.stringify({ status:'CANCELLED', cancelReason:'Cancelled by client from mobile app' }),
+          });
+          setSelectedAppointment(null);
+          load(true);
+          Alert.alert('Cancelled', 'Your appointment was cancelled.');
+        } catch (e) {
+          Alert.alert('Could not cancel', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  function openManage(a: ClientPortalAppointment) {
+    const url = manageUrl(a);
+    if (url) Linking.openURL(url);
+    else Alert.alert('Manage link unavailable', 'Open this appointment from your confirmation email.');
+  }
+
+  async function rescheduleClientAppointment(a: ClientPortalAppointment) {
+    if (!a.manageToken) {
+      Alert.alert('Manage link unavailable', 'Open this appointment from your confirmation email to reschedule it.');
+      return;
+    }
+    const today = new Date().toISOString().slice(0,10);
+    setSelectedAppointment(null);
+    setClientReschedule({ appointment:a, date:today, slots:[], loading:true });
+    await loadClientRescheduleSlots(a, today);
+  }
+
+  async function loadClientRescheduleSlots(a: ClientPortalAppointment, d: string) {
+    setClientReschedule(prev => prev ? { ...prev, date:d, slots:[], loading:true } : prev);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const data = await api<Slot[]>(`/availability/slots?staffId=${a.staff.id}&serviceId=${a.service.id}&startDate=${d}&endDate=${d}&timezone=${tz}`);
+      setClientReschedule(prev => prev ? { ...prev, date:d, slots:data, loading:false } : prev);
+    } catch(e) {
+      setClientReschedule(prev => prev ? { ...prev, loading:false } : prev);
+      Alert.alert('Could not load times', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function saveClientReschedule(startsAt: string) {
+    if (!clientReschedule?.appointment.manageToken) return;
+    try {
+      await api(`/bookings/${clientReschedule.appointment.id}/reschedule?token=${encodeURIComponent(clientReschedule.appointment.manageToken)}`, {
+        method:'PATCH',
+        body: JSON.stringify({ startsAt }),
+      });
+      setClientReschedule(null);
+      load(true);
+      Alert.alert('Rescheduled', 'Your appointment was moved. The business will confirm if approval is required.');
+    } catch(e) {
+      Alert.alert('Could not reschedule', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  function rebook(a: ClientPortalAppointment) {
+    const slug = a.business.slug;
+    if (slug) Linking.openURL(`${WEB_URL}/book/${slug}`);
+    else Alert.alert('Booking page unavailable', 'Contact the business to book again.');
+  }
+
+  function review(a: ClientPortalAppointment) {
+    if (['COMPLETED','NO_SHOW'].includes(a.status)) Linking.openURL(`${WEB_URL}/review/${a.id}`);
+    else Alert.alert('Review after your visit', 'Reviews open after the appointment is completed.');
+  }
+
+  if (emailBlocked) return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Verify email</Text>
+        <TouchableOpacity onPress={onLogout}><Text style={s.authSwitchLink}>Sign out</Text></TouchableOpacity>
+      </View>
+      <View style={[s.center,{ padding:28 }]}>
+        <Ionicons name="mail-unread-outline" size={44} color={BRAND}/>
+        <Text style={[s.loginTitle,{ fontSize:22, textAlign:'center', marginTop:14 }]}>Check your email</Text>
+        <Text style={[s.loginSub,{ textAlign:'center', marginBottom:0 }]}>
+          {user?.email ? `Verify ${user.email} to see your bookings and messages.` : 'Verify your email to see your bookings and messages.'}
+        </Text>
+        <TouchableOpacity style={[s.btnPrimary,{ marginTop:22, alignSelf:'stretch' }]} onPress={resendVerification}>
+          <Text style={s.btnPrimaryText}>Resend verification</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+
+  if (selectedThread) return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>setSelectedThread(null)} style={{ marginRight:12 }}>
+          <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
+        </TouchableOpacity>
+        <Text style={s.headerTitle} numberOfLines={1}>{selectedThread.businessName}</Text>
+      </View>
+      <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={Platform.OS==='ios'?88:0}>
+        <ScrollView ref={scrollRef} contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}
+          onContentSizeChange={()=>scrollRef.current?.scrollToEnd({ animated:false })}>
+          {selectedThread.messages.length === 0 && <Text style={s.emptyText}>No messages yet</Text>}
+          {selectedThread.messages.map(m => (
+            <View key={m.id} style={[s.bubble, m.fromClient ? s.bubbleRight : s.bubbleLeft]}>
+              <Text style={[s.bubbleText, m.fromClient ? s.bubbleTextRight : s.bubbleTextLeft]}>{m.content}</Text>
+              <Text style={s.bubbleTime}>{new Date(m.createdAt).toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' })}</Text>
+            </View>
+          ))}
+        </ScrollView>
+        <View style={s.composeRow}>
+          <TextInput style={s.composeInput} placeholder="Type a message..." placeholderTextColor={GRAY_400}
+            value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={sendClientMessage}/>
+          <TouchableOpacity style={[s.sendBtn, (!reply.trim() || sending) && { opacity:0.4 }]}
+            disabled={!reply.trim() || sending} onPress={sendClientMessage}>
+            <Ionicons name="send" size={18} color="#fff"/>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+
+  if (selectedAppointment) {
+    const a = selectedAppointment;
+    const upcoming = ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > Date.now();
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={()=>setSelectedAppointment(null)} style={{ marginRight:12 }}>
+            <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Booking</Text>
+        </View>
+        <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+          <View style={[ms.card,{ borderLeftWidth:3, borderLeftColor:STATUS_COLOR[a.status] ?? BRAND }]}>
+            <Text style={ms.cardLabel}>{a.business.name}</Text>
+            <Text style={ms.cardValue}>{a.service.name}</Text>
+            <Text style={ms.rowMeta}>{new Date(a.startsAt).toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric', year:'numeric' })}</Text>
+            <Text style={ms.rowMeta}>{new Date(a.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })} with {a.staff.user.name}</Text>
+            <View style={{ marginTop:10, alignSelf:'flex-start' }}>
+              <Pill label={a.status.replace('_',' ')} color={STATUS_COLOR[a.status] ?? GRAY_500}/>
+            </View>
+          </View>
+          <View style={ms.card}>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>openManage(a)}>
+              <Text style={ms.rowTitle}>Open manage link</Text><Ionicons name="open-outline" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+            {upcoming && (
+              <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rescheduleClientAppointment(a)}>
+                <Text style={ms.rowTitle}>Reschedule</Text><Ionicons name="calendar-outline" size={16} color={GRAY_400}/>
+              </TouchableOpacity>
+            )}
+            {upcoming && (
+              <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>cancelClientAppointment(a)}>
+                <Text style={[ms.rowTitle,{ color:'#DC2626' }]}>Cancel appointment</Text><Ionicons name="close-circle-outline" size={16} color="#DC2626"/>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rebook(a)}>
+              <Text style={ms.rowTitle}>Book again</Text><Ionicons name="repeat-outline" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+            <TouchableOpacity style={ms.notifRow} onPress={()=>review(a)}>
+              <Text style={ms.rowTitle}>Leave a review</Text><Ionicons name="star-outline" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (clientReschedule) {
+    const a = clientReschedule.appointment;
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={()=>setClientReschedule(null)} style={{ marginRight:12 }}>
+            <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Reschedule</Text>
+        </View>
+        <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
+          <Text style={s.stepLabel}>{a.service.name}</Text>
+          <Text style={s.sub}>{a.business.name} with {a.staff.user.name}</Text>
+          <Text style={[s.fieldLabel,{ marginTop:16 }]}>Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingVertical:8 }}>
+            {Array.from({ length:21 }, (_,i) => { const d = new Date(); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); }).map(d => (
+              <TouchableOpacity key={d} style={[s.datePill, clientReschedule.date===d && s.datePillActive]} onPress={()=>loadClientRescheduleSlots(a, d)}>
+                <Text style={[s.datePillDay, clientReschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').toLocaleDateString('en-US',{ weekday:'short' })}</Text>
+                <Text style={[s.datePillNum, clientReschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').getDate()}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {clientReschedule.loading ? <ActivityIndicator color={BRAND} style={{ marginTop:20 }}/> : (
+            <View style={s.slotGrid}>
+              {clientReschedule.slots.map(sl => (
+                <TouchableOpacity key={sl.startsAt} style={s.slotBtn} onPress={()=>saveClientReschedule(sl.startsAt)}>
+                  <Text style={s.slotText}>{new Date(sl.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })}</Text>
+                </TouchableOpacity>
+              ))}
+              {clientReschedule.slots.length===0 && <Text style={s.emptyText}>No available times for this date.</Text>}
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  const tabs = [
+    { id:'bookings' as const, label:'Bookings', icon:'calendar-outline' as const },
+    { id:'messages' as const, label:'Messages', icon:'chatbubbles-outline' as const },
+    { id:'offers' as const, label:'Offers', icon:'pricetag-outline' as const },
+  ];
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <Text style={s.headerTitle}>My account</Text>
+        <TouchableOpacity onPress={onLogout}><Ionicons name="log-out-outline" size={22} color="#EF4444"/></TouchableOpacity>
+      </View>
+      <View style={{ flexDirection:'row', gap:8, paddingHorizontal:16, paddingTop:12 }}>
+        {tabs.map(t => (
+          <TouchableOpacity key={t.id} onPress={()=>setTab(t.id)}
+            style={[ms.methodChip, tab===t.id && ms.methodChipOn, { flex:1, flexDirection:'row', gap:6, justifyContent:'center' }]}>
+            <Ionicons name={t.icon} size={16} color={tab===t.id ? BRAND : GRAY_500}/>
+            <Text style={[ms.methodChipText, tab===t.id && { color:BRAND }]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading ? <ActivityIndicator color={BRAND} style={{ marginTop:40 }}/> : (
+        <ScrollView
+          contentContainerStyle={s.listContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{ setRefreshing(true); load(true); }} tintColor={BRAND}/>}
+          showsVerticalScrollIndicator={false}
+        >
+          {tab === 'bookings' && (
+            <>
+              {appointments.map(a => (
+                <TouchableOpacity key={a.id} style={s.card} onPress={()=>setSelectedAppointment(a)}>
+                  <View style={[s.dot,{ backgroundColor: STATUS_COLOR[a.status] ?? GRAY_400 }]}/>
+                  <View style={s.cardBody}>
+                    <Text style={s.clientName}>{a.service.name}</Text>
+                    <Text style={s.sub}>{a.business.name} · {a.staff.user.name}</Text>
+                    <Text style={s.dateText}>{new Date(a.startsAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' })} at {new Date(a.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })}</Text>
+                  </View>
+                  <Pill label={a.status.replace('_',' ')} color={STATUS_COLOR[a.status] ?? GRAY_500}/>
+                </TouchableOpacity>
+              ))}
+              {appointments.length === 0 && <Text style={s.emptyText}>No bookings yet</Text>}
+            </>
+          )}
+
+          {tab === 'messages' && (
+            <>
+              {threads.map(t => {
+                const last = t.messages[t.messages.length - 1];
+                return (
+                  <TouchableOpacity key={`${t.businessId}:${t.clientId}`} style={s.card} onPress={()=>setSelectedThread(t)}>
+                    <View style={s.avatar}><Text style={s.avatarText}>{t.businessName.slice(0,2).toUpperCase()}</Text></View>
+                    <View style={s.cardBody}>
+                      <Text style={s.clientName}>{t.businessName}</Text>
+                      <Text style={s.sub} numberOfLines={1}>{last?.content ?? 'Start a conversation'}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
+                  </TouchableOpacity>
+                );
+              })}
+              {threads.length === 0 && <Text style={s.emptyText}>No message threads yet</Text>}
+            </>
+          )}
+
+          {tab === 'offers' && (
+            <>
+              {offers.map(o => (
+                <View key={o.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor:BRAND }]}>
+                  <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <Text style={ms.rowTitle}>{o.title}</Text>
+                    {!!o.discount && <View style={ms.dealChip}><Text style={ms.dealChipText}>{o.discount}</Text></View>}
+                  </View>
+                  <Text style={ms.rowMeta}>{o.business.name}</Text>
+                  {!!o.description && <Text style={[ms.rowMeta,{ marginTop:4 }]}>{o.description}</Text>}
+                  {!!o.expiresAt && <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>Expires {new Date(o.expiresAt).toLocaleDateString()}</Text>}
+                </View>
+              ))}
+              {offers.length === 0 && <Text style={s.emptyText}>No active offers</Text>}
+            </>
+          )}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
 // ── Tab navigator ────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
@@ -2120,9 +3211,10 @@ export default function App() {
     }
     const a = getAuth(); setToken(a.token); setUser(a.user);
     setBooting(false);
+    registerPushNotifications();
   })(); },[]);
 
-  function handleLogin(t:string, r:string, u:User) { setAuth(t,u,r); setToken(t); setUser(u); persistAuth(); }
+  function handleLogin(t:string, r:string, u:User) { setAuth(t,u,r); setToken(t); setUser(u); persistAuth(); registerPushNotifications(); }
   function handleLogout() { setAuth(null,null,null); setToken(null); setUser(null); persistAuth(); }
 
   if (booting) return (
@@ -2152,6 +3244,15 @@ export default function App() {
     </ErrorBoundary>
   );
 
+  if (user?.role === 'CLIENT') return (
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff"/>
+        <ClientPortalScreen onLogout={handleLogout}/>
+      </SafeAreaProvider>
+    </ErrorBoundary>
+  );
+
   return (
     <ErrorBoundary>
     <SafeAreaProvider>
@@ -2171,7 +3272,7 @@ export default function App() {
               const icons: Record<string,[string,string]> = {
                 Calendar:['calendar','calendar-outline'], Checkout:['card','card-outline'],
                 Customers:['people','people-outline'], Messages:['chatbubbles','chatbubbles-outline'],
-                Menu:['menu','menu-outline'],
+                Alerts:['notifications','notifications-outline'], Menu:['menu','menu-outline'],
               };
               const pair = icons[route.name] ?? ['ellipse','ellipse-outline'];
               return <Ionicons name={(focused ? pair[0] : pair[1]) as any} size={size} color={color}/>;
@@ -2186,6 +3287,7 @@ export default function App() {
           <Tab.Screen name="Messages">
             {()=><MessagesScreen initialClient={msgClient} onClearClient={()=>setMsgClient(null)}/>}
           </Tab.Screen>
+          <Tab.Screen name="Alerts" component={NotificationsScreen}/>
           <Tab.Screen name="Menu">
             {()=><MenuScreen onLogout={handleLogout}/>}
           </Tab.Screen>

@@ -15,6 +15,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatPrice, cn } from "@/lib/utils";
 
 type Tab = "today" | "week" | "all";
+type ViewMode = "list" | "staff";
 
 function AppointmentDrawer({ apt, onClose, onAction }: {
   apt: Appointment;
@@ -164,6 +165,7 @@ export default function AppointmentsPage() {
   const [search, setSearch] = useState("");
   const [staffFilter, setStaffFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selected, setSelected] = useState<Appointment | null>(null);
 
   const load = useCallback(async () => {
@@ -228,6 +230,15 @@ export default function AppointmentsPage() {
     return [...list].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   }, [appointments, tab, staffFilter, statusFilter, search]);
 
+  const staffGroups = useMemo(() => {
+    const groups = new Map<string, Appointment[]>();
+    for (const apt of filtered) {
+      const name = apt.staff.user.name;
+      groups.set(name, [...(groups.get(name) ?? []), apt]);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -271,6 +282,16 @@ export default function AppointmentsPage() {
           {["PENDING","CONFIRMED","CANCELLED","COMPLETED","NO_SHOW"].map((s) =>
             <option key={s} value={s}>{s}</option>)}
         </select>
+
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+          {(["list","staff"] as ViewMode[]).map((v) => (
+            <button key={v} onClick={() => setViewMode(v)}
+              className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                viewMode === v ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}>
+              {v === "list" ? "List" : "Staff board"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -282,6 +303,29 @@ export default function AppointmentsPage() {
 
       {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
         <EmptyState title="No appointments" description="Try adjusting your filters." />
+      ) : viewMode === "staff" ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {staffGroups.map(([name, rows]) => (
+            <div key={name} className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+              <div className="border-b border-gray-50 px-4 py-3">
+                <p className="text-sm font-semibold text-gray-900">{name}</p>
+                <p className="text-xs text-gray-400">{rows.length} appointment{rows.length === 1 ? "" : "s"}</p>
+              </div>
+              <div className="max-h-[520px] divide-y divide-gray-50 overflow-y-auto">
+                {rows.map((apt) => (
+                  <button key={apt.id} onClick={() => setSelected(apt)} className="block w-full px-4 py-3 text-left hover:bg-gray-50">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-gray-900">{format(new Date(apt.startsAt), "EEE h:mm a")}</p>
+                      <StatusBadge status={apt.status} />
+                    </div>
+                    <p className="mt-1 truncate text-sm text-gray-700">{apt.client.name}</p>
+                    <p className="truncate text-xs text-gray-500">{apt.service.name}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((apt) => (

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Search, Plus, Phone, Mail, Calendar, DollarSign, X } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { api, ClientWithStats } from "@/lib/api";
+import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ export default function ClientsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<(ClientWithStats & { appointments?: unknown[] }) | null>(null);
+  const [selected, setSelected] = useState<(ClientWithStats & { appointments?: unknown[]; payments?: Payment[]; packages?: ClientPackage[]; messages?: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }> }) | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
@@ -60,8 +60,13 @@ export default function ClientsPage() {
     setSelected(c);
     setLoadingDetail(true);
     try {
-      const detail = await api.clients.get(bizId, c.id);
-      setSelected({ ...c, ...detail });
+      const [detail, payments, packages, messages] = await Promise.all([
+        api.clients.get(bizId, c.id),
+        api.payments.list().then((rows) => rows.filter((p) => p.client?.id === c.id)).catch(() => []),
+        api.packages.listIssued(bizId, c.id).catch(() => []),
+        api.messages.thread(bizId, c.id).catch(() => []),
+      ]);
+      setSelected({ ...c, ...detail, payments, packages, messages });
     } catch { toast.error("Failed to load client details"); }
     finally { setLoadingDetail(false); }
   }
@@ -80,7 +85,12 @@ export default function ClientsPage() {
     finally { setSaving(false); }
   }
 
-  const detail = selected as (ClientWithStats & { appointments?: Array<{ id: string; startsAt: string; status: string; service: { name: string }; staff: { user: { name: string } } }> }) | null;
+  const detail = selected as (ClientWithStats & {
+    appointments?: Array<{ id: string; startsAt: string; status: string; service: { name: string }; staff: { user: { name: string } } }>;
+    payments?: Payment[];
+    packages?: ClientPackage[];
+    messages?: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }>;
+  }) | null;
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -181,6 +191,51 @@ export default function ClientsPage() {
                           <p className="text-xs text-gray-500">{format(new Date(apt.startsAt), "MMM d, yyyy")} · {apt.staff.user.name}</p>
                         </div>
                         <StatusBadge status={apt.status} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Payments</p>
+                {(detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No payments recorded.</p> : (
+                  <div className="space-y-2">
+                    {(detail?.payments ?? []).slice(0, 8).map((p) => (
+                      <div key={p.id} className="flex items-center justify-between border-b border-gray-100 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{formatPrice(p.amountCents - p.refundedCents)}</p>
+                          <p className="text-xs text-gray-500">{p.kind.replaceAll("_", " ")} · {format(new Date(p.createdAt), "MMM d, yyyy")}</p>
+                        </div>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{p.status.replaceAll("_", " ")}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Packages</p>
+                {(detail?.packages?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No active packages.</p> : (
+                  <div className="space-y-2">
+                    {(detail?.packages ?? []).slice(0, 6).map((pkg) => (
+                      <div key={pkg.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{pkg.name}</p>
+                          <p className="text-xs text-gray-500">{pkg.creditsRemaining} of {pkg.creditsTotal} credits left</p>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600">{pkg.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Recent messages</p>
+                {(detail?.messages?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No messages yet.</p> : (
+                  <div className="space-y-2">
+                    {(detail?.messages ?? []).slice(-5).reverse().map((m) => (
+                      <div key={m.id} className="rounded-lg bg-gray-50 px-3 py-2">
+                        <p className="text-xs font-semibold text-gray-500">{m.fromClient ? "Client" : "Business"} · {format(new Date(m.createdAt), "MMM d")}</p>
+                        <p className="mt-1 text-sm text-gray-700 line-clamp-2">{m.content}</p>
                       </div>
                     ))}
                   </div>

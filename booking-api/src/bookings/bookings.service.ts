@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
+import { EventsGateway } from '../events/events.gateway';
 import { CreateAppointmentDto, RescheduleDto, StatusDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { Prisma } from '@prisma/client';
@@ -19,6 +20,7 @@ export class BookingsService {
     private prisma: PrismaService,
     private notifications: NotificationsService,
     private payments: PaymentsService,
+    private events: EventsGateway,
   ) {}
 
   async findAll(
@@ -215,6 +217,12 @@ export class BookingsService {
       confirmed: !!opts.confirmed,
     });
 
+    this.events.emitBookingUpdate(businessId, {
+      type: 'CREATE',
+      appointmentId: appointment.id,
+      status: appointment.status,
+    });
+
     if (opts.confirmed) {
       // Owner/staff booking: confirm immediately, send the real confirmation to
       // the client and schedule reminders. No pending notice, no owner alert.
@@ -242,6 +250,13 @@ export class BookingsService {
       fromStatus: apt.status,
       status: 'CONFIRMED',
     }, userId);
+
+    this.events.emitBookingUpdate(updated.businessId, {
+      type: 'UPDATE_STATUS',
+      appointmentId: id,
+      status: 'CONFIRMED',
+    });
+
     await this.notifications.scheduleReminders(updated);
     return updated;
   }
@@ -345,6 +360,13 @@ export class BookingsService {
       status: 'PENDING',
       byClient: !!opts.byClient,
     }, opts.userId);
+
+    this.events.emitBookingUpdate(updated.businessId, {
+      type: 'RESCHEDULE',
+      appointmentId: id,
+      status: 'PENDING',
+    });
+
     return updated;
   }
 
@@ -402,6 +424,12 @@ export class BookingsService {
     }
 
     await this.logAction('APPOINTMENT', id, 'UPDATE_STATUS', auditChanges, userId);
+
+    this.events.emitBookingUpdate(updated.businessId, {
+      type: 'UPDATE_STATUS',
+      appointmentId: id,
+      status: dto.status,
+    });
 
     if (dto.status === 'COMPLETED') {
       // Post-visit review request.

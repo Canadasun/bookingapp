@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,6 +29,7 @@ export class SubscriptionsController {
   @Post('checkout')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   checkout(@Body() body: unknown, @CurrentUser() user: { businessId: string | null }) {
     const parsed = CheckoutSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('A valid plan (BASIC or PRO) is required');
@@ -39,6 +41,7 @@ export class SubscriptionsController {
   @Post('portal')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   portal(@CurrentUser() user: { businessId: string | null }) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.payments.createBillingPortal(user.businessId);

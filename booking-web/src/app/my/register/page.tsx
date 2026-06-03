@@ -19,6 +19,7 @@ function RegisterForm() {
     confirm: "",
   });
   const [showPw, setShowPw] = useState(false);
+  const [terms, setTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errs, setErrs] = useState<Partial<typeof form>>({});
 
@@ -29,6 +30,7 @@ function RegisterForm() {
     if (form.password.length < 8) e.password = "At least 8 characters";
     if (form.password !== form.confirm) e.confirm = "Passwords don't match";
     setErrs(e);
+    if (!terms) { toast.error("Please accept the Terms of Service & Privacy Policy"); return false; }
     return Object.keys(e).length === 0;
   }
 
@@ -37,10 +39,11 @@ function RegisterForm() {
     if (!validate()) return;
     setLoading(true);
     try {
+      const email = form.email.trim().toLowerCase();
       const regRes = await fetch("/proxy/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, role: "CLIENT" }),
+        body: JSON.stringify({ name: form.name.trim(), email, password: form.password, role: "CLIENT", privacyConsentAccepted: true }),
       });
       if (!regRes.ok) {
         const body = await regRes.json() as { message?: string };
@@ -49,7 +52,7 @@ function RegisterForm() {
       const loginRes = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({ email, password: form.password }),
       });
       if (!loginRes.ok) { router.push("/my/login"); return; }
       toast.success("Account created!");
@@ -104,7 +107,17 @@ function RegisterForm() {
                   onChange={(e) => f("confirm", e.target.value)} className={errs.confirm ? "border-red-400" : ""} />
                 {errs.confirm && <p className="text-xs text-red-500 mt-1">{errs.confirm}</p>}
               </div>
-              <Button type="submit" loading={loading} className="w-full" size="lg">Create account</Button>
+              <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+                <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-violet-600" />
+                <span className="text-xs text-gray-500 leading-relaxed">
+                  I agree to the{" "}
+                  <Link href="/terms" target="_blank" className="text-violet-600 hover:underline">Terms of Service</Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" target="_blank" className="text-violet-600 hover:underline">Privacy Policy</Link>.
+                </span>
+              </label>
+              <Button type="submit" loading={loading} disabled={!terms} className="w-full" size="lg">Create account</Button>
             </form>
             <p className="text-center text-sm text-gray-400 mt-5">
               Have an account? <Link href="/my/login" className="text-violet-600 hover:underline font-medium">Sign in</Link>

@@ -27,11 +27,23 @@ export default function ClientMessagesPage() {
   }, [user, router]);
 
   const load = useCallback(async () => {
-    try { setThreads(await api.clientPortal.messages()); }
+    try {
+      const data = await api.clientPortal.messages();
+      setThreads(data);
+      if (selected) {
+        const updated = data.find((t) => t.businessId === selected.businessId);
+        if (updated) setSelected(updated);
+      }
+    }
     catch { toast.error("Failed to load messages"); }
     finally { setLoading(false); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  }, [selected]);
+
+  useEffect(() => { 
+    load(); 
+    const timer = setInterval(load, 10000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   async function send() {
     if (!reply.trim() || !selected) return;
@@ -40,8 +52,6 @@ export default function ClientMessagesPage() {
       await api.messages.send(selected.businessId, selected.clientId, reply.trim());
       setReply("");
       await load();
-      const updated = (await api.clientPortal.messages()).find((t) => t.clientId === selected.clientId);
-      if (updated) setSelected(updated);
       setTimeout(() => scrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 50);
     } catch { toast.error("Failed to send"); }
     finally { setSending(false); }

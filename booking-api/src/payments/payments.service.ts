@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
+import { createHash } from 'crypto';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -31,6 +32,12 @@ export class PaymentsService {
 
   private publishableKey(): string {
     return this.configService.get<string>('STRIPE_PUBLISHABLE_KEY') ?? '';
+  }
+
+  private idempotencyKey(parts: Array<string | number | null | undefined>): string {
+    const raw = parts.map((p) => String(p ?? '')).join(':');
+    const digest = createHash('sha256').update(raw).digest('hex').slice(0, 32);
+    return `pulse:${digest}`;
   }
 
   // Ledger write. Best-effort: a bookkeeping failure must never break a real
@@ -101,7 +108,7 @@ export class PaymentsService {
         automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { appointmentId, businessId, kind: 'deposit' },
         description: `Deposit — ${apt.service.name} @ ${b.name}`,
-      });
+      }, { idempotencyKey: this.idempotencyKey(['deposit', businessId, appointmentId, depositCents]) });
       await this.prisma.appointment.update({
         where: { id: appointmentId },
         data: { stripePaymentIntentId: intent.id, depositCents },
@@ -121,7 +128,7 @@ export class PaymentsService {
         usage: 'off_session',
         automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { appointmentId, businessId, kind: 'card_on_file' },
-      });
+      }, { idempotencyKey: this.idempotencyKey(['card-on-file', businessId, appointmentId]) });
       return { required: true, mode: 'setup' as const, clientSecret: intent.client_secret, amountCents: 0, publishableKey: this.publishableKey() };
     }
 
@@ -145,7 +152,7 @@ export class PaymentsService {
    */
   async createCustomCharge(
     businessId: string,
-    input: { amountCents: number; description?: string; clientId?: string },
+    input: { amountCents: number; description?: string; clientId?: string; idempotencyKey?: string },
   ) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     const intent = await this.getStripe().paymentIntents.create({
@@ -159,6 +166,17 @@ export class PaymentsService {
         ...(input.clientId ? { clientId: input.clientId } : {}),
       },
       description: input.description?.trim() || `In-person charge — ${business.name}`,
+    }, {
+      idempotencyKey: input.idempotencyKey?.trim()
+        ? this.idempotencyKey(['custom', businessId, input.idempotencyKey.trim()])
+        : this.idempotencyKey([
+          'custom',
+          businessId,
+          input.clientId,
+          input.amountCents,
+          input.description?.trim(),
+          Math.floor(Date.now() / 60_000),
+        ]),
     });
     await this.recordPayment({
       businessId, clientId: input.clientId ?? null,
@@ -394,7 +412,7 @@ export class PaymentsService {
       cancel_url: `${webUrl}/dashboard/settings?billing=cancel`,
       metadata: { businessId, plan },
       subscription_data: { metadata: { businessId, plan } },
-    });
+    }, { idempotencyKey: this.idempotencyKey(['subscription-checkout', businessId, plan]) });
     return { url: session.url };
   }
 
@@ -452,6 +470,15 @@ export class PaymentsService {
       payment_intent: payment.stripePaymentIntentId,
       amount,
       ...(input.reason ? { metadata: { reason: input.reason } } : {}),
+    }, {
+      idempotencyKey: this.idempotencyKey([
+        'refund',
+        businessId,
+        payment.id,
+        amount,
+        payment.refundedCents,
+        input.reason?.trim(),
+      ]),
     });
 
     const refundedTotal = payment.refundedCents + amount;
@@ -518,7 +545,7 @@ export class PaymentsService {
       confirm: true,
       metadata: { appointmentId, businessId, kind: 'no_show_fee' },
       description: `No-show fee — ${apt.service.name} @ ${apt.business.name}`,
-    });
+    }, { idempotencyKey: this.idempotencyKey(['no-show', businessId, appointmentId, feeCents]) });
 
     await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
     await this.recordPayment({
@@ -557,7 +584,7 @@ export class PaymentsService {
         confirm: true,
         metadata: { appointmentId, businessId, kind: 'late_cancel_fee' },
         description: `Late cancellation fee — ${apt.service.name} @ ${apt.business.name}`,
-      });
+      }, { idempotencyKey: this.idempotencyKey(['late-cancel', businessId, appointmentId, feeCents]) });
       await this.recordPayment({
         businessId, appointmentId, clientId: apt.clientId,
         stripePaymentIntentId: intent.id, amountCents: feeCents,

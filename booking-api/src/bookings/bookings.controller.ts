@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
 import { verifyAppointmentToken } from '../common/util/appointment-token';
 import {
@@ -35,6 +36,7 @@ export class PublicBookingsController {
   // PublicStatusSchema enforces status === 'CANCELLED', so this endpoint can't be
   // used to confirm/complete/no-show a booking even with a valid token.
   @Patch(':id/status')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   updateStatus(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(PublicStatusSchema)) dto: PublicStatusDto,
@@ -46,6 +48,7 @@ export class PublicBookingsController {
 
   // Public reschedule — used by the client manage page redirect to booking wizard.
   @Patch(':id/reschedule')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   reschedule(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
@@ -98,6 +101,7 @@ export class BookingsController {
   // Public — called from the unauthenticated booking wizard. Goes PENDING and
   // waits for owner approval.
   @Post()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,
@@ -110,6 +114,7 @@ export class BookingsController {
   // gets a confirmation immediately.
   @Post('manual')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   createManual(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,

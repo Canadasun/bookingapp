@@ -3,8 +3,9 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { MessagesService } from './messages.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { verifyAppointmentToken } from '../common/util/appointment-token';
 
 const SendSchema = z.object({ content: z.string().min(1).max(2000) });
 type SendDto = z.infer<typeof SendSchema>;
@@ -14,28 +15,61 @@ type SendDto = z.infer<typeof SendSchema>;
 export class MessagesController {
   constructor(private svc: MessagesService) {}
 
-  // Protected — staff/owner reads thread
+  // Protected or Public-with-token — reads thread
   @Get()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  thread(
+  @UseGuards(OptionalJwtAuthGuard)
+  async thread(
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
+    @Query('appointmentId') appointmentId?: string,
+    @Query('token') token?: string,
+    @CurrentUser() user?: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
+    if (user && (user.role === 'ADMIN' || user.businessId === businessId)) {
+      return this.svc.getThread(businessId, clientId);
     }
-    return this.svc.getThread(businessId, clientId);
+
+    if (user && user.role === 'CLIENT') {
+      const ok = await this.svc.verifyUserClient(user.id, businessId, clientId);
+      if (ok) return this.svc.getThread(businessId, clientId);
+    }
+
+    if (appointmentId && token && verifyAppointmentToken(appointmentId, token)) {
+      const ok = await this.svc.verifyAppointmentClient(appointmentId, businessId, clientId);
+      if (ok) return this.svc.getThread(businessId, clientId);
+    }
+
+    throw new ForbiddenException('You do not have access to this thread');
   }
 
   // Public — client sends message from manage page or mobile
+  // Secured by appointment token for guests
   @Post()
-  clientSend(
+  @UseGuards(OptionalJwtAuthGuard)
+  async clientSend(
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
     @Body(new ZodValidationPipe(SendSchema)) dto: SendDto,
+    @Query('appointmentId') appointmentId?: string,
+    @Query('token') token?: string,
+    @CurrentUser() user?: { id: string; role: string },
   ) {
+    // 1. If logged in as a client, verify it's their own clientId
+    if (user && user.role === 'CLIENT') {
+      const ok = await this.svc.verifyUserClient(user.id, businessId, clientId);
+      if (!ok) throw new ForbiddenException('You do not have access to this client profile');
+    }
+
+    // 2. If guest, require valid appointment token
+    if (!user) {
+      if (!appointmentId || !token || !verifyAppointmentToken(appointmentId, token)) {
+        throw new ForbiddenException('Valid appointment token required to message as a guest');
+      }
+      const ok = await this.svc.verifyAppointmentClient(appointmentId, businessId, clientId);
+      if (!ok) throw new ForbiddenException('Token does not match this client');
+    }
+
     return this.svc.send(businessId, clientId, dto.content, true);
   }
 
@@ -43,7 +77,7 @@ export class MessagesController {
   @Post('reply')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  staffReply(
+  async staffReply(
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
     @Body(new ZodValidationPipe(SendSchema)) dto: SendDto,
@@ -52,6 +86,13 @@ export class MessagesController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
+
+    // Check plan — only PAID can reply
+    const biz = await this.svc.getBusiness(businessId);
+    if (biz?.plan === 'FREE') {
+      throw new ForbiddenException('Messaging is a paid-plan feature. Please upgrade to BASIC or PRO.');
+    }
+
     return this.svc.send(businessId, clientId, dto.content, false);
   }
 

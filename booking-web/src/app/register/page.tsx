@@ -35,13 +35,15 @@ export default function RegisterPage() {
     if (!validate()) return;
     setLoading(true);
     try {
+      const email = form.email.trim().toLowerCase();
       // Register creates the user then logs in
       const regRes = await fetch("/proxy/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name, email: form.email, password: form.password, role: "OWNER",
-          businessName: form.businessName,
+          name: form.name.trim(), email, password: form.password, role: "OWNER",
+          businessName: form.businessName.trim(),
+          privacyConsentAccepted: true,
           ...(form.phone.trim() ? { businessPhone: form.phone.trim() } : {}),
         }),
       });
@@ -62,7 +64,7 @@ export default function RegisterPage() {
       const loginRes = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({ email, password: form.password }),
       });
       if (!loginRes.ok) { toast.error("Registered but login failed — please log in manually"); router.push("/login"); return; }
       toast.success("Account created! Welcome.");
@@ -77,14 +79,16 @@ export default function RegisterPage() {
   const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); if (k === "email") setEmailExists(false); };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center brand-shell px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <Calendar className="w-8 h-8 text-indigo-600" />
-            <span className="text-2xl font-bold text-slate-900">Pulse</span>
+            <span className="w-11 h-11 rounded-2xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-white" />
+            </span>
+            <span className="text-2xl font-bold text-ink">Pulse</span>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">Create your business account</p>
+          <p className="text-slate-600 mt-3 text-sm">Create your business account</p>
         </div>
 
         <Card>

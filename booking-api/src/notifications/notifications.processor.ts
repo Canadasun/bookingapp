@@ -48,6 +48,8 @@ export class NotificationProcessor extends WorkerHost {
   // The job name currently being processed, used to label delivery-log rows.
   // (Worker concurrency is 1, so this is stable across a single job.)
   private currentType = '';
+  private currentBusinessId: string | null = null;
+  private currentUserId: string | null = null;
 
   constructor(
     private prisma: PrismaService,
@@ -63,7 +65,17 @@ export class NotificationProcessor extends WorkerHost {
   private installDeliveryLogging() {
     const log = (channel: 'EMAIL' | 'SMS', recipient: string, status: 'SENT' | 'FAILED', error?: string) =>
       this.prisma.notificationDelivery
-        .create({ data: { channel, recipient, type: this.currentType || 'unknown', status, error } })
+        .create({
+          data: {
+            channel,
+            recipient,
+            type: this.currentType || 'unknown',
+            status,
+            error,
+            businessId: this.currentBusinessId ?? undefined,
+            userId: this.currentUserId ?? undefined,
+          },
+        })
         .catch(() => {});
     const origEmail = this.email.send.bind(this.email);
     this.email.send = async (payload) => {
@@ -88,17 +100,107 @@ export class NotificationProcessor extends WorkerHost {
       await this.prisma.notification.createMany({
         data: owners.map((o) => ({ userId: o.id, kind: data.kind, title: data.title, body: data.body ?? null, linkUrl: data.linkUrl ?? null })),
       });
+      await this.sendPushToUsers(owners.map((o) => o.id), {
+        businessId,
+        title: data.title,
+        body: data.body,
+      });
     } catch { /* never block the job on inbox writes */ }
+  }
+
+  private async notifyStaffAndOwners(
+    businessId: string,
+    staffUserId: string | null,
+    data: { kind: 'BOOKING_NEW' | 'BOOKING_UPDATE' | 'PAYMENT' | 'SYSTEM'; title: string; body?: string; linkUrl?: string },
+  ) {
+    try {
+      const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { id: true } });
+      const targetUserIds = [...new Set([...owners.map(o => o.id), ...(staffUserId ? [staffUserId] : [])])];
+      
+      if (!targetUserIds.length) return;
+
+      await this.prisma.notification.createMany({
+        data: targetUserIds.map((id) => ({ 
+          userId: id, 
+          kind: data.kind, 
+          title: data.title, 
+          body: data.body ?? null, 
+          linkUrl: data.linkUrl ?? null 
+        })),
+      });
+
+      await this.sendPushToUsers(targetUserIds, {
+        businessId,
+        title: data.title,
+        body: data.body,
+      });
+    } catch { /* never block the job on inbox writes */ }
+  }
+
+  private async sendPushToUsers(userIds: string[], data: { businessId?: string; title: string; body?: string }) {
+    try {
+      if (!userIds.length) return;
+      const tokens = await this.prisma.deviceToken.findMany({
+        where: { userId: { in: userIds }, enabled: true },
+        select: { token: true, userId: true },
+      });
+      if (!tokens.length) return;
+      await Promise.all(tokens.map(async (row) => {
+        try {
+          const res = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Accept-Encoding': 'gzip, deflate',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: row.token,
+              sound: 'default',
+              title: data.title,
+              body: data.body ?? data.title,
+              data: { businessId: data.businessId },
+            }),
+          });
+          if (!res.ok) throw new Error(`Expo push HTTP ${res.status}`);
+          await this.prisma.notificationDelivery.create({
+            data: {
+              businessId: data.businessId,
+              userId: row.userId,
+              channel: 'PUSH',
+              recipient: row.token,
+              type: this.currentType || 'owner-notification',
+              status: 'SENT',
+            },
+          });
+        } catch (e) {
+          await this.prisma.notificationDelivery.create({
+            data: {
+              businessId: data.businessId,
+              userId: row.userId,
+              channel: 'PUSH',
+              recipient: row.token,
+              type: this.currentType || 'owner-notification',
+              status: 'FAILED',
+              error: e instanceof Error ? e.message : String(e),
+            },
+          }).catch(() => {});
+        }
+      }));
+    } catch { /* push is best-effort */ }
   }
 
   async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     this.currentType = job.name; // label for the delivery log
+    this.currentBusinessId = null;
+    this.currentUserId = job.data.userId ?? null;
 
     // 2FA one-time code (email, or SMS if the method is SMS and a phone exists).
     if (job.name === 'otp') {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user || !job.data.otpCode) return;
+      this.currentBusinessId = user.businessId;
       const code = job.data.otpCode;
       if (job.data.otpMethod === 'SMS' && user.phone) {
         await this.sms.send({ to: user.phone, body: `Your Pulse verification code is ${code}. It expires in 10 minutes.` });
@@ -123,6 +225,7 @@ export class NotificationProcessor extends WorkerHost {
     if (job.name === 'verify-email') {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user || !job.data.resetToken) return;
+      this.currentBusinessId = user.businessId;
       const link = `${baseUrl}/verify-email?token=${job.data.resetToken}`;
       await this.email.send({
         to: user.email,
@@ -144,6 +247,7 @@ export class NotificationProcessor extends WorkerHost {
         include: { business: true },
       });
       if (!user) return;
+      this.currentBusinessId = user.businessId;
       const bizName = user.business?.name ?? 'your business';
       await this.email.send({
         to: user.email,
@@ -166,6 +270,7 @@ export class NotificationProcessor extends WorkerHost {
     if (job.name === 'password-reset') {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user || !job.data.resetToken) return;
+      this.currentBusinessId = user.businessId;
       const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}`;
       await this.email.send({
         to: user.email,
@@ -183,6 +288,7 @@ export class NotificationProcessor extends WorkerHost {
     if (job.name === 'security-alert') {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user) return;
+      this.currentBusinessId = user.businessId;
       const resetUrl = job.data.resetToken ? `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}` : `${baseUrl}/forgot-password`;
       const device = (job.data.userAgent || 'an unrecognized device').slice(0, 120);
       const ip = job.data.ip ? ` (IP ${job.data.ip})` : '';
@@ -207,6 +313,7 @@ export class NotificationProcessor extends WorkerHost {
         include: { business: true },
       });
       if (!card || !card.recipientEmail) return;
+      this.currentBusinessId = card.businessId;
       const amount = `$${(card.initialCents / 100).toFixed(2)}`;
       await this.email.send({
         to: card.recipientEmail,
@@ -232,6 +339,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         this.prisma.client.findUnique({ where: { id: job.data.clientId! } }),
       ]);
       if (!campaign || !client) return;
+      this.currentBusinessId = campaign.businessId;
       const merge = (t: string) => t.replace(/\{name\}/g, client.name).replace(/\{business\}/g, campaign.business.name);
 
       if (campaign.channel === 'SMS') {
@@ -254,6 +362,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         include: { business: true },
       });
       if (!entry) return;
+      this.currentBusinessId = entry.businessId;
       const bookUrl = `${baseUrl}/book/${entry.business.slug}`;
       await this.email.send({
         to: entry.email,
@@ -267,12 +376,35 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       return;
     }
 
+    // Rebook reminder — automatically sent to lapsed clients.
+    if (job.name === 'rebook-reminder') {
+      const client = await this.prisma.client.findUnique({
+        where: { id: job.data.clientId! },
+        include: { business: true },
+      });
+      if (!client) return;
+      this.currentBusinessId = client.businessId;
+      const bookUrl = `${baseUrl}/book/${client.business.slug}`;
+      await this.email.send({
+        to: client.email,
+        subject: `We miss you at ${client.business.name}!`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">It's been a while...</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${client.name}, it's been a few weeks since your last visit to <strong>${client.business.name}</strong>. We'd love to see you again!</p>
+<p style="margin:0 0 20px;color:#374151;font-size:14px">Ready for your next appointment? You can book instantly online.</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
+`),
+      });
+      return;
+    }
+
     const apt = await this.prisma.appointment.findUnique({
       where: { id: job.data.appointmentId! },
       include: { client: true, service: true, staff: { include: { user: true } }, business: true },
     });
 
     if (!apt) return;
+    this.currentBusinessId = apt.businessId;
 
     // SMS reminders are a PAID-plan feature (BASIC + PRO). Free tier gets email
     // reminders only — no texts to clients.
@@ -334,6 +466,12 @@ ${aptDetails(apt)}
           `),
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}.`);
+        await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
+          kind: 'BOOKING_UPDATE',
+          title: `Booking confirmed — ${apt.client.name}`,
+          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')}`,
+          linkUrl: '/dashboard/appointments',
+        });
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
         break;
       }
@@ -381,6 +519,12 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
           `),
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
+        await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
+          kind: 'BOOKING_UPDATE',
+          title: `Booking cancelled — ${apt.client.name}`,
+          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')}`,
+          linkUrl: '/dashboard/appointments',
+        });
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
         break;
       }
@@ -414,6 +558,12 @@ ${aptDetails(apt)}
           `),
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}.`);
+        await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
+          kind: 'BOOKING_UPDATE',
+          title: `Booking rescheduled — ${apt.client.name}`,
+          body: `${apt.service.name} moved to ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')}`,
+          linkUrl: '/dashboard/appointments',
+        });
         await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SENT');
         break;
       }

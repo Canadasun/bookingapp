@@ -86,6 +86,11 @@ export default function SettingsPage() {
   }, [bizId]);
 
   const f = (k: keyof Business, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
+  const bookingSettings = (form.bookingPageSettings ?? {}) as Record<string, unknown>;
+  const bf = (k: string, v: unknown) => setForm((p) => ({
+    ...p,
+    bookingPageSettings: { ...((p.bookingPageSettings ?? {}) as Record<string, unknown>), [k]: v },
+  }));
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
 
@@ -101,7 +106,7 @@ export default function SettingsPage() {
     setBillingBusy(plan);
     try {
       const { url } = await api.subscriptions.checkout(plan);
-      window.location.href = url;
+      window.location.assign(url);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start checkout"); setBillingBusy(null); }
   }
 
@@ -109,7 +114,7 @@ export default function SettingsPage() {
     setBillingBusy("portal");
     try {
       const { url } = await api.subscriptions.portal();
-      window.location.href = url;
+      window.location.assign(url);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not open billing portal"); setBillingBusy(null); }
   }
 
@@ -349,6 +354,45 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Timezone</span>
                     <span className="text-gray-800 font-medium">{biz?.timezone}</span>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900">Booking page builder</h4>
+                      <p className="text-xs text-gray-400">Tune public page copy and SEO from the web dashboard.</p>
+                    </div>
+                    <Field label="Hero headline">
+                      <Input value={(bookingSettings.headline as string) ?? ""} onChange={(e) => bf("headline", e.target.value)} placeholder={`Book with ${biz?.name ?? "us"}`} />
+                    </Field>
+                    <Field label="Short introduction">
+                      <textarea
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-violet-200"
+                        value={(bookingSettings.intro as string) ?? ""}
+                        onChange={(e) => bf("intro", e.target.value)}
+                        placeholder="Tell clients what to expect before they book." />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field label="SEO title">
+                        <Input value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
+                      </Field>
+                      <Field label="Brand accent">
+                        <Input value={(bookingSettings.brandColor as string) ?? "#E9A23C"} onChange={(e) => bf("brandColor", e.target.value)} placeholder="#E9A23C" />
+                      </Field>
+                    </div>
+                    <Field label="SEO description">
+                      <Input value={(bookingSettings.seoDescription as string) ?? ""} onChange={(e) => bf("seoDescription", e.target.value)} placeholder="Book appointments online." />
+                    </Field>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Live preview</p>
+                    <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="h-10 w-10 rounded-lg" style={{ backgroundColor: String(bookingSettings.brandColor ?? "#E9A23C") }} />
+                      <h4 className="mt-4 text-base font-bold text-gray-900">{String(bookingSettings.headline || `Book with ${biz?.name ?? "us"}`)}</h4>
+                      <p className="mt-2 text-xs leading-relaxed text-gray-500">{String(bookingSettings.intro || biz?.cancellationPolicy || "Choose a service, pick a time, and confirm your appointment.")}</p>
+                      <div className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700">Services and availability appear below</div>
+                    </div>
                   </div>
                 </div>
               </div>

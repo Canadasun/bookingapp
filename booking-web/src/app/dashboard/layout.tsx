@@ -6,8 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
-  MessageSquare, Menu as MenuIcon, CreditCard,
+  MessageSquare, Menu as MenuIcon, CreditCard, Bell,
 } from "lucide-react";
+import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -106,8 +107,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [open, setOpen]  = useState(false);
   const [user, setUser]  = useState<SessionUser | null>(null);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => { setUser(getUser()); }, []);
+  useEffect(() => {
+    api.notifications.unreadCount()
+      .then((r) => setUnread(r.count))
+      .catch(() => setUnread(0));
+  }, [pathname]);
 
   const nav = user?.role === "STAFF" ? STAFF_NAV : OWNER_NAV;
 
@@ -123,19 +130,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )?.label ?? "Dashboard";
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FA]">
+    <div className="flex min-h-screen brand-shell">
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-60 bg-white border-r border-gray-100 flex flex-col transition-transform duration-200 shadow-sm",
+        "fixed inset-y-0 left-0 z-40 w-60 bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}>
         {/* Logo */}
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-gray-100">
-          <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB]">
+          <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center shrink-0">
             <Calendar className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-gray-900 tracking-tight">Pulse</span>
+          <span className="font-bold text-ink tracking-tight">Pulse</span>
         </div>
 
         {/* Nav */}
@@ -146,10 +153,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User + logout */}
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3 border-t border-[#E9DDCB]">
           {user && (
             <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
-              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
+              <div className="w-8 h-8 rounded-full bg-violet-100 ring-2 ring-white flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
                 {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
@@ -159,7 +166,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           )}
           <button onClick={logout}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
             <LogOut className="w-4 h-4" /> Sign out
           </button>
         </div>
@@ -174,7 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 md:ml-60 flex flex-col min-h-screen">
 
         {/* Top bar */}
-        <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 sticky top-0 z-20">
+        <header className="h-16 bg-white/82 backdrop-blur-xl border-b border-[#E9DDCB] flex items-center justify-between px-6 sticky top-0 z-20">
           <div className="flex items-center gap-3">
             {/* Hamburger — 3 lines */}
             <button
@@ -185,18 +192,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 ? <X className="w-5 h-5 text-gray-600" />
                 : <MenuIcon className="w-5 h-5 text-gray-600" />}
             </button>
-            <h1 className="text-sm font-semibold text-gray-800">{currentLabel}</h1>
+            <h1 className="text-sm font-semibold text-ink">{currentLabel}</h1>
           </div>
 
           <div className="flex items-center gap-3">
+            <Link href="/dashboard/notifications"
+              className="relative p-2 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors text-amber-700"
+              aria-label="Notifications">
+              <Bell className="w-4.5 h-4.5" />
+              {unread > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-5 h-5 rounded-full bg-red-500 px-1 text-[10px] leading-5 text-white text-center font-bold">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </Link>
             {/* Messages quick-link */}
             <Link href="/dashboard/messages"
-              className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-violet-600">
+              className="p-2 rounded-xl bg-violet-50 hover:bg-violet-100 transition-colors text-violet-700">
               <MessageSquare className="w-4.5 h-4.5" />
             </Link>
             {user && (
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs">
+                <div className="w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white flex items-center justify-center text-violet-700 font-bold text-xs">
                   {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <span className="hidden sm:inline text-sm font-medium text-gray-700">{user.name}</span>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiBase } from "@/lib/server-api";
 
-const API = (process.env.API_INTERNAL_URL ?? "http://localhost:3001") + "/api";
+const API = apiBase();
 
 // Second factor: exchange the OTP from the login challenge for session cookies.
 // Mirrors /api/auth/login's cookie handling exactly.
@@ -32,21 +33,21 @@ export async function POST(req: NextRequest) {
   res.cookies.set("booking_token", data.accessToken, {
     httpOnly: true,
     secure,
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true,
     secure,
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
   res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
     httpOnly: false,
     secure,
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });

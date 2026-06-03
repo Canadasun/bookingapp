@@ -196,6 +196,22 @@ export interface Payment {
   refunds?: RefundRow[];
 }
 
+export type NotificationKind = "BOOKING_NEW" | "BOOKING_UPDATE" | "PAYMENT" | "SYSTEM";
+export interface NotificationItem {
+  id: string; kind: NotificationKind; title: string; body?: string | null;
+  linkUrl?: string | null; read: boolean; createdAt: string;
+}
+export interface NotificationDelivery {
+  id: string; businessId?: string | null; userId?: string | null;
+  channel: "EMAIL" | "SMS" | "PUSH";
+  recipient: string; type: string; status: "SENT" | "FAILED" | "SKIPPED";
+  error?: string | null; createdAt: string;
+  canRetry?: boolean; retryReason?: string | null;
+}
+export interface DeviceToken {
+  id: string; platform: string; enabled: boolean; createdAt: string; updatedAt: string;
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -210,7 +226,17 @@ export const api = {
     // Authenticated — resend the verification link to the current user.
     resendVerification: () =>
       req<{ ok: boolean; alreadyVerified?: boolean }>("/auth/resend-verification", { method: "POST" }),
-    register: (data: { name: string; email: string; password: string; role?: string; businessId?: string }) =>
+    register: (data: {
+      name: string;
+      email: string;
+      password: string;
+      role?: string;
+      businessId?: string;
+      privacyConsentAccepted: true;
+      marketingConsent?: boolean;
+      trackingConsent?: boolean;
+      consentVersion?: string;
+    }) =>
       req<{ accessToken: string; refreshToken: string; user: { id: string; name: string; email: string; role: string } }>(
         "/auth/register", { method: "POST", body: JSON.stringify(data) }
       ),
@@ -245,10 +271,25 @@ export const api = {
   },
 
   notifications: {
-    list: () => req<Array<{ id: string; kind: string; title: string; body?: string | null; linkUrl?: string | null; read: boolean; createdAt: string }>>("/notifications"),
+    list: () => req<NotificationItem[]>("/notifications"),
     unreadCount: () => req<{ count: number }>("/notifications/unread-count"),
+    deliveries: (filters?: { status?: string; channel?: string; search?: string; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (filters?.status && filters.status !== "ALL") params.set("status", filters.status);
+      if (filters?.channel && filters.channel !== "ALL") params.set("channel", filters.channel);
+      if (filters?.search?.trim()) params.set("search", filters.search.trim());
+      if (filters?.limit) params.set("limit", String(filters.limit));
+      const qs = params.toString();
+      return req<NotificationDelivery[]>(`/notifications/deliveries${qs ? `?${qs}` : ""}`);
+    },
     markRead: (id: string) => req<{ ok: boolean }>(`/notifications/${id}/read`, { method: "POST" }),
     markAllRead: () => req<{ ok: boolean }>("/notifications/read-all", { method: "POST" }),
+  },
+
+  devices: {
+    list: () => req<DeviceToken[]>("/users/me/device-tokens"),
+    setEnabled: (id: string, enabled: boolean) =>
+      req<{ ok: boolean }>("/users/me/device-token", { method: "PATCH", body: JSON.stringify({ id, enabled }) }),
   },
 
   subscriptions: {
@@ -475,10 +516,20 @@ export const api = {
   messages: {
     threads: (businessId: string) =>
       req<Array<{ clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; createdAt: string }>>(`/businesses/${businessId}/messages`),
-    thread: (businessId: string, clientId: string) =>
-      req<Array<{ id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }>>(`/businesses/${businessId}/clients/${clientId}/messages`),
-    send: (businessId: string, clientId: string, content: string) =>
-      req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages`, { method: "POST", body: JSON.stringify({ content }) }, null),
+    thread: (businessId: string, clientId: string, appointmentId?: string, token?: string) => {
+      const q = new URLSearchParams();
+      if (appointmentId) q.set("appointmentId", appointmentId);
+      if (token) q.set("token", token);
+      const qs = q.toString();
+      return req<Array<{ id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }>>(`/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`, undefined, token === undefined ? undefined : null);
+    },
+    send: (businessId: string, clientId: string, content: string, appointmentId?: string, token?: string) => {
+      const q = new URLSearchParams();
+      if (appointmentId) q.set("appointmentId", appointmentId);
+      if (token) q.set("token", token);
+      const qs = q.toString();
+      return req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`, { method: "POST", body: JSON.stringify({ content }) }, token === undefined ? undefined : null);
+    },
     reply: (businessId: string, clientId: string, content: string) =>
       req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages/reply`, { method: "POST", body: JSON.stringify({ content }) }),
     markRead: (businessId: string, clientId: string) =>
@@ -502,4 +553,3 @@ export const api = {
     offers: () => req<Array<{ id: string; title: string; description: string; discount?: string; expiresAt?: string; business: { id: string; name: string } }>>(`/my/offers`),
   },
 };
-

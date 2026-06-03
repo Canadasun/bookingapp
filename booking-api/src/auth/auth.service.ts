@@ -59,6 +59,43 @@ export class AuthService {
         },
       });
 
+      await tx.privacyConsent.createMany({
+        data: [
+          {
+            userId: user.id,
+            businessId: businessId ?? null,
+            type: 'TERMS',
+            granted: true,
+            version: dto.consentVersion,
+            source: 'registration',
+          },
+          {
+            userId: user.id,
+            businessId: businessId ?? null,
+            type: 'PRIVACY_POLICY',
+            granted: true,
+            version: dto.consentVersion,
+            source: 'registration',
+          },
+          {
+            userId: user.id,
+            businessId: businessId ?? null,
+            type: 'MARKETING',
+            granted: dto.marketingConsent,
+            version: dto.consentVersion,
+            source: 'registration',
+          },
+          {
+            userId: user.id,
+            businessId: businessId ?? null,
+            type: 'TRACKING',
+            granted: dto.trackingConsent,
+            version: dto.consentVersion,
+            source: 'registration',
+          },
+        ],
+      });
+
       return user;
     });
 
