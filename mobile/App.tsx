@@ -4,9 +4,9 @@ enableScreens();
 
 import React, { useEffect, useState, useCallback, useRef, Component } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, ScrollView,
-  StyleSheet, ActivityIndicator, Alert, SafeAreaView, Platform,
-  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler, Linking, Switch,
+  View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, SectionList,
+  StyleSheet, ActivityIndicator, Alert, SafeAreaView, Platform, Modal,
+  StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler, Linking, Switch, Share,
 } from 'react-native';
 
 // Public marketing/legal site (where Terms & Privacy live).
@@ -206,14 +206,14 @@ function PriceTag({ cents }: { cents:number }) {
 }
 
 // ── Appointments screen ──────────────────────────────────────────────────────
-function AppointmentsScreen() {
+function CalendarScreen() {
   const { user } = getAuth();
+  const nav = useNavigation<any>();
   const [apts, setApts]       = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected]     = useState<Appointment|null>(null);
   const [acting, setActing]         = useState(false);
-  const [day, setDay]               = useState<string|null>(null); // null = All; else a toDateString() key
 
   const load = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
@@ -284,76 +284,88 @@ function AppointmentsScreen() {
     ]);
   }
 
-  const upcoming = apts.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && new Date(a.startsAt) > new Date());
-  const past     = apts.filter(a => !['PENDING','CONFIRMED'].includes(a.status) || new Date(a.startsAt) <= new Date());
-
-  // Week date-strip (scheduler feel): 14 days from today; tap to filter the list.
+  // ── Agenda: group appointments by day, today first, today's header in blue ────
+  const TODAY_KEY = new Date().toDateString();
   const dayKey = (iso:string) => new Date(iso).toDateString();
-  const stripDays = Array.from({length:14}, (_,i) => { const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+i); return d; });
-  const dayAppts = day ? apts.filter(a => dayKey(a.startsAt) === day).sort((a,b)=> +new Date(a.startsAt) - +new Date(b.startsAt)) : null;
-  const listData = dayAppts ?? [...upcoming, ...past];
+  const byDay = new Map<string, Appointment[]>();
+  for (const a of apts) {
+    const k = dayKey(a.startsAt);
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k)!.push(a);
+  }
+  // Future-and-today days ascending; always include today (even if empty).
+  const todayMs = new Date(TODAY_KEY).getTime();
+  const dayKeys = Array.from(new Set([TODAY_KEY, ...byDay.keys()]))
+    .filter(k => new Date(k).getTime() >= todayMs)
+    .sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+  const sections = dayKeys.map(k => ({
+    key: k,
+    isToday: k === TODAY_KEY,
+    title: new Date(k).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase(),
+    data: (byDay.get(k) ?? []).sort((a,b)=> +new Date(a.startsAt) - +new Date(b.startsAt)),
+  }));
 
-  function DateStrip() {
-    return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:16, paddingVertical:10, gap:8 }}>
-        <TouchableOpacity onPress={()=>setDay(null)} style={[dst.chip, !day && dst.chipOn]}>
-          <Text style={[dst.chipDow, !day && dst.chipTextOn]}>All</Text>
-        </TouchableOpacity>
-        {stripDays.map(d => {
-          const key = d.toDateString();
-          const on = day === key;
-          const has = apts.some(a => dayKey(a.startsAt) === key && ['PENDING','CONFIRMED'].includes(a.status));
-          return (
-            <TouchableOpacity key={key} onPress={()=>setDay(on ? null : key)} style={[dst.chip, on && dst.chipOn]}>
-              <Text style={[dst.chipDow, on && dst.chipTextOn]}>{d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}</Text>
-              <Text style={[dst.chipNum, on && dst.chipTextOn]}>{d.getDate()}</Text>
-              {has && <View style={[dst.chipDot, on && { backgroundColor:'#fff' }]}/>}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    );
+  function fmtDur(min:number){ const h=Math.floor(min/60), r=min%60; if(h&&r) return `${h}h ${r}m`; return h?`${h}h`:`${min}m`; }
+
+  function openMenu() {
+    Alert.alert('Calendar', undefined, [
+      { text:'Refresh', onPress:()=>{ setRefreshing(true); load(true); } },
+      { text:'New appointment', onPress:()=>nav.navigate('Book') },
+      { text:'Close', style:'cancel' },
+    ]);
   }
 
-  function AptCard({ a }: { a:Appointment }) {
-    const d = new Date(a.startsAt);
-    return (
-      <TouchableOpacity style={s.card} onPress={()=>setSelected(a)} activeOpacity={0.7}>
-        <View style={s.cardLeft}>
-          <View style={[s.dot, {backgroundColor: STATUS_COLOR[a.status]??GRAY_400}]} />
-        </View>
-        <View style={s.cardBody}>
-          <View style={s.row}>
-            <Text style={s.clientName}>{a.client.name}</Text>
-            <Pill label={a.status} color={STATUS_COLOR[a.status]??GRAY_400} />
-          </View>
-          <Text style={s.sub}>{a.service.name} · {a.staff.user.name}</Text>
-          <Text style={s.dateText}>
-            {d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
-            {' · '}
-            {d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
-          </Text>
-        </View>
-        <PriceTag cents={a.service.priceCents} />
-      </TouchableOpacity>
-    );
-  }
+  const monthLabel = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
 
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>Appointments</Text></View>
-      <DateStrip/>
-      <FlatList
-        data={listData}
-        keyExtractor={a=>a.id}
-        renderItem={({item})=><AptCard a={item}/>}
-        contentContainerStyle={s.listContent}
-        ListHeaderComponent={<Text style={s.sectionLabel}>{day ? `${new Date(day).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})} (${listData.length})` : `Upcoming (${upcoming.length})`}</Text>}
-        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>{day ? 'No appointments this day' : 'No appointments yet'}</Text></View>}
+      {/* Top bar: ⋯ (left) · Month ▾ (center) · + (right) */}
+      <View style={cal.topbar}>
+        <TouchableOpacity style={cal.topBtn} onPress={openMenu} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={GRAY_700}/>
+        </TouchableOpacity>
+        <TouchableOpacity style={cal.monthWrap} activeOpacity={0.7} onPress={()=>{ setRefreshing(true); load(true); }}>
+          <Text style={cal.monthText}>{monthLabel}</Text>
+          <Ionicons name="chevron-down" size={16} color={GRAY_700} style={{marginLeft:4}}/>
+        </TouchableOpacity>
+        <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Book')} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+          <Ionicons name="add" size={26} color={BRAND}/>
+        </TouchableOpacity>
+      </View>
+
+      <SectionList
+        sections={sections}
+        keyExtractor={(a)=>a.id}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={{ paddingBottom:32 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}
         showsVerticalScrollIndicator={false}
+        renderSectionHeader={({section})=>(
+          <View style={[cal.dateHeader, (section as any).isToday && cal.dateHeaderToday]}>
+            <Text style={[cal.dateHeaderText, (section as any).isToday && cal.dateHeaderTextToday]}>{(section as any).title}</Text>
+          </View>
+        )}
+        renderSectionFooter={({section})=> (section as any).data.length===0
+          ? <Text style={cal.emptyDay}>No appointments or events today.</Text>
+          : null}
+        renderItem={({item:a})=>{
+          const d = new Date(a.startsAt);
+          return (
+            <TouchableOpacity style={cal.aptRow} activeOpacity={0.6} onPress={()=>setSelected(a)}>
+              <View style={[cal.aptBar, {backgroundColor: STATUS_COLOR[a.status]??GRAY_200}]}/>
+              <View style={{flex:1}}>
+                <Text style={cal.aptClient}>{a.client.name}</Text>
+                <Text style={cal.aptService}>{a.service.name}</Text>
+              </View>
+              <View style={{alignItems:'flex-end'}}>
+                <Text style={cal.aptTime}>{d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</Text>
+                <Text style={cal.aptDur}>{fmtDur(a.service.durationMinutes)}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
 
       {/* Detail modal */}
@@ -400,6 +412,152 @@ function AppointmentsScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       )}
+    </SafeAreaView>
+  );
+}
+
+// ── Checkout → Custom price → Tap to Pay ─────────────────────────────────────
+function CheckoutScreen() {
+  type Phase = 'amount'|'tap'|'done';
+  const [phase, setPhase]     = useState<Phase>('amount');
+  const [digits, setDigits]   = useState('');   // raw cents, e.g. "1234" = $12.34
+  const [note, setNote]       = useState('');
+  const [loading, setLoading] = useState(false);
+  const [receipt, setReceipt] = useState<{ amountCents:number; ref:string; at:Date }|null>(null);
+
+  const cents   = parseInt(digits || '0', 10);
+  const display = (cents/100).toFixed(2);
+
+  // Hardware back steps the flow back instead of leaving the app.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (phase==='tap') { setPhase('amount'); return true; }
+      if (phase==='done') { reset(); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [phase]);
+
+  function pressDigit(d:string){ setDigits(p => (p + d).replace(/^0+/, '').slice(0, 7)); } // up to $99,999.99
+  function back(){ setDigits(p => p.slice(0, -1)); }
+
+  async function charge() {
+    if (cents < 50) { Alert.alert('Amount too low', 'Enter at least $0.50.'); return; }
+    setLoading(true);
+    try {
+      const r = await api<{ paymentIntentId:string; amountCents:number }>(`/payments/charge`, {
+        method:'POST', body: JSON.stringify({ amountCents: cents, description: note.trim() || undefined }),
+      });
+      setReceipt({ amountCents: r.amountCents, ref: r.paymentIntentId, at: new Date() });
+      setPhase('tap');
+    } catch(e){ Alert.alert('Checkout failed', e instanceof Error ? e.message : 'Please try again'); }
+    finally { setLoading(false); }
+  }
+
+  // The Stripe Terminal "Tap to Pay on iPhone" SDK confirms the PaymentIntent here
+  // (collectPaymentMethod → confirmPaymentIntent). Until the Apple proximity-reader
+  // entitlement is granted that hook is stubbed, so this advances to the receipt.
+  function completeTap(){ setPhase('done'); }
+
+  function reset(){ setPhase('amount'); setDigits(''); setNote(''); setReceipt(null); }
+
+  // ── Tap to Pay on iPhone (full-screen prompt) ──
+  if (phase === 'tap') {
+    return (
+      <SafeAreaView style={[s.screen, { backgroundColor:'#111827' }]}>
+        <View style={co.tapWrap}>
+          <Text style={co.tapAmount}>${(receipt!.amountCents/100).toFixed(2)}</Text>
+          <View style={co.tapNfc}>
+            <Ionicons name="wifi" size={44} color="#fff" style={{ transform:[{ rotate:'90deg' }] }}/>
+          </View>
+          <Text style={co.tapTitle}>Tap to Pay on iPhone</Text>
+          <Text style={co.tapSub}>Hold the customer&apos;s card, phone, or watch near the top of your iPhone.</Text>
+          <ActivityIndicator color="#fff" style={{ marginTop:24 }}/>
+
+          <TouchableOpacity style={co.tapDone} onPress={completeTap} activeOpacity={0.85}>
+            <Text style={co.tapDoneText}>Complete payment</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ marginTop:16 }} onPress={()=>setPhase('amount')}>
+            <Text style={co.tapCancel}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Receipt ──
+  if (phase === 'done' && receipt) {
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={co.receiptWrap}>
+          <View style={co.receiptCheck}><Ionicons name="checkmark" size={40} color="#fff"/></View>
+          <Text style={co.receiptAmount}>${(receipt.amountCents/100).toFixed(2)}</Text>
+          <Text style={co.receiptPaid}>Payment received</Text>
+
+          <View style={co.receiptCard}>
+            {[
+              { l:'Method', v:'Tap to Pay' },
+              { l:'Date',   v: receipt.at.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) },
+              { l:'Time',   v: receipt.at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) },
+              { l:'Reference', v: receipt.ref.slice(-10).toUpperCase() },
+            ].map(({l,v})=>(
+              <View key={l} style={co.receiptRow}>
+                <Text style={co.receiptRowL}>{l}</Text>
+                <Text style={co.receiptRowV}>{v}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity style={[s.btnPrimary,{ marginTop:24, alignSelf:'stretch' }]} onPress={reset}>
+            <Text style={s.btnPrimaryText}>New sale</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Amount entry (number pad) ──
+  const keys: Array<string> = ['1','2','3','4','5','6','7','8','9','note','0','back'];
+  return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}><Text style={s.headerTitle}>Checkout</Text></View>
+      <View style={co.amountArea}>
+        <Text style={co.amountLabel}>Custom amount</Text>
+        <Text style={co.amountValue}>${display}</Text>
+        {!!note && <Text style={co.amountNote}>{note}</Text>}
+      </View>
+
+      <View style={co.pad}>
+        {keys.map(k => {
+          if (k==='note') return (
+            <TouchableOpacity key={k} style={co.key} onPress={()=>{
+              Alert.prompt?.('Add a note', 'What is this charge for?', (t)=>setNote((t||'').slice(0,80)), 'plain-text', note);
+            }}>
+              <Ionicons name="create-outline" size={22} color={GRAY_500}/>
+            </TouchableOpacity>
+          );
+          if (k==='back') return (
+            <TouchableOpacity key={k} style={co.key} onPress={back} onLongPress={()=>setDigits('')}>
+              <Ionicons name="backspace-outline" size={24} color={GRAY_700}/>
+            </TouchableOpacity>
+          );
+          return (
+            <TouchableOpacity key={k} style={co.key} onPress={()=>pressDigit(k)} activeOpacity={0.6}>
+              <Text style={co.keyText}>{k}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <TouchableOpacity
+        style={[co.chargeBtn, (cents<50||loading) && { opacity:0.4 }]}
+        disabled={cents<50||loading}
+        onPress={charge}
+        activeOpacity={0.85}>
+        {loading
+          ? <ActivityIndicator color="#fff"/>
+          : <Text style={co.chargeBtnText}>Charge ${display}</Text>}
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -712,10 +870,12 @@ function BookScreen() {
 
 // ── Clients screen ───────────────────────────────────────────────────────────
 function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
+  const nav = useNavigation<any>();
   const [clients, setClients]   = useState<Client[]>([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [profile, setProfile]   = useState<Client|null>(null);
 
   const load = useCallback(async (silent=false, q='') => {
     if (!silent) setLoading(true);
@@ -732,11 +892,22 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
     return ()=>clearTimeout(t);
   },[search, load]);
 
+  // Hardware back closes the open profile instead of leaving the app.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (profile) { setProfile(null); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [profile]);
+
+  function initials(name:string){ return name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(); }
+
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
 
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>Clients</Text></View>
+      <View style={s.header}><Text style={s.headerTitle}>Customers</Text></View>
       <View style={s.searchBox}>
         <Ionicons name="search" size={16} color={GRAY_400} style={{marginRight:8}}/>
         <TextInput style={s.searchInput} placeholder="Search by name, email…"
@@ -746,12 +917,12 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
         data={clients}
         keyExtractor={c=>c.id}
         contentContainerStyle={s.listContent}
-        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No clients found</Text></View>}
+        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No customers found</Text></View>}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true,search);}} tintColor={BRAND}/>}
         showsVerticalScrollIndicator={false}
         renderItem={({item:c})=>(
-          <View style={s.card}>
-            <View style={s.avatar}><Text style={s.avatarText}>{c.name.slice(0,2).toUpperCase()}</Text></View>
+          <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={()=>setProfile(c)}>
+            <View style={s.avatar}><Text style={s.avatarText}>{initials(c.name)}</Text></View>
             <View style={{flex:1}}>
               <Text style={s.clientName}>{c.name}</Text>
               <Text style={s.sub}>{c.email}</Text>
@@ -761,9 +932,42 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
             <TouchableOpacity style={s.msgBtn} onPress={()=>onMessage(c)}>
               <Ionicons name="chatbubble-outline" size={18} color={BRAND}/>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         )}
       />
+
+      {/* Customer profile */}
+      {profile && (
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={()=>setProfile(null)}>
+          <TouchableOpacity style={s.sheet} activeOpacity={1} onPress={()=>{}}>
+            <View style={s.sheetHandle}/>
+            <View style={{ alignItems:'center', marginBottom:16 }}>
+              <View style={[s.avatarLg,{ marginBottom:10 }]}><Text style={s.avatarLgText}>{initials(profile.name)}</Text></View>
+              <Text style={s.sheetTitle}>{profile.name}</Text>
+            </View>
+            {[
+              { l:'Email', v:profile.email },
+              { l:'Phone', v:profile.phone || '—' },
+              { l:'Visits', v: profile.totalVisits!==undefined ? String(profile.totalVisits) : '—' },
+              { l:'Last visit', v: profile.lastVisit ? new Date(profile.lastVisit).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—' },
+            ].map(({l,v})=>(
+              <View key={l} style={s.detailRow}>
+                <Text style={s.detailLabel}>{l}</Text>
+                <Text style={s.detailValue}>{v}</Text>
+              </View>
+            ))}
+            <View style={s.sheetActions}>
+              <TouchableOpacity style={s.btnPrimary} onPress={()=>{ const c=profile; setProfile(null); onMessage(c); nav.navigate('Messages'); }}>
+                <Text style={s.btnPrimaryText}>Message</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btnSecondary} onPress={()=>{ setProfile(null); nav.navigate('Book'); }}>
+                <Text style={s.btnSecondaryText}>Book appointment</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.btnGhost} onPress={()=>setProfile(null)}><Text style={s.btnGhostText}>Close</Text></TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -874,11 +1078,14 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
   );
 }
 
-// ── More/Settings screen ─────────────────────────────────────────────────────
-type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'marketing' | 'giftcards' | 'packages' | 'settings';
-function MoreScreen({ onLogout }: { onLogout:()=>void }) {
+// ── Menu / Settings hub ──────────────────────────────────────────────────────
+type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews'
+  | 'marketing' | 'giftcards' | 'packages' | 'settings'
+  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'soon';
+function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const [view, setView]         = useState<MoreView>('menu');
+  const [soonLabel, setSoonLabel] = useState('');
   const [services, setServices] = useState<Service[] | null>(null);
   const [staff, setStaff]       = useState<Staff[] | null>(null);
   const [offers, setOffers]     = useState<any[] | null>(null);
@@ -887,6 +1094,7 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
   const [campaigns, setCampaigns] = useState<any[] | null>(null);
   const [giftcards, setGiftcards] = useState<any[] | null>(null);
   const [packages, setPackages] = useState<any[] | null>(null);
+  const [appts, setAppts]       = useState<Appointment[] | null>(null); // for Reports
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
   // Two-factor sign-in (seeded from the session, updated optimistically).
@@ -927,7 +1135,8 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'marketing' && !campaigns){ setLoading(true); setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`)); }
       else if (v === 'giftcards' && !giftcards){ setLoading(true); setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`)); }
       else if (v === 'packages' && !packages){ setLoading(true); setPackages(await api<any[]>(`/businesses/${bizId()}/packages`)); }
-      else if (v === 'settings' && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
+      else if ((v === 'settings' || v === 'booking' || v === 'subscriptions' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
+      else if (v === 'reports' && !appts) { setLoading(true); setAppts((await api<{data:Appointment[]}>(`/businesses/${bizId()}/bookings`)).data); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
 
@@ -1132,6 +1341,154 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'booking') {
+    const bookingUrl = `${WEB_URL}/book/${biz?.slug ?? ''}`;
+    return (
+      <SafeAreaView style={s.screen}>
+        <Head title="Online Booking"/>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>YOUR BOOKING PAGE</Text>
+            <View style={ms.card}>
+              <Text style={[ms.rowMeta,{ color:BRAND }]} numberOfLines={2}>{bookingUrl}</Text>
+              <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Linking.openURL(bookingUrl)}>
+                  <Text style={ms.methodChipText}>Open</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: bookingUrl })}>
+                  <Text style={ms.methodChipText}>Share link</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>BOOKING-PAGE TOOLS</Text>
+            {[
+              { label:'Reviews', icon:'star-outline' as const, v:'reviews' as MoreView },
+              { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
+            ].map((r,i,arr)=>(
+              <TouchableOpacity key={r.label} style={[s.menuRow, i<arr.length-1&&s.menuRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
+                <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
+                <Text style={s.menuLabel}>{r.label}</Text>
+                <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  if (view === 'notifications') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Notifications"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>EMAIL · ALL PLANS</Text>
+          <View style={ms.card}>
+            {['Booking confirmation','24-hour reminder','Cancellation notice','Reschedule notice','Review request'].map((n,i,arr)=>(
+              <View key={n} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]}>
+                <Text style={ms.rowTitle}>{n}</Text>
+                <View style={ms.statusOn}><View style={ms.statusDot}/><Text style={ms.statusOnText}>Active</Text></View>
+              </View>
+            ))}
+          </View>
+          <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>SMS · PAID PLANS</Text>
+          <View style={ms.card}>
+            <View style={ms.notifRow}>
+              <Text style={ms.rowTitle}>2-hour reminder &amp; alerts</Text>
+              {biz && biz.plan !== 'FREE'
+                ? <View style={ms.statusOn}><View style={ms.statusDot}/><Text style={ms.statusOnText}>Active</Text></View>
+                : <Text style={[ms.rowMeta,{ color:BRAND, fontWeight:'700' }]}>Upgrade</Text>}
+            </View>
+          </View>
+          <Text style={[ms.empty,{ marginTop:10 }]}>Client texts are a paid-plan feature. Free-tier salons don&apos;t send client SMS.</Text>
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  if (view === 'reports') {
+    const list = appts ?? [];
+    const now = Date.now();
+    const todayKey = new Date().toDateString();
+    const todayCount = list.filter(a => new Date(a.startsAt).toDateString()===todayKey).length;
+    const upcoming = list.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > now).length;
+    const completed = list.filter(a => a.status==='COMPLETED');
+    const revenueCents = completed.reduce((sum,a)=> sum + (a.service?.priceCents ?? 0), 0);
+    const stats = [
+      { label:"Today's appointments", value:String(todayCount) },
+      { label:'Upcoming', value:String(upcoming) },
+      { label:'Completed (all time)', value:String(completed.length) },
+      { label:'Revenue (completed)', value:`$${(revenueCents/100).toFixed(2)}` },
+    ];
+    return (
+      <SafeAreaView style={s.screen}>
+        <Head title="Reports"/>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {stats.map(st => (
+              <View key={st.label} style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
+                <Text style={ms.cardLabel}>{st.label}</Text>
+                <Text style={[ms.cardValue,{ marginTop:0 }]}>{st.value}</Text>
+              </View>
+            ))}
+            <Text style={[ms.empty,{ marginTop:8 }]}>Detailed reports &amp; exports live on the web dashboard.</Text>
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  if (view === 'addons') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Add-ons"/>
+      <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+        <View style={ms.card}>
+          {[
+            { label:'Gift cards', icon:'gift-outline' as const, v:'giftcards' as MoreView },
+            { label:'Packages', icon:'cube-outline' as const, v:'packages' as MoreView },
+            { label:'Marketing', icon:'megaphone-outline' as const, v:'marketing' as MoreView },
+            { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
+          ].map((r,i,arr)=>(
+            <TouchableOpacity key={r.label} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
+                <Ionicons name={r.icon} size={20} color={BRAND}/>
+                <Text style={ms.rowTitle}>{r.label}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+
+  if (view === 'subscriptions') return (
+    <SafeAreaView style={s.screen}>
+      <Head title="Subscriptions"/>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          <View style={[ms.card,{ alignItems:'center', paddingVertical:22 }]}>
+            <Text style={ms.cardLabel}>CURRENT PLAN</Text>
+            <Text style={{ fontSize:30, fontWeight:'800', color:BRAND, marginTop:6 }}>{biz?.plan ?? 'FREE'}</Text>
+            {biz?.planExpiresAt && <Text style={[ms.rowMeta,{ marginTop:4 }]}>Renews {new Date(biz.planExpiresAt).toLocaleDateString()}</Text>}
+          </View>
+          <Text style={[ms.empty,{ marginTop:8 }]}>Manage or upgrade your plan on the web dashboard.</Text>
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+
+  if (view === 'soon') return (
+    <SafeAreaView style={s.screen}>
+      <Head title={soonLabel}/>
+      <View style={[s.center,{ padding:32 }]}>
+        <View style={ms.soonIcon}><Ionicons name="construct-outline" size={28} color={BRAND}/></View>
+        <Text style={[ms.rowTitle,{ marginTop:14, textAlign:'center' }]}>{soonLabel} is coming to the app</Text>
+        <Text style={[ms.empty,{ marginTop:6, textAlign:'center' }]}>Manage {soonLabel.toLowerCase()} on the web dashboard for now.</Text>
+      </View>
+    </SafeAreaView>
+  );
+
   if (view === 'settings') return (
     <SafeAreaView style={s.screen}>
       <Head title="Settings"/>
@@ -1190,22 +1547,28 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
-  // ── default menu ──
-  const rows = [
-    { label:'Services', icon:'cut-outline' as const, v:'services' as MoreView },
-    { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
-    { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
-    { label:'Waitlist', icon:'hourglass-outline' as const, v:'waitlist' as MoreView },
-    { label:'Reviews', icon:'star-outline' as const, v:'reviews' as MoreView },
-    { label:'Marketing', icon:'megaphone-outline' as const, v:'marketing' as MoreView },
-    { label:'Gift cards', icon:'gift-outline' as const, v:'giftcards' as MoreView },
-    { label:'Packages', icon:'cube-outline' as const, v:'packages' as MoreView },
-    { label:'Settings', icon:'settings-outline' as const, v:'settings' as MoreView },
+  // ── default menu (exact spec order) ──
+  const goSoon = (label:string) => { setSoonLabel(label); setView('soon'); };
+  const MENU: Array<{ label:string; icon:any; onPress:()=>void }> = [
+    { label:'Items & Services', icon:'pricetags-outline',       onPress:()=>open('services') },
+    { label:'Online Booking',   icon:'globe-outline',           onPress:()=>open('booking') },
+    { label:'Waitlist',         icon:'hourglass-outline',       onPress:()=>open('waitlist') },
+    { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
+    { label:'Invoices',         icon:'document-text-outline',   onPress:()=>goSoon('Invoices') },
+    { label:'Estimates',        icon:'calculator-outline',      onPress:()=>goSoon('Estimates') },
+    { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>goSoon('Transactions') },
+    { label:'Orders',           icon:'cart-outline',            onPress:()=>goSoon('Orders') },
+    { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
+    { label:'Money',            icon:'cash-outline',            onPress:()=>goSoon('Money') },
+    { label:'Add-ons',          icon:'extension-puzzle-outline',onPress:()=>open('addons') },
+    { label:'Subscriptions',    icon:'card-outline',            onPress:()=>open('subscriptions') },
+    { label:'Support',          icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
+    { label:'Settings',         icon:'settings-outline',        onPress:()=>open('settings') },
   ];
   return (
     <SafeAreaView style={s.screen}>
-      <Head title="More"/>
-      <View style={s.listContent}>
+      <View style={s.header}><Text style={s.headerTitle}>Menu</Text></View>
+      <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
         {user&&(
           <View style={s.profileCard}>
             <View style={s.avatarLg}><Text style={s.avatarLgText}>{user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
@@ -1216,8 +1579,8 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
           </View>
         )}
         <View style={s.menuCard}>
-          {rows.map((r,i)=>(
-            <TouchableOpacity key={r.label} style={[s.menuRow, i<rows.length-1&&s.menuRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
+          {MENU.map((r,i)=>(
+            <TouchableOpacity key={r.label} style={[s.menuRow, i<MENU.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}>
               <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
               <Text style={s.menuLabel}>{r.label}</Text>
               <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
@@ -1230,16 +1593,72 @@ function MoreScreen({ onLogout }: { onLogout:()=>void }) {
           <Ionicons name="log-out-outline" size={18} color="#EF4444" style={{marginRight:8}}/>
           <Text style={{color:'#EF4444',fontWeight:'600',fontSize:15}}>Sign out</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
+// Calendar agenda styles
+const cal = StyleSheet.create({
+  topbar:        { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:12, borderBottomWidth:1, borderBottomColor:GRAY_100, backgroundColor:'#fff' },
+  topBtn:        { width:32, height:32, alignItems:'center', justifyContent:'center' },
+  monthWrap:     { flexDirection:'row', alignItems:'center' },
+  monthText:     { fontSize:17, fontWeight:'700', color:GRAY_900 },
+  dateHeader:    { backgroundColor:GRAY_50, paddingHorizontal:16, paddingVertical:8 },
+  dateHeaderToday:{ backgroundColor:'#EFF6FF' },
+  dateHeaderText:{ fontSize:12, fontWeight:'700', color:GRAY_500, letterSpacing:0.5 },
+  dateHeaderTextToday:{ color:'#2563EB' },
+  emptyDay:      { paddingHorizontal:16, paddingVertical:16, color:GRAY_400, fontSize:14 },
+  aptRow:        { flexDirection:'row', alignItems:'center', gap:12, paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:GRAY_100, backgroundColor:'#fff' },
+  aptBar:        { width:3, height:38, borderRadius:2 },
+  aptClient:     { fontSize:15, fontWeight:'700', color:GRAY_900 },
+  aptService:    { fontSize:13, color:GRAY_500, marginTop:2 },
+  aptTime:       { fontSize:15, fontWeight:'600', color:GRAY_900 },
+  aptDur:        { fontSize:13, color:GRAY_500, marginTop:2 },
+});
+
+// Checkout / Tap to Pay styles
+const co = StyleSheet.create({
+  amountArea:   { alignItems:'center', paddingVertical:28 },
+  amountLabel:  { fontSize:13, color:GRAY_500, marginBottom:8 },
+  amountValue:  { fontSize:48, fontWeight:'800', color:GRAY_900, letterSpacing:-1 },
+  amountNote:   { fontSize:13, color:GRAY_500, marginTop:8 },
+  pad:          { flexDirection:'row', flexWrap:'wrap', paddingHorizontal:24 },
+  key:          { width:'33.33%', height:62, alignItems:'center', justifyContent:'center' },
+  keyText:      { fontSize:26, fontWeight:'600', color:GRAY_900 },
+  chargeBtn:    { backgroundColor:BRAND, margin:20, marginTop:12, borderRadius:16, paddingVertical:18, alignItems:'center' },
+  chargeBtnText:{ color:'#fff', fontSize:17, fontWeight:'700' },
+  // Tap to Pay full-screen
+  tapWrap:      { flex:1, alignItems:'center', justifyContent:'center', paddingHorizontal:32 },
+  tapAmount:    { color:'#fff', fontSize:40, fontWeight:'800', marginBottom:28 },
+  tapNfc:       { width:96, height:96, borderRadius:48, borderWidth:2, borderColor:'rgba(255,255,255,0.4)', alignItems:'center', justifyContent:'center', marginBottom:24 },
+  tapTitle:     { color:'#fff', fontSize:22, fontWeight:'700', marginBottom:8 },
+  tapSub:       { color:'rgba(255,255,255,0.7)', fontSize:14, textAlign:'center', lineHeight:20 },
+  tapDone:      { marginTop:32, backgroundColor:'#fff', paddingVertical:15, borderRadius:14, alignSelf:'stretch', alignItems:'center' },
+  tapDoneText:  { color:'#111827', fontWeight:'700', fontSize:16 },
+  tapCancel:    { color:'rgba(255,255,255,0.6)', fontSize:14 },
+  // Receipt
+  receiptWrap:  { flex:1, alignItems:'center', justifyContent:'center', paddingHorizontal:28 },
+  receiptCheck: { width:72, height:72, borderRadius:36, backgroundColor:'#10B981', alignItems:'center', justifyContent:'center', marginBottom:20 },
+  receiptAmount:{ fontSize:40, fontWeight:'800', color:GRAY_900 },
+  receiptPaid:  { fontSize:15, color:GRAY_500, marginTop:4, marginBottom:24 },
+  receiptCard:  { alignSelf:'stretch', backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, paddingVertical:4 },
+  receiptRow:   { flexDirection:'row', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:12, borderBottomWidth:1, borderBottomColor:GRAY_50 },
+  receiptRowL:  { color:GRAY_500, fontSize:14 },
+  receiptRowV:  { color:GRAY_900, fontSize:14, fontWeight:'600' },
+});
 
 const ms = StyleSheet.create({
   row:       { flexDirection:'row', alignItems:'center', gap:12, backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10 },
   methodChip:  { flex:1, alignItems:'center', paddingVertical:10, borderRadius:12, borderWidth:1, borderColor:GRAY_200 },
   methodChipOn:{ borderColor:BRAND, backgroundColor:BRAND_LT },
   methodChipText:{ fontSize:14, fontWeight:'600', color:GRAY_700 },
+  notifRow:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:14, paddingHorizontal:4 },
+  notifRowBorder:{ borderBottomWidth:1, borderBottomColor:GRAY_50 },
+  statusOn:    { flexDirection:'row', alignItems:'center', gap:6 },
+  statusDot:   { width:7, height:7, borderRadius:4, backgroundColor:'#10B981' },
+  statusOnText:{ fontSize:13, fontWeight:'600', color:'#047857' },
+  soonIcon:    { width:60, height:60, borderRadius:30, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
   dot:       { width:10, height:10, borderRadius:5 },
   rowTitle:  { fontSize:15, fontWeight:'600', color:GRAY_900 },
   rowMeta:   { fontSize:13, color:GRAY_500, marginTop:2 },
@@ -1577,144 +1996,6 @@ function ChangePasswordScreen({ onDone }: { onDone:()=>void }) {
   );
 }
 
-// ── Home / Dashboard (Square-style landing) ──────────────────────────────────
-function HomeScreen() {
-  const nav = useNavigation<any>();
-  const { user } = getAuth();
-  const [appts, setAppts]       = useState<Appointment[]>([]);
-  const [bizName, setBizName]   = useState('');
-  const [loading, setLoading]   = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async (silent=false) => {
-    if (!silent) setLoading(true);
-    try {
-      const [res, biz] = await Promise.all([
-        api<{ data:Appointment[] }>(`/businesses/${bizId()}/bookings`).catch(()=>({ data:[] as Appointment[] })),
-        api<{ name:string }>(`/businesses/${bizId()}`).catch(()=>({ name:'' })),
-      ]);
-      setAppts(Array.isArray(res?.data) ? res.data : []);
-      setBizName(biz?.name ?? '');
-    } catch { /* ignore */ }
-    finally { setLoading(false); setRefreshing(false); }
-  }, []);
-  useEffect(()=>{ load(); }, [load]);
-
-  const now = new Date();
-  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
-  const firstName = (user?.name ?? 'there').split(' ')[0];
-
-  const todayStr = now.toDateString();
-  const real = appts
-    .filter(a => new Date(a.startsAt).toDateString() === todayStr)
-    .sort((a,b) => +new Date(a.startsAt) - +new Date(b.startsAt));
-
-  // Demo-friendly: when there are no real appointments today, show realistic
-  // sample data so the dashboard looks populated. (Swap for live data later.)
-  const at = (h:number,m:number) => { const d=new Date(); d.setHours(h,m,0,0); return d.toISOString(); };
-  const SAMPLE = [
-    { id:'s1', startsAt:at(9,0),  endsAt:at(10,0), status:'CONFIRMED', notes:'', service:{name:'Haircut',durationMinutes:60,priceCents:4500}, staff:{id:'x',user:{name:'Alex'}}, client:{id:'c1',name:'Jordan Lee',email:''} },
-    { id:'s2', startsAt:at(11,30),endsAt:at(13,30),status:'PENDING',   notes:'', service:{name:'Color & Highlights',durationMinutes:120,priceCents:12000}, staff:{id:'x',user:{name:'Sam'}}, client:{id:'c2',name:'Riley Chen',email:''} },
-    { id:'s3', startsAt:at(14,0), endsAt:at(14,30),status:'CONFIRMED', notes:'', service:{name:'Beard Trim',durationMinutes:30,priceCents:2500}, staff:{id:'x',user:{name:'Alex'}}, client:{id:'c3',name:'Taylor Brooks',email:''} },
-  ] as unknown as Appointment[];
-
-  const isSample = real.length === 0;
-  const agenda = isSample ? SAMPLE : real;
-  const todayCount   = isSample ? 6     : real.length;
-  const pendingCount = isSample ? 2     : appts.filter(a => a.status === 'PENDING').length;
-  const revenueCents = isSample ? 24500 : real.filter(a => a.status==='CONFIRMED' || a.status==='COMPLETED').reduce((s,a)=> s + (a.service?.priceCents ?? 0), 0);
-
-  const Stat = ({ label, value, icon, color }:{label:string;value:string;icon:any;color:string}) => (
-    <View style={hs.stat}>
-      <View style={[hs.statIcon,{backgroundColor:color+'18'}]}><Ionicons name={icon} size={16} color={color}/></View>
-      <Text style={hs.statValue}>{value}</Text>
-      <Text style={hs.statLabel}>{label}</Text>
-    </View>
-  );
-  const Action = ({ label, icon, to }:{label:string;icon:any;to:string}) => (
-    <TouchableOpacity style={hs.action} onPress={()=>nav.navigate(to)}>
-      <View style={hs.actionIcon}><Ionicons name={icon} size={20} color={BRAND}/></View>
-      <Text style={hs.actionLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-
-  if (loading) return <SafeAreaView style={s.screen}><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><ActivityIndicator color={BRAND}/></View></SafeAreaView>;
-
-  return (
-    <SafeAreaView style={s.screen}>
-      <ScrollView contentContainerStyle={{padding:16,paddingBottom:32}} showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}>
-        <Text style={hs.greeting}>{greeting}, {firstName} 👋</Text>
-        {!!bizName && <Text style={hs.biz}>{bizName}</Text>}
-
-        <View style={hs.statRow}>
-          <Stat label="Today" value={String(todayCount)} icon="calendar" color={BRAND}/>
-          <Stat label="Pending" value={String(pendingCount)} icon="time" color="#F59E0B"/>
-          <Stat label="Revenue" value={`$${(revenueCents/100).toFixed(0)}`} icon="cash" color="#10B981"/>
-        </View>
-
-        <View style={hs.actionRow}>
-          <Action label="New booking" icon="add-circle" to="Book"/>
-          <Action label="Clients" icon="people" to="Clients"/>
-          <Action label="Messages" icon="chatbubbles" to="Messages"/>
-        </View>
-
-        <View style={hs.sectionHead}>
-          <Text style={hs.sectionTitle}>Today’s schedule</Text>
-          {isSample && <View style={hs.sampleChip}><Text style={hs.sampleChipText}>Sample</Text></View>}
-        </View>
-
-        {agenda.map(a => {
-          const d = new Date(a.startsAt);
-          const hr = ((d.getHours() + 11) % 12) + 1;
-          const mm = String(d.getMinutes()).padStart(2, '0');
-          const ap = d.getHours() < 12 ? 'AM' : 'PM';
-          return (
-          <TouchableOpacity key={a.id} style={hs.apt} activeOpacity={0.7} onPress={()=>nav.navigate('Appointments')}>
-            <View style={hs.aptTime}>
-              <Text style={hs.aptHour}>{hr}:{mm}</Text>
-              <Text style={hs.aptAmPm}>{ap}</Text>
-            </View>
-            <View style={{flex:1,minWidth:0}}>
-              <Text style={hs.aptService} numberOfLines={1}>{a.service?.name}</Text>
-              <Text style={hs.aptMeta} numberOfLines={1}>{a.client?.name} · {a.staff?.user?.name}</Text>
-            </View>
-            <View style={{alignItems:'flex-end',gap:4}}>
-              <PriceTag cents={a.service?.priceCents ?? 0}/>
-              <Pill label={a.status} color={STATUS_COLOR[a.status] ?? GRAY_500}/>
-            </View>
-          </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-const hs = StyleSheet.create({
-  greeting:   { fontSize:24, fontWeight:'800', color:GRAY_900 },
-  biz:        { fontSize:14, color:GRAY_500, marginTop:2, marginBottom:18 },
-  statRow:    { flexDirection:'row', gap:10, marginBottom:18 },
-  stat:       { flex:1, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, padding:14 },
-  statIcon:   { width:30, height:30, borderRadius:9, alignItems:'center', justifyContent:'center', marginBottom:10 },
-  statValue:  { fontSize:22, fontWeight:'800', color:GRAY_900 },
-  statLabel:  { fontSize:12, color:GRAY_500, marginTop:1 },
-  actionRow:  { flexDirection:'row', gap:10, marginBottom:22 },
-  action:     { flex:1, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, paddingVertical:16, alignItems:'center' },
-  actionIcon: { width:40, height:40, borderRadius:12, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center', marginBottom:8 },
-  actionLabel:{ fontSize:12, fontWeight:'600', color:GRAY_700 },
-  sectionHead:{ flexDirection:'row', alignItems:'center', gap:8, marginBottom:12 },
-  sectionTitle:{ fontSize:17, fontWeight:'700', color:GRAY_900 },
-  sampleChip: { backgroundColor:'#FEF3C7', borderRadius:6, paddingHorizontal:7, paddingVertical:2 },
-  sampleChipText:{ fontSize:10, fontWeight:'700', color:'#92400E' },
-  apt:        { flexDirection:'row', alignItems:'center', gap:12, backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10 },
-  aptTime:    { width:54, alignItems:'center' },
-  aptHour:    { fontSize:15, fontWeight:'800', color:GRAY_900 },
-  aptAmPm:    { fontSize:11, color:GRAY_400, fontWeight:'600' },
-  aptService: { fontSize:15, fontWeight:'600', color:GRAY_900 },
-  aptMeta:    { fontSize:13, color:GRAY_500, marginTop:2 },
-});
-
 // ── Tab navigator ────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
@@ -1779,31 +2060,37 @@ export default function App() {
         <Tab.Navigator
           screenOptions={({ route }) => ({
             headerShown: false,
-            tabBarActiveTintColor: BRAND,
+            tabBarActiveTintColor: GRAY_900,
             tabBarInactiveTintColor: GRAY_400,
-            tabBarStyle: { backgroundColor:'#fff', borderTopColor:GRAY_100, height:60, paddingBottom:8 },
+            // Active tab = rounded grey pill behind the icon + label.
+            tabBarActiveBackgroundColor: GRAY_100,
+            tabBarStyle: { backgroundColor:'#fff', borderTopColor:GRAY_100, height:64, paddingTop:6, paddingBottom:8, paddingHorizontal:6 },
+            tabBarItemStyle: { borderRadius:16, marginHorizontal:4, marginVertical:6 },
             tabBarLabelStyle: { fontSize:11, fontWeight:'600' },
-            tabBarIcon: ({ color, size }) => {
-              const icons: Record<string,string> = {
-                Home:'home-outline', Appointments:'calendar-outline', Book:'add-circle-outline',
-                Clients:'people-outline', Messages:'chatbubbles-outline', More:'menu-outline',
+            tabBarIcon: ({ color, size, focused }) => {
+              const icons: Record<string,[string,string]> = {
+                Calendar:['calendar','calendar-outline'], Checkout:['card','card-outline'],
+                Customers:['people','people-outline'], Messages:['chatbubbles','chatbubbles-outline'],
+                Menu:['menu','menu-outline'],
               };
-              return <Ionicons name={(icons[route.name]??'ellipse-outline') as any} size={size} color={color}/>;
+              const pair = icons[route.name] ?? ['ellipse','ellipse-outline'];
+              return <Ionicons name={(focused ? pair[0] : pair[1]) as any} size={size} color={color}/>;
             },
           })}
         >
-          <Tab.Screen name="Home" component={HomeScreen}/>
-          <Tab.Screen name="Appointments" component={AppointmentsScreen}/>
-          <Tab.Screen name="Book" component={BookScreen}/>
-          <Tab.Screen name="Clients">
+          <Tab.Screen name="Calendar" component={CalendarScreen}/>
+          <Tab.Screen name="Checkout" component={CheckoutScreen}/>
+          <Tab.Screen name="Customers">
             {()=><ClientsScreen onMessage={c=>setMsgClient(c)}/>}
           </Tab.Screen>
           <Tab.Screen name="Messages">
             {()=><MessagesScreen initialClient={msgClient} onClearClient={()=>setMsgClient(null)}/>}
           </Tab.Screen>
-          <Tab.Screen name="More">
-            {()=><MoreScreen onLogout={handleLogout}/>}
+          <Tab.Screen name="Menu">
+            {()=><MenuScreen onLogout={handleLogout}/>}
           </Tab.Screen>
+          {/* Hidden route — opened from the Calendar "+" to add an appointment. */}
+          <Tab.Screen name="Book" component={BookScreen} options={{ tabBarButton: () => null }}/>
         </Tab.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
