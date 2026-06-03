@@ -84,6 +84,12 @@ export default function TransactionsPage() {
                         {format(new Date(p.createdAt), "MMM d, yyyy · h:mm a")}
                         {p.refundedCents > 0 && <span className="text-amber-600"> · {formatPrice(p.refundedCents)} refunded</span>}
                       </p>
+                      {p.receiptUrl && (
+                        <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 mt-1">
+                          <Receipt className="w-3.5 h-3.5" /> View receipt
+                        </a>
+                      )}
                     </div>
                     {refundable && refundFor !== p.id && (
                       <Button variant="outline" size="sm" className="shrink-0" onClick={() => setRefundFor(p.id)}>

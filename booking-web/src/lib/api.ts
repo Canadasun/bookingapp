@@ -190,7 +190,7 @@ export interface RefundRow {
 export interface Payment {
   id: string; businessId: string; amountCents: number; currency: string;
   kind: PaymentKind; status: PaymentStatus; refundedCents: number;
-  description?: string | null; stripePaymentIntentId?: string | null; createdAt: string;
+  description?: string | null; stripePaymentIntentId?: string | null; receiptUrl?: string | null; createdAt: string;
   client?: { id: string; name: string; email: string } | null;
   appointment?: { id: string; startsAt: string } | null;
   refunds?: RefundRow[];

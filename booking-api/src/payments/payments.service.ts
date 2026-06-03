@@ -102,6 +102,7 @@ export class PaymentsService {
         amount: depositCents,
         currency: 'usd',
         customer,
+        receipt_email: apt.client.email, // Stripe emails the official receipt on success
         setup_future_usage: 'off_session', // save the card for a possible no-show charge
         // Card-only: no redirect-based methods, so the client can confirm without
         // supplying a return_url.
@@ -155,9 +156,13 @@ export class PaymentsService {
     input: { amountCents: number; description?: string; clientId?: string; idempotencyKey?: string },
   ) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    const chargeClient = input.clientId
+      ? await this.prisma.client.findUnique({ where: { id: input.clientId }, select: { email: true } })
+      : null;
     const intent = await this.getStripe().paymentIntents.create({
       amount: input.amountCents,
       currency: 'usd',
+      ...(chargeClient?.email ? { receipt_email: chargeClient.email } : {}),
       // Card-only, no redirect methods — the reader confirms on-device.
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
       metadata: {
@@ -218,11 +223,21 @@ export class PaymentsService {
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const intent = event.data.object as Stripe.PaymentIntent;
+        // Grab the Stripe-hosted receipt URL from the settled charge so it can be
+        // surfaced in the dashboard (best-effort — never block the webhook).
+        let receiptUrl: string | null = null;
+        const chargeId = typeof intent.latest_charge === 'string' ? intent.latest_charge : intent.latest_charge?.id;
+        if (chargeId) {
+          try {
+            const charge = await this.getStripe().charges.retrieve(chargeId);
+            receiptUrl = charge.receipt_url ?? null;
+          } catch { /* receipt is a nice-to-have */ }
+        }
         // Ledger: mark the payment SUCCEEDED (idempotent — keyed on the unique
         // intent id; only flips rows not already settled).
         await this.prisma.payment.updateMany({
           where: { stripePaymentIntentId: intent.id, status: { in: ['PENDING', 'FAILED'] } },
-          data: { status: 'SUCCEEDED' },
+          data: { status: 'SUCCEEDED', ...(receiptUrl ? { receiptUrl } : {}) },
         });
         const appointmentId = intent.metadata.appointmentId;
         if (appointmentId) {
@@ -541,6 +556,7 @@ export class PaymentsService {
       currency: 'usd',
       customer: apt.client.stripeCustomerId,
       payment_method: apt.stripePaymentMethodId,
+      receipt_email: apt.client.email,
       off_session: true,
       confirm: true,
       metadata: { appointmentId, businessId, kind: 'no_show_fee' },
@@ -580,6 +596,7 @@ export class PaymentsService {
         currency: 'usd',
         customer: apt.client.stripeCustomerId,
         payment_method: apt.stripePaymentMethodId,
+        receipt_email: apt.client.email,
         off_session: true,
         confirm: true,
         metadata: { appointmentId, businessId, kind: 'late_cancel_fee' },
