@@ -50,7 +50,13 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string, unknown>;
-    const raw = body.message;
+    let raw = body.message;
+    // A global exception filter nests the original error as { message: {...} }.
+    // Unwrap one level so the real message/code survives instead of falling back
+    // to the bare status text.
+    if (raw && typeof raw === "object" && !Array.isArray(raw) && typeof (raw as Record<string, unknown>).message !== "undefined") {
+      raw = (raw as Record<string, unknown>).message;
+    }
     const msg = Array.isArray(raw) ? raw.join(", ") : typeof raw === "string" ? raw : res.statusText;
     throw new Error(msg);
   }
