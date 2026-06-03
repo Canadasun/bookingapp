@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -145,8 +145,25 @@ export class AuthService {
     if (!ch || ch.consumedAt || ch.expiresAt < new Date() || ch.attempts >= 5) {
       throw new UnauthorizedException('Invalid or expired code');
     }
-    const codeHash = createHash('sha256').update(code).digest('hex');
-    if (codeHash !== ch.codeHash) {
+    const otpOk = createHash('sha256').update(code).digest('hex') === ch.codeHash;
+
+    // Recovery-code fallback: if the OTP didn't match, the user may have entered
+    // one of their one-time recovery codes (which bypass the email/SMS channel
+    // entirely — the whole point of recovery). Consume it on use.
+    let recoveryOk = false;
+    if (!otpOk) {
+      const u = await this.prisma.user.findUnique({ where: { id: ch.userId } });
+      const recHash = createHash('sha256').update(code.trim().toLowerCase()).digest('hex');
+      if (u && u.twoFactorRecoveryCodes.includes(recHash)) {
+        recoveryOk = true;
+        await this.prisma.user.update({
+          where: { id: u.id },
+          data: { twoFactorRecoveryCodes: u.twoFactorRecoveryCodes.filter((h) => h !== recHash) },
+        });
+      }
+    }
+
+    if (!otpOk && !recoveryOk) {
       await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { attempts: { increment: 1 } } });
       throw new UnauthorizedException('Invalid or expired code');
     }
@@ -156,12 +173,32 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
+  // A readable one-time code, e.g. "a3f9c-1e7d2".
+  private genRecoveryCode(): string {
+    const raw = randomBytes(5).toString('hex'); // 10 hex chars
+    return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+  }
+
   async setTwoFactor(userId: string, enabled: boolean, method?: 'EMAIL' | 'SMS') {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { twoFactorEnabled: enabled, ...(method ? { twoFactorMethod: method } : {}) },
-    });
-    return { ok: true, twoFactorEnabled: enabled };
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const data: { twoFactorEnabled: boolean; twoFactorMethod?: string; twoFactorRecoveryCodes?: string[] } = {
+      twoFactorEnabled: enabled,
+      ...(method ? { twoFactorMethod: method } : {}),
+    };
+
+    // Mint fresh recovery codes only on the off→on transition (not when just
+    // switching delivery method while already enabled — that must not invalidate
+    // codes the user already saved). Clear them when turning 2FA off.
+    let recoveryCodes: string[] | undefined;
+    if (enabled && !user.twoFactorEnabled) {
+      recoveryCodes = Array.from({ length: 8 }, () => this.genRecoveryCode());
+      data.twoFactorRecoveryCodes = recoveryCodes.map((c) => createHash('sha256').update(c).digest('hex'));
+    } else if (!enabled) {
+      data.twoFactorRecoveryCodes = [];
+    }
+
+    await this.prisma.user.update({ where: { id: userId }, data });
+    return { ok: true, twoFactorEnabled: enabled, ...(recoveryCodes ? { recoveryCodes } : {}) };
   }
 
   // Record the sign-in and, if it's from a NEW device (but not the user's very

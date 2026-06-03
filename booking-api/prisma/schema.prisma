@@ -284,6 +284,7 @@ model User {
   mustResetPassword Boolean @default(false)
   twoFactorEnabled  Boolean @default(false)
   twoFactorMethod   String  @default("EMAIL") // EMAIL | SMS
+  twoFactorRecoveryCodes String[] @default([]) // sha256 hashes of one-time recovery codes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

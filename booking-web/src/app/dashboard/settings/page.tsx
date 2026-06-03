@@ -54,13 +54,16 @@ export default function SettingsPage() {
   const [twoFA, setTwoFA] = useState<boolean>(user?.twoFactorEnabled ?? false);
   const [twoFAMethod, setTwoFAMethod] = useState<"EMAIL" | "SMS">(user?.twoFactorMethod ?? "EMAIL");
   const [twoFASaving, setTwoFASaving] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null); // shown once after enabling
 
   async function saveTwoFactor(enabled: boolean, method: "EMAIL" | "SMS") {
     setTwoFASaving(true);
     const prev = { enabled: twoFA, method: twoFAMethod };
     setTwoFA(enabled); setTwoFAMethod(method);
     try {
-      await api.auth.setTwoFactor(enabled, method);
+      const res = await api.auth.setTwoFactor(enabled, method);
+      if (res.recoveryCodes?.length) setRecoveryCodes(res.recoveryCodes);
+      if (!enabled) setRecoveryCodes(null);
       toast.success(enabled ? "Two-factor sign-in enabled" : "Two-factor sign-in turned off");
     } catch (err) {
       setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
@@ -434,6 +437,29 @@ export default function SettingsPage() {
                         Make sure your account has a mobile number on file — codes fall back to email otherwise.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {recoveryCodes && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-amber-900">Save your recovery codes</p>
+                    <p className="text-xs text-amber-700 mt-0.5 mb-3">
+                      Each code works once. If you ever can&apos;t receive your verification code, enter one of these to sign in. They won&apos;t be shown again.
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 font-mono text-sm text-gray-800 bg-white rounded-lg border border-amber-100 p-3">
+                      {recoveryCodes.map((c) => <span key={c}>{c}</span>)}
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button type="button"
+                        onClick={() => { navigator.clipboard?.writeText(recoveryCodes.join("\n")); toast.success("Recovery codes copied"); }}
+                        className="text-xs font-semibold text-amber-800 border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-100">
+                        Copy codes
+                      </button>
+                      <button type="button" onClick={() => setRecoveryCodes(null)}
+                        className="text-xs font-semibold text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50">
+                        I&apos;ve saved them
+                      </button>
+                    </div>
                   </div>
                 )}
 

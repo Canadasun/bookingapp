@@ -1101,13 +1101,16 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [twoFA, setTwoFA]       = useState<boolean>(getAuth().user?.twoFactorEnabled ?? false);
   const [twoFAMethod, setTwoFAMethod] = useState<'EMAIL'|'SMS'>(getAuth().user?.twoFactorMethod ?? 'EMAIL');
   const [twoFASaving, setTwoFASaving] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]|null>(null); // shown once on enable
 
   async function saveTwoFA(enabled: boolean, method: 'EMAIL'|'SMS') {
     setTwoFASaving(true);
     const prev = { enabled: twoFA, method: twoFAMethod };
     setTwoFA(enabled); setTwoFAMethod(method);
     try {
-      await api('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method }) });
+      const res = await api<{ recoveryCodes?: string[] }>('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method }) });
+      if (res.recoveryCodes?.length) setRecoveryCodes(res.recoveryCodes);
+      if (!enabled) setRecoveryCodes(null);
     } catch (e) {
       setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
       Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.');
@@ -1541,6 +1544,24 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             )}
           </View>
 
+          {recoveryCodes && (
+            <View style={ms.recoveryBox}>
+              <Text style={ms.recoveryTitle}>Save your recovery codes</Text>
+              <Text style={ms.recoverySub}>Each works once. If you can&apos;t receive your code, enter one of these to sign in. They won&apos;t be shown again.</Text>
+              <View style={ms.recoveryGrid}>
+                {recoveryCodes.map(c => <Text key={c} style={ms.recoveryCode}>{c}</Text>)}
+              </View>
+              <View style={{ flexDirection:'row', gap:8, marginTop:10 }}>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: `Pulse recovery codes:\n${recoveryCodes.join('\n')}` })}>
+                  <Text style={ms.methodChipText}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>setRecoveryCodes(null)}>
+                  <Text style={ms.methodChipText}>I&apos;ve saved them</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <Text style={[ms.empty,{ marginTop:8 }]}>Editing business settings is coming to the app — manage those on the web dashboard for now.</Text>
         </ScrollView>
       )}
@@ -1659,6 +1680,11 @@ const ms = StyleSheet.create({
   statusDot:   { width:7, height:7, borderRadius:4, backgroundColor:'#10B981' },
   statusOnText:{ fontSize:13, fontWeight:'600', color:'#047857' },
   soonIcon:    { width:60, height:60, borderRadius:30, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
+  recoveryBox: { marginTop:12, borderWidth:1, borderColor:'#FCD34D', backgroundColor:'#FFFBEB', borderRadius:14, padding:14 },
+  recoveryTitle:{ fontSize:14, fontWeight:'700', color:'#92400E' },
+  recoverySub: { fontSize:12, color:'#B45309', marginTop:2, marginBottom:10 },
+  recoveryGrid:{ flexDirection:'row', flexWrap:'wrap', backgroundColor:'#fff', borderRadius:10, borderWidth:1, borderColor:'#FDE68A', padding:10 },
+  recoveryCode:{ width:'50%', fontSize:13, color:GRAY_900, paddingVertical:3, fontVariant:['tabular-nums'] },
   dot:       { width:10, height:10, borderRadius:5 },
   rowTitle:  { fontSize:15, fontWeight:'600', color:GRAY_900 },
   rowMeta:   { fontSize:13, color:GRAY_500, marginTop:2 },
@@ -1688,6 +1714,8 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
   // 2FA: set once a password passes for an account with two-factor enabled.
   const [challenge, setChallenge] = useState<{id:string;method:string}|null>(null);
   const [code, setCode]         = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recovery, setRecovery] = useState('');
 
   async function login() {
     if (!email||!password) return;
@@ -1707,11 +1735,13 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
   }
 
   async function verify() {
-    if (!challenge || code.trim().length<4) return;
+    if (!challenge) return;
+    const entered = (recoveryMode ? recovery : code).trim();
+    if (entered.length<4) return;
     setLoading(true);
     try {
       const res = await api<{accessToken:string;refreshToken:string;user:User}>('/auth/2fa/verify',{
-        method:'POST', body:JSON.stringify({ challengeId: challenge.id, code: code.trim() }),
+        method:'POST', body:JSON.stringify({ challengeId: challenge.id, code: entered }),
       });
       onLogin(res.accessToken, res.refreshToken, res.user);
     } catch {
@@ -1727,18 +1757,35 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
             <View style={s.logoIcon}><Ionicons name="shield-checkmark" size={28} color="#fff"/></View>
             <Text style={s.logoText}>Pulse</Text>
           </View>
-          <Text style={s.loginTitle}>Enter your code</Text>
-          <Text style={s.loginSub}>We sent a 6-digit code to your {challenge.method==='SMS'?'phone':'email'}. It expires in 10 minutes.</Text>
+          <Text style={s.loginTitle}>{recoveryMode ? 'Enter a recovery code' : 'Enter your code'}</Text>
+          <Text style={s.loginSub}>
+            {recoveryMode
+              ? 'Enter one of the one-time recovery codes you saved when you turned on two-factor sign-in.'
+              : `We sent a 6-digit code to your ${challenge.method==='SMS'?'phone':'email'}. It expires in 10 minutes.`}
+          </Text>
 
-          <Text style={[s.fieldLabel,{marginTop:12}]}>Verification code</Text>
-          <TextInput style={[s.input,{textAlign:'center',letterSpacing:8,fontSize:20}]} placeholder="123456" placeholderTextColor={GRAY_400}
-            keyboardType="number-pad" value={code} onChangeText={(t)=>setCode(t.replace(/\D/g,'').slice(0,6))} onSubmitEditing={verify} autoFocus/>
+          {recoveryMode ? (
+            <>
+              <Text style={[s.fieldLabel,{marginTop:12}]}>Recovery code</Text>
+              <TextInput style={[s.input,{textAlign:'center',letterSpacing:2,fontSize:18}]} placeholder="xxxxx-xxxxx" placeholderTextColor={GRAY_400}
+                autoCapitalize="none" autoCorrect={false} value={recovery} onChangeText={(t)=>setRecovery(t.trim())} onSubmitEditing={verify} autoFocus/>
+            </>
+          ) : (
+            <>
+              <Text style={[s.fieldLabel,{marginTop:12}]}>Verification code</Text>
+              <TextInput style={[s.input,{textAlign:'center',letterSpacing:8,fontSize:20}]} placeholder="123456" placeholderTextColor={GRAY_400}
+                keyboardType="number-pad" value={code} onChangeText={(t)=>setCode(t.replace(/\D/g,'').slice(0,6))} onSubmitEditing={verify} autoFocus/>
+            </>
+          )}
 
-          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||code.trim().length<4} onPress={verify}>
+          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||(recoveryMode?recovery.trim().length<4:code.trim().length<4)} onPress={verify}>
             {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Verify &amp; sign in</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={()=>{setChallenge(null);setCode('');}}>
+          <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={()=>setRecoveryMode(m=>!m)}>
+            <Text style={s.authSwitchLink}>{recoveryMode ? 'Use the code we sent instead' : 'Lost access? Use a recovery code'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={{ alignSelf:'center', marginTop:12 }} onPress={()=>{setChallenge(null);setCode('');setRecovery('');setRecoveryMode(false);}}>
             <Text style={s.authSwitchLink}>← Back to sign in</Text>
           </TouchableOpacity>
         </KeyboardAvoidingView>

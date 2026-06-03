@@ -22,6 +22,8 @@ function LoginForm() {
   // 2FA step: set once the password check passes for an account with 2FA on.
   const [challenge, setChallenge] = useState<{ id: string; method: string } | null>(null);
   const [code, setCode] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState(false); // enter a recovery code instead of the OTP
+  const [recovery, setRecovery] = useState("");
 
   function go() {
     router.push(next.startsWith("/") ? next : "/dashboard");
@@ -56,13 +58,15 @@ function LoginForm() {
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (!challenge || code.trim().length < 4) return;
+    if (!challenge) return;
+    const entered = recoveryMode ? recovery.trim() : code.trim();
+    if (entered.length < 4) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/2fa-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.id, code: code.trim() }),
+        body: JSON.stringify({ challengeId: challenge.id, code: entered }),
       });
       if (!res.ok) {
         const body = await res.json() as { message?: string };
@@ -80,25 +84,48 @@ function LoginForm() {
     return (
       <form onSubmit={handleVerify} className="space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Enter your verification code</h2>
+          <h2 className="text-sm font-semibold text-slate-900">
+            {recoveryMode ? "Enter a recovery code" : "Enter your verification code"}
+          </h2>
           <p className="text-xs text-slate-500 mt-1">
-            We sent a 6-digit code to your {challenge.method === "SMS" ? "phone" : "email"}. It expires in 10 minutes.
+            {recoveryMode
+              ? "Enter one of the one-time recovery codes you saved when you turned on two-factor sign-in."
+              : `We sent a 6-digit code to your ${challenge.method === "SMS" ? "phone" : "email"}. It expires in 10 minutes.`}
           </p>
         </div>
-        <Input
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          placeholder="123456"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          required
-          autoFocus
-          className="text-center text-lg tracking-[0.4em]"
-        />
+        {recoveryMode ? (
+          <Input
+            autoComplete="off"
+            placeholder="xxxxx-xxxxx"
+            value={recovery}
+            onChange={(e) => setRecovery(e.target.value.trim())}
+            required
+            autoFocus
+            className="text-center text-lg tracking-[0.2em]"
+          />
+        ) : (
+          <Input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            required
+            autoFocus
+            className="text-center text-lg tracking-[0.4em]"
+          />
+        )}
         <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
         <button
           type="button"
-          onClick={() => { setChallenge(null); setCode(""); }}
+          onClick={() => setRecoveryMode((m) => !m)}
+          className="w-full text-center text-xs text-violet-600 hover:underline font-medium"
+        >
+          {recoveryMode ? "Use the code we sent instead" : "Lost access? Use a recovery code"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setChallenge(null); setCode(""); setRecovery(""); setRecoveryMode(false); }}
           className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
         >
           ← Back to sign in
