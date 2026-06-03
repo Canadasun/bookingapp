@@ -74,6 +74,12 @@ export class NotificationsService {
     await this.queue.add('send-staff-cancellation', { appointmentId: apt.id });
   }
 
+  // A client tried to cancel past the cancellation window: alert the owner so
+  // they can decide whether to cancel the appointment and/or charge a fee.
+  async sendLateCancellationRequest(apt: AppointmentWithRelations) {
+    await this.queue.add('late-cancel-request', { appointmentId: apt.id }, { removeOnComplete: true });
+  }
+
   // Tell a waitlisted client that a spot opened up (auto-fill on cancellation).
   async notifyWaitlistOpening(waitlistEntryId: string) {
     await this.queue.add('waitlist-opening', { waitlistEntryId });

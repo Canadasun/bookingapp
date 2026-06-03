@@ -43,12 +43,22 @@ export default function ManageAppointmentPage() {
 
     const windowHours = appointment.business.cancellationWindowHours;
     const cutoff = subHours(new Date(appointment.startsAt), windowHours);
-    const withinWindow = !isBefore(new Date(), cutoff);
+    const isLate = !isBefore(new Date(), cutoff); // now is inside the window → too late
 
-    const msg = withinWindow
-      ? `You are within the ${windowHours}-hour cancellation window. A fee may apply. Proceed?`
-      : 'Are you sure you want to cancel this appointment?';
-    if (!confirm(msg)) return;
+    // Past the cancellation window: cannot self-cancel online. Tell the client to
+    // contact the business, and ping the server so the owner gets notified.
+    if (isLate) {
+      const biz = appointment.business;
+      const contact = [biz.phone, biz.email].filter(Boolean).join(" · ");
+      toast.error(
+        `It's past the ${windowHours}-hour cancellation window — please contact ${biz.name}${contact ? ` (${contact})` : ""} to cancel. We've let them know.`,
+        { duration: 8000 },
+      );
+      api.appointments.publicCancel(id, "Late cancellation requested by client", token).catch(() => {});
+      return;
+    }
+
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
 
     setCancelling(true);
     try {

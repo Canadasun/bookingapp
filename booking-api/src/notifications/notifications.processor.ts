@@ -589,6 +589,33 @@ ${aptDetails(apt)}
         break;
       }
 
+      case 'late-cancel-request': {
+        const ownerEmail = apt.business.email || this.configService.get<string>('ADMIN_ALERT_EMAIL');
+        const dashUrl = `${webUrl}/dashboard/appointments`;
+        if (ownerEmail) {
+          await this.email.send({
+            to: ownerEmail,
+            subject: `Late cancellation request — ${apt.client.name}`,
+            html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#D97706;font-size:20px;font-weight:700">Late cancellation request</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${apt.client.name} asked to cancel <strong>after</strong> your ${apt.business.cancellationWindowHours}-hour cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
+${aptDetails(apt)}
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.client.name} (${apt.client.email}${apt.client.phone ? ', ' + apt.client.phone : ''})</td></tr>
+</table>
+<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Review in dashboard →</a>
+            `),
+          });
+        }
+        await this.notifyOwners(apt.businessId, {
+          kind: 'BOOKING_UPDATE',
+          title: `Late cancellation request — ${apt.client.name}`,
+          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')} — client wants to cancel past the window`,
+          linkUrl: '/dashboard/appointments',
+        });
+        break;
+      }
+
     }
   }
 

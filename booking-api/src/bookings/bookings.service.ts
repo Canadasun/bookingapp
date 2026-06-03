@@ -376,6 +376,23 @@ export class BookingsService {
       throw new BadRequestException('Only pending or confirmed appointments can be cancelled');
     }
 
+    // Strict cancellation-window enforcement. A client (byStaff=false) may only
+    // self-cancel BEFORE the business's cancellation window. Once inside it, the
+    // online cancel is refused — the client is told to contact the business, and
+    // the owner is notified to decide whether to cancel and/or charge. Owners and
+    // staff (byStaff=true) can always cancel.
+    if (dto.status === 'CANCELLED' && !byStaff) {
+      const biz = existing.business;
+      const cutoff = biz && new Date(existing.startsAt.getTime() - biz.cancellationWindowHours * 3600 * 1000);
+      if (cutoff && new Date() > cutoff) {
+        await this.notifications.sendLateCancellationRequest(existing).catch(() => {});
+        throw new ForbiddenException({
+          code: 'TOO_LATE_TO_CANCEL',
+          message: `It's past the ${biz!.cancellationWindowHours}-hour cancellation window. Please contact ${biz!.name} to cancel — we've let them know you'd like to.`,
+        });
+      }
+    }
+
     const updated = await this.prisma.appointment.update({
       where: { id },
       data: {
