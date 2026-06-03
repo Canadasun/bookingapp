@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -179,9 +179,14 @@ export class PaymentsService {
   async handleWebhook(rawBody: Buffer, signature: string) {
     const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') ?? '';
 
-    // Deferred until a real "whsec_..." secret is set: safe no-op (returns 200 so
-    // Stripe doesn't retry-storm). Set STRIPE_WEBHOOK_SECRET to enable.
     if (!webhookSecret.startsWith('whsec_')) {
+      // In production, fail CLOSED and loudly: a missing/invalid secret means the
+      // webhook is misconfigured (deposits won't auto-confirm) — surface it as an
+      // error so Stripe flags failed deliveries and the operator notices, rather
+      // than silently 200-ing. Outside production, no-op so local/dev works.
+      if (process.env.NODE_ENV === 'production') {
+        throw new ServiceUnavailableException('Stripe webhook secret is not configured');
+      }
       return { received: true, skipped: 'stripe webhook deferred — not configured' };
     }
 

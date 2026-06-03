@@ -52,7 +52,7 @@ export class PublicBookingsController {
     @Query('token') token?: string,
   ) {
     this.assertToken(id, token);
-    return this.bookingsService.reschedule(id, dto);
+    return this.bookingsService.reschedule(id, dto, undefined, { byClient: true });
   }
 }
 
@@ -131,7 +131,7 @@ export class BookingsController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.appointmentService.confirm(id, businessId);
+    return this.appointmentService.confirm(id, businessId, user.id);
   }
 
   @Patch(':id/reschedule')
@@ -145,7 +145,7 @@ export class BookingsController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.appointmentService.reschedule(id, dto, businessId);
+    return this.appointmentService.reschedule(id, dto, businessId, { userId: user.id });
   }
 
   @Patch(':id/status')
@@ -159,6 +159,6 @@ export class BookingsController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.appointmentService.updateStatus(id, dto, businessId, true);
+    return this.appointmentService.updateStatus(id, dto, businessId, true, user.id);
   }
 }

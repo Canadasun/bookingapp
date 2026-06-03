@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
+import { hashRefreshToken } from '../common/util/refresh-token';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -267,7 +268,9 @@ export class AuthService {
     });
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken },
+      // Store only a hash of the refresh token — a DB leak then can't replay live
+      // sessions. The refresh strategy compares the same hash.
+      data: { refreshToken: hashRefreshToken(refreshToken) },
     });
 
     let staffId: string | null = null;

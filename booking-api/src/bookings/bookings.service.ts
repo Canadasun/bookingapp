@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -90,9 +91,20 @@ export class BookingsService {
     let totalDurationMinutes = primaryService.durationMinutes;
     const additionalServiceNames: string[] = [];
     if (dto.additionalServiceIds?.length) {
+      const ids = [...new Set(dto.additionalServiceIds)];
       const extras = await this.prisma.service.findMany({
-        where: { id: { in: dto.additionalServiceIds }, businessId },
+        where: { id: { in: ids }, businessId, active: true },
       });
+      if (extras.length !== ids.length) {
+        throw new BadRequestException('One or more selected services are unavailable');
+      }
+      // Every additional service must also be offered by the chosen staff member.
+      const offered = await this.prisma.staffService.count({
+        where: { staffId: dto.staffId, serviceId: { in: ids } },
+      });
+      if (offered !== ids.length) {
+        throw new BadRequestException('This staff member does not offer one of the selected services');
+      }
       totalDurationMinutes += extras.reduce((sum, s) => sum + s.durationMinutes, 0);
       additionalServiceNames.push(...extras.map((s) => s.name));
     }
@@ -219,25 +231,58 @@ export class BookingsService {
     return { ...appointment, manageToken: signAppointmentToken(appointment.id) };
   }
 
-  async confirm(id: string, businessId?: string) {
+  async confirm(id: string, businessId?: string, userId?: string) {
     const apt = await this.findOne(id, businessId);
     const updated = await this.prisma.appointment.update({
       where: { id },
       data: { status: 'CONFIRMED' },
       include: { client: true, service: true, business: true },
     });
+    await this.logAction('APPOINTMENT', id, 'UPDATE_STATUS', {
+      fromStatus: apt.status,
+      status: 'CONFIRMED',
+    }, userId);
     await this.notifications.scheduleReminders(updated);
     return updated;
   }
 
-  async reschedule(id: string, dto: RescheduleDto, businessId?: string) {
+  async reschedule(
+    id: string,
+    dto: RescheduleDto,
+    businessId?: string,
+    opts: { byClient?: boolean; userId?: string } = {},
+  ) {
     const existing = await this.findOne(id, businessId);
     const service = await this.prisma.service.findFirstOrThrow({
       where: { id: existing.serviceId, businessId: existing.businessId },
     });
+    if (service.active === false) throw new BadRequestException('Service is not available');
 
     const startsAt = new Date(dto.startsAt);
     const endsAt = addMinutes(startsAt, service.durationMinutes);
+
+    // Re-apply the same integrity + policy checks as creation — a reschedule must
+    // not slip a booking into a state the business wouldn't otherwise allow.
+    const biz = existing.business;
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: existing.staffId, businessId: existing.businessId, active: true },
+    });
+    if (!staff) throw new BadRequestException('This staff member is no longer available');
+    const offersService = await this.prisma.staffService.findFirst({
+      where: { staffId: existing.staffId, serviceId: existing.serviceId },
+    });
+    if (!offersService) throw new BadRequestException('This staff member no longer offers the service');
+
+    if (opts.byClient) {
+      if (biz && !biz.allowClientReschedule) {
+        throw new ForbiddenException('Online rescheduling is disabled — please contact the business.');
+      }
+      const now = Date.now();
+      const minNoticeMs = (biz?.minNoticeMinutes ?? 0) * 60_000;
+      const maxAdvanceMs = (biz?.maxAdvanceDays ?? 365) * 24 * 60 * 60_000;
+      if (startsAt.getTime() < now + minNoticeMs) throw new BadRequestException('This time is too soon — please pick a later slot.');
+      if (startsAt.getTime() > now + maxAdvanceMs) throw new BadRequestException('This time is too far in advance.');
+    }
 
     const runReschedule = () =>
       this.prisma.$transaction(
@@ -293,11 +338,22 @@ export class BookingsService {
 
     await this.notifications.cancelReminders(id);
     await this.notifications.sendReschedule(updated);
+    await this.logAction('APPOINTMENT', id, 'RESCHEDULE', {
+      fromStartsAt: existing.startsAt,
+      toStartsAt: startsAt,
+      fromStatus: existing.status,
+      status: 'PENDING',
+      byClient: !!opts.byClient,
+    }, opts.userId);
     return updated;
   }
 
-  async updateStatus(id: string, dto: StatusDto, businessId?: string, byStaff = false) {
-    await this.findOne(id, businessId);
+  async updateStatus(id: string, dto: StatusDto, businessId?: string, byStaff = false, userId?: string) {
+    const existing = await this.findOne(id, businessId);
+    if (dto.status === 'CANCELLED' && !['PENDING', 'CONFIRMED'].includes(existing.status)) {
+      throw new BadRequestException('Only pending or confirmed appointments can be cancelled');
+    }
+
     const updated = await this.prisma.appointment.update({
       where: { id },
       data: {
@@ -307,9 +363,12 @@ export class BookingsService {
       include: { client: true, service: true, business: true },
     });
 
-    await this.logAction('APPOINTMENT', id, 'UPDATE_STATUS', { status: dto.status });
-
     let cancelFee: { charged: boolean; feeCents: number; reason?: string } | undefined;
+    const auditChanges: Record<string, unknown> = {
+      fromStatus: existing.status,
+      status: dto.status,
+    };
+
     if (dto.status === 'CANCELLED') {
       await this.notifications.cancelReminders(id);
 
@@ -318,10 +377,19 @@ export class BookingsService {
       // "late" cancel when we're already inside the cancellation window. Free tier
       // and early cancels are always free. Best-effort: never blocks the cancel.
       const biz = updated.business;
+      const cancellationTiming =
+        biz && new Date() > new Date(updated.startsAt.getTime() - biz.cancellationWindowHours * 3600 * 1000)
+          ? 'late'
+          : 'early';
+      auditChanges.cancelReason = dto.cancelReason ?? null;
+      auditChanges.cancelledBy = byStaff ? 'staff' : 'client';
+      auditChanges.cancellationTiming = cancellationTiming;
+      auditChanges.cancellationWindowHours = biz?.cancellationWindowHours ?? null;
+
       if (!byStaff && biz && biz.plan !== 'FREE' && biz.cancellationFeeCents > 0) {
-        const cutoff = new Date(updated.startsAt.getTime() - biz.cancellationWindowHours * 3600 * 1000);
-        if (new Date() > cutoff) {
+        if (cancellationTiming === 'late') {
           cancelFee = await this.payments.chargeCancellationFee(id, updated.businessId);
+          auditChanges.cancelFee = cancelFee;
         }
       }
 
@@ -332,6 +400,8 @@ export class BookingsService {
       }
       await this.notifyWaitlist(updated.businessId, updated.serviceId);
     }
+
+    await this.logAction('APPOINTMENT', id, 'UPDATE_STATUS', auditChanges, userId);
 
     if (dto.status === 'COMPLETED') {
       // Post-visit review request.

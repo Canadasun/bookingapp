@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
+import { hashRefreshToken } from '../../common/util/refresh-token';
 
 // Fail closed: refuse to start without a configured refresh secret.
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
@@ -21,7 +22,10 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
   async validate(req: Request, payload: { sub: string }) {
     const { refreshToken } = req.body as { refreshToken: string };
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || user.refreshToken !== refreshToken) throw new UnauthorizedException();
+    // Compare the hash of the presented token against the stored hash.
+    if (!user || !user.refreshToken || user.refreshToken !== hashRefreshToken(refreshToken)) {
+      throw new UnauthorizedException();
+    }
     return user;
   }
 }

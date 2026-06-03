@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -28,6 +28,15 @@ function makeAppointment(overrides = {}) {
     client: { id: 'client1', name: 'Jane Doe', email: 'jane@example.com', phone: null },
     service: { id: 'svc1', name: 'Haircut', durationMinutes: 60 },
     staff: { id: 'staff1', user: { name: 'Bob' } },
+    business: {
+      id: 'biz1',
+      plan: 'FREE',
+      minNoticeMinutes: 120,
+      maxAdvanceDays: 60,
+      allowClientReschedule: true,
+      cancellationWindowHours: 24,
+      cancellationFeeCents: 0,
+    },
     ...overrides,
   };
 }
@@ -67,7 +76,7 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }),
     },
     business: {
-      findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60 }),
+      findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60, allowClientReschedule: true }),
     },
     appointment: {
       findMany: jest.fn().mockResolvedValue([makeAppointment()]),
@@ -276,6 +285,53 @@ describe('BookingsService', () => {
     });
   });
 
+  describe('reschedule', () => {
+    it('rejects public client reschedule when online rescheduling is disabled', async () => {
+      const { svc } = await buildService({
+        appointment: {
+          ...mockPrisma().appointment,
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({
+            business: {
+              id: 'biz1',
+              plan: 'FREE',
+              minNoticeMinutes: 120,
+              maxAdvanceDays: 60,
+              allowClientReschedule: false,
+              cancellationWindowHours: 24,
+              cancellationFeeCents: 0,
+            },
+          })),
+        },
+      });
+
+      await expect(
+        svc.reschedule('apt1', { startsAt: SLOT_START.toISOString() }, undefined, { byClient: true }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects public client reschedule inside the minimum notice window', async () => {
+      const { svc } = await buildService();
+      const tooSoon = new Date(Date.now() + 30 * 60 * 1000);
+
+      await expect(
+        svc.reschedule('apt1', { startsAt: tooSoon.toISOString() }, undefined, { byClient: true }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects reschedule when the service has been deactivated', async () => {
+      const { svc } = await buildService({
+        service: {
+          ...mockPrisma().service,
+          findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: false }),
+        },
+      });
+
+      await expect(
+        svc.reschedule('apt1', { startsAt: SLOT_START.toISOString() }, 'biz1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('updateStatus', () => {
     it('cancels reminders when status set to CANCELLED', async () => {
       const cancelReminders = jest.fn();
@@ -295,6 +351,28 @@ describe('BookingsService', () => {
       await svc.updateStatus('apt1', { status: 'CANCELLED' }, 'biz1');
       expect(cancelReminders).toHaveBeenCalledWith('apt1');
       expect(sendCancellation).toHaveBeenCalled();
+    });
+
+    it('rejects cancelling an appointment that is already closed', async () => {
+      const { svc } = await buildService({
+        appointment: {
+          ...mockPrisma().appointment,
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({ status: 'COMPLETED' })),
+        },
+      });
+
+      await expect(svc.updateStatus('apt1', { status: 'CANCELLED' }, 'biz1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('records userId on authenticated owner or staff status changes', async () => {
+      const { svc, prisma } = await buildService();
+      await svc.updateStatus('apt1', { status: 'CANCELLED' }, 'biz1', true, 'user1');
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: 'user1' }),
+        }),
+      );
     });
   });
 });

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -73,5 +73,30 @@ describe('PaymentsService.refundPayment', () => {
   it('404 when the payment is not in the business', async () => {
     const { svc } = await build(null);
     await expect(svc.refundPayment('biz1', 'missing', {})).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('PaymentsService.handleWebhook', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it('fails closed in production when STRIPE_WEBHOOK_SECRET is not configured', async () => {
+    process.env.NODE_ENV = 'production';
+    const { svc } = await build(makePayment());
+
+    await expect(svc.handleWebhook(Buffer.from('{}'), 'sig_test')).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('skips unconfigured webhooks outside production', async () => {
+    process.env.NODE_ENV = 'development';
+    const { svc } = await build(makePayment());
+
+    await expect(svc.handleWebhook(Buffer.from('{}'), 'sig_test')).resolves.toMatchObject({
+      received: true,
+      skipped: expect.stringContaining('not configured'),
+    });
   });
 });
