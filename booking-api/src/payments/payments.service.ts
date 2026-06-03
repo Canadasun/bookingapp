@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PaymentKind, PaymentStatus } from '@prisma/client';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -30,6 +31,25 @@ export class PaymentsService {
 
   private publishableKey(): string {
     return this.configService.get<string>('STRIPE_PUBLISHABLE_KEY') ?? '';
+  }
+
+  // Ledger write. Best-effort: a bookkeeping failure must never break a real
+  // charge (the money has already moved), so we log and continue.
+  private async recordPayment(data: {
+    businessId: string;
+    appointmentId?: string | null;
+    clientId?: string | null;
+    stripePaymentIntentId?: string | null;
+    amountCents: number;
+    kind: PaymentKind;
+    status: PaymentStatus;
+    description?: string;
+  }) {
+    try {
+      await this.prisma.payment.create({ data });
+    } catch (err) {
+      console.error('[ledger] failed to record payment', err);
+    }
   }
 
   // Get-or-create a Stripe Customer for a client and persist the id so cards can
@@ -86,6 +106,12 @@ export class PaymentsService {
         where: { id: appointmentId },
         data: { stripePaymentIntentId: intent.id, depositCents },
       });
+      await this.recordPayment({
+        businessId, appointmentId, clientId: apt.clientId,
+        stripePaymentIntentId: intent.id, amountCents: depositCents,
+        kind: 'DEPOSIT', status: 'PENDING',
+        description: `Deposit — ${apt.service.name}`,
+      });
       return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey() };
     }
 
@@ -134,6 +160,12 @@ export class PaymentsService {
       },
       description: input.description?.trim() || `In-person charge — ${business.name}`,
     });
+    await this.recordPayment({
+      businessId, clientId: input.clientId ?? null,
+      stripePaymentIntentId: intent.id, amountCents: input.amountCents,
+      kind: 'IN_PERSON', status: 'PENDING',
+      description: input.description?.trim() || `In-person charge`,
+    });
     return {
       paymentIntentId: intent.id,
       clientSecret: intent.client_secret,
@@ -163,6 +195,12 @@ export class PaymentsService {
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const intent = event.data.object as Stripe.PaymentIntent;
+        // Ledger: mark the payment SUCCEEDED (idempotent — keyed on the unique
+        // intent id; only flips rows not already settled).
+        await this.prisma.payment.updateMany({
+          where: { stripePaymentIntentId: intent.id, status: { in: ['PENDING', 'FAILED'] } },
+          data: { status: 'SUCCEEDED' },
+        });
         const appointmentId = intent.metadata.appointmentId;
         if (appointmentId) {
           // Idempotent: only transition (and notify) on first success.
@@ -198,6 +236,10 @@ export class PaymentsService {
       }
       case 'payment_intent.payment_failed': {
         const intent = event.data.object as Stripe.PaymentIntent;
+        await this.prisma.payment.updateMany({
+          where: { stripePaymentIntentId: intent.id, status: 'PENDING' },
+          data: { status: 'FAILED' },
+        });
         const appointmentId = intent.metadata.appointmentId;
         if (appointmentId) {
           await this.prisma.appointment.updateMany({
@@ -207,9 +249,100 @@ export class PaymentsService {
         }
         break;
       }
+      case 'charge.refunded': {
+        // Reconcile the ledger when a refund happens anywhere (our endpoint, the
+        // Stripe dashboard, or a dispute). Keyed on the payment intent.
+        const charge = event.data.object as Stripe.Charge;
+        const intentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : null;
+        if (intentId) {
+          const payment = await this.prisma.payment.findUnique({ where: { stripePaymentIntentId: intentId } });
+          if (payment) {
+            const refundedCents = charge.amount_refunded ?? 0;
+            const status: PaymentStatus =
+              refundedCents >= payment.amountCents ? 'REFUNDED' : refundedCents > 0 ? 'PARTIALLY_REFUNDED' : payment.status;
+            await this.prisma.payment.update({ where: { id: payment.id }, data: { refundedCents, status } });
+            // Mirror each Stripe refund as a Refund row (idempotent on stripeRefundId).
+            for (const r of charge.refunds?.data ?? []) {
+              await this.prisma.refund.upsert({
+                where: { stripeRefundId: r.id },
+                update: { status: r.status === 'succeeded' ? 'SUCCEEDED' : r.status === 'failed' ? 'FAILED' : 'PENDING' },
+                create: {
+                  businessId: payment.businessId, paymentId: payment.id, stripeRefundId: r.id,
+                  amountCents: r.amount, reason: r.reason ?? undefined,
+                  status: r.status === 'succeeded' ? 'SUCCEEDED' : r.status === 'failed' ? 'FAILED' : 'PENDING',
+                },
+              });
+            }
+          }
+        }
+        break;
+      }
     }
 
     return { received: true, eventId: event.id };
+  }
+
+  /**
+   * Owner-initiated refund of a customer payment (full or partial). Creates a
+   * Stripe refund, writes a Refund ledger row, and updates the Payment's
+   * refunded total + status. Scoped to the owner's business.
+   */
+  async refundPayment(
+    businessId: string,
+    paymentId: string,
+    input: { amountCents?: number; reason?: string },
+  ) {
+    const payment = await this.prisma.payment.findFirst({ where: { id: paymentId, businessId } });
+    if (!payment) throw new NotFoundException('Payment not found');
+    if (payment.status !== 'SUCCEEDED' && payment.status !== 'PARTIALLY_REFUNDED') {
+      throw new BadRequestException('Only a settled payment can be refunded');
+    }
+    if (!payment.stripePaymentIntentId) {
+      throw new BadRequestException('This payment has no Stripe charge to refund');
+    }
+    const remaining = payment.amountCents - payment.refundedCents;
+    const amount = input.amountCents ?? remaining;
+    if (amount <= 0 || amount > remaining) {
+      throw new BadRequestException(`Refund amount must be between 1 and ${remaining} cents`);
+    }
+
+    const stripeRefund = await this.getStripe().refunds.create({
+      payment_intent: payment.stripePaymentIntentId,
+      amount,
+      ...(input.reason ? { metadata: { reason: input.reason } } : {}),
+    });
+
+    const refundedTotal = payment.refundedCents + amount;
+    const newStatus: PaymentStatus = refundedTotal >= payment.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+
+    const [refund] = await this.prisma.$transaction([
+      this.prisma.refund.create({
+        data: {
+          businessId, paymentId: payment.id, stripeRefundId: stripeRefund.id,
+          amountCents: amount, reason: input.reason,
+          status: stripeRefund.status === 'succeeded' ? 'SUCCEEDED' : stripeRefund.status === 'failed' ? 'FAILED' : 'PENDING',
+        },
+      }),
+      this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { refundedCents: refundedTotal, status: newStatus },
+      }),
+    ]);
+    return { refund, paymentId: payment.id, refundedCents: refundedTotal, status: newStatus };
+  }
+
+  // Owner-scoped payment ledger for the business (newest first).
+  async listPayments(businessId: string, limit = 100) {
+    return this.prisma.payment.findMany({
+      where: { businessId },
+      include: {
+        refunds: { orderBy: { createdAt: 'desc' } },
+        client: { select: { id: true, name: true, email: true } },
+        appointment: { select: { id: true, startsAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 200),
+    });
   }
 
   /**
@@ -246,6 +379,12 @@ export class PaymentsService {
     });
 
     await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+    await this.recordPayment({
+      businessId, appointmentId, clientId: apt.clientId,
+      stripePaymentIntentId: intent.id, amountCents: feeCents,
+      kind: 'NO_SHOW_FEE', status: intent.status === 'succeeded' ? 'SUCCEEDED' : 'FAILED',
+      description: `No-show fee — ${apt.service.name}`,
+    });
     return { charged: intent.status === 'succeeded', feeCents, paymentIntentId: intent.id, status: intent.status };
   }
 
@@ -276,6 +415,12 @@ export class PaymentsService {
         confirm: true,
         metadata: { appointmentId, businessId, kind: 'late_cancel_fee' },
         description: `Late cancellation fee — ${apt.service.name} @ ${apt.business.name}`,
+      });
+      await this.recordPayment({
+        businessId, appointmentId, clientId: apt.clientId,
+        stripePaymentIntentId: intent.id, amountCents: feeCents,
+        kind: 'LATE_CANCEL_FEE', status: intent.status === 'succeeded' ? 'SUCCEEDED' : 'FAILED',
+        description: `Late cancellation fee — ${apt.service.name}`,
       });
       return { charged: intent.status === 'succeeded', feeCents, reason: intent.status };
     } catch {

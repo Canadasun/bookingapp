@@ -94,6 +94,8 @@ model Business {
   giftCards          GiftCard[]
   packages           Package[]
   clientPackages     ClientPackage[]
+  payments           Payment[]
+  refunds            Refund[]
 }
 
 model Review {
@@ -443,6 +445,7 @@ model Client {
   appointments Appointment[]
   messages     Message[]
   packages     ClientPackage[]
+  payments     Payment[]
 
   @@unique([businessId, email])
   @@index([businessId])
@@ -473,6 +476,7 @@ model Appointment {
   service           Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   client            Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
   notificationLogs  NotificationLog[]
+  payments          Payment[]
 
   @@index([businessId])
   @@index([staffId])
@@ -573,4 +577,75 @@ model SystemMetric {
 
   @@index([name])
   @@index([timestamp])
+}
+
+// ── Customer payment ledger ───────────────────────────────────────────────────
+enum PaymentKind {
+  DEPOSIT
+  NO_SHOW_FEE
+  LATE_CANCEL_FEE
+  IN_PERSON
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+// First-class record of every customer charge (deposits, no-show / late-cancel
+// fees, in-person Tap to Pay). One row per charge, reconciled with Stripe by
+// webhook. stripePaymentIntentId is unique → webhook idempotency.
+model Payment {
+  id                    String        @id @default(cuid())
+  businessId            String
+  appointmentId         String?
+  clientId              String?
+  stripePaymentIntentId String?       @unique
+  amountCents           Int
+  currency              String        @default("usd")
+  kind                  PaymentKind   @default(OTHER)
+  status                PaymentStatus @default(PENDING)
+  refundedCents         Int           @default(0)
+  description           String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  client      Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  refunds     Refund[]
+
+  @@index([businessId])
+  @@index([appointmentId])
+  @@index([createdAt])
+}
+
+model Refund {
+  id             String       @id @default(cuid())
+  businessId     String
+  paymentId      String
+  stripeRefundId String?      @unique
+  amountCents    Int
+  reason         String?
+  status         RefundStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  payment  Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([paymentId])
 }

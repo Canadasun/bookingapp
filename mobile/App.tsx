@@ -1081,7 +1081,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 // ── Menu / Settings hub ──────────────────────────────────────────────────────
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
-  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'soon';
+  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'soon';
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const [view, setView]         = useState<MoreView>('menu');
@@ -1095,6 +1095,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [giftcards, setGiftcards] = useState<any[] | null>(null);
   const [packages, setPackages] = useState<any[] | null>(null);
   const [appts, setAppts]       = useState<Appointment[] | null>(null); // for Reports
+  const [payments, setPayments] = useState<any[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
   // Two-factor sign-in (seeded from the session, updated optimistically).
@@ -1127,6 +1128,20 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     return () => sub.remove();
   }, [view]);
 
+  function refundPayment(p: any) {
+    const remaining = (p.amountCents - p.refundedCents) / 100;
+    Alert.alert('Refund payment', `Refund $${remaining.toFixed(2)} to the customer?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Refund', style:'destructive', onPress: async () => {
+        try {
+          await api(`/payments/${p.id}/refund`, { method:'POST', body: JSON.stringify({}) });
+          setPayments(await api<any[]>(`/payments`));
+          Alert.alert('Refunded', 'The payment was refunded.');
+        } catch(e){ Alert.alert('Refund failed', e instanceof Error ? e.message : 'Please try again.'); }
+      }},
+    ]);
+  }
+
   async function open(v: MoreView) {
     setView(v);
     try {
@@ -1140,6 +1155,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'packages' && !packages){ setLoading(true); setPackages(await api<any[]>(`/businesses/${bizId()}/packages`)); }
       else if ((v === 'settings' || v === 'booking' || v === 'subscriptions' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
       else if (v === 'reports' && !appts) { setLoading(true); setAppts((await api<{data:Appointment[]}>(`/businesses/${bizId()}/bookings`)).data); }
+      else if (v === 'transactions') { setLoading(true); setPayments(await api<any[]>(`/payments`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
 
@@ -1441,6 +1457,43 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     );
   }
 
+  if (view === 'transactions') {
+    const PK: Record<string,string> = { DEPOSIT:'Deposit', NO_SHOW_FEE:'No-show fee', LATE_CANCEL_FEE:'Late-cancel fee', IN_PERSON:'In-person', OTHER:'Charge' };
+    const SC: Record<string,string> = { SUCCEEDED:'#065F46', PENDING:'#B45309', FAILED:'#991B1B', REFUNDED:GRAY_700, PARTIALLY_REFUNDED:'#B45309', CANCELED:GRAY_700 };
+    const SB: Record<string,string> = { SUCCEEDED:'#D1FAE5', PENDING:'#FEF3C7', FAILED:'#FEE2E2', REFUNDED:GRAY_100, PARTIALLY_REFUNDED:'#FEF3C7', CANCELED:GRAY_100 };
+    return (
+      <SafeAreaView style={s.screen}>
+        <Head title="Transactions"/>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {(payments ?? []).map(p => {
+              const refundable = (p.status==='SUCCEEDED' || p.status==='PARTIALLY_REFUNDED') && (p.amountCents - p.refundedCents) > 0;
+              return (
+                <View key={p.id} style={ms.card}>
+                  <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <Text style={ms.rowTitle}>${(p.amountCents/100).toFixed(2)}</Text>
+                    <View style={[ms.dealChip,{ backgroundColor: SB[p.status] ?? GRAY_100 }]}>
+                      <Text style={[ms.dealChipText,{ color: SC[p.status] ?? GRAY_700 }]}>{String(p.status).replace('_',' ')}</Text>
+                    </View>
+                  </View>
+                  <Text style={[ms.rowMeta,{ marginTop:2 }]}>{PK[p.kind] ?? p.kind}{p.client ? ` · ${p.client.name}` : ''}</Text>
+                  <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:2 }]}>{new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · {new Date(p.createdAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</Text>
+                  {p.refundedCents > 0 && <Text style={[ms.rowMeta,{ color:'#B45309', marginTop:2 }]}>Refunded ${(p.refundedCents/100).toFixed(2)}</Text>}
+                  {refundable && (
+                    <TouchableOpacity style={[ms.methodChip,{ marginTop:10 }]} onPress={()=>refundPayment(p)}>
+                      <Text style={ms.methodChipText}>Refund</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+            {payments && payments.length===0 && <Text style={ms.empty}>No transactions yet. In-person charges and deposits show here.</Text>}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   if (view === 'addons') return (
     <SafeAreaView style={s.screen}>
       <Head title="Add-ons"/>
@@ -1577,7 +1630,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
     { label:'Invoices',         icon:'document-text-outline',   onPress:()=>goSoon('Invoices') },
     { label:'Estimates',        icon:'calculator-outline',      onPress:()=>goSoon('Estimates') },
-    { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>goSoon('Transactions') },
+    { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
     { label:'Orders',           icon:'cart-outline',            onPress:()=>goSoon('Orders') },
     { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
     { label:'Money',            icon:'cash-outline',            onPress:()=>goSoon('Money') },

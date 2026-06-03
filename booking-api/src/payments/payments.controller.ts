@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Param, Body, Headers, RawBodyRequest, Req, UseGuards, ForbiddenException, BadRequestException,
+  Controller, Get, Post, Param, Body, Headers, RawBodyRequest, Req, UseGuards, ForbiddenException, BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -18,6 +18,12 @@ const CustomChargeSchema = z.object({
   amountCents: z.number().int().min(50).max(10_000_000),
   description: z.string().max(200).optional(),
   clientId: z.string().optional(),
+});
+
+const RefundSchema = z.object({
+  // Omit amountCents for a full refund of the remaining balance.
+  amountCents: z.number().int().positive().optional(),
+  reason: z.string().max(200).optional(),
 });
 
 @ApiTags('payments')
@@ -69,6 +75,30 @@ export class PaymentsController {
     if (!parsed.success) throw new BadRequestException('A valid amountCents (>= 50) is required');
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.paymentService.createCustomCharge(user.businessId, parsed.data);
+  }
+
+  // Owner — the business payment ledger (deposits, fees, in-person charges + refunds).
+  @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  list(@CurrentUser() user: { role: string; businessId: string | null }) {
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.listPayments(user.businessId);
+  }
+
+  // Owner — refund a payment (full or partial). Scoped to the owner's business.
+  @Post(':paymentId/refund')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  refund(
+    @Param('paymentId') paymentId: string,
+    @Body() body: unknown,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    const parsed = RefundSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Invalid refund request');
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.refundPayment(user.businessId, paymentId, parsed.data);
   }
 
   @Post('webhook/stripe')
