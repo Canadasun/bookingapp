@@ -167,8 +167,8 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Walk-in checkout</h2>
-        <p className="text-sm text-gray-400 mt-0.5">Book an appointment for a client at the counter</p>
+        <h2 className="text-xl font-bold text-gray-900">New booking</h2>
+        <p className="text-sm text-gray-400 mt-0.5">Book an appointment for a client from your services</p>
       </div>
 
       {/* Step indicator */}

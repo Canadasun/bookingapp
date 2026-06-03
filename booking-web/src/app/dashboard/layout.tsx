@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
-  MessageSquare, Menu as MenuIcon, CreditCard, Bell,
+  MessageSquare, Menu as MenuIcon, CalendarPlus, Bell,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -22,7 +22,7 @@ interface NavItem {
 const OWNER_NAV: NavItem[] = [
   { href: "/dashboard",              label: "Overview",     icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
-  { href: "/dashboard/checkout",     label: "Checkout",     icon: CreditCard },
+  { href: "/dashboard/checkout",     label: "New booking",  icon: CalendarPlus },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
   { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
   {
