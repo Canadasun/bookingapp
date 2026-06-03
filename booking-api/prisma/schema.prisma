@@ -305,6 +305,7 @@ model User {
   staff    Staff?
   loginEvents LoginEvent[]
   otpChallenges OtpChallenge[]
+  notifications Notification[]
 
   @@index([email])
   @@index([businessId])
@@ -599,6 +600,54 @@ model Subscription {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([stripeCustomerId])
+}
+
+// ── Notification center ──────────────────────────────────────────────────────
+enum NotificationKind {
+  BOOKING_NEW
+  BOOKING_UPDATE
+  PAYMENT
+  SYSTEM
+}
+
+// In-app notification inbox, per user (owners/staff/registered clients).
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  kind      NotificationKind @default(SYSTEM)
+  title     String
+  body      String?
+  linkUrl   String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum DeliveryChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+// Broad delivery log for every outbound message (email/SMS/push), independent of
+// appointments — complements the appointment-scoped NotificationLog.
+model NotificationDelivery {
+  id         String             @id @default(cuid())
+  businessId String?
+  userId     String?
+  channel    DeliveryChannel
+  recipient  String
+  type       String
+  status     NotificationStatus
+  error      String?
+  createdAt  DateTime           @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([createdAt])
 }
 
 model SystemMetric {

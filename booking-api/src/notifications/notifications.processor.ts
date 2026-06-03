@@ -45,14 +45,55 @@ function aptDetails(apt: {
 export class NotificationProcessor extends WorkerHost {
   private email = new ResendEmailProvider();
   private sms   = new TwilioSmsProvider();
+  // The job name currently being processed, used to label delivery-log rows.
+  // (Worker concurrency is 1, so this is stable across a single job.)
+  private currentType = '';
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-  ) { super(); }
+  ) {
+    super();
+    this.installDeliveryLogging();
+  }
+
+  // Wrap the providers so every email/SMS send is recorded in NotificationDelivery
+  // (sent or failed) with zero changes at the ~14 call sites. Best-effort: a
+  // logging failure never affects the actual send.
+  private installDeliveryLogging() {
+    const log = (channel: 'EMAIL' | 'SMS', recipient: string, status: 'SENT' | 'FAILED', error?: string) =>
+      this.prisma.notificationDelivery
+        .create({ data: { channel, recipient, type: this.currentType || 'unknown', status, error } })
+        .catch(() => {});
+    const origEmail = this.email.send.bind(this.email);
+    this.email.send = async (payload) => {
+      try { await origEmail(payload); await log('EMAIL', payload.to, 'SENT'); }
+      catch (e) { await log('EMAIL', payload.to, 'FAILED', e instanceof Error ? e.message : String(e)); throw e; }
+    };
+    const origSms = this.sms.send.bind(this.sms);
+    this.sms.send = async (payload) => {
+      try { await origSms(payload); await log('SMS', payload.to, 'SENT'); }
+      catch (e) { await log('SMS', payload.to, 'FAILED', e instanceof Error ? e.message : String(e)); throw e; }
+    };
+  }
+
+  // In-app inbox notification to a business's owner(s). Best-effort.
+  private async notifyOwners(
+    businessId: string,
+    data: { kind: 'BOOKING_NEW' | 'BOOKING_UPDATE' | 'PAYMENT' | 'SYSTEM'; title: string; body?: string; linkUrl?: string },
+  ) {
+    try {
+      const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { id: true } });
+      if (!owners.length) return;
+      await this.prisma.notification.createMany({
+        data: owners.map((o) => ({ userId: o.id, kind: data.kind, title: data.title, body: data.body ?? null, linkUrl: data.linkUrl ?? null })),
+      });
+    } catch { /* never block the job on inbox writes */ }
+  }
 
   async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string }>) {
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    this.currentType = job.name; // label for the delivery log
 
     // 2FA one-time code (email, or SMS if the method is SMS and a phone exists).
     if (job.name === 'otp') {
@@ -270,6 +311,12 @@ ${aptDetails(apt)}
           `),
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}. Awaiting approval.`);
+        await this.notifyOwners(apt.businessId, {
+          kind: 'BOOKING_NEW',
+          title: `New booking — ${apt.client.name}`,
+          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')} — awaiting your approval.`,
+          linkUrl: '/dashboard/appointments',
+        });
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
         break;
       }

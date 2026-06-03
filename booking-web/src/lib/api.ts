@@ -244,6 +244,13 @@ export const api = {
     },
   },
 
+  notifications: {
+    list: () => req<Array<{ id: string; kind: string; title: string; body?: string | null; linkUrl?: string | null; read: boolean; createdAt: string }>>("/notifications"),
+    unreadCount: () => req<{ count: number }>("/notifications/unread-count"),
+    markRead: (id: string) => req<{ ok: boolean }>(`/notifications/${id}/read`, { method: "POST" }),
+    markAllRead: () => req<{ ok: boolean }>("/notifications/read-all", { method: "POST" }),
+  },
+
   subscriptions: {
     // Current plan + billing status.
     get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),

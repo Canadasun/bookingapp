@@ -15,6 +15,7 @@ import { ClientsModule } from './clients/clients.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { InboxModule } from './inbox/inbox.module';
 import { UsersModule } from './users/users.module';
 import { MessagesModule } from './messages/messages.module';
 import { OffersModule } from './offers/offers.module';
@@ -59,6 +60,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     NotificationsModule,
     PaymentsModule,
     UploadsModule,
+    InboxModule,
     MessagesModule,
     OffersModule,
     ClientPortalModule,
