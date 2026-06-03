@@ -39,7 +39,7 @@ RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@yourdomain.com
 RESEND_VERIFIED_FROM=noreply@yourdomain.com
 RESEND_TEST_REDIRECT=
-ADMIN_ALERT_EMAIL=idowu@icloud.com
+ADMIN_ALERT_EMAIL=pmayeni1@icloud.com
 
 TWILIO_ACCOUNT_SID=AC...
 TWILIO_AUTH_TOKEN=...
@@ -71,9 +71,9 @@ In project Settings → Environment Variables:
 
 ```
 API_INTERNAL_URL=https://booking-api-production-xxxx.up.railway.app
-NEXT_PUBLIC_BUSINESS_ID=cmpr97t3d0000pti96ggnrcvm   # your business ID
-NEXT_PUBLIC_BUSINESS_SLUG=idowu-salon
-NEXT_PUBLIC_WEB_URL=https://your-app.vercel.app
+NEXT_PUBLIC_BUSINESS_ID=cmpwffih20000rgxw61idarqm   # Pulse Appointments business ID
+NEXT_PUBLIC_BUSINESS_SLUG=pulseappointments
+NEXT_PUBLIC_WEB_URL=https://www.pulseappointments.com
 ```
 
 ### 2c. Deploy
