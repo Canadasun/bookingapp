@@ -9,6 +9,19 @@ const API_INTERNAL = (process.env.API_INTERNAL_URL ?? "http://localhost:3001")
 
 const nextConfig: NextConfig = {
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
+  // Canonical host is www.pulseappointments.com. Any request that reaches the
+  // app on the bare apex is 308-redirected (method-preserving, cacheable) to
+  // the www host so links, SEO, and cookies all live on a single origin.
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "pulseappointments.com" }],
+        destination: "https://www.pulseappointments.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
