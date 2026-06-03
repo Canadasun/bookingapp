@@ -176,6 +176,20 @@ export interface Campaign {
   createdAt: string; sentAt?: string | null;
 }
 
+export type PaymentKind = "DEPOSIT" | "NO_SHOW_FEE" | "LATE_CANCEL_FEE" | "IN_PERSON" | "OTHER";
+export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "REFUNDED" | "PARTIALLY_REFUNDED";
+export interface RefundRow {
+  id: string; amountCents: number; reason?: string | null; status: string; createdAt: string;
+}
+export interface Payment {
+  id: string; businessId: string; amountCents: number; currency: string;
+  kind: PaymentKind; status: PaymentStatus; refundedCents: number;
+  description?: string | null; stripePaymentIntentId?: string | null; createdAt: string;
+  client?: { id: string; name: string; email: string } | null;
+  appointment?: { id: string; startsAt: string } | null;
+  refunds?: RefundRow[];
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -204,6 +218,14 @@ export const api = {
     // Owner — charge the configured no-show fee on the saved card.
     chargeNoShow: (appointmentId: string) =>
       req<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${appointmentId}`, { method: "POST" }),
+    // Owner — the business payment ledger (deposits, fees, in-person charges + refunds).
+    list: () => req<Payment[]>("/payments"),
+    // Owner — refund a payment (omit amountCents for a full refund of the remaining balance).
+    refund: (paymentId: string, amountCents?: number, reason?: string) =>
+      req<{ refundedCents: number; status: PaymentStatus }>(`/payments/${paymentId}/refund`, {
+        method: "POST",
+        body: JSON.stringify({ ...(amountCents ? { amountCents } : {}), ...(reason ? { reason } : {}) }),
+      }),
   },
 
   waitlist: {
