@@ -11,6 +11,7 @@ import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import { hashRefreshToken } from '../common/util/refresh-token';
+import { normalizePhone } from '../common/util/phone';
 import { User } from '@prisma/client';
 
 @Injectable()
@@ -42,7 +43,7 @@ export class AuthService {
             name: businessName,
             slug: `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`,
             email: dto.email,
-            phone: dto.businessPhone?.trim() || undefined,
+            phone: normalizePhone(dto.businessPhone) ?? undefined,
             timezone: dto.timezone?.trim() || undefined,
           },
         });

@@ -1,10 +1,27 @@
 import { z } from 'zod';
+import { normalizePhone } from '../../common/util/phone';
+
+// Optional phone normalized to E.164 (so Twilio can deliver SMS to the owner).
+// A bare 10-digit number is treated as +1; anything present must be complete.
+const phoneSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v, ctx) => {
+    if (!v) return undefined;
+    const normalized = normalizePhone(v);
+    if (!normalized) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a valid phone number, e.g. +1 555 123 4567' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 export const CreateBusinessSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
   email: z.string().email(),
-  phone: z.string().optional(),
+  phone: phoneSchema,
   timezone: z.string().default('America/New_York'),
   address: z.string().optional(),
   logoUrl: z.string().max(2048).optional(),

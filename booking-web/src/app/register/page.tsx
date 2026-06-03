@@ -115,7 +115,10 @@ export default function RegisterPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Business phone <span className="text-slate-400 font-normal">(optional)</span></label>
-                <Input type="tel" placeholder="+1 555 123 4567" value={form.phone} onChange={(e) => f("phone", e.target.value)} />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 select-none pointer-events-none z-10">+1</span>
+                  <Input type="tel" className="pl-9" placeholder="555 123 4567" value={form.phone} onChange={(e) => f("phone", e.target.value)} />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
