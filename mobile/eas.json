@@ -16,7 +16,7 @@
       }
     },
     "production": {
-      "autoIncrement": false,
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
         "EXPO_PUBLIC_BUSINESS_ID": "cmpwffih20000rgxw61idarqm"
