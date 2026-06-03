@@ -115,6 +115,11 @@ export class NotificationsService {
     await this.queue.add('otp', { userId, otpCode: code, otpMethod: method }, { removeOnComplete: true, attempts: 3 });
   }
 
+  // Email-verification link (gates the client portal).
+  async sendVerifyEmail(userId: string, token: string) {
+    await this.queue.add('verify-email', { userId, resetToken: token }, { removeOnComplete: true, attempts: 3 });
+  }
+
   // Marketing campaign — one job per recipient so the queue can retry individually.
   async sendCampaignMessage(campaignId: string, clientId: string) {
     await this.queue.add(

@@ -66,8 +66,39 @@ export class AuthService {
     if (result.role === 'OWNER') {
       this.notifications.sendWelcome(result.id).catch(() => {});
     }
+    // Send an email-verification link (best-effort). Verification gates the
+    // client portal so email-matched lookups are only trusted once proven.
+    this.sendVerification(result.id).catch(() => {});
 
     return this.issueTokens(result);
+  }
+
+  // ── Email verification ──────────────────────────────────────────────────────
+  // Short-lived JWT signed with JWT_SECRET; carries the userId and a 'verify'
+  // kind. Not single-use (re-clicking is harmless — it just re-sets the flag).
+  private async sendVerification(userId: string) {
+    const token = this.jwt.sign({ sub: userId, kind: 'verify' }, { secret: process.env.JWT_SECRET, expiresIn: '7d' });
+    await this.notifications.sendVerifyEmail(userId, token);
+  }
+
+  async verifyEmail(token: string) {
+    let decoded: { sub?: string; kind?: string } | null = null;
+    try {
+      decoded = this.jwt.verify(token, { secret: process.env.JWT_SECRET }) as { sub?: string; kind?: string };
+    } catch {
+      throw new BadRequestException('Invalid or expired verification link');
+    }
+    if (!decoded?.sub || decoded.kind !== 'verify') throw new BadRequestException('Invalid verification link');
+    await this.prisma.user.update({ where: { id: decoded.sub }, data: { emailVerified: true } });
+    return { ok: true };
+  }
+
+  async resendVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { ok: true };
+    if (user.emailVerified) return { ok: true, alreadyVerified: true };
+    await this.sendVerification(userId);
+    return { ok: true };
   }
 
   // ── Self-service password reset ─────────────────────────────────────────────

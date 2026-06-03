@@ -1,0 +1,52 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+
+export default function VerifyEmailPage() {
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (!token) { setState("error"); return; }
+    api.auth.verifyEmail(token).then(() => setState("ok")).catch(() => setState("error"));
+  }, []);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+      <Card className="w-full max-w-sm">
+        <CardContent className="p-8 text-center">
+          {state === "loading" && (
+            <>
+              <Loader2 className="w-10 h-10 text-violet-600 mx-auto animate-spin" />
+              <p className="text-sm text-slate-500 mt-4">Verifying your email…</p>
+            </>
+          )}
+          {state === "ok" && (
+            <>
+              <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
+              <h1 className="text-lg font-bold text-slate-900 mt-4">Email verified</h1>
+              <p className="text-sm text-slate-500 mt-1">You can now view your bookings and messages.</p>
+              <Link href="/my/dashboard" className="inline-block mt-6 bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
+                Go to my bookings
+              </Link>
+            </>
+          )}
+          {state === "error" && (
+            <>
+              <XCircle className="w-12 h-12 text-red-500 mx-auto" />
+              <h1 className="text-lg font-bold text-slate-900 mt-4">Link invalid or expired</h1>
+              <p className="text-sm text-slate-500 mt-1">Sign in and resend a fresh verification link from your dashboard.</p>
+              <Link href="/my/login" className="inline-block mt-6 text-sm font-semibold text-violet-600 hover:underline">
+                Sign in
+              </Link>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

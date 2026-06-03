@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, isFuture } from "date-fns";
-import { Calendar, MessageSquare, Tag, LogOut, ChevronRight, Clock, AlertCircle, RefreshCw } from "lucide-react";
+import { Calendar, MessageSquare, Tag, LogOut, ChevronRight, Clock, AlertCircle, RefreshCw, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { api, Appointment } from "@/lib/api";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -26,6 +26,8 @@ export default function ClientDashboard() {
   }>>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [notVerified, setNotVerified] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // Hydrate user from cookie on client only
   useEffect(() => {
@@ -46,8 +48,14 @@ export default function ClientDashboard() {
       ]);
       setAppointments(apts as Appointment[]);
       setOffers(offs);
+      setNotVerified(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to load — try refreshing");
+      // The portal requires a verified email — show the gate instead of an error.
+      if (e instanceof Error && e.message.includes("EMAIL_NOT_VERIFIED")) {
+        setNotVerified(true);
+      } else {
+        toast.error(e instanceof Error ? e.message : "Failed to load — try refreshing");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -65,6 +73,19 @@ export default function ClientDashboard() {
     router.replace("/my/login");
   }
 
+  async function resend() {
+    setResending(true);
+    try {
+      const r = await api.auth.resendVerification();
+      toast.success(r.alreadyVerified ? "Already verified — try refreshing" : "Verification email sent");
+      if (r.alreadyVerified) load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not resend");
+    } finally {
+      setResending(false);
+    }
+  }
+
   // Still checking auth
   if (user === undefined) {
     return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]"><LoadingSpinner /></div>;
@@ -72,6 +93,26 @@ export default function ClientDashboard() {
 
   // Not a client — middleware will redirect, show nothing
   if (!user || user.role !== "CLIENT") return null;
+
+  // Email-verification gate — the portal won't return data until the email is confirmed.
+  if (notVerified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] px-4">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-100 p-8 text-center shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+            <Mail className="w-6 h-6 text-amber-600" />
+          </div>
+          <h1 className="text-lg font-bold text-gray-900 mt-4">Verify your email</h1>
+          <p className="text-sm text-gray-500 mt-1">We sent a link to <strong>{user.email}</strong>. Confirm it to view your bookings and messages.</p>
+          <button onClick={resend} disabled={resending}
+            className="mt-6 w-full bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors">
+            {resending ? "Sending…" : "Resend verification email"}
+          </button>
+          <button onClick={logout} className="mt-3 text-xs text-gray-500 hover:text-gray-700">Sign out</button>
+        </div>
+      </div>
+    );
+  }
 
   const upcoming = appointments.filter(
     (a) => isFuture(new Date(a.startsAt)) && ["PENDING","CONFIRMED"].includes(a.status)

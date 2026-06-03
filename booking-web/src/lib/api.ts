@@ -198,6 +198,12 @@ export const api = {
       req<{ accessToken: string; refreshToken: string; user: { id: string; name: string; email: string; role: string } }>(
         "/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }
       ),
+    // Public — confirm email from the emailed link.
+    verifyEmail: (token: string) =>
+      req<{ ok: boolean }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }, null),
+    // Authenticated — resend the verification link to the current user.
+    resendVerification: () =>
+      req<{ ok: boolean; alreadyVerified?: boolean }>("/auth/resend-verification", { method: "POST" }),
     register: (data: { name: string; email: string; password: string; role?: string; businessId?: string }) =>
       req<{ accessToken: string; refreshToken: string; user: { id: string; name: string; email: string; role: string } }>(
         "/auth/register", { method: "POST", body: JSON.stringify(data) }

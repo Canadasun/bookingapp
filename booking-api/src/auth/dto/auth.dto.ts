@@ -49,9 +49,14 @@ export const SetTwoFactorSchema = z.object({
   method: z.enum(['EMAIL', 'SMS']).optional(),
 });
 
+export const VerifyEmailSchema = z.object({
+  token: z.string().min(1),
+});
+
 export type RegisterDto = z.infer<typeof RegisterSchema>;
 export type VerifyTwoFactorDto = z.infer<typeof VerifyTwoFactorSchema>;
 export type SetTwoFactorDto = z.infer<typeof SetTwoFactorSchema>;
+export type VerifyEmailDto = z.infer<typeof VerifyEmailSchema>;
 export type LoginDto = z.infer<typeof LoginSchema>;
 export type RefreshDto = z.infer<typeof RefreshSchema>;
 export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;

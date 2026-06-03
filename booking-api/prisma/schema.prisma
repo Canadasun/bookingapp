@@ -284,6 +284,7 @@ model User {
   role         Role     @default(CLIENT)
   businessId   String?
   refreshToken String?
+  emailVerified Boolean @default(false)
   mustResetPassword Boolean @default(false)
   twoFactorEnabled  Boolean @default(false)
   twoFactorMethod   String  @default("EMAIL") // EMAIL | SMS

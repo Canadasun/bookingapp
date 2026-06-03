@@ -78,6 +78,24 @@ export class NotificationProcessor extends WorkerHost {
       return;
     }
 
+    // Email-verification link.
+    if (job.name === 'verify-email') {
+      const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
+      if (!user || !job.data.resetToken) return;
+      const link = `${baseUrl}/verify-email?token=${job.data.resetToken}`;
+      await this.email.send({
+        to: user.email,
+        subject: 'Verify your email for Pulse',
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Confirm your email</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, please confirm this is your email address so you can view your bookings and messages.</p>
+<a href="${link}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Verify email →</a>
+<p style="margin:16px 0 0;color:#9CA3AF;font-size:12px">This link expires in 7 days. If you didn't create a Pulse account, you can ignore this email.</p>
+`),
+      });
+      return;
+    }
+
     // Welcome email — new owner just registered.
     if (job.name === 'welcome') {
       const user = await this.prisma.user.findUnique({
