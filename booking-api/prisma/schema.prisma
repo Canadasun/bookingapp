@@ -598,7 +598,10 @@ model UploadedFile {
   kind       UploadKind @default(OTHER)
   mimeType   String
   sizeBytes  Int
-  data       Bytes
+  // Bytes live in `data` (DB storage) OR in object storage keyed by `storageKey`
+  // (S3/R2). Exactly one is set, decided by whether object storage is configured.
+  data       Bytes?
+  storageKey String?
   createdAt  DateTime   @default(now())
 
   business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)

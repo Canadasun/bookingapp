@@ -1,9 +1,11 @@
 import { Injectable, BadRequestException, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadKind } from '@prisma/client';
+import { sniffImageMime } from './sniff';
+import { objectStorageEnabled, putObject, getObjectBytes, newStorageKey, publicUrlFor } from './object-storage';
 
-// Allow common web image types only. (Validated server-side regardless of the
-// client-declared type the browser sends.)
+// Allow common raster web image types only. SVG is intentionally excluded
+// because it can embed script-like content.
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
@@ -24,11 +26,30 @@ export class UploadsService {
     }
     if (file.size > MAX_BYTES) throw new PayloadTooLargeException('Image must be 2 MB or smaller');
 
+    // Content sniffing: the real bytes must be one of the allowed image types,
+    // regardless of the client-declared Content-Type. The sniffed type is stored
+    // as the authoritative MIME.
+    const sniffed = sniffImageMime(file.buffer);
+    if (!sniffed || !ALLOWED_MIME.has(sniffed)) {
+      throw new BadRequestException('File content is not a valid PNG, JPEG, WebP, or GIF image');
+    }
+
+    // Object storage when configured; otherwise the bytes live in the DB. Either
+    // way the public URL shape (/uploads/:id) is identical.
+    if (objectStorageEnabled()) {
+      const storageKey = newStorageKey(businessId);
+      await putObject(storageKey, file.buffer, sniffed);
+      const row = await this.prisma.uploadedFile.create({
+        data: { businessId, kind, mimeType: sniffed, sizeBytes: file.size, storageKey },
+        select: { id: true },
+      });
+      return { id: row.id, url: `/uploads/${row.id}`, kind };
+    }
+
     const row = await this.prisma.uploadedFile.create({
-      data: { businessId, kind, mimeType: file.mimetype, sizeBytes: file.size, data: file.buffer },
+      data: { businessId, kind, mimeType: sniffed, sizeBytes: file.size, data: file.buffer },
       select: { id: true },
     });
-    // The stored URL shape stays stable even if storage moves to S3/R2 later.
     return { id: row.id, url: `/uploads/${row.id}`, kind };
   }
 
@@ -36,5 +57,20 @@ export class UploadsService {
     const file = await this.prisma.uploadedFile.findUnique({ where: { id } });
     if (!file) throw new NotFoundException('File not found');
     return file;
+  }
+
+  // Resolve an upload for serving: either a redirect URL (public bucket / CDN) or
+  // the raw bytes (DB storage, or streamed from a private bucket).
+  async resolve(id: string): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string }> {
+    const file = await this.get(id);
+    if (file.storageKey) {
+      const pub = publicUrlFor(file.storageKey);
+      if (pub) return { redirectUrl: pub, contentType: file.mimeType };
+      const obj = await getObjectBytes(file.storageKey);
+      if (!obj) throw new NotFoundException('File not found');
+      return { buffer: obj.buffer, contentType: obj.contentType || file.mimeType };
+    }
+    if (!file.data) throw new NotFoundException('File not found');
+    return { buffer: Buffer.from(file.data), contentType: file.mimeType };
   }
 }

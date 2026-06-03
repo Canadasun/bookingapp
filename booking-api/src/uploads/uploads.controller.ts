@@ -33,11 +33,13 @@ export class UploadsController {
   }
 
   // Public — images are served by id (logos appear on the public booking page).
+  // Resolves to a redirect (public bucket/CDN) or raw bytes (DB or private bucket).
   @Get(':id')
   async serve(@Param('id') id: string, @Res() res: Response) {
-    const file = await this.uploads.get(id);
-    res.setHeader('Content-Type', file.mimeType);
+    const r = await this.uploads.resolve(id);
+    if (r.redirectUrl) return res.redirect(302, r.redirectUrl);
+    res.setHeader('Content-Type', r.contentType);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.send(file.data);
+    res.send(r.buffer);
   }
 }
