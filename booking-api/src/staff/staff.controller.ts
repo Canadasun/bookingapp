@@ -65,35 +65,52 @@ export class StaffController {
     return this.staffService.invite(businessId, dto, user);
   }
 
-  // Protected — owner/staff only
+  // Owner/Admin only — and only within their own business.
   @Post()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   create(
     @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(CreateStaffSchema)) dto: CreateStaffDto,
   ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
     return this.staffService.create(businessId, dto);
   }
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   update(
     @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(UpdateStaffSchema)) dto: UpdateStaffDto,
   ) {
-    return this.staffService.update(id, dto);
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.staffService.update(id, dto, businessId);
   }
 
   @Post(':id/services')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   assignServices(
     @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(AssignServicesSchema)) dto: AssignServicesDto,
   ) {
-    return this.staffService.assignServices(id, dto);
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.staffService.assignServices(id, dto, businessId);
   }
 
   @Post(':id/availability')

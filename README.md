@@ -122,11 +122,15 @@ npm run test:cov
 
 ## Demo credentials (after seed)
 
+The seed creates an owner + staff accounts. Passwords are **not** hardcoded —
+set them via env when seeding (`OWNER_PASSWORD`, `ADMIN_PASSWORD`); the seed
+refuses weak/blank values. Never use a shared default password in any
+deployed environment.
+
 | Role | Email | Password |
 |---|---|---|
-| Owner | owner@demo-salon.com | password123 |
-| Staff (Bob) | bob@demo-salon.com | password123 |
-| Staff (Sara) | sara@demo-salon.com | password123 |
+| Owner | owner@demo-salon.com | _set via `OWNER_PASSWORD`_ |
+| Staff | (created via owner invite) | _one-time temp, force-reset on first login_ |
 
 ---
 

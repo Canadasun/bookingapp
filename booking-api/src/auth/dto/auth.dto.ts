@@ -40,7 +40,8 @@ export const ResetPasswordSchema = z.object({
 
 export const VerifyTwoFactorSchema = z.object({
   challengeId: z.string().min(1),
-  code: z.string().trim().min(4).max(8),
+  // Accepts either the 6-digit OTP or an 11-char recovery code ("xxxxx-xxxxx").
+  code: z.string().trim().min(4).max(32),
 });
 
 export const SetTwoFactorSchema = z.object({

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -73,6 +74,17 @@ export class BookingsService {
       where: { id: dto.serviceId, businessId },
     });
     if (!primaryService) throw new NotFoundException('Service not found');
+    if (primaryService.active === false) throw new BadRequestException('Service is not available');
+
+    // Tenant integrity: the staff and client must belong to THIS business, the
+    // staff must be active, and actually offer the selected service. Otherwise a
+    // crafted request could attach another business's staff/client to a booking.
+    const staff = await this.prisma.staff.findFirst({ where: { id: dto.staffId, businessId, active: true } });
+    if (!staff) throw new NotFoundException('Staff not found');
+    const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId } });
+    if (!client) throw new NotFoundException('Client not found');
+    const offersService = await this.prisma.staffService.findFirst({ where: { staffId: dto.staffId, serviceId: dto.serviceId } });
+    if (!offersService) throw new BadRequestException('This staff member does not offer the selected service');
 
     // Sum durations of all selected services
     let totalDurationMinutes = primaryService.durationMinutes;
@@ -87,6 +99,24 @@ export class BookingsService {
 
     const startsAt = new Date(dto.startsAt);
     const endsAt = addMinutes(startsAt, totalDurationMinutes);
+
+    // Booking-window policy. Owner/staff bookings (opts.confirmed) can override;
+    // public self-service must respect the business's notice + advance limits.
+    if (!opts.confirmed) {
+      const business = await this.prisma.business.findUnique({
+        where: { id: businessId },
+        select: { minNoticeMinutes: true, maxAdvanceDays: true },
+      });
+      const now = Date.now();
+      const minNoticeMs = (business?.minNoticeMinutes ?? 0) * 60_000;
+      const maxAdvanceMs = (business?.maxAdvanceDays ?? 365) * 24 * 60 * 60_000;
+      if (startsAt.getTime() < now + minNoticeMs) {
+        throw new BadRequestException('This time is too soon — please pick a later slot.');
+      }
+      if (startsAt.getTime() > now + maxAdvanceMs) {
+        throw new BadRequestException('This time is too far in advance.');
+      }
+    }
 
     // Append additional service names to notes for display
     const notesWithServices = [

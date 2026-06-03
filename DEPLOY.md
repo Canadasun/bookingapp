@@ -99,7 +99,7 @@ Until your domain is verified, use `onboarding@resend.dev` (limited to 100 email
 
 - [ ] Visit `https://your-api.railway.app/api/healthz` → `{"status":"ok"}`
 - [ ] Visit `https://your-app.vercel.app` → landing page loads
-- [ ] Login with `idowu@icloud.com` / `password123`
+- [ ] Login with the seeded owner account (password set via `OWNER_PASSWORD` at seed time)
 - [ ] Book a test appointment → confirm email arrives
 - [ ] Check Stripe webhook fires on payment
 - [ ] Update `NEXT_PUBLIC_WEB_URL` to your final domain in both API and web env

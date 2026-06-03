@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmitReviewDto } from './dto/reviews.dto';
 
@@ -13,6 +13,10 @@ export class ReviewsService {
       include: { client: true },
     });
     if (!apt) throw new NotFoundException('Appointment not found');
+    // Reviews are only for visits that actually happened.
+    if (apt.status !== 'COMPLETED') {
+      throw new BadRequestException('You can only review a completed appointment');
+    }
     return this.prisma.review.upsert({
       where: { appointmentId: dto.appointmentId },
       update: { rating: dto.rating, comment: dto.comment },

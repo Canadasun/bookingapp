@@ -35,6 +35,17 @@ export class AvailabilityService {
 
     if (!service) throw new NotFoundException('Service not found');
     if (!staff) throw new NotFoundException('Staff not found');
+    // Staff and service must belong to the same business, the staff must be
+    // active, and actually offer this service — otherwise the returned slots
+    // are meaningless (and could mix tenants).
+    if (staff.businessId !== service.businessId) {
+      throw new NotFoundException('Staff does not belong to this service’s business');
+    }
+    if (!staff.active) throw new NotFoundException('Staff is not available');
+    const offersService = await this.prisma.staffService.findFirst({
+      where: { staffId, serviceId },
+    });
+    if (!offersService) throw new NotFoundException('Staff does not offer this service');
 
     const businessTimezone = staff.business.timezone;
 

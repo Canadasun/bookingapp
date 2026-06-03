@@ -5,8 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 
-const SLOT_START = new Date('2024-03-04T14:00:00.000Z');
-const SLOT_END = new Date('2024-03-04T15:00:00.000Z');
+// 7 days out: within the default 60-day max-advance and past the 120-min notice
+// window, so public-booking policy checks pass.
+const SLOT_START = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+const SLOT_END = new Date(SLOT_START.getTime() + 60 * 60 * 1000);
 
 function makeAppointment(overrides = {}) {
   return {
@@ -45,13 +47,27 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue({
         id: 'svc1',
         durationMinutes: 60,
+        active: true,
       }),
-      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60 }),
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }),
       findUnique: jest.fn().mockResolvedValue({
         id: 'svc1',
         durationMinutes: 60,
+        active: true,
       }),
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60 }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }),
+    },
+    staff: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }),
+    },
+    client: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }),
+    },
+    staffService: {
+      findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }),
+    },
+    business: {
+      findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60 }),
     },
     appointment: {
       findMany: jest.fn().mockResolvedValue([makeAppointment()]),
@@ -168,7 +184,11 @@ describe('BookingsService', () => {
       };
 
       const prisma = {
-        service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60 }) },
+        service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }) },
+        staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }) },
+        client: { findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }) },
+        staffService: { findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
+        business: { findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60 }) },
         appointment: { findFirst: jest.fn().mockResolvedValue(makeAppointment()) },
         auditLog: { create: jest.fn().mockResolvedValue({}) },
         $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock)),

@@ -42,7 +42,10 @@ export class StaffService {
     return staff;
   }
 
-  create(businessId: string, dto: CreateStaffDto) {
+  async create(businessId: string, dto: CreateStaffDto) {
+    // The linked user must belong to this business (no cross-business linking).
+    const user = await this.prisma.user.findFirst({ where: { id: dto.userId, businessId } });
+    if (!user) throw new NotFoundException('User not found in this business');
     return this.prisma.staff.create({
       data: { businessId, userId: dto.userId, bio: dto.bio, avatarUrl: dto.avatarUrl },
       include: { user: { select: { name: true, email: true } } },
@@ -125,6 +128,16 @@ export class StaffService {
 
   async assignServices(staffId: string, dto: AssignServicesDto, businessId?: string) {
     const staff = await this.findOne(staffId, businessId);
+    // Every service must belong to the staff member's business — no assigning
+    // another business's services.
+    if (dto.serviceIds.length) {
+      const valid = await this.prisma.service.count({
+        where: { id: { in: dto.serviceIds }, businessId: staff.businessId },
+      });
+      if (valid !== new Set(dto.serviceIds).size) {
+        throw new NotFoundException('One or more services do not belong to this business');
+      }
+    }
     await this.prisma.staffService.deleteMany({ where: { staffId: staff.id } });
     await this.prisma.staffService.createMany({
       data: dto.serviceIds.map((serviceId) => ({ staffId: staff.id, serviceId })),
