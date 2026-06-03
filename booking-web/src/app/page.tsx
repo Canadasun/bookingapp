@@ -27,10 +27,10 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-violet-700 transition-colors">
-              Business login
+              Sign in
             </Link>
-            <Link href="/book" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
-              Book now
+            <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
+              Get started
             </Link>
           </div>
         </div>
@@ -56,14 +56,14 @@ export default function LandingPage() {
             and a beautiful dashboard — all in one place.
           </p>
           <div className="flex flex-col sm:flex-row items-center gap-4">
-            <Link href="/book"
+            <Link href="/register"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 text-white text-base font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-xl shadow-violet-200">
-              <Calendar className="w-5 h-5" />
-              Book an appointment
+              <Sparkles className="w-5 h-5" />
+              Get started free
             </Link>
             <Link href="/login"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/90 text-slate-800 text-base font-semibold px-8 py-4 rounded-xl border border-[#E9DDCB] hover:bg-violet-50 transition-colors">
-              Business login <ArrowRight className="w-4 h-4" />
+              Sign in <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
@@ -141,14 +141,14 @@ export default function LandingPage() {
           <h2 className="text-3xl font-bold text-white mb-4">Ready to simplify your scheduling?</h2>
           <p className="text-white/60 mb-8">Join thousands of businesses using Pulse.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/book"
+            <Link href="/register"
               className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
-              <Calendar className="w-5 h-5" />
-              Book an appointment
+              <Sparkles className="w-5 h-5" />
+              Get started free
             </Link>
             <Link href="/login"
               className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
-              Business login <ArrowRight className="w-4 h-4" />
+              Sign in <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
@@ -162,8 +162,8 @@ export default function LandingPage() {
             <span className="text-sm">© {new Date().getFullYear()} Pulse</span>
           </div>
           <div className="flex gap-6 text-sm text-slate-500">
-            <Link href="/book" className="hover:text-indigo-600 transition-colors">Book</Link>
-            <Link href="/login" className="hover:text-indigo-600 transition-colors">Business login</Link>
+            <Link href="/register" className="hover:text-indigo-600 transition-colors">Get started</Link>
+            <Link href="/login" className="hover:text-indigo-600 transition-colors">Sign in</Link>
           </div>
         </div>
       </footer>
