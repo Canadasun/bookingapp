@@ -44,7 +44,7 @@ async function main() {
     const existing = await prisma.user.findUnique({ where: { email: ownerEmail } });
     if (!existing) {
       await prisma.user.create({
-        data: { name: 'Demo Owner', email: ownerEmail, passwordHash: await bcrypt.hash(ownerPassword, 10), role: 'OWNER', businessId: business.id },
+        data: { name: 'Demo Owner', email: ownerEmail, passwordHash: await bcrypt.hash(ownerPassword, 12), role: 'OWNER', businessId: business.id },
       });
       console.log('owner CREATED:', ownerEmail);
     } else console.log('owner exists (unchanged):', ownerEmail);
@@ -62,7 +62,7 @@ async function main() {
   let staffUser = await prisma.user.findUnique({ where: { email: staffEmail } });
   if (!staffUser) {
     staffUser = await prisma.user.create({
-      data: { name: 'Demo Stylist', email: staffEmail, passwordHash: await bcrypt.hash(randomBytes(24).toString('hex'), 10), role: 'STAFF', businessId: business.id, mustResetPassword: true },
+      data: { name: 'Demo Stylist', email: staffEmail, passwordHash: await bcrypt.hash(randomBytes(24).toString('hex'), 12), role: 'STAFF', businessId: business.id, mustResetPassword: true },
     });
   }
   const staff = await prisma.staff.upsert({ where: { userId: staffUser.id }, update: {}, create: { userId: staffUser.id, businessId: business.id, bio: 'Demo stylist.' } });

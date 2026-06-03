@@ -39,7 +39,7 @@ async function main() {
   console.log('  ✔ business:', business.slug);
 
   // ── Owner test login (the only seeded account) ───────────────────────────────
-  const ownerHash = await bcrypt.hash('password123', 10);
+  const ownerHash = await bcrypt.hash('password123', 12);
   const owner = await prisma.user.upsert({
     where: { email: 'owner@demo-salon.com' },
     update: {},

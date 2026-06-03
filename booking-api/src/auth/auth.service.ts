@@ -25,7 +25,7 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException("Email already registered");
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const result = await this.prisma.$transaction(async (tx) => {
       let businessId = dto.businessId;
@@ -140,7 +140,7 @@ export class AuthService {
       where: { id: user.id },
       // Clear the refresh token so existing sessions are logged out, and clear any
       // forced-reset flag since the user has now set a fresh password.
-      data: { passwordHash: await bcrypt.hash(newPassword, 10), refreshToken: null, mustResetPassword: false },
+      data: { passwordHash: await bcrypt.hash(newPassword, 12), refreshToken: null, mustResetPassword: false },
     });
     return { ok: true };
   }
@@ -280,7 +280,7 @@ export class AuthService {
     }
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: await bcrypt.hash(newPassword, 10), mustResetPassword: false },
+      data: { passwordHash: await bcrypt.hash(newPassword, 12), mustResetPassword: false },
     });
     return { ok: true };
   }

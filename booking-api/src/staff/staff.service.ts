@@ -69,7 +69,7 @@ export class StaffService {
     if (existing) throw new ConflictException('Email already registered');
 
     const tempPassword = randomBytes(9).toString('base64url').slice(0, 12);
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
 
     const staff = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
