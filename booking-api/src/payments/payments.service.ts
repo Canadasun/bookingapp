@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableE
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { PaymentKind, PaymentStatus } from '@prisma/client';
+import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -282,9 +282,146 @@ export class PaymentsService {
         }
         break;
       }
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === 'subscription' && session.subscription) {
+          const businessId = session.metadata?.businessId;
+          const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+          if (businessId) {
+            const sub = await this.getStripe().subscriptions.retrieve(subId);
+            await this.applySubscription(businessId, sub);
+          }
+        }
+        break;
+      }
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        const businessId = sub.metadata?.businessId;
+        if (businessId) await this.applySubscription(businessId, sub);
+        break;
+      }
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as Stripe.Subscription;
+        const businessId = sub.metadata?.businessId;
+        if (businessId) {
+          await this.prisma.subscription.updateMany({
+            where: { businessId },
+            data: { status: 'CANCELED', plan: 'FREE', cancelAtPeriodEnd: false },
+          });
+          await this.prisma.business.update({ where: { id: businessId }, data: { plan: 'FREE', planExpiresAt: null } });
+        }
+        break;
+      }
     }
 
     return { received: true, eventId: event.id };
+  }
+
+  // ── SaaS subscription billing ────────────────────────────────────────────────
+  private priceIdForPlan(plan: 'BASIC' | 'PRO'): string | null {
+    const key = plan === 'BASIC' ? 'STRIPE_PRICE_BASIC' : 'STRIPE_PRICE_PRO';
+    return this.configService.get<string>(key) || null;
+  }
+
+  private planForPriceId(priceId?: string | null): PlanTier {
+    if (!priceId) return 'FREE';
+    if (priceId === this.configService.get<string>('STRIPE_PRICE_BASIC')) return 'BASIC';
+    if (priceId === this.configService.get<string>('STRIPE_PRICE_PRO')) return 'PRO';
+    return 'FREE';
+  }
+
+  private mapSubStatus(s: Stripe.Subscription.Status): SubscriptionStatus {
+    switch (s) {
+      case 'active': return 'ACTIVE';
+      case 'trialing': return 'TRIALING';
+      case 'past_due':
+      case 'unpaid': return 'PAST_DUE';
+      case 'canceled':
+      case 'incomplete_expired': return 'CANCELED';
+      default: return 'INCOMPLETE';
+    }
+  }
+
+  // Reconcile our Subscription + Business.plan from a Stripe subscription object.
+  private async applySubscription(businessId: string, sub: Stripe.Subscription) {
+    const priceId = sub.items.data[0]?.price?.id ?? null;
+    const status = this.mapSubStatus(sub.status);
+    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+    const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
+    // Only an active/trialing subscription grants the paid tier; anything else
+    // (past_due, canceled, …) falls back to FREE.
+    const effectivePlan: PlanTier = status === 'ACTIVE' || status === 'TRIALING' ? this.planForPriceId(priceId) : 'FREE';
+    const data = {
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: sub.id,
+      stripePriceId: priceId,
+      plan: effectivePlan,
+      status,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+    };
+    await this.prisma.subscription.upsert({ where: { businessId }, create: { businessId, ...data }, update: data });
+    await this.prisma.business.update({ where: { id: businessId }, data: { plan: effectivePlan, planExpiresAt: periodEnd } });
+  }
+
+  private async ensureBusinessCustomer(business: { id: string; name: string; email: string }): Promise<string> {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId: business.id } });
+    if (sub?.stripeCustomerId) return sub.stripeCustomerId;
+    const customer = await this.getStripe().customers.create({
+      name: business.name, email: business.email, metadata: { businessId: business.id },
+    });
+    await this.prisma.subscription.upsert({
+      where: { businessId: business.id },
+      create: { businessId: business.id, stripeCustomerId: customer.id, plan: 'FREE' },
+      update: { stripeCustomerId: customer.id },
+    });
+    return customer.id;
+  }
+
+  // Owner — start a Stripe Checkout session to subscribe to a paid plan.
+  async createSubscriptionCheckout(businessId: string, plan: 'BASIC' | 'PRO') {
+    const priceId = this.priceIdForPlan(plan);
+    if (!priceId) throw new BadRequestException(`The ${plan} plan is not available for purchase yet.`);
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    const customerId = await this.ensureBusinessCustomer(business);
+    const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const session = await this.getStripe().checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${webUrl}/dashboard/settings?billing=success`,
+      cancel_url: `${webUrl}/dashboard/settings?billing=cancel`,
+      metadata: { businessId, plan },
+      subscription_data: { metadata: { businessId, plan } },
+    });
+    return { url: session.url };
+  }
+
+  // Owner — open the Stripe billing portal (update card, cancel, view invoices).
+  async createBillingPortal(businessId: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (!sub?.stripeCustomerId) throw new BadRequestException('No billing account yet — subscribe to a plan first.');
+    const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const session = await this.getStripe().billingPortal.sessions.create({
+      customer: sub.stripeCustomerId,
+      return_url: `${webUrl}/dashboard/settings`,
+    });
+    return { url: session.url };
+  }
+
+  async getSubscription(businessId: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    const business = await this.prisma.business.findUniqueOrThrow({
+      where: { id: businessId }, select: { plan: true, planExpiresAt: true },
+    });
+    return {
+      plan: business.plan,
+      status: sub?.status ?? null,
+      currentPeriodEnd: sub?.currentPeriodEnd ?? business.planExpiresAt ?? null,
+      cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      hasBilling: !!sub?.stripeCustomerId,
+    };
   }
 
   /**

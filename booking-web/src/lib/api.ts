@@ -244,6 +244,16 @@ export const api = {
     },
   },
 
+  subscriptions: {
+    // Current plan + billing status.
+    get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),
+    // Owner — start Stripe Checkout for a paid plan; returns a redirect URL.
+    checkout: (plan: "BASIC" | "PRO") =>
+      req<{ url: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan }) }),
+    // Owner — open the Stripe billing portal; returns a redirect URL.
+    portal: () => req<{ url: string }>("/subscriptions/portal", { method: "POST" }),
+  },
+
   payments: {
     // Public — booking wizard asks whether a deposit / card-on-file is required.
     bookingIntent: (appointmentId: string, businessId: string) =>

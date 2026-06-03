@@ -87,6 +87,32 @@ export default function SettingsPage() {
 
   const f = (k: keyof Business, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
 
+  const [billingBusy, setBillingBusy] = useState<string | null>(null);
+
+  // Toast the result of a returning Stripe Checkout, then reload the plan.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("billing");
+    if (p === "success") { toast.success("Subscription updated"); if (bizId) api.business.get(bizId).then(setBiz).catch(() => {}); }
+    else if (p === "cancel") { toast.info("Checkout canceled"); }
+    if (p) window.history.replaceState({}, "", "/dashboard/settings");
+  }, [bizId]);
+
+  async function upgrade(plan: "BASIC" | "PRO") {
+    setBillingBusy(plan);
+    try {
+      const { url } = await api.subscriptions.checkout(plan);
+      window.location.href = url;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start checkout"); setBillingBusy(null); }
+  }
+
+  async function manageBilling() {
+    setBillingBusy("portal");
+    try {
+      const { url } = await api.subscriptions.portal();
+      window.location.href = url;
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not open billing portal"); setBillingBusy(null); }
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!bizId) return;
@@ -529,20 +555,27 @@ export default function SettingsPage() {
                           <p className="font-semibold text-gray-800 mt-0.5">{plan.name}</p>
                           <p className="text-xs text-gray-400 mt-0.5">{plan.desc}</p>
                         </div>
-                        <button
-                          type="button"
-                          disabled={plan.disabled}
-                          onClick={() => toast.info("Stripe billing coming soon — contact us to upgrade.")}
-                          className={cn(
-                            "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
-                            plan.disabled
-                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                              : plan.highlight
-                              ? "bg-violet-600 text-white hover:bg-violet-700"
-                              : "border border-violet-300 text-violet-600 hover:bg-violet-50",
-                          )}>
-                          {plan.cta}
-                        </button>
+                        {(() => {
+                          const isCurrent = (biz?.plan ?? "FREE") === plan.id;
+                          const canBuy = (plan.id === "BASIC" || plan.id === "PRO") && !isCurrent;
+                          return (
+                            <button
+                              type="button"
+                              disabled={isCurrent || billingBusy !== null}
+                              onClick={() => { if (canBuy) upgrade(plan.id as "BASIC" | "PRO"); }}
+                              className={cn(
+                                "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
+                                isCurrent
+                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  : plan.highlight
+                                  ? "bg-violet-600 text-white hover:bg-violet-700"
+                                  : "border border-violet-300 text-violet-600 hover:bg-violet-50",
+                                billingBusy !== null && "opacity-60",
+                              )}>
+                              {isCurrent ? "Current plan" : billingBusy === plan.id ? "Redirecting…" : plan.cta}
+                            </button>
+                          );
+                        })()}
                       </div>
                       <ul className="mt-4 space-y-1.5">
                         {plan.features.map((f) => (
@@ -555,6 +588,19 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
+
+                {(biz?.plan ?? "FREE") !== "FREE" && (
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Manage billing</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, or cancel in Stripe&apos;s billing portal.</p>
+                    </div>
+                    <button type="button" onClick={manageBilling} disabled={billingBusy !== null}
+                      className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-2 hover:bg-violet-50 disabled:opacity-60 transition-colors shrink-0">
+                      {billingBusy === "portal" ? "Opening…" : "Manage"}
+                    </button>
+                  </div>
+                )}
 
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
                   <Zap className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />

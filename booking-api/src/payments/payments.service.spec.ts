@@ -100,3 +100,36 @@ describe('PaymentsService.handleWebhook', () => {
     });
   });
 });
+
+describe('PaymentsService subscriptions', () => {
+  async function buildSub(env: Record<string, string | undefined>) {
+    const prisma = {
+      business: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'biz1', name: 'Biz', email: 'b@x.com' }) },
+      subscription: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}) },
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
+        { provide: NotificationsService, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get<PaymentsService>(PaymentsService);
+    (svc as unknown as { stripe: unknown }).stripe = {
+      customers: { create: jest.fn().mockResolvedValue({ id: 'cus_1' }) },
+      checkout: { sessions: { create: jest.fn().mockResolvedValue({ url: 'https://stripe.test/checkout' }) } },
+    };
+    return { svc };
+  }
+
+  it('rejects checkout when the plan price is not configured', async () => {
+    const { svc } = await buildSub({});
+    await expect(svc.createSubscriptionCheckout('biz1', 'BASIC')).rejects.toThrow(BadRequestException);
+  });
+
+  it('creates a checkout session when the plan price is configured', async () => {
+    const { svc } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123' });
+    await expect(svc.createSubscriptionCheckout('biz1', 'BASIC')).resolves.toEqual({ url: 'https://stripe.test/checkout' });
+  });
+});

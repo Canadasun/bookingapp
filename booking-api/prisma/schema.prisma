@@ -20,6 +20,14 @@ enum PlanTier {
   PRO
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
 enum AppointmentStatus {
   PENDING
   CONFIRMED
@@ -97,6 +105,7 @@ model Business {
   payments           Payment[]
   refunds            Refund[]
   uploads            UploadedFile[]
+  subscription       Subscription?
 }
 
 model Review {
@@ -569,6 +578,27 @@ model Transaction {
 
   @@index([businessId])
   @@index([createdAt])
+}
+
+// SaaS subscription: the business's paid plan with Pulse, backed by a Stripe
+// subscription. Business.plan is the denormalized current tier, kept in sync by
+// the Stripe webhook; this row holds the billing details.
+model Subscription {
+  id                   String             @id @default(cuid())
+  businessId           String             @unique
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 PlanTier           @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
 }
 
 model SystemMetric {
