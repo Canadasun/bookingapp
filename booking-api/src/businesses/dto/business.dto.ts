@@ -7,6 +7,7 @@ export const CreateBusinessSchema = z.object({
   phone: z.string().optional(),
   timezone: z.string().default('America/New_York'),
   address: z.string().optional(),
+  logoUrl: z.string().max(2048).optional(),
   bookingPageSettings: z.record(z.unknown()).optional(),
   minNoticeMinutes: z.number().int().nonnegative().default(120),
   maxAdvanceDays: z.number().int().positive().default(60),

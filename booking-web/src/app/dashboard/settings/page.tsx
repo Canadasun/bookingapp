@@ -8,6 +8,7 @@ import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { ImageUpload } from "@/components/ImageUpload";
 import { cn } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -156,6 +157,9 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-0.5">This information appears on your booking page.</p>
                 </div>
                 <hr className="border-gray-100" />
+                <Field label="Logo">
+                  <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={(url) => f("logoUrl", url ?? "")} />
+                </Field>
                 <Field label="Business name">
                   <Input value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="Demo Salon" />
                 </Field>

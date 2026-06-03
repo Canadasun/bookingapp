@@ -311,9 +311,14 @@ function BookPageInner({ slug }: { slug: string }) {
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
-              <Calendar className="w-3.5 h-3.5 text-white" />
-            </div>
+            {biz?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={biz.logoUrl} alt="" className="w-7 h-7 rounded-xl object-cover shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-white" />
+              </div>
+            )}
             <span className="font-bold text-gray-900 truncate">{biz?.name ?? "Pulse"}</span>
           </div>
           <div className="flex items-center gap-3 text-sm shrink-0">

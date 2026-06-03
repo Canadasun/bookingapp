@@ -96,6 +96,7 @@ model Business {
   clientPackages     ClientPackage[]
   payments           Payment[]
   refunds            Refund[]
+  uploads            UploadedFile[]
 }
 
 model Review {
@@ -577,6 +578,31 @@ model SystemMetric {
 
   @@index([name])
   @@index([timestamp])
+}
+
+// ── Uploaded images (logos, avatars, covers) ─────────────────────────────────
+// Stored in-DB as bytea — works on ephemeral container filesystems with no extra
+// infra. The bytes are wrapped behind UploadsService, so swapping to S3/R2 later
+// only touches that one service (the public URL shape /uploads/:id stays the same).
+enum UploadKind {
+  LOGO
+  AVATAR
+  COVER
+  OTHER
+}
+
+model UploadedFile {
+  id         String     @id @default(cuid())
+  businessId String
+  kind       UploadKind @default(OTHER)
+  mimeType   String
+  sizeBytes  Int
+  data       Bytes
+  createdAt  DateTime   @default(now())
+
+  business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
 }
 
 // ── Customer payment ledger ───────────────────────────────────────────────────

@@ -210,6 +210,28 @@ export const api = {
       req<{ ok: boolean; twoFactorEnabled: boolean; recoveryCodes?: string[] }>("/auth/2fa", { method: "POST", body: JSON.stringify({ enabled, method }) }),
   },
 
+  uploads: {
+    // Owner — upload an image (multipart). Returns a same-origin URL the app can
+    // render directly (resolves through /proxy to the API's public /uploads/:id).
+    upload: async (file: File, kind: "LOGO" | "AVATAR" | "COVER" | "OTHER" = "OTHER"): Promise<{ id: string; url: string }> => {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", kind);
+      const token = getToken();
+      const res = await fetch("/proxy/uploads", {
+        method: "POST",
+        body: fd, // let the browser set the multipart boundary
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({})) as { message?: string };
+        throw new Error(b.message ?? "Upload failed");
+      }
+      const data = await res.json() as { id: string; url: string };
+      return { id: data.id, url: `/proxy${data.url}` };
+    },
+  },
+
   payments: {
     // Public — booking wizard asks whether a deposit / card-on-file is required.
     bookingIntent: (appointmentId: string, businessId: string) =>
