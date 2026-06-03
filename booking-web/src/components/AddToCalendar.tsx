@@ -26,6 +26,27 @@ function googleUrl(p: Props) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+// Build the .ics entirely client-side from the props we already have — no API
+// round-trip (the appointment API now requires a manage token the browser link
+// doesn't carry).
+function icsDataUri(p: Props) {
+  const fmt = (d: string) => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z/, "Z");
+  const esc = (s: string) => s.replace(/([\\;,])/g, "\\$1").replace(/\n/g, "\\n");
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Pulse//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${p.appointmentId}@pulseappointments`,
+    `DTSTAMP:${fmt(new Date().toISOString())}`,
+    `DTSTART:${fmt(p.startsAt)}`,
+    `DTEND:${fmt(p.endsAt)}`,
+    `SUMMARY:${esc(p.title)}`,
+    ...(p.description ? [`DESCRIPTION:${esc(p.description)}`] : []),
+    ...(p.location ? [`LOCATION:${esc(p.location)}`] : []),
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+}
+
 function outlookUrl(p: Props) {
   const params = new URLSearchParams({
     path: "/calendar/action/compose",
@@ -52,7 +73,7 @@ export function AddToCalendar(props: Props) {
     {
       label: "Apple / iCal",
       icon: "📅",
-      href: `/api/calendar/${props.appointmentId}`,
+      href: icsDataUri(props),
       external: false,
     },
     {

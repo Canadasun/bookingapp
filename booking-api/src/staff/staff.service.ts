@@ -19,16 +19,17 @@ import {
 export class StaffService {
   constructor(private prisma: PrismaService) {}
 
+  // Public (booking flow): names only — never expose staff emails here.
   findAll(businessId: string) {
     return this.prisma.staff.findMany({
       where: { businessId, active: true },
-      include: { user: { select: { name: true, email: true } }, staffServices: true },
+      include: { user: { select: { name: true } }, staffServices: true },
     });
   }
 
   async findOne(id: string, businessId?: string) {
     const staff = await this.prisma.staff.findFirst({
-      where: { 
+      where: {
         id,
         ...(businessId ? { businessId } : {})
       },

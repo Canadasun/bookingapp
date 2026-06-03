@@ -16,16 +16,21 @@ export default function ReviewPage({ params }: { params: Promise<{ appointmentId
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    api.appointments.get(appointmentId).then(setApt).catch(() => {}).finally(() => setLoading(false));
+    // The signed token rides in the email link's query string and authorizes both
+    // loading the appointment and submitting the review.
+    const t = new URLSearchParams(window.location.search).get("token");
+    setToken(t);
+    api.appointments.get(appointmentId, t ?? undefined).then(setApt).catch(() => {}).finally(() => setLoading(false));
   }, [appointmentId]);
 
   async function submit() {
     if (!apt || rating < 1) { toast.error("Please pick a star rating"); return; }
     setSaving(true);
     try {
-      await api.reviews.submit(apt.business.id, { appointmentId, rating, comment: comment || undefined });
+      await api.reviews.submit(apt.business.id, { appointmentId, rating, comment: comment || undefined, token: token ?? undefined });
       setDone(true);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit your review"); }
     finally { setSaving(false); }

@@ -32,6 +32,14 @@ export class BusinessesService {
     return business;
   }
 
+  // Public booking page: omit internal/sensitive fields (contact email, plan,
+  // subscription expiry) — keep only what the booking flow legitimately needs.
+  async findBySlugPublic(slug: string) {
+    const business = await this.findBySlug(slug);
+    const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
+    return pub;
+  }
+
   async update(id: string, dto: UpdateBusinessDto) {
     await this.findOne(id);
     const { bookingPageSettings, ...rest } = dto;

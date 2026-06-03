@@ -243,8 +243,8 @@ export const api = {
     list: (businessId: string) =>
       req<{ reviews: Array<{ id: string; clientName: string; rating: number; comment?: string | null; createdAt: string }>; average: number; count: number }>(
         `/businesses/${businessId}/reviews`, undefined, null),
-    // Public — submit from the post-visit email link.
-    submit: (businessId: string, data: { appointmentId: string; rating: number; comment?: string }) =>
+    // Public — submit from the post-visit email link (token proves the link is ours).
+    submit: (businessId: string, data: { appointmentId: string; rating: number; comment?: string; token?: string }) =>
       req<{ id: string }>(`/businesses/${businessId}/reviews`, { method: "POST", body: JSON.stringify(data) }, null),
     // Owner — all reviews + moderation.
     ownerList: (businessId: string) =>

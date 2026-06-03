@@ -41,9 +41,20 @@ export class StaffController {
     return this.staffService.findAllIncludingInactive(businessId);
   }
 
+  // Full staff detail (incl. email) is for the owner dashboard only and scoped to
+  // the business. The public booking flow uses GET /staff (names only).
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.staffService.findOne(id);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  findOne(
+    @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.staffService.findOne(id, businessId);
   }
 
   @Get(':id/time-off')

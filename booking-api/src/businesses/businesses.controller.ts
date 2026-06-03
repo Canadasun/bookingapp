@@ -22,14 +22,23 @@ export class BusinessesController {
     return this.businessService.create(dto, user.id);
   }
 
+  // Full business record (incl. email, plan) — owner dashboard only. The public
+  // booking page uses GET /businesses/slug/:slug (public DTO).
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  @UseGuards(JwtAuthGuard)
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
     return this.businessService.findOne(id);
   }
 
   @Get('slug/:slug')
   findBySlug(@Param('slug') slug: string) {
-    return this.businessService.findBySlug(slug);
+    return this.businessService.findBySlugPublic(slug);
   }
 
   @Patch(':id')

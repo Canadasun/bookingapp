@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmitReviewDto } from './dto/reviews.dto';
+import { verifyAppointmentToken } from '../common/util/appointment-token';
 
 @Injectable()
 export class ReviewsService {
@@ -8,6 +9,11 @@ export class ReviewsService {
 
   // Public — client submits via the post-visit email link (tied to their appt).
   async submit(businessId: string, dto: SubmitReviewDto) {
+    // The signed token in the review-request email proves the submitter is the
+    // appointment's client (the only recipient of that link).
+    if (!verifyAppointmentToken(dto.appointmentId, dto.token)) {
+      throw new BadRequestException('Invalid or expired review link');
+    }
     const apt = await this.prisma.appointment.findFirst({
       where: { id: dto.appointmentId, businessId },
       include: { client: true },
