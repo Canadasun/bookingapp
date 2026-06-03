@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
-import { format, startOfDay, addDays, parseISO } from "date-fns";
+import { format, startOfDay, addDays, parseISO, isBefore, isAfter } from "date-fns";
 import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
@@ -12,7 +12,7 @@ import Link from "next/link";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { BookingPayment } from "@/components/BookingPayment";
-import "react-day-picker/dist/style.css";
+import "react-day-picker/style.css";
 
 type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string };
 
@@ -551,7 +551,7 @@ function BookPageInner({ slug }: { slug: string }) {
                   mode="single"
                   selected={selectedDate}
                   onSelect={pickDate}
-                  disabled={{ before: today, after: addDays(today, biz?.maxAdvanceDays ?? 60) }}
+                  disabled={(date) => isBefore(date, today) || isAfter(date, addDays(today, biz?.maxAdvanceDays ?? 60))}
                   className="mx-auto"
                 />
 

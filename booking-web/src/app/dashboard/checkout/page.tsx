@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { format, addDays, startOfDay } from "date-fns";
+import { format, addDays, startOfDay, isBefore, isAfter } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { parseISO } from "date-fns";
 import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus } from "lucide-react";
@@ -11,7 +11,7 @@ import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import "react-day-picker/dist/style.css";
+import "react-day-picker/style.css";
 
 function fmtDuration(mins: number) {
   const h = Math.floor(mins / 60), m = mins % 60;
@@ -255,9 +255,18 @@ export default function CheckoutPage() {
                   ].map(({ k, label, type }) => (
                     <div key={k}>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-                      <Input type={type}
-                        value={newClient[k as keyof typeof newClient]}
-                        onChange={(e) => setNewClient((p) => ({ ...p, [k]: e.target.value }))} />
+                      {k === "phone" ? (
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 select-none pointer-events-none z-10">+1</span>
+                          <Input type={type} className="pl-9" placeholder="555 123 4567"
+                            value={newClient.phone}
+                            onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))} />
+                        </div>
+                      ) : (
+                        <Input type={type}
+                          value={newClient[k as keyof typeof newClient]}
+                          onChange={(e) => setNewClient((p) => ({ ...p, [k]: e.target.value }))} />
+                      )}
                     </div>
                   ))}
                   <Button className="w-full"
@@ -367,7 +376,7 @@ export default function CheckoutPage() {
               mode="single"
               selected={selectedDate}
               onSelect={pickDate}
-              disabled={{ before: today, after: addDays(today, biz?.maxAdvanceDays ?? 60) }}
+              disabled={(date) => isBefore(date, today) || isAfter(date, addDays(today, biz?.maxAdvanceDays ?? 60))}
               className="mx-auto"
             />
             {selectedDate && (
