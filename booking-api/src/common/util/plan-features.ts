@@ -1,11 +1,12 @@
 import { PlanTier } from '@prisma/client';
+import { featuresUnlocked } from './plan';
 
 export function isPaidPlan(plan: PlanTier | undefined | null) {
-  return plan === 'BASIC' || plan === 'PRO';
+  return featuresUnlocked() || plan === 'BASIC' || plan === 'PRO';
 }
 
 export function isProPlan(plan: PlanTier | undefined | null) {
-  return plan === 'PRO';
+  return featuresUnlocked() || plan === 'PRO';
 }
 
 export function applyPlanLimits<T extends {

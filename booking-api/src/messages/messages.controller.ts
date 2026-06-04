@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { MessagesService } from './messages.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { effectivePlan } from '../common/util/plan';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { verifyAppointmentToken } from '../common/util/appointment-token';
 
@@ -87,9 +88,9 @@ export class MessagesController {
       throw new ForbiddenException('You do not have access to this business');
     }
 
-    // Check plan — only PAID can reply
+    // Check plan — only PAID can reply (unlocked for all during testing).
     const biz = await this.svc.getBusiness(businessId);
-    if (biz?.plan === 'FREE') {
+    if (effectivePlan(biz?.plan) === 'FREE') {
       throw new ForbiddenException('Messaging is a paid-plan feature. Please upgrade to BASIC or PRO.');
     }
 

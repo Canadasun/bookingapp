@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ResendEmailProvider } from './providers/email.provider';
 import { TwilioSmsProvider } from './providers/sms.provider';
 import { NOTIFICATION_QUEUE } from './notifications.service';
+import { effectivePlan } from '../common/util/plan';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -417,9 +418,9 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     this.currentBusinessId = apt.businessId;
     const clientFirstName = firstName(apt.client.name);
 
-    // SMS reminders are a PAID-plan feature (BASIC + PRO). Free tier gets email
-    // reminders only — no texts to clients.
-    const smsEnabled = apt.business.plan !== 'FREE';
+    // SMS reminders are a PAID-plan feature (BASIC + PRO) — unlocked for all
+    // during testing. Free tier otherwise gets email reminders only.
+    const smsEnabled = effectivePlan(apt.business.plan) !== 'FREE';
 
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     // HMAC manage token so the link proves the recipient got the email (the
