@@ -247,6 +247,7 @@ export class BookingsService {
         this.notifications.sendPendingNotification(appointment),
         this.notifications.sendAdminBookingAlert(appointment.id),
       ]);
+      void this.googleCalendar.syncAppointment(appointment.id); // keep connected calendars blocked even while pending
     }
 
     // Manage token so the confirmation screen can link straight to the manage page.

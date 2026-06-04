@@ -18,8 +18,16 @@ export class GoogleCalendarService {
   private clientId() { return process.env.GOOGLE_CLIENT_ID ?? ''; }
   private clientSecret() { return process.env.GOOGLE_CLIENT_SECRET ?? ''; }
   private redirectUri() {
-    return process.env.GOOGLE_REDIRECT_URI
-      ?? 'https://bookingapp-production-32f8.up.railway.app/api/calendar-sync/google/callback';
+    const configured = process.env.GOOGLE_REDIRECT_URI;
+    if (configured && !(process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/.test(configured))) {
+      return configured;
+    }
+    const publicApi =
+      process.env.API_PUBLIC_URL
+      ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : undefined);
+    return publicApi
+      ? `${publicApi.replace(/\/+$/, '').replace(/\/api$/, '')}/api/calendar-sync/google/callback`
+      : 'https://bookingapp-production-32f8.up.railway.app/api/calendar-sync/google/callback';
   }
   configured() { return !!this.clientId() && !!this.clientSecret(); }
 
@@ -156,11 +164,12 @@ export class GoogleCalendarService {
       };
       const base = `${CAL_API}/calendars/${encodeURIComponent(auth.calendarId)}/events`;
       if (apt.googleEventId) {
-        await fetch(`${base}/${apt.googleEventId}`, {
+        const res = await fetch(`${base}/${apt.googleEventId}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
+        if (!res.ok) this.logger.warn(`Google event patch failed ${res.status}: ${(await res.text()).slice(0, 300)}`);
       } else {
         const res = await fetch(base, {
           method: 'POST',
@@ -170,6 +179,8 @@ export class GoogleCalendarService {
         if (res.ok) {
           const ev = await res.json() as { id: string };
           await this.prisma.appointment.update({ where: { id: appointmentId }, data: { googleEventId: ev.id } });
+        } else {
+          this.logger.warn(`Google event insert failed ${res.status}: ${(await res.text()).slice(0, 300)}`);
         }
       }
     } catch (e) { this.logger.warn(`Google sync failed for ${appointmentId}: ${e}`); }

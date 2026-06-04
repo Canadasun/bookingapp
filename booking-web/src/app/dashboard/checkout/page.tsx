@@ -23,13 +23,15 @@ function fmtPrice(cents: number) {
 }
 
 type Step = "client" | "services" | "staff" | "datetime" | "confirm";
+type BookingSlot = Slot & { staffId?: string; staffName?: string };
 
 export default function CheckoutPage() {
   const [step, setStep]                   = useState<Step>("client");
   const [biz, setBiz]                     = useState<Business | null>(null);
   const [allServices, setAllServices]     = useState<Service[]>([]);
+  const [allStaffList, setAllStaffList]   = useState<StaffMember[]>([]);
   const [staffList, setStaffList]         = useState<StaffMember[]>([]);
-  const [slots, setSlots]                 = useState<Slot[]>([]);
+  const [slots, setSlots]                 = useState<BookingSlot[]>([]);
 
   const [clientSearch, setClientSearch]   = useState("");
   const [clientResults, setClientResults] = useState<Client[]>([]);
@@ -41,8 +43,10 @@ export default function CheckoutPage() {
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [selectedStaff, setSelectedStaff]     = useState<StaffMember | "any" | null>(null);
   const [selectedDate, setSelectedDate]       = useState<Date | undefined>();
-  const [selectedSlot, setSelectedSlot]       = useState<Slot | null>(null);
-  const [customStartsAt, setCustomStartsAt]   = useState("");
+  const [selectedSlot, setSelectedSlot]       = useState<BookingSlot | null>(null);
+  const [customDate, setCustomDate]           = useState("");
+  const [customTime, setCustomTime]           = useState("");
+  const [customStaffId, setCustomStaffId]     = useState("");
   const [overrideCalendar, setOverrideCalendar] = useState(false);
 
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -56,6 +60,7 @@ export default function CheckoutPage() {
     if (!bizId) return;
     api.business.get(bizId).then(setBiz).catch(() => {});
     api.services.listAll(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
+    api.staff.listAll(bizId).then((all) => setAllStaffList(all.filter((st) => st.active))).catch(() => {});
   }, [bizId]);
 
   useEffect(() => {
@@ -65,6 +70,14 @@ export default function CheckoutPage() {
       setStaffList(all.filter((st) => st.active && ids.every((id) => st.staffServices.some((ss) => ss.serviceId === id))));
     }).catch(() => {});
   }, [bizId, selectedServices]);
+
+  useEffect(() => {
+    if (selectedStaff !== "any") {
+      setCustomStaffId("");
+      return;
+    }
+    if (!customStaffId && allStaffList[0]) setCustomStaffId(allStaffList[0].id);
+  }, [selectedStaff, allStaffList, customStaffId]);
 
   const searchClients = useCallback(async (q: string) => {
     if (!bizId || !q.trim()) { setClientResults([]); return; }
@@ -82,13 +95,17 @@ export default function CheckoutPage() {
   async function loadSlots(date: Date) {
     if (!bizId) return;
     setLoadingSlots(true); setSlots([]);
-    const staffId = selectedStaff && selectedStaff !== "any" ? selectedStaff.id : staffList[0]?.id;
     const serviceId = selectedServices[0]?.id;
-    if (!staffId || !serviceId) { setLoadingSlots(false); return; }
+    const targets = selectedStaff && selectedStaff !== "any" ? [selectedStaff] : staffList;
+    if (targets.length === 0 || !serviceId) { setLoadingSlots(false); return; }
     try {
       const d = format(date, "yyyy-MM-dd");
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setSlots(await api.availability.getSlots({ staffId, serviceId, startDate: d, endDate: d, timezone: tz, enforceNotice: false }));
+      const rows = await Promise.all(targets.map(async (staff) => {
+        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, startDate: d, endDate: d, timezone: tz, enforceNotice: false });
+        return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
+      }));
+      setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
     } catch { toast.error("Failed to load times"); }
     finally { setLoadingSlots(false); }
   }
@@ -96,6 +113,7 @@ export default function CheckoutPage() {
   function pickDate(date?: Date) {
     if (!date) return;
     setSelectedDate(date); setSelectedSlot(null);
+    setCustomDate(format(date, "yyyy-MM-dd"));
     loadSlots(date);
   }
 
@@ -114,8 +132,18 @@ export default function CheckoutPage() {
     }
   }
 
+  function customStartsAtValue() {
+    return customDate && customTime ? `${customDate}T${customTime}` : "";
+  }
+
+  function resolvedCustomStaff() {
+    if (selectedStaff && selectedStaff !== "any") return selectedStaff;
+    return allStaffList.find((st) => st.id === customStaffId) ?? allStaffList[0] ?? null;
+  }
+
   async function confirm() {
     if (!bizId || selectedServices.length === 0) return;
+    const customStartsAt = customStartsAtValue();
     const customDate = customStartsAt ? new Date(customStartsAt) : null;
     if (customStartsAt && Number.isNaN(customDate?.getTime())) {
       toast.error("Enter a valid custom date and time");
@@ -130,7 +158,11 @@ export default function CheckoutPage() {
     try {
       const client = await createOrGetClient();
       if (!client) return;
-      const staffId = selectedStaff && selectedStaff !== "any" ? selectedStaff.id : staffList[0]?.id;
+      const staffId = customStartsAt
+        ? resolvedCustomStaff()?.id
+        : selectedStaff && selectedStaff !== "any"
+          ? selectedStaff.id
+          : selectedSlot?.staffId;
       if (!staffId) { toast.error("Choose a provider before booking"); return; }
       const apt = await api.appointments.createManual(bizId, {
         staffId, serviceId: selectedServices[0].id,
@@ -148,7 +180,7 @@ export default function CheckoutPage() {
   function reset() {
     setStep("client"); setSelectedClient(null); setSelectedServices([]);
     setSelectedStaff(null); setSelectedDate(undefined); setSelectedSlot(null);
-    setCustomStartsAt(""); setOverrideCalendar(false);
+    setCustomDate(""); setCustomTime(""); setCustomStaffId(""); setOverrideCalendar(false);
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
     setNewClientMode(false); setNewClient({ name: "", email: "", phone: "" });
   }
@@ -156,6 +188,8 @@ export default function CheckoutPage() {
   const today = startOfDay(new Date());
   const totalMins  = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const totalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
+  const customStartsAt = customStartsAtValue();
+  const customStaff = resolvedCustomStaff();
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (booked) return (
@@ -172,6 +206,7 @@ export default function CheckoutPage() {
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
           {(selectedDate || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Date: </span>{format(customStartsAt ? new Date(customStartsAt) : selectedDate!, "EEE, MMM d, yyyy")}</p>}
           {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "HH:mm") : format(parseISO(selectedSlot!.startsAtLocal), "HH:mm")}</p>}
+          {(selectedSlot?.staffName || customStaff) && <p className="text-gray-700"><span className="text-gray-400">Provider: </span>{customStartsAt ? customStaff?.user.name : selectedSlot?.staffName}</p>}
           <p className="text-gray-700"><span className="text-gray-400">Duration: </span>{fmtDuration(totalMins)}</p>
           <p className="font-semibold text-violet-700"><span className="text-gray-400">Total: </span>{fmtPrice(totalCents)}</p>
         </div>
@@ -357,9 +392,16 @@ export default function CheckoutPage() {
               ← Back
             </button>
             <h3 className="text-base font-semibold text-gray-900 mb-4">Choose a provider</h3>
+            {staffList.length === 0 && (
+              <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                No provider is assigned to every selected service yet. You can still use <span className="font-semibold">Custom owner time</span> on the next step with any active provider.
+              </div>
+            )}
             <div className="space-y-2">
               <button onClick={() => { setSelectedStaff("any"); setStep("datetime"); }}
+                disabled={staffList.length === 0 && allStaffList.length === 0}
                 className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                  staffList.length === 0 && allStaffList.length === 0 && "opacity-50 cursor-not-allowed",
                   selectedStaff === "any" ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg shrink-0">✨</div>
                 <div className="flex-1">
@@ -378,6 +420,20 @@ export default function CheckoutPage() {
                   <div className="flex-1">
                     <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
                     {st.bio && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{st.bio}</p>}
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                </button>
+              ))}
+              {staffList.length === 0 && allStaffList.map((st) => (
+                <button key={st.id} onClick={() => { setSelectedStaff(st); setStep("datetime"); }}
+                  className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                    (selectedStaff as StaffMember)?.id === st.id ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
+                  <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
+                    {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
+                    <p className="text-xs text-amber-600 mt-0.5">Owner override provider</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300" />
                 </button>
@@ -410,14 +466,15 @@ export default function CheckoutPage() {
                 ) : (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                     {slots.map((sl) => (
-                      <button key={sl.startsAt}
-                        onClick={() => { setSelectedSlot(sl); setStep("confirm"); }}
+                      <button key={`${sl.staffId ?? "staff"}-${sl.startsAt}`}
+                        onClick={() => { setSelectedSlot(sl); setCustomDate(""); setCustomTime(""); setOverrideCalendar(false); setStep("confirm"); }}
                         className={cn("py-2.5 rounded-xl border text-xs font-semibold transition-all",
                           selectedSlot?.startsAt === sl.startsAt
                             ? "bg-violet-600 text-white border-violet-600"
                             : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50")}>
                         {format(parseISO(sl.startsAtLocal), "HH:mm")}
                         <span className="text-[10px] block">{format(parseISO(sl.startsAtLocal), "a")}</span>
+                        {selectedStaff === "any" && sl.staffName && <span className="text-[10px] block truncate px-1 opacity-70">{sl.staffName}</span>}
                       </button>
                     ))}
                   </div>
@@ -426,17 +483,61 @@ export default function CheckoutPage() {
             )}
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-amber-900">Custom owner time</p>
-              <p className="mt-1 text-xs text-amber-700">Book any date &amp; time directly — this overrides the calendar slots and any double-book conflict. {selectedStaff === "any" ? "Uses your default provider unless you pick one." : ""}</p>
-              <div className="mt-3">
-                <Input
-                  type="datetime-local"
-                  value={customStartsAt}
-                  onChange={(e) => { setCustomStartsAt(e.target.value); setSelectedSlot(null); setOverrideCalendar(!!e.target.value); }}
-                />
+              <p className="mt-1 text-xs text-amber-700">Book any date and HH:mm time directly. This overrides availability and double-book conflicts, then syncs like other confirmed bookings.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                {selectedStaff === "any" && (
+                  <div className="sm:col-span-3">
+                    <label className="mb-1 block text-xs font-semibold text-amber-900">Provider</label>
+                    <select
+                      value={customStaffId}
+                      onChange={(e) => setCustomStaffId(e.target.value)}
+                      className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      {allStaffList.map((st) => <option key={st.id} value={st.id}>{st.user.name}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-amber-900">Date</label>
+                  <Input
+                    type="date"
+                    min={format(today, "yyyy-MM-dd")}
+                    max={format(addDays(today, biz?.maxAdvanceDays ?? 60), "yyyy-MM-dd")}
+                    value={customDate}
+                    onChange={(e) => { setCustomDate(e.target.value); setSelectedSlot(null); setOverrideCalendar(!!e.target.value && !!customTime); }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-amber-900">Time</label>
+                  <Input
+                    type="time"
+                    step={300}
+                    value={customTime}
+                    onChange={(e) => { setCustomTime(e.target.value); setSelectedSlot(null); setOverrideCalendar(!!customDate && !!e.target.value); }}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-amber-900">Quick times</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {["09:00", "12:00", "15:00", "18:00"].map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setCustomTime(t); setSelectedSlot(null); setOverrideCalendar(!!customDate); }}
+                        className={cn(
+                          "rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors",
+                          customTime === t ? "border-violet-500 bg-violet-600 text-white" : "border-amber-200 bg-white text-amber-900 hover:border-violet-300",
+                        )}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               {customStartsAt && (
                 <Button type="button" variant="secondary" className="mt-3 w-full sm:w-auto" onClick={() => setStep("confirm")}>
-                  Use custom time
+                  Use {format(new Date(customStartsAt), "MMM d")} at {format(new Date(customStartsAt), "HH:mm")}
                 </Button>
               )}
             </div>
@@ -456,6 +557,7 @@ export default function CheckoutPage() {
                 { label: "Client", value: selectedClient?.name ?? newClient.name, icon: User },
                 { label: "Services", value: selectedServices.map(s => s.name).join(", "), icon: Check },
                 { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
+                { label: "Provider", value: customStartsAt ? customStaff?.user.name ?? "—" : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName ?? "—", icon: Check },
                 { label: "Date", value: customStartsAt ? format(new Date(customStartsAt), "EEE, MMM d, yyyy") : selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
                 { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "HH:mm") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "HH:mm") : "—", icon: Check },
                 { label: "Calendar", value: customStartsAt || overrideCalendar ? "Owner override" : "Available slot", icon: Check },
