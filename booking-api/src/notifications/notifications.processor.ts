@@ -9,6 +9,14 @@ import { effectivePlan } from '../common/util/plan';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { formatInTimeZone } from 'date-fns-tz';
 
+// Escape user-controlled text before interpolating into email HTML — prevents
+// HTML/markup injection via names, reasons, notes, gift-card messages, etc.
+function esc(s: unknown): string {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  );
+}
+
 function emailWrap(content: string) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse</title></head>
 <body style="margin:0;padding:0;background:#F8F9FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -35,8 +43,8 @@ function aptDetails(apt: {
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#F8F9FA;border-radius:12px">
   <tr><td style="padding:16px 20px">
     <table width="100%">
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Service</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.service.name} (${apt.service.durationMinutes} min)</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.staff.user.name}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Service</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.service.name)} (${apt.service.durationMinutes} min)</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.staff.user.name)}</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'EEEE, MMMM d, yyyy')}</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'HH:mm')} - ${formatInTimeZone(apt.endsAt, tz, 'HH:mm')}</td></tr>
     </table>
@@ -332,7 +340,7 @@ export class NotificationProcessor extends WorkerHost {
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A gift just for you 🎁</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">${card.purchaserName ? `${card.purchaserName} sent you` : "You've received"} a <strong>${amount}</strong> gift card for <strong>${card.business.name}</strong>.</p>
-${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">"${card.message}"</p>` : ''}
+${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">"${esc(card.message)}"</p>` : ''}
 <div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:16px;text-align:center;margin:0 0 16px">
   <p style="margin:0 0 4px;color:#6B7280;font-size:12px">Your gift card code</p>
   <p style="margin:0;color:#E9A23C;font-size:22px;font-weight:700;letter-spacing:1px">${card.code}</p>
@@ -351,7 +359,8 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       ]);
       if (!campaign || !client) return;
       this.currentBusinessId = campaign.businessId;
-      const merge = (t: string) => t.replace(/\{name\}/g, client.name).replace(/\{business\}/g, campaign.business.name);
+      const merge = (t: string) => t.replace(/\{name\}/g, client.name).replace(/\{business\}/g, campaign.business.name); // raw: SMS + subject
+      const mergeHtml = (t: string) => t.replace(/\{name\}/g, esc(client.name)).replace(/\{business\}/g, esc(campaign.business.name)); // escaped merge values for HTML
 
       if (campaign.channel === 'SMS') {
         if (client.phone) await this.sms.send({ to: client.phone, body: merge(campaign.body) });
@@ -359,7 +368,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         await this.email.send({
           to: client.email,
           subject: merge(campaign.subject ?? `A note from ${campaign.business.name}`),
-          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${merge(campaign.body)}</div>`),
+          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${mergeHtml(campaign.body)}</div>`),
         });
       }
       await this.prisma.campaign.update({ where: { id: campaign.id }, data: { sentCount: { increment: 1 } } });
@@ -401,7 +410,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         subject: `We miss you at ${client.business.name}!`,
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">It's been a while...</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${client.name}, it's been a few weeks since your last visit to <strong>${client.business.name}</strong>. We'd love to see you again!</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(client.name)}, it's been a few weeks since your last visit to <strong>${esc(client.business.name)}</strong>. We'd love to see you again!</p>
 <p style="margin:0 0 20px;color:#374151;font-size:14px">Ready for your next appointment? You can book instantly online.</p>
 <a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
 `),
@@ -416,7 +425,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 
     if (!apt) return;
     this.currentBusinessId = apt.businessId;
-    const clientFirstName = firstName(apt.client.name);
+    const clientFirstName = esc(firstName(apt.client.name));
 
     // SMS reminders are a PAID-plan feature (BASIC + PRO) — unlocked for all
     // during testing. Free tier otherwise gets email reminders only.
@@ -526,7 +535,7 @@ ${aptDetails(apt)}
 <h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been cancelled.</p>
 ${aptDetails(apt)}
-${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Reason: <em>${apt.cancelReason}</em></p>` : ''}
+${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Reason: <em>${esc(apt.cancelReason)}</em></p>` : ''}
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
           `),
         });
@@ -549,7 +558,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
 <h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled by business</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, ${apt.business.name} has cancelled your appointment. We apologise for the inconvenience.</p>
 ${aptDetails(apt)}
-${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>Reason:</strong> ${apt.cancelReason}</p></div>` : ''}
+${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>Reason:</strong> ${esc(apt.cancelReason)}</p></div>` : ''}
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
           `),
         });
@@ -592,7 +601,7 @@ ${aptDetails(apt)}
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">A new appointment has been booked through your booking page.</p>
 ${aptDetails(apt)}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
-  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.client.name} (${apt.client.email}${apt.client.phone ? ', ' + apt.client.phone : ''})</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Booking ID</td><td style="color:#111827;font-size:12px;font-family:monospace">${apt.id}</td></tr>
 </table>
 <a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View in dashboard →</a>
@@ -613,7 +622,7 @@ ${aptDetails(apt)}
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">${apt.client.name} asked to cancel <strong>after</strong> your ${apt.business.cancellationWindowHours}-hour cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
 ${aptDetails(apt)}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
-  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.client.name} (${apt.client.email}${apt.client.phone ? ', ' + apt.client.phone : ''})</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>
 </table>
 <a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Review in dashboard →</a>
             `),
