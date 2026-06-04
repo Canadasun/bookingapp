@@ -108,6 +108,21 @@ export class StaffController {
     return this.staffService.update(id, dto, businessId);
   }
 
+  @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  remove(
+    @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.staffService.remove(id, businessId);
+  }
+
   @Post(':id/services')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -473,6 +473,8 @@ export const api = {
       req<{ staff: StaffMember; tempPassword: string }>(`/businesses/${businessId}/staff/invite`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean }) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    remove: (businessId: string, id: string) =>
+      req<{ ok: boolean }>(`/businesses/${businessId}/staff/${id}`, { method: "DELETE" }),
     assignServices: (businessId: string, staffId: string, serviceIds: string[]) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${staffId}/services`, { method: "POST", body: JSON.stringify({ serviceIds }) }),
     setAvailability: (businessId: string, staffId: string, rules: { dayOfWeek: number; startTime: string; endTime: string }[]) =>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle } from "lucide-react";
+import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -94,6 +94,13 @@ export default function StaffPage() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
   }
 
+  async function removeStaff(s: StaffMember) {
+    if (!bizId) return;
+    if (!confirm(`Permanently delete ${s.user.name}? This removes their profile and login. (Providers with bookings can't be deleted — deactivate them instead.)`)) return;
+    try { await api.staff.remove(bizId, s.id); toast.success("Provider deleted"); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  }
+
   function toggleService(id: string) {
     setSelectedServiceIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   }
@@ -160,6 +167,7 @@ export default function StaffPage() {
                     ? <button onClick={() => deactivate(s)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Deactivate"><UserX className="w-4 h-4"/></button>
                     : <button onClick={() => reactivate(s)} className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors" title="Reactivate"><Check className="w-4 h-4"/></button>
                   }
+                  <button onClick={() => removeStaff(s)} className="p-2 text-gray-400 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors" title="Delete provider"><Trash2 className="w-4 h-4"/></button>
                 </div>
               </CardContent>
             </Card>

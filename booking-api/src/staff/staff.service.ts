@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
@@ -113,6 +114,26 @@ export class StaffService {
   async deactivate(id: string, businessId?: string) {
     const staff = await this.findOne(id, businessId);
     return this.prisma.staff.update({ where: { id: staff.id }, data: { active: false } });
+  }
+
+  // Permanently remove a provider. Blocked for the owner (always a provider) and
+  // for providers with bookings (Appointment→Staff is Restrict to protect history
+  // — deactivate those instead). Removes the staff record + their login account.
+  async remove(id: string, businessId?: string) {
+    const staff = await this.findOne(id, businessId);
+    const user = await this.prisma.user.findUnique({ where: { id: staff.userId }, select: { role: true } });
+    if (user?.role === 'OWNER') {
+      throw new BadRequestException("You can't remove yourself as a provider — deactivate instead if you're not taking bookings.");
+    }
+    const aptCount = await this.prisma.appointment.count({ where: { staffId: staff.id } });
+    if (aptCount > 0) {
+      throw new BadRequestException('This provider has bookings — deactivate them instead of deleting, to keep your booking history.');
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.staff.delete({ where: { id: staff.id } });       // cascades services/availability/time-off
+      await tx.user.delete({ where: { id: staff.userId } });    // remove their login too
+    });
+    return { ok: true };
   }
 
   findAllIncludingInactive(businessId: string) {
