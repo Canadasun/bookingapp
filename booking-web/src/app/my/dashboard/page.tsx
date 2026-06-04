@@ -8,6 +8,7 @@ import { Calendar, MessageSquare, Tag, LogOut, ChevronRight, Clock, AlertCircle,
 import { toast } from "sonner";
 import { api, Appointment } from "@/lib/api";
 import { StatusBadge } from "@/components/StatusBadge";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -296,7 +297,10 @@ function AptCard({ apt }: { apt: Appointment }) {
             {format(start, "HH:mm")} · {apt.staff?.user?.name}
           </p>
           {(apt as { business?: { name?: string } }).business?.name && (
-            <p className="text-xs text-violet-500 mt-0.5">{(apt as { business?: { name?: string } }).business!.name}</p>
+            <p className="text-xs text-violet-500 mt-0.5 flex items-center gap-1.5">
+              <span className="truncate">{(apt as { business?: { name?: string } }).business!.name}</span>
+              {(apt as { business?: { verificationStatus?: string } }).business?.verificationStatus === "VERIFIED" && <VerifiedBadge />}
+            </p>
           )}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">

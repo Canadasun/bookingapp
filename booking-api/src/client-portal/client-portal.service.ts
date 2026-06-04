@@ -10,7 +10,7 @@ export class ClientPortalService {
     const clients = await this.prisma.client.findMany({
       where: { email },
       include: {
-        business: { select: { id: true, name: true, phone: true, address: true } },
+        business: { select: { id: true, name: true, phone: true, address: true, verificationStatus: true } },
         appointments: {
           include: {
             service: true,

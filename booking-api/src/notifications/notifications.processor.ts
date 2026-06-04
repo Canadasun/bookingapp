@@ -32,17 +32,28 @@ function emailWrap(content: string) {
 </table></td></tr></table></body></html>`;
 }
 
+// Inline "Verified" pill for emails (solid colour — gradients are unreliable in
+// mail clients). Empty string unless the business is admin-approved.
+function verifiedPill(status?: string | null) {
+  if (status !== 'VERIFIED') return '';
+  return ` <span style="display:inline-block;background:#4F46E5;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;vertical-align:middle">&#10003; Verified</span>`;
+}
+
 function aptDetails(apt: {
   service: { name: string; durationMinutes: number };
   staff: { user: { name: string } };
-  business: { timezone?: string | null };
+  business: { name?: string; timezone?: string | null; verificationStatus?: string | null };
   startsAt: Date; endsAt: Date;
 }) {
   const tz = apt.business.timezone ?? 'UTC';
+  const bizRow = apt.business.name
+    ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Business</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.business.name)}${verifiedPill(apt.business.verificationStatus)}</td></tr>`
+    : '';
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#F8F9FA;border-radius:12px">
   <tr><td style="padding:16px 20px">
     <table width="100%">
+      ${bizRow}
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Service</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.service.name)} (${apt.service.durationMinutes} min)</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.staff.user.name)}</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'EEEE, MMMM d, yyyy')}</td></tr>
