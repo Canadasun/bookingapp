@@ -182,6 +182,7 @@ export interface Campaign {
   createdAt: string; sentAt?: string | null;
 }
 
+export type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 export type PaymentKind = "DEPOSIT" | "NO_SHOW_FEE" | "LATE_CANCEL_FEE" | "IN_PERSON" | "OTHER";
 export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "REFUNDED" | "PARTIALLY_REFUNDED";
 export interface RefundRow {
@@ -305,6 +306,18 @@ export const api = {
   referrals: {
     // The current business's shareable code + who they've referred.
     get: () => req<{ code: string; referredCount: number; referrals: { business: string; since: string; status: string }[] }>("/referrals"),
+  },
+  verification: {
+    status: (businessId: string) =>
+      req<{ verificationStatus: VerificationStatus; verificationDocUrl: string | null; verificationNote: string | null; verificationSubmittedAt: string | null; verifiedAt: string | null }>(`/businesses/${businessId}/verification`),
+    submit: (businessId: string, docUrl: string) =>
+      req<{ verificationStatus: VerificationStatus }>(`/businesses/${businessId}/verification`, { method: "POST", body: JSON.stringify({ docUrl }) }),
+  },
+  // Platform admin (Role.ADMIN) — review the business-verification queue.
+  adminVerifications: {
+    list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
+    approve: (id: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/approve`, { method: "POST" }),
+    reject: (id: string, note?: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }),
   },
 
   payments: {

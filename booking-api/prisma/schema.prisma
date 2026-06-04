@@ -70,6 +70,13 @@ enum DataErasureStatus {
   REJECTED
 }
 
+enum VerificationStatus {
+  UNVERIFIED  // not submitted
+  PENDING     // document uploaded, awaiting admin review
+  VERIFIED    // approved by admin
+  REJECTED    // admin declined (see verificationNote)
+}
+
 model Business {
   id          String   @id @default(cuid())
   name        String
@@ -102,6 +109,13 @@ model Business {
   // Referral program: each business has a shareable code; new businesses that
   // apply someone's code at subscription checkout get a discount.
   referralCode String? @unique
+
+  // Business verification (upload a registration doc → admin approves).
+  verificationStatus      VerificationStatus @default(UNVERIFIED)
+  verificationDocUrl      String?
+  verificationNote        String?            // admin's note, e.g. rejection reason
+  verificationSubmittedAt DateTime?
+  verifiedAt              DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

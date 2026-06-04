@@ -37,6 +37,19 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Platform admin area — must be logged in AND Role.ADMIN.
+  if (pathname.startsWith("/admin")) {
+    if (!token) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+    if (user?.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+  }
+
   if (STAFF_PROTECTED.some((p) => pathname.startsWith(p)) && !token) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
@@ -65,6 +78,7 @@ export function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
+    "/admin/:path*",
     "/change-password",
     "/my/dashboard", "/my/messages",
     "/my/login", "/my/register",

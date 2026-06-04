@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { api, Business } from "@/lib/api";
+import { api, Business, VerificationStatus } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +103,24 @@ export default function SettingsPage() {
   useEffect(() => {
     api.referrals.get().then((r) => setMyReferral({ code: r.code, referredCount: r.referredCount })).catch(() => {});
   }, []);
+
+  // Business verification status.
+  const [verif, setVerif] = useState<{ status: VerificationStatus; note: string | null } | null>(null);
+  const [verifBusy, setVerifBusy] = useState(false);
+  useEffect(() => {
+    if (!bizId) return;
+    api.verification.status(bizId).then((v) => setVerif({ status: v.verificationStatus, note: v.verificationNote })).catch(() => {});
+  }, [bizId]);
+  async function submitVerification(docUrl: string) {
+    if (!bizId || !docUrl) return;
+    setVerifBusy(true);
+    try {
+      const r = await api.verification.submit(bizId, docUrl);
+      setVerif({ status: r.verificationStatus, note: null });
+      toast.success("Document submitted — we'll review it shortly");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
+    finally { setVerifBusy(false); }
+  }
 
   // Toast the result of a returning Stripe Checkout, then reload the plan.
   useEffect(() => {
@@ -244,6 +262,36 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-0.5">This information appears on your booking page.</p>
                 </div>
                 <hr className="border-gray-100" />
+
+                {/* Business verification */}
+                {verif && verif.status === "VERIFIED" ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <p className="text-sm font-medium text-emerald-800">Business verified</p>
+                  </div>
+                ) : verif ? (
+                  <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                    <div className="flex items-start gap-2">
+                      <ShieldCheck className="w-5 h-5 text-violet-600 mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-violet-900">Verify your business</p>
+                        {verif.status === "PENDING" ? (
+                          <p className="text-xs text-violet-700 mt-1">Your document is under review — we&apos;ll let you know once it&apos;s approved.</p>
+                        ) : (
+                          <>
+                            <p className="text-xs text-violet-700 mt-1">
+                              Upload your business registration to earn a verified badge and unlock premium offers.
+                              {verif.status === "REJECTED" && verif.note ? ` Previous submission declined: ${verif.note}` : ""}
+                            </p>
+                            <div className={cn("mt-3", verifBusy && "opacity-60 pointer-events-none")}>
+                              <ImageUpload value={null} onChange={(url) => { if (url) submitVerification(url); }} />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <Field label="Logo">
                   <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={async (url) => {
                     f("logoUrl", url ?? "");
