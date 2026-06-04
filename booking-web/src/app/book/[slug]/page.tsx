@@ -407,16 +407,15 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             <span className="font-bold text-gray-900 truncate">{biz?.name ?? "Pulse"}</span>
             {biz?.verificationStatus === "VERIFIED" && <VerifiedBadge className="shrink-0" />}
           </div>
-          <div className="flex items-center gap-3 text-sm shrink-0">
-            {homeHref ? (
+          {/* Signed-in viewers get a way back; guests can't sign in yet, so no link. */}
+          {homeHref && (
+            <div className="flex items-center gap-3 text-sm shrink-0">
               <Link href={homeHref}
                 className="text-xs font-medium text-gray-600 hover:text-violet-600 transition-colors border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg">
                 {navUser?.role === "CLIENT" ? "My bookings" : "Back to dashboard"}
               </Link>
-            ) : (
-              <Link href="/my/login" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Sign in</Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </nav>
       )}
