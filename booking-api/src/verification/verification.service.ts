@@ -6,7 +6,7 @@ export class VerificationService {
   constructor(private prisma: PrismaService) {}
 
   // Owner submits a registration document → status PENDING (awaiting admin).
-  async submit(businessId: string, docUrl: string) {
+  async submit(businessId: string, docUrl?: string) {
     const biz = await this.prisma.business.findUnique({
       where: { id: businessId },
       select: { verificationStatus: true },
@@ -19,7 +19,9 @@ export class VerificationService {
       where: { id: businessId },
       data: {
         verificationStatus: 'PENDING',
-        verificationDocUrl: docUrl,
+        // A document is optional — one click enters the queue; attaching a doc
+        // just helps the admin review faster.
+        ...(docUrl ? { verificationDocUrl: docUrl } : {}),
         verificationNote: null,
         verificationSubmittedAt: new Date(),
       },

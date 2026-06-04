@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
-import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset } from "lucide-react";
+import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { api, Appointment, ClientWithStats, NotificationDelivery } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -64,10 +65,28 @@ export default function OverviewPage() {
   const [failedPayments, setFailedPayments] = useState(0);
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
+  const [verifStatus, setVerifStatus] = useState<string | null>(null);
+  const [verifBusy, setVerifBusy] = useState(false);
 
   const user    = getUser();
   const isStaff = user?.role === "STAFF";
   const bizId   = user?.businessId ?? "";
+
+  useEffect(() => {
+    if (!bizId || isStaff) return;
+    api.verification.status(bizId).then((v) => setVerifStatus(v.verificationStatus)).catch(() => {});
+  }, [bizId, isStaff]);
+
+  async function requestVerification() {
+    if (!bizId) return;
+    setVerifBusy(true);
+    try {
+      const r = await api.verification.submit(bizId);
+      setVerifStatus(r.verificationStatus);
+      toast.success("Verification requested — we'll review it shortly");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
+    finally { setVerifBusy(false); }
+  }
 
   const load = useCallback(async () => {
     if (!bizId) {
@@ -171,6 +190,27 @@ export default function OverviewPage() {
           All appointments <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      {/* Get verified — one-click request, lands the business in the admin queue */}
+      {!isStaff && (verifStatus === "UNVERIFIED" || verifStatus === "REJECTED") && (
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex items-center gap-3">
+          <ShieldCheck className="w-6 h-6 text-violet-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-violet-900">Get your business verified</p>
+            <p className="text-xs text-violet-700 mt-0.5">Earn a standout verified badge clients trust — shown on your booking page, emails and their portal. One click to request it.</p>
+          </div>
+          <button onClick={requestVerification} disabled={verifBusy}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
+            {verifBusy ? "Submitting…" : "Get verified"}
+          </button>
+        </div>
+      )}
+      {!isStaff && verifStatus === "PENDING" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
+          <p className="text-sm text-amber-800">Verification requested — under review. We&apos;ll let you know once it&apos;s approved.</p>
+        </div>
+      )}
 
       {/* Metrics */}
       {!isStaff && (

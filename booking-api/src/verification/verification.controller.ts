@@ -11,7 +11,9 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
 
-const SubmitSchema = z.object({ docUrl: z.string().trim().min(1).max(2048) });
+// docUrl is optional — a business can request verification in one click and
+// (optionally) attach a registration document to speed up review.
+const SubmitSchema = z.object({ docUrl: z.string().trim().max(2048).optional() });
 const RejectSchema = z.object({ note: z.string().trim().max(500).optional() });
 
 // ── Owner: submit + check their own business verification ───────────────────
@@ -39,7 +41,7 @@ export class VerificationController {
   @Roles(Role.OWNER, Role.ADMIN)
   submit(
     @Param('businessId') businessId: string,
-    @Body(new ZodValidationPipe(SubmitSchema)) dto: { docUrl: string },
+    @Body(new ZodValidationPipe(SubmitSchema)) dto: { docUrl?: string },
     @CurrentUser() user: AuthUser,
   ) {
     this.assertOwns(user, businessId);

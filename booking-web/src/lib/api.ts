@@ -332,8 +332,9 @@ export const api = {
   verification: {
     status: (businessId: string) =>
       req<{ verificationStatus: VerificationStatus; verificationDocUrl: string | null; verificationNote: string | null; verificationSubmittedAt: string | null; verifiedAt: string | null }>(`/businesses/${businessId}/verification`),
-    submit: (businessId: string, docUrl: string) =>
-      req<{ verificationStatus: VerificationStatus }>(`/businesses/${businessId}/verification`, { method: "POST", body: JSON.stringify({ docUrl }) }),
+    // docUrl optional — submit in one click, or attach a document to speed review.
+    submit: (businessId: string, docUrl?: string) =>
+      req<{ verificationStatus: VerificationStatus }>(`/businesses/${businessId}/verification`, { method: "POST", body: JSON.stringify(docUrl ? { docUrl } : {}) }),
   },
   calendarSync: {
     // Returns the Google OAuth consent URL to connect the owner's calendar.

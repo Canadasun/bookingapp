@@ -116,13 +116,13 @@ export default function SettingsPage() {
     if (!bizId) return;
     api.verification.status(bizId).then((v) => setVerif({ status: v.verificationStatus, note: v.verificationNote })).catch(() => {});
   }, [bizId]);
-  async function submitVerification(docUrl: string) {
-    if (!bizId || !docUrl) return;
+  async function submitVerification(docUrl?: string) {
+    if (!bizId) return;
     setVerifBusy(true);
     try {
       const r = await api.verification.submit(bizId, docUrl);
       setVerif({ status: r.verificationStatus, note: null });
-      toast.success("Document submitted — we'll review it shortly");
+      toast.success(docUrl ? "Document submitted — we'll review it shortly" : "Verification requested — we'll review it shortly");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
     finally { setVerifBusy(false); }
   }
@@ -304,11 +304,20 @@ export default function SettingsPage() {
                         ) : (
                           <>
                             <p className="text-xs text-violet-700 mt-1">
-                              Upload your business registration to earn a verified badge and unlock premium offers.
+                              Earn a verified badge that builds trust with clients. Submit in one click — attaching your business registration just helps us review faster.
                               {verif.status === "REJECTED" && verif.note ? ` Previous submission declined: ${verif.note}` : ""}
                             </p>
-                            <div className={cn("mt-3", verifBusy && "opacity-60 pointer-events-none")}>
-                              <ImageUpload value={null} onChange={(url) => { if (url) submitVerification(url); }} />
+                            <div className={cn("mt-3 space-y-3", verifBusy && "opacity-60 pointer-events-none")}>
+                              <button
+                                type="button"
+                                onClick={() => submitVerification()}
+                                className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
+                                <ShieldCheck className="w-4 h-4" /> Submit for verification
+                              </button>
+                              <div>
+                                <p className="text-xs font-medium text-violet-700 mb-1.5">Optional: attach a registration document</p>
+                                <ImageUpload value={null} onChange={(url) => { if (url) submitVerification(url); }} />
+                              </div>
                             </div>
                           </>
                         )}
