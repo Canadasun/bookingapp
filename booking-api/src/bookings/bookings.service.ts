@@ -506,7 +506,36 @@ export class BookingsService {
       await this.notifications.sendReviewRequest(full);
     }
 
+    // Policy due: a no-show was just recorded and a fee is configured but wasn't
+    // auto-collected here — prompt the owner in their dashboard to charge it.
+    if (dto.status === 'NO_SHOW' && !cancelFee?.charged && updated.business.noShowFeeCents > 0) {
+      await this.promptOwnersToCharge(updated.businessId, id, 'NO_SHOW', updated.client.name, updated.business.noShowFeeCents);
+    }
+
     return { ...updated, cancelFee };
+  }
+
+  // In-app dashboard prompt to the owner(s) that a chargeable policy is due
+  // (no-show / late cancellation). Best-effort — never blocks the action.
+  private async promptOwnersToCharge(
+    businessId: string,
+    appointmentId: string,
+    kind: 'NO_SHOW' | 'LATE_CANCEL',
+    clientName: string,
+    feeCents: number,
+  ) {
+    try {
+      const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { id: true } });
+      if (!owners.length) return;
+      const fee = `$${(feeCents / 100).toFixed(2)}`;
+      const title = kind === 'NO_SHOW' ? `Charge no-show fee?` : `Charge late-cancellation fee?`;
+      const body = kind === 'NO_SHOW'
+        ? `${clientName} didn't show up. Your policy allows a ${fee} no-show fee — open the appointment to charge it.`
+        : `${clientName} cancelled inside your window. Your policy allows a ${fee} late-cancellation fee — open the appointment to charge it.`;
+      await this.prisma.notification.createMany({
+        data: owners.map((o) => ({ userId: o.id, kind: 'PAYMENT' as const, title, body, linkUrl: '/dashboard/appointments' })),
+      });
+    } catch { /* never block on the prompt */ }
   }
 
   async requestLateCancellation(id: string, cancelReason?: string) {
@@ -523,6 +552,11 @@ export class BookingsService {
       ...existing,
       ...(cancelReason ? { cancelReason } : {}),
     }).catch(() => {});
+
+    // Dashboard prompt to the owner when a late-cancel fee is configured.
+    if (existing.business.cancellationFeeCents > 0) {
+      await this.promptOwnersToCharge(existing.businessId, id, 'LATE_CANCEL', existing.client.name, existing.business.cancellationFeeCents);
+    }
 
     await this.logAction('APPOINTMENT', id, 'LATE_CANCEL_REQUEST', {
       status: existing.status,
