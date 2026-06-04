@@ -206,6 +206,7 @@ export default function SettingsPage() {
         depositPercent: Math.max(1, Number(form.depositPercent ?? 25)),
         noShowFeeCents: Math.max(0, Number(form.noShowFeeCents ?? 0)),
         cancellationFeeCents: Math.max(0, Number(form.cancellationFeeCents ?? 0)),
+        collectCardOnFile: !!form.collectCardOnFile,
         allowClientReschedule: form.allowClientReschedule !== false,
         cancellationPolicy: String(form.cancellationPolicy ?? "").trim() || undefined,
       };
@@ -483,6 +484,17 @@ export default function SettingsPage() {
                     </div>
                   </Field>
                 )}
+
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50">
+                  <div className="pr-3">
+                    <p className="text-sm font-semibold text-gray-800">Collect a card on file</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Ask every client to save a card with Stripe at booking (no upfront charge) so you can collect deposits/no-show/late-cancel fees later. Basic+</p>
+                  </div>
+                  <button type="button" onClick={() => isPaid ? f("collectCardOnFile", !form.collectCardOnFile) : promptUpgrade("BASIC", "Card on file")}
+                    className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.collectCardOnFile ? "bg-violet-600" : "bg-gray-200")}>
+                    <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.collectCardOnFile ? "translate-x-6" : "translate-x-1")} />
+                  </button>
+                </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>

@@ -36,6 +36,7 @@ export const CreateBusinessSchema = z.object({
   depositPercent: z.number().int().min(1).max(100).default(25),
   noShowFeeCents: z.number().int().nonnegative().default(0),
   cancellationFeeCents: z.number().int().nonnegative().default(0),
+  collectCardOnFile: z.boolean().default(false),
   allowClientReschedule: z.boolean().default(true),
   cancellationPolicy: optionalString(),
   plan: z.enum(['FREE', 'BASIC', 'PRO']).optional(),

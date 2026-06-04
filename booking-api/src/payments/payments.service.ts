@@ -126,7 +126,9 @@ export class PaymentsService {
       return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey() };
     }
 
-    if (isProPlan(b.plan) && b.noShowFeeCents > 0) {
+    // Card-on-file (no upfront charge): collect a saveable card when the owner
+    // turned on "always collect a card", or (Pro) when a no-show fee is set.
+    if (b.collectCardOnFile || (isProPlan(b.plan) && b.noShowFeeCents > 0)) {
       const intent = await this.getStripe().setupIntents.create({
         customer,
         usage: 'off_session',

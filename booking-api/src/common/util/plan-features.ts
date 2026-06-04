@@ -13,6 +13,7 @@ export function applyPlanLimits<T extends {
   requireDeposit?: boolean;
   noShowFeeCents?: number;
   cancellationFeeCents?: number;
+  collectCardOnFile?: boolean;
 }>(plan: PlanTier, data: T): T {
   if (!isPaidPlan(plan)) {
     return {
@@ -20,6 +21,7 @@ export function applyPlanLimits<T extends {
       requireDeposit: false,
       noShowFeeCents: 0,
       cancellationFeeCents: 0,
+      collectCardOnFile: false,
     };
   }
   if (!isProPlan(plan)) {

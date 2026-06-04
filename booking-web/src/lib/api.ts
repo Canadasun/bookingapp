@@ -72,7 +72,7 @@ export interface Business {
   bookingPageSettings: Record<string, unknown>;
   minNoticeMinutes: number; maxAdvanceDays: number;
   cancellationWindowHours: number; requireDeposit: boolean;
-  depositPercent: number; noShowFeeCents: number; cancellationFeeCents: number; allowClientReschedule: boolean;
+  depositPercent: number; noShowFeeCents: number; cancellationFeeCents: number; collectCardOnFile: boolean; allowClientReschedule: boolean;
   cancellationPolicy: string;
   plan: "FREE" | "BASIC" | "PRO";
   planExpiresAt?: string;

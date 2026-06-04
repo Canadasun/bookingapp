@@ -96,6 +96,7 @@ model Business {
   depositPercent        Int     @default(25)
   noShowFeeCents        Int     @default(0)
   cancellationFeeCents  Int     @default(0)
+  collectCardOnFile     Boolean @default(false)
   allowClientReschedule Boolean @default(true)
 
   // Subscription

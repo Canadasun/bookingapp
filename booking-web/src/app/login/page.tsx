@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Calendar, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { getUser } from "@/lib/auth";
 import { safeNextPath } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,7 +39,11 @@ function LoginForm() {
   const [rememberDevice, setRememberDevice] = useState(true); // skip 2FA on this device next time
 
   function go() {
-    router.push(safeNextPath(next, "/dashboard"));
+    // Honour an explicit ?next, otherwise route by role: admins to the platform
+    // admin area, clients to their portal, owners/staff to the dashboard.
+    if (next && next !== "/dashboard") { router.push(safeNextPath(next, "/dashboard")); return; }
+    const role = getUser()?.role;
+    router.push(role === "ADMIN" ? "/admin/verifications" : role === "CLIENT" ? "/my/dashboard" : "/dashboard");
   }
 
   async function handleSubmit(e: React.FormEvent) {
