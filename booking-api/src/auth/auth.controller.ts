@@ -53,8 +53,10 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   @UseGuards(JwtRefreshGuard)
-  refresh(@CurrentUser() user: User) {
-    return this.authService.refresh(user);
+  refresh(@CurrentUser() user: User, @Req() req: Request) {
+    const presented = (req.body as { refreshToken?: string }).refreshToken;
+    const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
+    return this.authService.refresh(user, presented, userAgent);
   }
 
   @Post('logout')

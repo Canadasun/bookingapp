@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getUser } from "./auth";
+import { api } from "./api";
 import { io, Socket } from "socket.io-client";
 
 export function useBusinessId() {
@@ -24,31 +25,40 @@ export function useEvents(onUpdate: (data: any) => void) {
   useEffect(() => {
     if (!bizId) return;
 
-    // Use the base API URL (e.g. http://localhost:3001) for the websocket
-    // In production, NEXT_PUBLIC_WEB_URL points to the web app, 
-    // but the API usually lives on a different subdomain or port.
-    // We'll use a relative path /proxy if we want to pipe through Next.js, 
-    // but socket.io often works better directly to the API if CORS allows.
-    // For now, let's try the direct API URL if available.
+    // The API lives on a different origin and the access token is in an HttpOnly
+    // cookie (unreadable by JS), so we can't authenticate the socket with it
+    // directly. Instead fetch a short-lived ticket over the authenticated proxy
+    // and present it in the handshake; the gateway verifies it and scopes the
+    // connection to our business.
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-    
-    const socket: Socket = io(apiUrl, {
-      transports: ["websocket"],
-    });
+    let socket: Socket | null = null;
+    let cancelled = false;
 
-    socket.on("connect", () => {
-      console.log("WebSocket connected");
-      socket.emit("joinBusiness", bizId);
-    });
+    api.events
+      .wsTicket()
+      .then(({ ticket }) => {
+        if (cancelled) return;
+        socket = io(apiUrl, { transports: ["websocket"], auth: { ticket } });
 
-    socket.on("bookingUpdated", (data) => {
-      console.log("Real-time update received:", data);
-      onUpdate(data);
-    });
+        socket.on("connect", () => {
+          socket?.emit("joinBusiness", bizId);
+        });
+
+        socket.on("bookingUpdated", (data) => {
+          onUpdate(data);
+        });
+      })
+      .catch(() => {
+        // Not authenticated / ticket unavailable — skip realtime; the UI still
+        // works via normal fetches.
+      });
 
     return () => {
-      socket.emit("leaveBusiness", bizId);
-      socket.disconnect();
+      cancelled = true;
+      if (socket) {
+        socket.emit("leaveBusiness", bizId);
+        socket.disconnect();
+      }
     };
   }, [bizId, onUpdate]);
 }

@@ -21,11 +21,14 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
   async validate(req: Request, payload: { sub: string }) {
     const { refreshToken } = req.body as { refreshToken: string };
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-    // Compare the hash of the presented token against the stored hash.
-    if (!user || !user.refreshToken || user.refreshToken !== hashRefreshToken(refreshToken)) {
-      throw new UnauthorizedException();
-    }
-    return user;
+    if (!refreshToken) throw new UnauthorizedException();
+    // The presented token must match a live session row (one per device), not a
+    // single shared column — so a sign-in on another device hasn't revoked it.
+    const session = await this.prisma.refreshSession.findFirst({
+      where: { userId: payload.sub, tokenHash: hashRefreshToken(refreshToken), expiresAt: { gt: new Date() } },
+      include: { user: true },
+    });
+    if (!session) throw new UnauthorizedException();
+    return session.user;
   }
 }

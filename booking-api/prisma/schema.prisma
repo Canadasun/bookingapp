@@ -330,7 +330,6 @@ model User {
   phone        String?
   role         Role     @default(CLIENT)
   businessId   String?
-  refreshToken String?
   emailVerified Boolean @default(false)
   mustResetPassword Boolean @default(false)
   twoFactorEnabled  Boolean @default(false)
@@ -347,9 +346,28 @@ model User {
   deviceTokens DeviceToken[]
   privacyConsents PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
+  refreshSessions RefreshSession[]
 
   @@index([email])
   @@index([businessId])
+}
+
+// One row per active sign-in (device/session). Replaces the old single
+// User.refreshToken column so a user can stay logged in on web AND mobile at the
+// same time — logging in on one device no longer revokes the others. Each stores
+// only a sha256 hash of the refresh token; rotated on refresh, pruned on expiry.
+model RefreshSession {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  userAgent String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model PrivacyConsent {

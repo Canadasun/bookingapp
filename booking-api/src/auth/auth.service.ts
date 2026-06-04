@@ -10,7 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
-import { hashRefreshToken } from '../common/util/refresh-token';
+import { hashRefreshToken, refreshTokenTtlMs } from '../common/util/refresh-token';
 import { normalizePhone } from '../common/util/phone';
 import { User } from '@prisma/client';
 
@@ -202,10 +202,11 @@ export class AuthService {
     }
     await this.prisma.user.update({
       where: { id: user.id },
-      // Clear the refresh token so existing sessions are logged out, and clear any
-      // forced-reset flag since the user has now set a fresh password.
-      data: { passwordHash: await bcrypt.hash(newPassword, 12), refreshToken: null, mustResetPassword: false },
+      // Clear any forced-reset flag since the user has now set a fresh password.
+      data: { passwordHash: await bcrypt.hash(newPassword, 12), mustResetPassword: false },
     });
+    // Revoke every device session so a reset logs the account out everywhere.
+    await this.prisma.refreshSession.deleteMany({ where: { userId: user.id } });
     return { ok: true };
   }
 
@@ -224,7 +225,7 @@ export class AuthService {
     }
 
     await this.recordLoginAndMaybeAlert(user, ctx);
-    return this.issueTokens(user);
+    return this.issueTokens(user, { userAgent: ctx?.userAgent });
   }
 
   // ── 2FA (one-time code) ─────────────────────────────────────────────────────
@@ -305,7 +306,7 @@ export class AuthService {
     await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { consumedAt: new Date() } });
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ch.userId } });
     await this.recordLoginAndMaybeAlert(user, ctx);
-    const tokens = await this.issueTokens(user);
+    const tokens = await this.issueTokens(user, { userAgent: ctx?.userAgent });
     // "Remember this device": hand back a trusted-device token the client stores,
     // so future logins from here skip the 2FA prompt.
     return rememberDevice ? { ...tokens, trustedDeviceToken: this.mintTrustedDeviceToken(user) } : tokens;
@@ -383,15 +384,18 @@ export class AuthService {
     } catch { /* never block login on the alert path */ }
   }
 
-  async refresh(user: User) {
-    return this.issueTokens(user);
+  // Rotate the CURRENT device's session in place (identified by the presented
+  // refresh token) so other devices' sessions are untouched.
+  async refresh(user: User, presentedToken?: string, userAgent?: string) {
+    return this.issueTokens(user, {
+      replaceTokenHash: presentedToken ? hashRefreshToken(presentedToken) : undefined,
+      userAgent,
+    });
   }
 
   async logout(userId: string) {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: null },
-    });
+    // Sign the account out on every device (matches prior single-token behaviour).
+    await this.prisma.refreshSession.deleteMany({ where: { userId } });
   }
 
   // Authenticated password change. Verifies the current password, sets the new
@@ -411,7 +415,7 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async issueTokens(user: User) {
+  private async issueTokens(user: User, opts: { userAgent?: string; replaceTokenHash?: string } = {}) {
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET,
@@ -423,12 +427,26 @@ export class AuthService {
       secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as unknown as number,
     });
-    await this.prisma.user.update({
-      where: { id: user.id },
-      // Store only a hash of the refresh token — a DB leak then can't replay live
-      // sessions. The refresh strategy compares the same hash.
-      data: { refreshToken: hashRefreshToken(refreshToken) },
-    });
+
+    // Persist the session as a hash only — a DB leak then can't replay live
+    // sessions. On refresh we ROTATE the presented session's row in place (one
+    // row per device); on login we add a NEW row so web + mobile coexist.
+    const tokenHash = hashRefreshToken(refreshToken);
+    const expiresAt = new Date(Date.now() + refreshTokenTtlMs());
+    const userAgent = opts.userAgent?.slice(0, 256) ?? null;
+    if (opts.replaceTokenHash) {
+      const { count } = await this.prisma.refreshSession.updateMany({
+        where: { userId: user.id, tokenHash: opts.replaceTokenHash },
+        data: { tokenHash, expiresAt, userAgent },
+      });
+      if (count === 0) {
+        await this.prisma.refreshSession.create({ data: { userId: user.id, tokenHash, expiresAt, userAgent } });
+      }
+    } else {
+      await this.prisma.refreshSession.create({ data: { userId: user.id, tokenHash, expiresAt, userAgent } });
+    }
+    // Opportunistic cleanup of this user's expired sessions.
+    await this.prisma.refreshSession.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
 
     let staffId: string | null = null;
     if (user.role === 'STAFF') {

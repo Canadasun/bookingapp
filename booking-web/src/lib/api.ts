@@ -216,6 +216,10 @@ export interface DeviceToken {
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
+  events: {
+    // Short-lived ticket for the realtime socket handshake (see useEvents).
+    wsTicket: () => req<{ ticket: string }>("/events/ws-ticket"),
+  },
   auth: {
     login: (email: string, password: string) =>
       req<{ accessToken: string; refreshToken: string; user: { id: string; name: string; email: string; role: string } }>(
