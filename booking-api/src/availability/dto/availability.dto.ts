@@ -9,7 +9,7 @@ export const GetSlotsSchema = z.object({
   // Public callers enforce the business's min-notice window; owner/staff tools
   // pass enforceNotice=false to also see near-term slots (their manual bookings
   // override min-notice). Past slots are ALWAYS hidden either way.
-  enforceNotice: z.string().optional().transform((v) => v !== 'false'),
+  enforceNotice: z.string().optional(),
 });
 
 export type GetSlotsDto = z.infer<typeof GetSlotsSchema>;

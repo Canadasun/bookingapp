@@ -72,6 +72,11 @@ async function buildService(prismaOverrides = {}) {
 }
 
 describe('AvailabilityService', () => {
+  // Pin "now" to just before the fixed 2024 test dates so the service's
+  // past-slot filter doesn't strip the expected slots.
+  beforeAll(() => { jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }); jest.setSystemTime(new Date('2024-03-01T00:00:00Z')); });
+  afterAll(() => { jest.useRealTimers(); });
+
   describe('getAvailableSlots — basic', () => {
     it('returns hourly slots for a 9–17 Monday window', async () => {
       const { svc } = await buildService();
