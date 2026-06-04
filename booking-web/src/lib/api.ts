@@ -320,8 +320,10 @@ export const api = {
     get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),
     // Owner — start Stripe Checkout for a paid plan; returns a redirect URL.
     // An optional referral code applies a discount + records the referral.
+    // Returns a checkout URL for new subscribers, or { updated, plan } when an
+    // existing subscriber switches plan in place (prorated — no redirect needed).
     checkout: (plan: "BASIC" | "PRO", referralCode?: string) =>
-      req<{ url: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
+      req<{ url?: string; updated?: boolean; plan?: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
     // Owner — open the Stripe billing portal; returns a redirect URL.
     portal: () => req<{ url: string }>("/subscriptions/portal", { method: "POST" }),
   },
@@ -614,6 +616,8 @@ export const api = {
 
   clientPortal: {
     appointments: () => req<Appointment[]>(`/my/appointments`),
+    cardStatus: () => req<{ hasCard: boolean }>(`/my/payment-method`),
+    removeCard: () => req<{ removed: number }>(`/my/payment-method/remove`, { method: "POST" }),
     messages: () => req<Array<{ businessId: string; businessName: string; clientId: string; messages: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }> }>>(`/my/messages`),
     offers: () => req<Array<{ id: string; title: string; description: string; discount?: string; expiresAt?: string; business: { id: string; name: string } }>>(`/my/offers`),
   },

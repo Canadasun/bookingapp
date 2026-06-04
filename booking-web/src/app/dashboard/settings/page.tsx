@@ -161,8 +161,17 @@ export default function SettingsPage() {
   async function upgrade(plan: "BASIC" | "PRO") {
     setBillingBusy(plan);
     try {
-      const { url } = await api.subscriptions.checkout(plan, referralInput);
-      window.location.assign(url);
+      const res = await api.subscriptions.checkout(plan, referralInput);
+      if (res.url) {
+        window.location.assign(res.url); // new subscriber → Stripe Checkout
+      } else if (res.updated) {
+        // Existing subscriber switched plan in place (prorated) — refresh state.
+        toast.success(`Switched to ${plan} — you were only charged the prorated difference`);
+        if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
+        setBillingBusy(null);
+      } else {
+        setBillingBusy(null);
+      }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start checkout"); setBillingBusy(null); }
   }
 

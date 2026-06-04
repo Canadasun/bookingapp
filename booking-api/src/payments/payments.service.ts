@@ -428,6 +428,28 @@ export class PaymentsService {
     const customerId = await this.ensureBusinessCustomer(business);
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
 
+    // Already subscribed? Switch the plan IN PLACE with proration instead of a new
+    // checkout — Stripe credits the unused time on the old plan and immediately
+    // invoices only the difference (e.g. Basic→Pro mid-cycle ≈ +$10, not $20).
+    const existing = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (existing?.stripeSubscriptionId && ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(existing.status ?? '')) {
+      try {
+        const sub = await this.getStripe().subscriptions.retrieve(existing.stripeSubscriptionId);
+        const itemId = sub.items.data[0]?.id;
+        if (sub.status !== 'canceled' && itemId && sub.items.data[0]?.price?.id !== priceId) {
+          const updated = await this.getStripe().subscriptions.update(existing.stripeSubscriptionId, {
+            items: [{ id: itemId, price: priceId }],
+            proration_behavior: 'always_invoice', // charge/credit the difference now
+            metadata: { businessId, plan },
+          });
+          await this.applySubscription(businessId, updated);
+          return { updated: true as const, plan };
+        }
+      } catch {
+        // Fall through to a fresh checkout if the in-place switch isn't possible.
+      }
+    }
+
     // Referral: if a valid code is applied, record it and (when a Stripe coupon
     // is configured) attach it as the checkout discount. Otherwise let the owner
     // enter any standard Stripe promotion code.
@@ -637,5 +659,39 @@ export class PaymentsService {
     } catch {
       return { charged: false, feeCents, reason: 'charge_failed' };
     }
+  }
+
+  // ── Client card-on-file management (portal) ─────────────────────────────────
+  // Does this client (matched by email across their records) have a saved card?
+  async clientCardStatus(email: string) {
+    const clients = await this.prisma.client.findMany({ where: { email }, select: { id: true } });
+    const clientIds = clients.map((c) => c.id);
+    if (!clientIds.length) return { hasCard: false };
+    const count = await this.prisma.appointment.count({
+      where: { clientId: { in: clientIds }, stripePaymentMethodId: { not: null } },
+    });
+    return { hasCard: count > 0 };
+  }
+
+  // Client-initiated: detach every saved card from Stripe and clear it from their
+  // appointments, so it can no longer be auto-charged (no-show/late-cancel) or
+  // manually charged. Best-effort per card; always clears the stored references.
+  async removeClientCards(email: string) {
+    const clients = await this.prisma.client.findMany({ where: { email }, select: { id: true } });
+    const clientIds = clients.map((c) => c.id);
+    if (!clientIds.length) return { removed: 0 };
+    const appts = await this.prisma.appointment.findMany({
+      where: { clientId: { in: clientIds }, stripePaymentMethodId: { not: null } },
+      select: { stripePaymentMethodId: true },
+    });
+    const pmIds = [...new Set(appts.map((a) => a.stripePaymentMethodId).filter((x): x is string => !!x))];
+    for (const pm of pmIds) {
+      try { await this.getStripe().paymentMethods.detach(pm); } catch { /* already detached/unconfigured */ }
+    }
+    await this.prisma.appointment.updateMany({
+      where: { clientId: { in: clientIds } },
+      data: { stripePaymentMethodId: null },
+    });
+    return { removed: pmIds.length };
   }
 }
