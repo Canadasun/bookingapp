@@ -73,12 +73,16 @@ export class GoogleCalendarService {
         grant_type: 'authorization_code',
       }),
     });
-    if (!tokenRes.ok) throw new BadRequestException('Google rejected the authorization.');
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text().catch(() => '');
+      this.logger.warn(`token exchange ${tokenRes.status}: ${body.slice(0, 300)}`);
+      throw new BadRequestException(`token_exchange_${tokenRes.status}`);
+    }
     const tok = await tokenRes.json() as { access_token: string; refresh_token?: string; expires_in: number };
     if (!tok.refresh_token) {
-      // No refresh token (already granted without prompt=consent) — keep any existing one.
+      // No refresh token (already granted previously) — keep any existing one.
       const existing = await this.prisma.googleCalendarConnection.findUnique({ where: { businessId } });
-      if (!existing) throw new BadRequestException('Google did not return a refresh token. Please remove the app from your Google account and reconnect.');
+      if (!existing) throw new BadRequestException('no_refresh_token');
     }
 
     let email: string | undefined;

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CalendarSyncService } from './calendar-sync.service';
@@ -33,14 +33,24 @@ export class CalendarSyncController {
   // Public — Google redirects here after consent. Verifies the signed state,
   // stores the connection, and bounces back to the dashboard.
   @Get('google/callback')
-  async callback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
+  async callback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') oauthError: string,
+    @Res() res: Response,
+  ) {
     const web = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000';
+    const logger = new Logger('GoogleCallback');
     try {
-      if (!code) throw new Error('missing code');
+      if (oauthError) throw new Error(`google_denied:${oauthError}`); // e.g. access_denied
+      if (!code) throw new Error('missing_code');
       await this.google.handleCallback(code, state);
+      logger.log('Google Calendar connected successfully');
       return res.redirect(`${web}/dashboard/settings?calendar=connected`);
-    } catch {
-      return res.redirect(`${web}/dashboard/settings?calendar=error`);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : 'unknown';
+      logger.warn(`Google callback FAILED: ${reason}`);
+      return res.redirect(`${web}/dashboard/settings?calendar=error&reason=${encodeURIComponent(reason)}`);
     }
   }
 
