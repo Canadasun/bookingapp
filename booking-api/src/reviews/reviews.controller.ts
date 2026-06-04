@@ -4,6 +4,9 @@ import { ReviewsService } from './reviews.service';
 import { SubmitReviewSchema, SubmitReviewDto, ModerateReviewSchema, ModerateReviewDto } from './dto/reviews.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
@@ -45,7 +48,8 @@ export class ReviewsController {
   // Owner — show/hide a review.
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   moderate(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

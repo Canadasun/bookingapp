@@ -4,6 +4,9 @@ import { CampaignsService } from './campaigns.service';
 import { CreateCampaignSchema, CreateCampaignDto, UpdateCampaignSchema, UpdateCampaignDto } from './dto/campaigns.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
@@ -18,7 +21,8 @@ type Audience = 'ALL' | 'RECENT' | 'LAPSED';
 
 @ApiTags('campaigns')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.OWNER, Role.ADMIN)
 @Controller('businesses/:businessId/campaigns')
 export class CampaignsController {
   constructor(private svc: CampaignsService) {}

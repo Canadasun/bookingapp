@@ -2,6 +2,9 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Forbidden
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { OffersService } from './offers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -36,7 +39,8 @@ export class OffersController {
 
   @Post()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   create(
     @Param('businessId') businessId: string,
     @CurrentUser() user: AuthUser,
@@ -48,7 +52,8 @@ export class OffersController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -61,7 +66,8 @@ export class OffersController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   remove(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

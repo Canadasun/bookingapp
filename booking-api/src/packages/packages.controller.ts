@@ -7,6 +7,9 @@ import {
 } from './dto/packages.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
@@ -31,6 +34,8 @@ export class PackagesController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreatePackageSchema)) dto: CreatePackageDto,
@@ -41,6 +46,8 @@ export class PackagesController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   update(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
@@ -52,6 +59,8 @@ export class PackagesController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   remove(@Param('businessId') businessId: string, @Param('id') id: string, @CurrentUser() user: AuthUser) {
     assertOwns(user, businessId);
     return this.svc.removePackage(businessId, id);
@@ -75,6 +84,8 @@ export class PackagesController {
   }
 
   @Post('issued')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   issue(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(IssueClientPackageSchema)) dto: IssueClientPackageDto,
@@ -96,6 +107,8 @@ export class PackagesController {
   }
 
   @Post('issued/:id/void')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   void(@Param('businessId') businessId: string, @Param('id') id: string, @CurrentUser() user: AuthUser) {
     assertOwns(user, businessId);
     return this.svc.void(businessId, id);
