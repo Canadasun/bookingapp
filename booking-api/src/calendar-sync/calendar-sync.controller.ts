@@ -14,10 +14,19 @@ type AuthUser = { id: string; role: string; businessId: string | null };
 @ApiTags('calendar-sync')
 @Controller('calendar-sync')
 export class CalendarSyncController {
+  // In-memory record of the last OAuth callback outcome (diagnostics — survives
+  // within the running process; readable via google/last-attempt).
+  private static lastAttempt: { at: string; ok: boolean; reason?: string; query?: string } | null = null;
+
   constructor(
     private readonly calendarSyncService: CalendarSyncService,
     private readonly google: GoogleCalendarService,
   ) {}
+
+  @Get('google/last-attempt')
+  lastAttempt() {
+    return CalendarSyncController.lastAttempt ?? { at: null, ok: null, reason: 'no callback received yet' };
+  }
 
   // ── Google Calendar OAuth ───────────────────────────────────────────────────
   // Owner — get the consent URL to connect their Google Calendar.
@@ -41,15 +50,18 @@ export class CalendarSyncController {
   ) {
     const web = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000';
     const logger = new Logger('GoogleCallback');
+    const queryInfo = `code=${code ? 'yes' : 'no'} error=${oauthError ?? 'none'} state=${state ? 'yes' : 'no'}`;
     try {
       if (oauthError) throw new Error(`google_denied:${oauthError}`); // e.g. access_denied
       if (!code) throw new Error('missing_code');
       await this.google.handleCallback(code, state);
       logger.log('Google Calendar connected successfully');
+      CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: true, query: queryInfo };
       return res.redirect(`${web}/dashboard/settings?calendar=connected`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : 'unknown';
       logger.warn(`Google callback FAILED: ${reason}`);
+      CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: false, reason, query: queryInfo };
       return res.redirect(`${web}/dashboard/settings?calendar=error&reason=${encodeURIComponent(reason)}`);
     }
   }
