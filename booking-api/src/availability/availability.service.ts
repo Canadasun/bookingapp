@@ -116,7 +116,12 @@ export class AvailabilityService {
       cursor = addDays(cursor, 1);
     }
 
-    return slots;
+    // Only return slots that are actually bookable, so the calendar never offers
+    // a time that create() will reject. Past slots are always hidden; public
+    // callers additionally honour the business's min-notice window.
+    const minNoticeMs = dto.enforceNotice ? (staff.business.minNoticeMinutes ?? 0) * 60_000 : 0;
+    const earliest = new Date(Date.now() + minNoticeMs);
+    return slots.filter((s) => s.startsAt >= earliest);
   }
 
   private generateDaySlots(

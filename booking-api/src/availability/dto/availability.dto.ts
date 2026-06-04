@@ -6,6 +6,10 @@ export const GetSlotsSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
   timezone: z.string().default('UTC'),
+  // Public callers enforce the business's min-notice window; owner/staff tools
+  // pass enforceNotice=false to also see near-term slots (their manual bookings
+  // override min-notice). Past slots are ALWAYS hidden either way.
+  enforceNotice: z.string().optional().transform((v) => v !== 'false'),
 });
 
 export type GetSlotsDto = z.infer<typeof GetSlotsSchema>;

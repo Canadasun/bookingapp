@@ -86,7 +86,7 @@ export default function CheckoutPage() {
     try {
       const d = format(date, "yyyy-MM-dd");
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setSlots(await api.availability.getSlots({ staffId, serviceId, startDate: d, endDate: d, timezone: tz }));
+      setSlots(await api.availability.getSlots({ staffId, serviceId, startDate: d, endDate: d, timezone: tz, enforceNotice: false }));
     } catch { toast.error("Failed to load times"); }
     finally { setLoadingSlots(false); }
   }
