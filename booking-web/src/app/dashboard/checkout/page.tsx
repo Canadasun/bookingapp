@@ -63,6 +63,17 @@ export default function CheckoutPage() {
     api.staff.listAll(bizId).then((all) => setAllStaffList(all.filter((st) => st.active))).catch(() => {});
   }, [bizId]);
 
+  // "Book again" deep-link from the Clients page (?client=<id>): pre-select that
+  // client and skip straight to choosing services — no duplicate contact created.
+  useEffect(() => {
+    if (!bizId || typeof window === "undefined") return;
+    const clientId = new URLSearchParams(window.location.search).get("client");
+    if (!clientId) return;
+    api.clients.get(bizId, clientId)
+      .then((c) => { setSelectedClient(c); setStep("services"); })
+      .catch(() => {});
+  }, [bizId]);
+
   useEffect(() => {
     if (!bizId || selectedServices.length === 0) { setStaffList([]); return; }
     api.staff.listAll(bizId).then((all) => {

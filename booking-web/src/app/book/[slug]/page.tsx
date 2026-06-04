@@ -12,6 +12,7 @@ import Link from "next/link";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { BookingPayment } from "@/components/BookingPayment";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import "react-day-picker/style.css";
 
 type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string };
@@ -359,6 +360,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               </div>
             )}
             <span className="font-bold text-gray-900 truncate">{biz?.name ?? "Pulse"}</span>
+            {biz?.verificationStatus === "VERIFIED" && <VerifiedBadge className="shrink-0" />}
           </div>
           <div className="flex items-center gap-3 text-sm shrink-0">
             <Link href={`/my/bookings/${slug}`}

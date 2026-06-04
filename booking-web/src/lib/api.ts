@@ -76,6 +76,7 @@ export interface Business {
   cancellationPolicy: string;
   plan: "FREE" | "BASIC" | "PRO";
   planExpiresAt?: string;
+  verificationStatus?: VerificationStatus;
   createdAt: string; updatedAt: string;
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
@@ -28,7 +29,11 @@ export default function ClientsPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [deletingClient, setDeletingClient] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
+  const router = useRouter();
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
@@ -59,6 +64,7 @@ export default function ClientsPage() {
   async function openClient(c: ClientWithStats) {
     if (!bizId) return;
     setSelected(c);
+    setEditMode(false);
     setLoadingDetail(true);
     try {
       const [detail, payments, packages, messages] = await Promise.all([
@@ -105,6 +111,44 @@ export default function ClientsPage() {
     } finally {
       setDeletingClient(false);
     }
+  }
+
+  function startEdit() {
+    if (!selected) return;
+    setEditForm({
+      name: selected.name ?? "",
+      email: selected.email ?? "",
+      phone: selected.phone ?? "",
+      notes: selected.notes ?? "",
+    });
+    setEditMode(true);
+  }
+
+  async function saveEdit() {
+    if (!bizId || !selected) return;
+    if (!editForm.name.trim() || !editForm.email.trim()) { toast.error("Name and email are required"); return; }
+    setSavingEdit(true);
+    try {
+      const updated = await api.clients.update(bizId, selected.id, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim() || undefined,
+        notes: editForm.notes.trim() || undefined,
+      });
+      setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
+      setEditMode(false);
+      toast.success("Contact updated");
+      load(search, page);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update contact");
+    } finally { setSavingEdit(false); }
+  }
+
+  // Rebook the same person: jump to New booking with this client pre-selected,
+  // so the owner never creates a duplicate client for a repeat visit.
+  function rebook() {
+    if (!selected) return;
+    router.push(`/dashboard/checkout?client=${selected.id}`);
   }
 
   const detail = selected as (ClientWithStats & {
@@ -175,25 +219,44 @@ export default function ClientsPage() {
           <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setSelected(null)} />
           <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">{selected.name}</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={deleteClient}
-                  loading={deletingClient}
-                  className="gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4" />Delete
+              <h2 className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button size="sm" onClick={rebook} className="gap-1.5">
+                  <CalendarPlus className="w-4 h-4" />Book again
                 </Button>
-                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                <button onClick={startEdit} title="Edit contact"
+                  className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4" /></button>
+                <button onClick={deleteClient} disabled={deletingClient} title="Delete contact"
+                  className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="space-y-1.5 text-sm">
-                <div className="flex items-center gap-2 text-gray-600"><Mail className="w-4 h-4 text-gray-400" />{selected.email}</div>
-                {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{selected.phone}</div>}
-              </div>
+              {editMode ? (
+                <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/40 p-4">
+                  <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Edit contact</p>
+                  {([
+                    { k: "name", label: "Full name *", type: "text" },
+                    { k: "email", label: "Email *", type: "email" },
+                    { k: "phone", label: "Phone", type: "tel" },
+                    { k: "notes", label: "Notes", type: "text" },
+                  ] as const).map(({ k, label, type }) => (
+                    <div key={k}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                      <Input type={type} value={editForm[k]} onChange={(e) => setEditForm((p) => ({ ...p, [k]: e.target.value }))} />
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="secondary" className="flex-1" onClick={() => setEditMode(false)}>Cancel</Button>
+                    <Button className="flex-1" loading={savingEdit} onClick={saveEdit}>Save</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600"><Mail className="w-4 h-4 text-gray-400" />{selected.email}</div>
+                  {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{selected.phone}</div>}
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { label: "Total visits", value: selected.totalVisits, icon: Calendar },

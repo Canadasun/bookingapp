@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -109,6 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [open, setOpen]  = useState(false);
   const [user, setUser]  = useState<SessionUser | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
   const [unread, setUnread] = useState(0);
 
   // Re-read the (display) session and refresh the avatar on every navigation, so
@@ -117,6 +119,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     api.users.me().then((u) => setAvatar(u.avatarUrl ?? null)).catch(() => {});
   }, [pathname]);
+  useEffect(() => {
+    const u = getUser();
+    if (!u?.businessId || (u.role !== "OWNER" && u.role !== "ADMIN")) return;
+    api.verification.status(u.businessId).then((v) => setVerified(v.verificationStatus === "VERIFIED")).catch(() => {});
+  }, []);
   useEffect(() => {
     api.notifications.unreadCount()
       .then((r) => setUnread(r.count))
@@ -144,13 +151,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         "fixed inset-y-0 left-0 z-40 w-60 bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}>
-        {/* Logo */}
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB]">
+        {/* Logo — back to the landing page (session stays active). */}
+        <Link href="/" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Pulse home">
           <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center shrink-0">
             <Calendar className="w-4 h-4 text-white" />
           </div>
           <span className="font-bold text-ink tracking-tight">Pulse</span>
-        </div>
+        </Link>
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
@@ -204,6 +211,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 : <MenuIcon className="w-5 h-5 text-gray-600" />}
             </button>
             <h1 className="text-sm font-semibold text-ink">{currentLabel}</h1>
+            {verified && <VerifiedBadge />}
           </div>
 
           <div className="flex items-center gap-3">
