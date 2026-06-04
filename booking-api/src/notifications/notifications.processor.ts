@@ -113,13 +113,32 @@ export class NotificationProcessor extends WorkerHost {
           },
         })
         .catch(() => {});
+    // Anti-bust guard: jobs already run once (attempts:1, no retries). On top of
+    // that, suppress an *identical* message (same channel + recipient + type) sent
+    // in the last 2 minutes, so a double-trigger can't fire two emails/texts and
+    // burn the business's quota. Auth/transactional types that legitimately repeat
+    // (OTP, verify, reset, security) are never suppressed.
+    const ALWAYS_SEND = new Set(['otp', 'verify-email', 'password-reset', 'security-alert']);
+    const isDuplicate = async (channel: 'EMAIL' | 'SMS', recipient: string): Promise<boolean> => {
+      const type = this.currentType || 'unknown';
+      if (ALWAYS_SEND.has(type)) return false;
+      try {
+        const dup = await this.prisma.notificationDelivery.findFirst({
+          where: { channel, recipient, type, status: 'SENT', createdAt: { gt: new Date(Date.now() - 120_000) } },
+          select: { id: true },
+        });
+        return !!dup;
+      } catch { return false; }
+    };
     const origEmail = this.email.send.bind(this.email);
     this.email.send = async (payload) => {
+      if (await isDuplicate('EMAIL', payload.to)) return; // suppress duplicate — saves quota
       try { await origEmail(payload); await log('EMAIL', payload.to, 'SENT'); }
       catch (e) { await log('EMAIL', payload.to, 'FAILED', e instanceof Error ? e.message : String(e)); throw e; }
     };
     const origSms = this.sms.send.bind(this.sms);
     this.sms.send = async (payload) => {
+      if (await isDuplicate('SMS', payload.to)) return; // suppress duplicate — saves SMS cost
       try { await origSms(payload); await log('SMS', payload.to, 'SENT'); }
       catch (e) { await log('SMS', payload.to, 'FAILED', e instanceof Error ? e.message : String(e)); throw e; }
     };

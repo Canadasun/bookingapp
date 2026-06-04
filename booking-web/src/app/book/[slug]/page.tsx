@@ -133,6 +133,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [wl, setWl]                         = useState({ name: "", email: "" });
   const [wlSaving, setWlSaving]             = useState(false);
   const [wlDone, setWlDone]                 = useState(false);
+  const [slotTaken, setSlotTaken]           = useState(false); // someone grabbed the slot first → offer waitlist
   const [revStats, setRevStats]             = useState<{ average: number; count: number; reviews: { id: string; clientName: string; rating: number; comment?: string | null }[] } | null>(null);
 
   // Load business by slug
@@ -278,7 +279,16 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       } else {
         setStep(4);
       }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Booking failed — slot may be taken"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      // Lost the race for this slot — first booker wins. Offer the waitlist using
+      // the details they've already entered instead of a dead-end error.
+      if (/no longer available|not available|already|taken/i.test(msg)) {
+        setSlotTaken(true);
+      } else {
+        toast.error(msg || "Booking failed — please try again");
+      }
+    }
     finally { setSubmitting(false); }
   }
 
@@ -296,6 +306,35 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       setWlDone(true);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not join the waitlist"); }
     finally { setWlSaving(false); }
+  }
+
+  // Join the waitlist from the booking details the client already entered (used
+  // when the chosen slot was taken by someone else mid-checkout).
+  async function joinWaitlistFromBooking() {
+    if (!bizId) return;
+    if (!form.name.trim() || !/\S+@\S+\.\S+/.test(form.email)) { toast.error("Enter your name and a valid email"); return; }
+    setWlSaving(true);
+    try {
+      await api.waitlist.join(bizId, {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim() || undefined,
+        serviceId: selectedServices[0]?.id,
+        staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : undefined,
+        desiredDate: selectedDate ? selectedDate.toISOString() : undefined,
+        notes: form.notes.trim() || undefined,
+      });
+      setWlDone(true); // keep the panel open to show the success state
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not join the waitlist"); }
+    finally { setWlSaving(false); }
+  }
+
+  // Go back to pick a different time after losing a slot.
+  function pickAnotherTime() {
+    setSlotTaken(false);
+    setSelectedSlot(null);
+    setStep(2);
+    if (selectedDate) loadSlots(selectedDate);
   }
 
   function reset() {
@@ -374,8 +413,52 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       )}
 
       <div className="max-w-2xl mx-auto px-5 py-8">
-        {/* Confirmation screen */}
-        {step === 4 && booking ? (
+        {/* Slot taken mid-checkout → offer the waitlist with details already entered */}
+        {slotTaken ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            {wlDone ? (
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+                  <Check className="w-8 h-8 text-emerald-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re on the waitlist</h2>
+                <p className="text-gray-500 mb-6">We&apos;ll email <span className="font-medium text-gray-800">{form.email}</span> the moment a matching spot opens up.</p>
+                <button onClick={() => { setSlotTaken(false); setWlDone(false); pickAnotherTime(); }}
+                  className="w-full py-3 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
+                  Try another time
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 mb-5">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">That time was just booked</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">Someone grabbed{selectedSlot ? ` ${format(parseISO(selectedSlot.startsAtLocal), "EEE, MMM d 'at' HH:mm")}` : " this slot"} a moment before you. Want us to notify you if it opens back up?</p>
+                  </div>
+                </div>
+                <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-sm space-y-1 mb-5">
+                  <div className="flex justify-between"><span className="text-gray-500">Service</span><span className="font-medium text-gray-800">{selectedServices.map((s) => s.name).join(" + ")}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Name</span><span className="font-medium text-gray-800">{form.name}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Email</span><span className="font-medium text-gray-800 truncate ml-3">{form.email}</span></div>
+                  {selectedDate && <div className="flex justify-between"><span className="text-gray-500">Preferred day</span><span className="font-medium text-gray-800">{format(selectedDate, "EEE, MMM d")}</span></div>}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button onClick={pickAnotherTime}
+                    className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    Pick another time
+                  </button>
+                  <button onClick={joinWaitlistFromBooking} disabled={wlSaving}
+                    className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-60 transition-colors">
+                    {wlSaving ? "Adding you…" : "Yes, add me to the waitlist"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : step === 4 && booking ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
             <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
               <Check className="w-8 h-8 text-emerald-600" />
@@ -612,28 +695,36 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     {loadingSlots ? (
                       <p className="text-sm text-gray-400 text-center py-4">Loading available times…</p>
                     ) : slots.length === 0 ? (
-                      <div className="py-4">
-                        <div className="text-center mb-4">
-                          <p className="text-sm text-gray-500 font-medium">No availability on this date</p>
-                          <p className="text-xs text-gray-400 mt-1">Try another date, or join the waitlist and we&apos;ll email you when a spot opens.</p>
-                        </div>
+                      <div className="py-2">
                         {wlDone ? (
-                          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
-                            <Check className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-                            <p className="text-sm font-medium text-emerald-700">You&apos;re on the waitlist!</p>
-                            <p className="text-xs text-emerald-600 mt-0.5">We&apos;ll email you the moment a matching spot frees up.</p>
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center">
+                            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                              <Check className="w-6 h-6 text-emerald-600" />
+                            </div>
+                            <p className="text-base font-bold text-emerald-800">You&apos;re on the waitlist!</p>
+                            <p className="text-sm text-emerald-600 mt-1">We&apos;ll email you the moment a matching spot frees up.</p>
                           </div>
                         ) : (
-                          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2">
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Join the waitlist</p>
-                            <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-400"
-                              placeholder="Your name" value={wl.name} onChange={(e) => setWl((p) => ({ ...p, name: e.target.value }))} />
-                            <input className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-400"
-                              placeholder="you@example.com" type="email" value={wl.email} onChange={(e) => setWl((p) => ({ ...p, email: e.target.value }))} />
-                            <button type="button" onClick={joinWaitlist} disabled={wlSaving}
-                              className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg py-2.5 transition-colors">
-                              {wlSaving ? "Joining…" : "Notify me when a spot opens"}
-                            </button>
+                          <div className="rounded-2xl border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-5">
+                            <div className="flex items-start gap-3 mb-4">
+                              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+                                <Clock className="w-5 h-5 text-violet-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-gray-900">Fully booked on this day</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Join the waitlist and we&apos;ll email you the instant a spot opens — or try another date.</p>
+                              </div>
+                            </div>
+                            <div className="space-y-2.5">
+                              <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow"
+                                placeholder="Your name" value={wl.name} onChange={(e) => setWl((p) => ({ ...p, name: e.target.value }))} />
+                              <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow"
+                                placeholder="you@example.com" type="email" value={wl.email} onChange={(e) => setWl((p) => ({ ...p, email: e.target.value }))} />
+                              <button type="button" onClick={joinWaitlist} disabled={wlSaving}
+                                className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl py-3 transition-colors">
+                                {wlSaving ? "Joining…" : "Notify me when a spot opens"}
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

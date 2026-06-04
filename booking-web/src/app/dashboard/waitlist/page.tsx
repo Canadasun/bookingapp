@@ -36,9 +36,16 @@ export default function WaitlistPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Waitlist</h2>
-        <p className="text-sm text-gray-500">Clients waiting for an opening — they&apos;re emailed automatically when a matching appointment is cancelled.</p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Waitlist</h2>
+          <p className="text-sm text-gray-500">Clients waiting for an opening — they&apos;re emailed automatically when a matching appointment is cancelled.</p>
+        </div>
+        {!loading && entries.length > 0 && (
+          <span className="shrink-0 inline-flex items-center rounded-full bg-violet-100 text-violet-700 text-sm font-semibold px-3 py-1">
+            {entries.length} waiting
+          </span>
+        )}
       </div>
       {loading ? <LoadingSpinner /> : entries.length === 0 ? (
         <EmptyState title="No one on the waitlist yet" />
