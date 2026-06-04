@@ -33,18 +33,15 @@ export default function BookEntryPage() {
               <div>
                 <p className="text-sm font-semibold text-gray-900">No demo or fallback booking</p>
                 <p className="mt-1 text-sm leading-relaxed text-gray-500">
-                  This page does not choose a default business. Open the unique link shared by the business, or sign in to your client portal.
+                  This page does not choose a default business. Open the unique link shared by the business to book or manage an appointment.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Link href="/my/login" className="rounded-xl bg-violet-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-violet-700">
-              Client sign in
-            </Link>
-            <Link href="/login" className="rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">
-              Business sign in
+          <div className="mt-6">
+            <Link href="/login" className="block rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">
+              Are you a business? Sign in
             </Link>
           </div>
         </div>

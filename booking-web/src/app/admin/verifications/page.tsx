@@ -33,7 +33,7 @@ export default function AdminVerificationsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function approve(b: Pending) {
-    if (!window.confirm(`Verify "${b.name}"? They'll get a Verified badge across their booking page, dashboard, client portal and emails.`)) return;
+    if (!window.confirm(`Verify "${b.name}"? They'll get a Verified badge across their booking page, dashboard and emails.`)) return;
     setBusy(b.id);
     try { await api.adminVerifications.approve(b.id); toast.success(`${b.name} is now verified`); load(false); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(null); }

@@ -3,11 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { format, isBefore, subHours } from 'date-fns';
-import Link from 'next/link';
 import { Calendar, Clock, User, Scissors, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AddToCalendar } from '@/components/AddToCalendar';
 import { api, Appointment } from '@/lib/api';
-import { getUser } from '@/lib/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
@@ -22,7 +20,6 @@ export default function ManageAppointmentPage() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
-  const [showGate, setShowGate] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,30 +169,10 @@ export default function ManageAppointmentPage() {
                 <Button
                   variant="secondary"
                   className="flex-1 py-6 text-lg font-semibold"
-                  onClick={() => {
-                    // Cancel stays open to guests (token), but rescheduling requires
-                    // a (free) account — prompt guests to sign up / sign in.
-                    if (getUser()) {
-                      router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `&token=${encodeURIComponent(token)}` : ''}`);
-                    } else {
-                      setShowGate(true);
-                    }
-                  }}
+                  onClick={() => router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `&token=${encodeURIComponent(token)}` : ''}`)}
                 >
                   Reschedule
                 </Button>
-              </div>
-            )}
-            {showGate && canManage && (
-              <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
-                <p className="font-medium mb-2">Rescheduling needs a free account</p>
-                <p className="text-violet-700 mb-3">Create an account (or sign in) to reschedule and manage all your bookings in one place. You can still cancel without an account.</p>
-                <div className="flex gap-2">
-                  <Link href={`/my/register?next=${encodeURIComponent(`/appointments/${id}/manage${token ? `?token=${token}` : ''}`)}`}
-                    className="flex-1 text-center bg-violet-600 text-white font-semibold py-2 rounded-lg hover:bg-violet-700">Create account</Link>
-                  <Link href={`/my/login?next=${encodeURIComponent(`/appointments/${id}/manage${token ? `?token=${token}` : ''}`)}`}
-                    className="flex-1 text-center border border-violet-300 text-violet-700 font-semibold py-2 rounded-lg hover:bg-violet-100">Sign in</Link>
-                </div>
               </div>
             )}
             

@@ -10,23 +10,17 @@ import { Card, CardContent } from "@/components/ui/card";
 export default function VerifyEmailPage() {
   const router = useRouter();
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  // Where to send them after verifying: clients to their portal, owners/staff to
-  // the business dashboard. Defaults to the client portal.
-  const [dest, setDest] = useState<{ href: string; label: string }>({ href: "/my/dashboard", label: "Go to my bookings" });
+  // Email verification is for business accounts; send them to their dashboard.
+  const dest = { href: "/dashboard", label: "Go to your dashboard" };
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token");
     if (!token) { setState("error"); return; }
     api.auth.verifyEmail(token)
-      .then((res) => {
-        const owner = res.role && res.role !== "CLIENT";
-        const d = owner
-          ? { href: "/dashboard", label: "Go to your dashboard" }
-          : { href: "/my/dashboard", label: "Go to my bookings" };
-        setDest(d);
+      .then(() => {
         setState("ok");
-        // Auto-return to the right place (middleware sends them via sign-in if needed).
-        setTimeout(() => router.push(d.href), 2500);
+        // Auto-return (middleware sends them via sign-in if needed).
+        setTimeout(() => router.push(dest.href), 2500);
       })
       .catch(() => setState("error"));
   }, [router]);
@@ -56,7 +50,7 @@ export default function VerifyEmailPage() {
               <XCircle className="w-12 h-12 text-red-500 mx-auto" />
               <h1 className="text-lg font-bold text-slate-900 mt-4">Link invalid or expired</h1>
               <p className="text-sm text-slate-500 mt-1">Sign in and resend a fresh verification link from your dashboard.</p>
-              <Link href="/my/login" className="inline-block mt-6 text-sm font-semibold text-violet-600 hover:underline">
+              <Link href="/login" className="inline-block mt-6 text-sm font-semibold text-violet-600 hover:underline">
                 Sign in
               </Link>
             </>
