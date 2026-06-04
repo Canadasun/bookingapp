@@ -26,3 +26,10 @@ export function clearToken() {
   document.cookie = "booking_token=; Max-Age=0; path=/";
   document.cookie = "booking_user=; Max-Age=0; path=/";
 }
+
+// Only allow same-origin internal paths as post-login redirect targets.
+// Rejects protocol-relative ("//evil.com") and "/\\evil.com" open-redirect tricks.
+export function safeNextPath(next: string | null | undefined, fallback: string): string {
+  if (next && /^\/(?![/\\])/.test(next)) return next;
+  return fallback;
+}

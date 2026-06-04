@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Calendar, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { safeNextPath } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -27,7 +28,7 @@ function LoginForm() {
   const [rememberDevice, setRememberDevice] = useState(true); // skip 2FA on this device next time
 
   function go() {
-    router.push(next.startsWith("/") ? next : "/dashboard");
+    router.push(safeNextPath(next, "/dashboard"));
   }
 
   async function handleSubmit(e: React.FormEvent) {

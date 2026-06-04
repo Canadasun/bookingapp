@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { safeNextPath } from "@/lib/utils";
 
 function LoginForm() {
   const router = useRouter();
@@ -36,7 +37,7 @@ function LoginForm() {
         toast.error("This is the client portal. Business owners please use the main login.");
         return;
       }
-      router.push(next.startsWith("/") ? next : "/my/dashboard");
+      router.push(safeNextPath(next, "/my/dashboard"));
     } catch (err) { toast.error(err instanceof Error ? err.message : "Login failed"); }
     finally { setLoading(false); }
   }
