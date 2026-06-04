@@ -1,6 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
 import { ClientsService } from './clients.service';
 import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto } from './dto/client.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -32,19 +31,10 @@ export class ClientsController {
     );
   }
 
-  // Public — must be declared BEFORE @Get(':id') so NestJS doesn't swallow it as a param
-  // Stricter rate limit: 5 requests per minute per IP to prevent email enumeration
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @Get('lookup')
-  async lookup(
-    @Param('businessId') businessId: string,
-    @Query('email') email?: string,
-    @Query('phone') phone?: string,
-  ) {
-    const client = await this.clientService.lookupByEmailOrPhone(businessId, email, phone);
-    if (!client) throw new NotFoundException('No bookings found for that email or phone');
-    return client;
-  }
+  // (Removed) The unauthenticated guest "lookup by email/phone" endpoint was
+  // dropped: it disclosed a person's name, phone and booking history to anyone
+  // who knew their email/phone. Clients now manage bookings only via the signed
+  // link in their confirmation email, or by signing into the portal.
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)

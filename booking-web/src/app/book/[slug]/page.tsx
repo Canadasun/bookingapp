@@ -13,6 +13,7 @@ import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { BookingPayment } from "@/components/BookingPayment";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { getUser, type SessionUser } from "@/lib/auth";
 import "react-day-picker/style.css";
 
 type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string };
@@ -134,6 +135,11 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [wlSaving, setWlSaving]             = useState(false);
   const [wlDone, setWlDone]                 = useState(false);
   const [slotTaken, setSlotTaken]           = useState(false); // someone grabbed the slot first → offer waitlist
+  const [navUser, setNavUser]               = useState<SessionUser | null>(null); // logged-in viewer → show a way back
+  useEffect(() => { setNavUser(getUser()); }, []);
+  const homeHref = navUser
+    ? (navUser.role === "ADMIN" ? "/admin/verifications" : navUser.role === "CLIENT" ? "/my/dashboard" : "/dashboard")
+    : null;
   const [revStats, setRevStats]             = useState<{ average: number; count: number; reviews: { id: string; clientName: string; rating: number; comment?: string | null }[] } | null>(null);
 
   // Load business by slug
@@ -402,11 +408,14 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {biz?.verificationStatus === "VERIFIED" && <VerifiedBadge className="shrink-0" />}
           </div>
           <div className="flex items-center gap-3 text-sm shrink-0">
-            <Link href={`/my/bookings/${slug}`}
-              className="text-xs font-medium text-gray-500 hover:text-violet-600 transition-colors border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg">
-              Find my bookings
-            </Link>
-            <Link href="/my/login" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Sign in</Link>
+            {homeHref ? (
+              <Link href={homeHref}
+                className="text-xs font-medium text-gray-600 hover:text-violet-600 transition-colors border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg">
+                {navUser?.role === "CLIENT" ? "My bookings" : "Back to dashboard"}
+              </Link>
+            ) : (
+              <Link href="/my/login" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Sign in</Link>
+            )}
           </div>
         </div>
       </nav>
@@ -512,8 +521,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             </div>
 
             <p className="text-center text-xs text-gray-400 mt-2">
-              Returning client?{" "}
-              <Link href="/my/bookings" className="text-violet-600 font-medium hover:underline">View all your bookings</Link>
+              We&apos;ve emailed your confirmation with a link to manage this booking.
             </p>
           </div>
         ) : (

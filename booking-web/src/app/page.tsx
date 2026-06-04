@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Calendar, Bell, CreditCard, Clock, Star, Shield, ArrowRight, Sparkles } from "lucide-react";
-import { LandingAuthCta, LandingResources } from "@/components/LandingClient";
+import { LandingAuthCta, LandingResources, LandingHeroCta, LandingBottomCta, LandingFooterLinks } from "@/components/LandingClient";
 
 const features = [
   { icon: Clock,       title: "24/7 Online Booking",       desc: "Clients book appointments any time — no phone tag, no back-and-forth." },
@@ -49,17 +49,7 @@ export default function LandingPage() {
             Let your clients book appointments online 24/7. Automated reminders, deposit collection,
             and a beautiful dashboard — all in one place.
           </p>
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <Link href="/register"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 text-white text-base font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-xl shadow-violet-200">
-              <Sparkles className="w-5 h-5" />
-              Get started free
-            </Link>
-            <Link href="/login"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/90 text-slate-800 text-base font-semibold px-8 py-4 rounded-xl border border-[#E9DDCB] hover:bg-violet-50 transition-colors">
-              Sign in <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <LandingHeroCta />
 
           {/* Stats */}
           <div className="mt-16 grid grid-cols-3 gap-4 max-w-lg">
@@ -135,19 +125,7 @@ export default function LandingPage() {
       <section className="py-20 bg-[#19212B]">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <Shield className="w-10 h-10 text-violet-300 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to simplify your scheduling?</h2>
-          <p className="text-white/60 mb-8">Join thousands of businesses using Pulse.</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/register"
-              className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
-              <Sparkles className="w-5 h-5" />
-              Get started free
-            </Link>
-            <Link href="/login"
-              className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
-              Sign in <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <LandingBottomCta />
         </div>
       </section>
 
@@ -158,10 +136,7 @@ export default function LandingPage() {
             <Calendar className="w-4 h-4" />
             <span className="text-sm">© {new Date().getFullYear()} Pulse</span>
           </div>
-          <div className="flex gap-6 text-sm text-slate-500">
-            <Link href="/register" className="hover:text-indigo-600 transition-colors">Get started</Link>
-            <Link href="/login" className="hover:text-indigo-600 transition-colors">Sign in</Link>
-          </div>
+          <LandingFooterLinks />
         </div>
       </footer>
     </div>

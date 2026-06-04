@@ -76,7 +76,11 @@ export default function ManageAppointmentPage() {
   if (!appointment) return <div className="min-h-screen flex items-center justify-center text-gray-500">Appointment not found</div>;
 
   const isCancelled = appointment.status === 'CANCELLED';
-  const canCancel = ['PENDING', 'CONFIRMED'].includes(appointment.status);
+  // Only live bookings can be managed (cancel/reschedule). Completed, no-show and
+  // cancelled bookings are closed — the client must book fresh.
+  const canManage = ['PENDING', 'CONFIRMED'].includes(appointment.status);
+  const isClosed = !canManage;
+  const canCancel = canManage;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -96,7 +100,7 @@ export default function ManageAppointmentPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
-                    {isCancelled ? 'Cancelled' : 'Upcoming Appointment'}
+                    {canManage ? 'Upcoming Appointment' : isCancelled ? 'Cancelled' : 'Past appointment'}
                   </h2>
                   <p className="text-sm text-gray-500">{appointment.business.name}</p>
                 </div>
@@ -140,7 +144,7 @@ export default function ManageAppointmentPage() {
               </div>
             </div>
 
-            {!isCancelled && appointment.status !== 'COMPLETED' && (
+            {canManage && (
               <div className="border-t border-gray-100 pt-6 pb-2 flex justify-center">
                 <AddToCalendar
                   appointmentId={appointment.id}
@@ -153,7 +157,7 @@ export default function ManageAppointmentPage() {
               </div>
             )}
 
-            {!isCancelled && (
+            {canManage && (
               <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row gap-4">
                 {canCancel && (
                   <Button 
@@ -182,7 +186,7 @@ export default function ManageAppointmentPage() {
                 </Button>
               </div>
             )}
-            {showGate && !isCancelled && (
+            {showGate && canManage && (
               <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
                 <p className="font-medium mb-2">Rescheduling needs a free account</p>
                 <p className="text-violet-700 mb-3">Create an account (or sign in) to reschedule and manage all your bookings in one place. You can still cancel without an account.</p>
@@ -195,10 +199,13 @@ export default function ManageAppointmentPage() {
               </div>
             )}
             
-            {isCancelled && (
-              <div className="text-center pt-4">
-                <Button 
-                  variant="primary" 
+            {isClosed && (
+              <div className="border-t border-gray-100 pt-6 text-center space-y-3">
+                <p className="text-sm text-gray-500">
+                  This booking is {appointment.status.toLowerCase().replace('_', '-')} and can no longer be changed. To see {appointment.business.name} again, just book a fresh appointment.
+                </p>
+                <Button
+                  variant="primary"
                   className="w-full py-6 text-lg font-semibold"
                   onClick={() => router.push(`/book/${appointment.business.slug}`)}
                 >
@@ -220,11 +227,7 @@ export default function ManageAppointmentPage() {
           />
         </div>
 
-        <div className="text-center space-y-2">
-          <Link href={`/my/bookings/${appointment.business.slug}`}
-            className="inline-block text-sm text-violet-600 font-medium hover:underline">
-            ← View all my bookings
-          </Link>
+        <div className="text-center">
           <p className="text-sm text-gray-400">
             Need help? Contact {appointment.business.name} at {appointment.business.phone || appointment.business.email}
           </p>
