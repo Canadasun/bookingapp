@@ -195,12 +195,17 @@ export default function CheckoutPage() {
           const cur  = step === s;
           return (
             <div key={s} className="flex items-center gap-1 shrink-0">
-              <div className={cn("w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center transition-colors",
-                done ? "bg-violet-600 text-white" : cur ? "bg-violet-600 text-white ring-4 ring-violet-100" : "bg-gray-100 text-gray-400"
-              )}>
-                {done ? <Check className="w-3 h-3" /> : i + 1}
-              </div>
-              <span className={cn("text-xs font-medium", cur ? "text-gray-900" : "text-gray-400")}>{labels[s]}</span>
+              {/* Completed steps are clickable to jump back and edit. */}
+              <button type="button" disabled={!done} onClick={() => done && setStep(s)}
+                title={done ? `Back to ${labels[s]}` : undefined}
+                className={cn("flex items-center gap-1", done && "cursor-pointer hover:opacity-75 transition-opacity")}>
+                <div className={cn("w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center transition-colors",
+                  done ? "bg-violet-600 text-white" : cur ? "bg-violet-600 text-white ring-4 ring-violet-100" : "bg-gray-100 text-gray-400"
+                )}>
+                  {done ? <Check className="w-3 h-3" /> : i + 1}
+                </div>
+                <span className={cn("text-xs font-medium", cur ? "text-gray-900" : done ? "text-violet-700" : "text-gray-400")}>{labels[s]}</span>
+              </button>
               {i < 4 && <ChevronRight className="w-3 h-3 text-gray-200 mx-1" />}
             </div>
           );
