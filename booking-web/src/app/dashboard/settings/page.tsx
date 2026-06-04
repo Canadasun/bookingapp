@@ -95,6 +95,14 @@ export default function SettingsPage() {
   }));
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
+  const [referralInput, setReferralInput] = useState("");
+  const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
+  const [refCopied, setRefCopied] = useState(false);
+
+  // Load this business's own referral code + count.
+  useEffect(() => {
+    api.referrals.get().then((r) => setMyReferral({ code: r.code, referredCount: r.referredCount })).catch(() => {});
+  }, []);
 
   // Toast the result of a returning Stripe Checkout, then reload the plan.
   useEffect(() => {
@@ -112,7 +120,7 @@ export default function SettingsPage() {
   async function upgrade(plan: "BASIC" | "PRO") {
     setBillingBusy(plan);
     try {
-      const { url } = await api.subscriptions.checkout(plan);
+      const { url } = await api.subscriptions.checkout(plan, referralInput);
       window.location.assign(url);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start checkout"); setBillingBusy(null); }
   }
@@ -658,6 +666,33 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-0.5">Choose the plan that fits your business.</p>
                 </div>
                 <hr className="border-gray-100" />
+
+                {/* Referral: apply a code for a discount + share your own */}
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">Have a referral code?</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Enter it before upgrading to get a discount on your subscription.</p>
+                    <input
+                      value={referralInput}
+                      onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                      placeholder="PULSE-XXXXXX"
+                      className="mt-2 w-full sm:w-64 text-sm border border-amber-300 rounded-lg px-3 py-2 bg-white uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                  {myReferral && (
+                    <div className="border-t border-amber-200 pt-3">
+                      <p className="text-xs text-amber-700">Your referral code — share it so friends get a discount{myReferral.referredCount > 0 ? ` (${myReferral.referredCount} referred so far)` : ""}:</p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <code className="text-sm font-bold text-amber-900 bg-white border border-amber-300 rounded-lg px-3 py-1.5">{myReferral.code}</code>
+                        <button type="button"
+                          onClick={() => { navigator.clipboard.writeText(myReferral.code); setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }}
+                          className="text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-2.5 py-1.5 hover:bg-amber-100 transition-colors">
+                          {refCopied ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid gap-4">
                   {[

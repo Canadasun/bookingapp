@@ -4,6 +4,7 @@ import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ReferralsService } from '../referrals/referrals.service';
 
 function makePayment(overrides = {}) {
   return {
@@ -32,6 +33,7 @@ async function build(paymentRow: unknown) {
       { provide: PrismaService, useValue: prisma },
       { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('sk_test_x') } },
       { provide: NotificationsService, useValue: {} },
+      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false) } },
     ],
   }).compile();
   const svc = module.get<PaymentsService>(PaymentsService);
@@ -116,6 +118,7 @@ describe('PaymentsService subscriptions', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
         { provide: NotificationsService, useValue: {} },
+      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false) } },
       ],
     }).compile();
     const svc = module.get<PaymentsService>(PaymentsService);

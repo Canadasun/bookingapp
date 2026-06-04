@@ -6,6 +6,7 @@ import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prism
 import { createHash } from 'crypto';
 import Stripe from 'stripe';
 import { isPaidPlan, isProPlan } from '../common/util/plan-features';
+import { ReferralsService } from '../referrals/referrals.service';
 
 @Injectable()
 export class PaymentsService {
@@ -15,6 +16,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private notifications: NotificationsService,
+    private referrals: ReferralsService,
   ) {}
 
   // Lazily construct Stripe so a missing STRIPE_SECRET_KEY can't crash the app
@@ -417,21 +419,33 @@ export class PaymentsService {
   }
 
   // Owner — start a Stripe Checkout session to subscribe to a paid plan.
-  async createSubscriptionCheckout(businessId: string, plan: 'BASIC' | 'PRO') {
+  async createSubscriptionCheckout(businessId: string, plan: 'BASIC' | 'PRO', referralCode?: string) {
     const priceId = this.priceIdForPlan(plan);
     if (!priceId) throw new BadRequestException(`The ${plan} plan is not available for purchase yet.`);
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     const customerId = await this.ensureBusinessCustomer(business);
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    // Referral: if a valid code is applied, record it and (when a Stripe coupon
+    // is configured) attach it as the checkout discount. Otherwise let the owner
+    // enter any standard Stripe promotion code.
+    const referralCoupon = this.configService.get<string>('STRIPE_REFERRAL_COUPON');
+    let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+    if (referralCode?.trim()) {
+      const recorded = await this.referrals.recordReferral(businessId, referralCode).catch(() => false);
+      if (recorded && referralCoupon) discounts = [{ coupon: referralCoupon }];
+    }
+
     const session = await this.getStripe().checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${webUrl}/dashboard/settings?billing=success`,
       cancel_url: `${webUrl}/dashboard/settings?billing=cancel`,
-      metadata: { businessId, plan },
+      metadata: { businessId, plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) },
       subscription_data: { metadata: { businessId, plan } },
-    }, { idempotencyKey: this.idempotencyKey(['subscription-checkout', businessId, plan]) });
+      ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+    }, { idempotencyKey: this.idempotencyKey(['subscription-checkout', businessId, plan, referralCode ?? '']) });
     return { url: session.url };
   }
 

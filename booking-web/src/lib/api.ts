@@ -296,10 +296,15 @@ export const api = {
     // Current plan + billing status.
     get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),
     // Owner — start Stripe Checkout for a paid plan; returns a redirect URL.
-    checkout: (plan: "BASIC" | "PRO") =>
-      req<{ url: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan }) }),
+    // An optional referral code applies a discount + records the referral.
+    checkout: (plan: "BASIC" | "PRO", referralCode?: string) =>
+      req<{ url: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
     // Owner — open the Stripe billing portal; returns a redirect URL.
     portal: () => req<{ url: string }>("/subscriptions/portal", { method: "POST" }),
+  },
+  referrals: {
+    // The current business's shareable code + who they've referred.
+    get: () => req<{ code: string; referredCount: number; referrals: { business: string; since: string; status: string }[] }>("/referrals"),
   },
 
   payments: {

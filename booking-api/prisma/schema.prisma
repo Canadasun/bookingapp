@@ -99,10 +99,16 @@ model Business {
   // Cancellation policy text shown to clients before booking
   cancellationPolicy String @default("Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee.")
 
+  // Referral program: each business has a shareable code; new businesses that
+  // apply someone's code at subscription checkout get a discount.
+  referralCode String? @unique
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   users              User[]
+  referralsMade      Referral[] @relation("referrer")
+  referralReceived   Referral?  @relation("referred")
   staff              Staff[]
   services           Service[]
   serviceCategories  ServiceCategory[]
@@ -827,4 +833,26 @@ model Refund {
 
   @@index([businessId])
   @@index([paymentId])
+}
+
+enum ReferralStatus {
+  PENDING   // the referred business signed up / subscribed
+  REWARDED  // the referrer's reward has been granted
+}
+
+// Tracks a referral: one business (referrer) referred another (referred) who
+// applied their code. One row per referred business (a business is referred once).
+model Referral {
+  id                   String         @id @default(cuid())
+  code                 String         // the referrer's referralCode used
+  referrerBusinessId   String
+  referredBusinessId   String         @unique
+  status               ReferralStatus @default(PENDING)
+  createdAt            DateTime       @default(now())
+  rewardedAt           DateTime?
+
+  referrer Business @relation("referrer", fields: [referrerBusinessId], references: [id], onDelete: Cascade)
+  referred Business @relation("referred", fields: [referredBusinessId], references: [id], onDelete: Cascade)
+
+  @@index([referrerBusinessId])
 }

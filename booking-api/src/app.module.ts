@@ -28,6 +28,7 @@ import { GiftCardsModule } from './gift-cards/gift-cards.module';
 import { PackagesModule } from './packages/packages.module';
 import { HealthModule } from './health/health.module';
 import { EventsModule } from './events/events.module';
+import { ReferralsModule } from './referrals/referrals.module';
 // LoyaltyModule parked: its service injects the shared `notifications` BullMQ
 // queue (which NotificationsModule doesn't export) → DI boot crash, and its
 // processor is a 2nd worker on that same queue (would steal real notification
@@ -78,6 +79,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     PackagesModule,
     HealthModule,
     EventsModule,
+    ReferralsModule,
   ],
 
   providers: [

@@ -9,7 +9,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
-const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO']) });
+const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO']), referralCode: z.string().trim().max(40).optional() });
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -34,7 +34,7 @@ export class SubscriptionsController {
     const parsed = CheckoutSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('A valid plan (BASIC or PRO) is required');
     if (!user.businessId) throw new ForbiddenException('No business on this account');
-    return this.payments.createSubscriptionCheckout(user.businessId, parsed.data.plan);
+    return this.payments.createSubscriptionCheckout(user.businessId, parsed.data.plan, parsed.data.referralCode);
   }
 
   // Owner/Admin — open the Stripe billing portal.
