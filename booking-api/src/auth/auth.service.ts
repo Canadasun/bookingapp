@@ -60,6 +60,14 @@ export class AuthService {
         },
       });
 
+      // Sole-proprietor model: the owner is automatically a provider so they can
+      // take bookings immediately, without adding "staff". Extra staff are
+      // optional — the booking flow only shows a provider step once more than one
+      // provider exists.
+      if (user.role === 'OWNER' && businessId) {
+        await tx.staff.create({ data: { userId: user.id, businessId, active: true } });
+      }
+
       await tx.privacyConsent.createMany({
         data: [
           {

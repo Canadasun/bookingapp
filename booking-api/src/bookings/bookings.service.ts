@@ -75,6 +75,12 @@ export class BookingsService {
     return apt;
   }
 
+  // A business with one active provider (sole proprietor) doesn't require
+  // per-service staff assignment — the lone provider offers everything.
+  private async hasMultipleStaff(businessId: string): Promise<boolean> {
+    return (await this.prisma.staff.count({ where: { businessId, active: true } })) > 1;
+  }
+
   /**
    * Creates an appointment with SERIALIZABLE isolation + SELECT FOR UPDATE
    * to guarantee exactly-once booking under concurrent requests.
@@ -95,8 +101,11 @@ export class BookingsService {
     if (!client) throw new NotFoundException('Client not found');
     const offersService = await this.prisma.staffService.findFirst({ where: { staffId: dto.staffId, serviceId: dto.serviceId } });
     // Owner override (manual custom-time booking) can assign any active staff to
-    // the service even if it isn't formally on their service list.
-    if (!offersService && !opts.overrideConflicts) throw new BadRequestException('This staff member does not offer the selected service');
+    // the service. Single-provider (sole-proprietor) businesses also skip this —
+    // the lone provider offers every service without explicit assignment.
+    if (!offersService && !opts.overrideConflicts && (await this.hasMultipleStaff(businessId))) {
+      throw new BadRequestException('This staff member does not offer the selected service');
+    }
 
     // Sum durations of all selected services
     let totalDurationMinutes = primaryService.durationMinutes;
@@ -113,7 +122,7 @@ export class BookingsService {
       const offered = await this.prisma.staffService.count({
         where: { staffId: dto.staffId, serviceId: { in: ids } },
       });
-      if (offered !== ids.length && !opts.overrideConflicts) {
+      if (offered !== ids.length && !opts.overrideConflicts && (await this.hasMultipleStaff(businessId))) {
         throw new BadRequestException('This staff member does not offer one of the selected services');
       }
       totalDurationMinutes += extras.reduce((sum, s) => sum + s.durationMinutes, 0);
