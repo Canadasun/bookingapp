@@ -67,7 +67,9 @@ export default function CheckoutPage() {
     if (!bizId || selectedServices.length === 0) { setStaffList([]); return; }
     api.staff.listAll(bizId).then((all) => {
       const ids = selectedServices.map((s) => s.id);
-      setStaffList(all.filter((st) => st.active && ids.every((id) => st.staffServices.some((ss) => ss.serviceId === id))));
+      // A provider with no explicit service assignments offers everything
+      // (sole-proprietor model) — otherwise match the assigned services.
+      setStaffList(all.filter((st) => st.active && (st.staffServices.length === 0 || ids.every((id) => st.staffServices.some((ss) => ss.serviceId === id)))));
     }).catch(() => {});
   }, [bizId, selectedServices]);
 
@@ -188,6 +190,11 @@ export default function CheckoutPage() {
   const today = startOfDay(new Date());
   const totalMins  = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const totalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
+  // Sole-proprietor: only show the provider step when there's more than one.
+  const showStaffStep = staffList.length > 1;
+  const STEPS: Step[] = showStaffStep
+    ? ["client", "services", "staff", "datetime", "confirm"]
+    : ["client", "services", "datetime", "confirm"];
   const customStartsAt = customStartsAtValue();
   const customStaff = resolvedCustomStaff();
 
@@ -224,9 +231,9 @@ export default function CheckoutPage() {
 
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-7 overflow-x-auto pb-1">
-        {(["client","services","staff","datetime","confirm"] as Step[]).map((s, i) => {
+        {STEPS.map((s, i) => {
           const labels: Record<Step, string> = { client: "Client", services: "Services", staff: "Staff", datetime: "Date & Time", confirm: "Confirm" };
-          const done = ["client","services","staff","datetime","confirm"].indexOf(step) > i;
+          const done = STEPS.indexOf(step) > i;
           const cur  = step === s;
           return (
             <div key={s} className="flex items-center gap-1 shrink-0">
@@ -379,7 +386,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <Button className="w-full mt-5" disabled={selectedServices.length === 0} onClick={() => setStep("staff")}>
+            <Button className="w-full mt-5" disabled={selectedServices.length === 0} onClick={() => { if (showStaffStep) { setStep("staff"); } else { setSelectedStaff(staffList[0] ?? "any"); setStep("datetime"); } }}>
               Continue — {selectedServices.length} service{selectedServices.length !== 1 ? "s" : ""}
             </Button>
           </div>
@@ -445,7 +452,7 @@ export default function CheckoutPage() {
         {/* ── Date & Time ────────────────────────────────────────────── */}
         {step === "datetime" && (
           <div className="p-6">
-            <button onClick={() => setStep("staff")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
+            <button onClick={() => setStep(showStaffStep ? "staff" : "services")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
               ← Back
             </button>
             <h3 className="text-base font-semibold text-gray-900 mb-4">Pick a date &amp; time</h3>

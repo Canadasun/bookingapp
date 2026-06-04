@@ -163,7 +163,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   useEffect(() => {
     if (!bizId || selectedServices.length === 0) { setStaffList([]); return; }
     api.staff.list(bizId).then((all) => {
-      setStaffList(all.filter((st) => selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))));
+      // A provider with no explicit service assignments offers everything
+      // (sole-proprietor model) — otherwise match the assigned services.
+      setStaffList(all.filter((st) => st.staffServices.length === 0 || selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))));
     }).catch(() => {});
   }, [bizId, selectedServices]);
 
@@ -497,7 +499,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
                 <div className="mt-5">
                   <button
-                    onClick={() => setStep(1)}
+                    onClick={() => { if (staffList.length > 1) { setStep(1); } else { setSelectedStaff(staffList[0] ?? "any"); setStep(2); } }}
                     disabled={selectedServices.length === 0}
                     className="w-full py-3.5 rounded-xl bg-violet-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-violet-700 transition-colors">
                     Continue — {selectedServices.length > 0 ? `${selectedServices.length} service${selectedServices.length > 1 ? "s" : ""} · ${fmtPrice(totalCents)}` : "select services"}
@@ -565,7 +567,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 2: Date + Time ───────────────────────────────────── */}
             {step === 2 && (
               <div className="px-6 pb-6">
-                <button onClick={() => setStep(1)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
+                <button onClick={() => setStep(staffList.length > 1 ? 1 : 0)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Pick a date &amp; time</h2>
