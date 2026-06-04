@@ -211,8 +211,8 @@ export class AuthService {
     // UNLESS this device was previously remembered (trusted), so we don't bug the
     // user with a code on every sign-in from the same device.
     if (user.twoFactorEnabled && !this.isTrustedDevice(user, dto.trustedDeviceToken)) {
-      const challengeId = await this.createLoginChallenge(user);
-      return { twoFactorRequired: true as const, challengeId, method: user.twoFactorMethod };
+      const challenge = await this.createLoginChallenge(user);
+      return { twoFactorRequired: true as const, challengeId: challenge.id, method: challenge.method };
     }
 
     await this.recordLoginAndMaybeAlert(user, ctx);
@@ -220,14 +220,51 @@ export class AuthService {
   }
 
   // ── 2FA (one-time code) ─────────────────────────────────────────────────────
-  private async createLoginChallenge(user: User): Promise<string> {
+  private async resolveTwoFactorSmsPhone(user: User): Promise<string | null> {
+    const userPhone = normalizePhone(user.phone);
+    if (userPhone) return userPhone;
+
+    const linkedClient = await this.prisma.client.findFirst({
+      where: { userId: user.id },
+      select: { phone: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const linkedClientPhone = normalizePhone(linkedClient?.phone);
+    if (linkedClientPhone) return linkedClientPhone;
+
+    const client = await this.prisma.client.findFirst({
+      where: {
+        email: { equals: user.email, mode: 'insensitive' },
+        ...(user.businessId ? { businessId: user.businessId } : {}),
+      },
+      select: { phone: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const clientPhone = normalizePhone(client?.phone);
+    if (clientPhone) return clientPhone;
+
+    if (user.businessId) {
+      const business = await this.prisma.business.findUnique({
+        where: { id: user.businessId },
+        select: { phone: true },
+      });
+      const businessPhone = normalizePhone(business?.phone);
+      if (businessPhone) return businessPhone;
+    }
+
+    return null;
+  }
+
+  private async createLoginChallenge(user: User): Promise<{ id: string; method: 'EMAIL' | 'SMS' }> {
     const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
     const codeHash = createHash('sha256').update(code).digest('hex');
+    const smsPhone = user.twoFactorMethod === 'SMS' ? await this.resolveTwoFactorSmsPhone(user) : null;
+    const method: 'EMAIL' | 'SMS' = user.twoFactorMethod === 'SMS' && smsPhone ? 'SMS' : 'EMAIL';
     const ch = await this.prisma.otpChallenge.create({
-      data: { userId: user.id, codeHash, method: user.twoFactorMethod, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      data: { userId: user.id, codeHash, method, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
     });
-    await this.notifications.sendOtp(user.id, code, user.twoFactorMethod);
-    return ch.id;
+    await this.notifications.sendOtp(user.id, code, method, smsPhone);
+    return { id: ch.id, method };
   }
 
   async verifyTwoFactor(challengeId: string, code: string, ctx?: { ip?: string; userAgent?: string }, rememberDevice?: boolean) {

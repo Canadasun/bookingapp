@@ -170,6 +170,10 @@ export class ClientsService {
 
   async remove(id: string, businessId?: string) {
     const client = await this.findOne(id, businessId);
-    return this.prisma.client.delete({ where: { id: client.id } });
+    return this.prisma.$transaction(async (tx) => {
+      const appointments = await tx.appointment.deleteMany({ where: { clientId: client.id } });
+      await tx.client.delete({ where: { id: client.id } });
+      return { ok: true, deletedAppointments: appointments.count };
+    });
   }
 }

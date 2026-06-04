@@ -125,8 +125,12 @@ export class NotificationsService {
   }
 
   // 2FA one-time code, by email or SMS.
-  async sendOtp(userId: string, code: string, method: string) {
-    await this.queue.add('otp', { userId, otpCode: code, otpMethod: method }, { jobId: `otp-${userId}-${Date.now()}`, removeOnComplete: true, attempts: 1 });
+  async sendOtp(userId: string, code: string, method: string, phone?: string | null) {
+    await this.queue.add(
+      'otp',
+      { userId, otpCode: code, otpMethod: method, otpPhone: phone ?? undefined },
+      { jobId: `otp-${userId}-${Date.now()}`, removeOnComplete: true, attempts: 1 },
+    );
   }
 
   // Email-verification link (gates the client portal).

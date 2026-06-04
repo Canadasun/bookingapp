@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Search, Plus, Phone, Mail, Calendar, DollarSign, X } from "lucide-react";
+import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
@@ -27,6 +27,7 @@ export default function ClientsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [saving, setSaving] = useState(false);
+  const [deletingClient, setDeletingClient] = useState(false);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -83,6 +84,27 @@ export default function ClientsPage() {
       load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     finally { setSaving(false); }
+  }
+
+  async function deleteClient() {
+    if (!bizId || !selected) return;
+    const ok = window.confirm(
+      `Delete ${selected.name}? This removes the client profile and appointment history from the log. Payments remain in reporting.`,
+    );
+    if (!ok) return;
+    setDeletingClient(true);
+    try {
+      const res = await api.clients.delete(bizId, selected.id);
+      toast.success(res.deletedAppointments > 0
+        ? `Client deleted with ${res.deletedAppointments} appointment${res.deletedAppointments === 1 ? "" : "s"}`
+        : "Client deleted");
+      setSelected(null);
+      await load(search, 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete client");
+    } finally {
+      setDeletingClient(false);
+    }
   }
 
   const detail = selected as (ClientWithStats & {
@@ -154,7 +176,18 @@ export default function ClientsPage() {
           <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">{selected.name}</h2>
-              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={deleteClient}
+                  loading={deletingClient}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />Delete
+                </Button>
+                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="space-y-1.5 text-sm">

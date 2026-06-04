@@ -42,3 +42,57 @@ describe('AuthService.verifyEmail', () => {
     await expect(svc.verifyEmail('tok')).rejects.toThrow(BadRequestException);
   });
 });
+
+describe('AuthService SMS 2FA phone resolution', () => {
+  function buildResolver(prisma: Record<string, unknown>) {
+    return new AuthService(
+      prisma as unknown as PrismaService,
+      {} as JwtService,
+      { sendOtp: jest.fn() } as unknown as NotificationsService,
+    ) as unknown as { resolveTwoFactorSmsPhone(user: Record<string, unknown>): Promise<string | null> };
+  }
+
+  it('uses the phone saved directly on the user first', async () => {
+    const svc = buildResolver({
+      client: { findFirst: jest.fn() },
+      business: { findUnique: jest.fn() },
+    });
+
+    await expect(svc.resolveTwoFactorSmsPhone({ id: 'u1', email: 'a@example.com', phone: '825 964 0641', businessId: 'b1' }))
+      .resolves.toBe('+18259640641');
+  });
+
+  it('falls back to a linked client phone', async () => {
+    const prisma = {
+      client: { findFirst: jest.fn().mockResolvedValue({ phone: '825 964 0641' }) },
+      business: { findUnique: jest.fn() },
+    };
+    const svc = buildResolver(prisma);
+
+    await expect(svc.resolveTwoFactorSmsPhone({ id: 'u1', email: 'a@example.com', phone: null, businessId: null }))
+      .resolves.toBe('+18259640641');
+    expect(prisma.client.findFirst).toHaveBeenCalled();
+  });
+
+  it('falls back to the business phone for owner and staff accounts', async () => {
+    const prisma = {
+      client: { findFirst: jest.fn().mockResolvedValue(null) },
+      business: { findUnique: jest.fn().mockResolvedValue({ phone: '825 964 0641' }) },
+    };
+    const svc = buildResolver(prisma);
+
+    await expect(svc.resolveTwoFactorSmsPhone({ id: 'u1', email: 'owner@example.com', phone: null, businessId: 'b1' }))
+      .resolves.toBe('+18259640641');
+  });
+
+  it('returns null when no usable phone is on file', async () => {
+    const prisma = {
+      client: { findFirst: jest.fn().mockResolvedValue(null) },
+      business: { findUnique: jest.fn().mockResolvedValue({ phone: null }) },
+    };
+    const svc = buildResolver(prisma);
+
+    await expect(svc.resolveTwoFactorSmsPhone({ id: 'u1', email: 'owner@example.com', phone: null, businessId: 'b1' }))
+      .resolves.toBeNull();
+  });
+});

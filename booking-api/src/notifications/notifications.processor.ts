@@ -215,7 +215,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
@@ -231,8 +231,8 @@ export class NotificationProcessor extends WorkerHost {
       if (!user || !job.data.otpCode) return;
       this.currentBusinessId = user.businessId;
       const code = job.data.otpCode;
-      if (job.data.otpMethod === 'SMS' && user.phone) {
-        await this.sms.send({ to: user.phone, body: `Your Pulse verification code is ${code}. It expires in 10 minutes.` });
+      if (job.data.otpMethod === 'SMS' && job.data.otpPhone) {
+        await this.sms.send({ to: job.data.otpPhone, body: `Your Pulse verification code is ${code}. It expires in 10 minutes.` });
       } else {
         await this.email.send({
           to: user.email,

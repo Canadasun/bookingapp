@@ -515,6 +515,8 @@ export const api = {
       req<Client>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (businessId: string, id: string) =>
+      req<{ ok: boolean; deletedAppointments: number }>(`/businesses/${businessId}/clients/${id}`, { method: "DELETE" }),
   },
 
   appointments: {
