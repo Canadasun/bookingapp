@@ -116,10 +116,6 @@ export default function CheckoutPage() {
 
   async function confirm() {
     if (!bizId || selectedServices.length === 0) return;
-    if (customStartsAt && selectedStaff === "any") {
-      toast.error("Choose a named provider before using a custom time");
-      return;
-    }
     const customDate = customStartsAt ? new Date(customStartsAt) : null;
     if (customStartsAt && Number.isNaN(customDate?.getTime())) {
       toast.error("Enter a valid custom date and time");
@@ -425,21 +421,15 @@ export default function CheckoutPage() {
             )}
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-amber-900">Custom owner time</p>
-              <p className="mt-1 text-xs text-amber-700">Use this when you want to book outside the normal calendar slots. Choose a specific provider first; this can override availability and double-book conflicts.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <p className="mt-1 text-xs text-amber-700">Book any date &amp; time directly — this overrides the calendar slots and any double-book conflict. {selectedStaff === "any" ? "Uses your default provider unless you pick one." : ""}</p>
+              <div className="mt-3">
                 <Input
                   type="datetime-local"
                   value={customStartsAt}
                   onChange={(e) => { setCustomStartsAt(e.target.value); setSelectedSlot(null); setOverrideCalendar(!!e.target.value); }}
-                  disabled={selectedStaff === "any"}
                 />
-                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700">
-                  <input type="checkbox" checked={overrideCalendar} onChange={(e) => setOverrideCalendar(e.target.checked)} className="h-4 w-4 accent-violet-600" />
-                  Override
-                </label>
               </div>
-              {selectedStaff === "any" && <p className="mt-2 text-xs text-amber-700">Pick a named provider before using a custom time.</p>}
-              {customStartsAt && selectedStaff !== "any" && (
+              {customStartsAt && (
                 <Button type="button" variant="secondary" className="mt-3 w-full sm:w-auto" onClick={() => setStep("confirm")}>
                   Use custom time
                 </Button>
