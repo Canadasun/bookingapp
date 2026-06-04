@@ -127,8 +127,10 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired verification link');
     }
     if (!decoded?.sub || decoded.kind !== 'verify') throw new BadRequestException('Invalid verification link');
-    await this.prisma.user.update({ where: { id: decoded.sub }, data: { emailVerified: true } });
-    return { ok: true };
+    const user = await this.prisma.user.update({ where: { id: decoded.sub }, data: { emailVerified: true } });
+    // Return the role so the verify page can send them to the right home
+    // (owners/staff → /dashboard, clients → /my/dashboard).
+    return { ok: true, role: user.role };
   }
 
   async resendVerification(userId: string) {

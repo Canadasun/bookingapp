@@ -222,7 +222,7 @@ export const api = {
       ),
     // Public — confirm email from the emailed link.
     verifyEmail: (token: string) =>
-      req<{ ok: boolean }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }, null),
+      req<{ ok: boolean; role?: string }>("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }, null),
     // Authenticated — resend the verification link to the current user.
     resendVerification: () =>
       req<{ ok: boolean; alreadyVerified?: boolean }>("/auth/resend-verification", { method: "POST" }),
