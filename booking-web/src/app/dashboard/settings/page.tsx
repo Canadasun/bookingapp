@@ -189,7 +189,14 @@ export default function SettingsPage() {
                 </div>
                 <hr className="border-gray-100" />
                 <Field label="Logo">
-                  <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={(url) => f("logoUrl", url ?? "")} />
+                  <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={async (url) => {
+                    f("logoUrl", url ?? "");
+                    // Persist the logo on its own so it can't be lost to an unrelated
+                    // invalid field elsewhere in the settings form.
+                    if (!bizId) return;
+                    try { await api.business.update(bizId, { logoUrl: url ?? "" }); toast.success(url ? "Logo saved" : "Logo removed"); }
+                    catch (e) { toast.error(e instanceof Error ? e.message : "Could not save logo"); }
+                  }} />
                 </Field>
                 <Field label="Business name">
                   <Input value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="Demo Salon" />
