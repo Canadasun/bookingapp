@@ -290,8 +290,28 @@ export class AuthService {
       data.twoFactorRecoveryCodes = [];
     }
 
-    await this.prisma.user.update({ where: { id: userId }, data });
-    return { ok: true, twoFactorEnabled: enabled, ...(recoveryCodes ? { recoveryCodes } : {}) };
+    const updated = await this.prisma.user.update({ where: { id: userId }, data });
+    let staffId: string | null = null;
+    if (updated.role === 'STAFF') {
+      const staff = await this.prisma.staff.findUnique({ where: { userId: updated.id } });
+      staffId = staff?.id ?? null;
+    }
+    return {
+      ok: true,
+      twoFactorEnabled: updated.twoFactorEnabled,
+      ...(recoveryCodes ? { recoveryCodes } : {}),
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        businessId: updated.businessId,
+        staffId,
+        mustResetPassword: updated.mustResetPassword,
+        twoFactorEnabled: updated.twoFactorEnabled,
+        twoFactorMethod: updated.twoFactorMethod,
+      },
+    };
   }
 
   // Record the sign-in and, if it's from a NEW device (but not the user's very

@@ -60,7 +60,13 @@ function aptDate(apt: { startsAt: Date; business: { timezone?: string | null } }
   return formatInTimeZone(apt.startsAt, apt.business.timezone ?? 'UTC', pattern);
 }
 
-@Processor(NOTIFICATION_QUEUE)
+@Processor(NOTIFICATION_QUEUE, {
+  concurrency: Number(process.env.NOTIFICATION_WORKER_CONCURRENCY ?? 1),
+  limiter: {
+    max: Number(process.env.NOTIFICATION_RATE_MAX ?? 10),
+    duration: Number(process.env.NOTIFICATION_RATE_DURATION_MS ?? 60_000),
+  },
+})
 export class NotificationProcessor extends WorkerHost {
   private email = new ResendEmailProvider();
   private sms   = new TwilioSmsProvider();
@@ -210,6 +216,10 @@ export class NotificationProcessor extends WorkerHost {
   }
 
   async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string }>) {
+    if (process.env.NOTIFICATIONS_ENABLED === 'false') {
+      console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
+      return;
+    }
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     this.currentType = job.name; // label for the delivery log
     this.currentBusinessId = null;

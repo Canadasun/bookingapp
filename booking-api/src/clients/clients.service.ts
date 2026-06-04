@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto, UpdateClientDto } from './dto/client.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
+import { normalizePhone } from '../common/util/phone';
 
 @Injectable()
 export class ClientsService {
@@ -97,12 +98,15 @@ export class ClientsService {
 
   async lookupByEmailOrPhone(businessId: string, email?: string, phone?: string) {
     if (!email && !phone) return null;
+    const phoneTerms = phone
+      ? [...new Set([phone.trim(), normalizePhone(phone)].filter(Boolean) as string[])]
+      : [];
     const client = await this.prisma.client.findFirst({
       where: {
         businessId,
         OR: [
           ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
-          ...(phone ? [{ phone }] : []),
+          ...phoneTerms.map((p) => ({ phone: p })),
         ],
       },
       include: {

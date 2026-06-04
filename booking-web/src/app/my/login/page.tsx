@@ -10,6 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { safeNextPath } from "@/lib/utils";
 
+async function readJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -18,6 +28,13 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState<{ id: string; method: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
+
+  function go() {
+    router.push(safeNextPath(next, "/my/dashboard"));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,17 +46,85 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const body = await res.json() as { message?: string };
-        throw new Error(body.message ?? "Invalid credentials");
+        const body = await readJson<{ message?: string }>(res);
+        throw new Error(body?.message ?? "Invalid credentials");
       }
-      const { user } = await res.json() as { user: { role: string } };
+      const data = await readJson<{ twoFactorRequired?: boolean; challengeId?: string; method?: string; user?: { role: string } }>(res);
+      if (data?.twoFactorRequired && data.challengeId) {
+        setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL" });
+        return;
+      }
+      const user = data?.user;
+      if (!user) throw new Error("Login did not return a user session");
       if (user.role !== "CLIENT") {
         toast.error("This is the client portal. Business owners please use the main login.");
         return;
       }
-      router.push(safeNextPath(next, "/my/dashboard"));
+      go();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Login failed"); }
     finally { setLoading(false); }
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challenge || code.trim().length < 4) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/2fa-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId: challenge.id, code: code.trim(), rememberDevice }),
+      });
+      if (!res.ok) {
+        const body = await readJson<{ message?: string }>(res);
+        throw new Error(body?.message ?? "Invalid or expired code");
+      }
+      const data = await readJson<{ user?: { role: string } }>(res);
+      if (data?.user?.role !== "CLIENT") {
+        toast.error("This is the client portal. Business owners please use the main login.");
+        return;
+      }
+      go();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <form onSubmit={handleVerify} className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">Enter your verification code</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            We sent a 6-digit code to your {challenge.method === "SMS" ? "phone" : "email"}.
+          </p>
+        </div>
+        <Input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="123456"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          required
+          autoFocus
+          className="text-center text-lg tracking-[0.4em]"
+        />
+        <label className="flex items-center gap-2 text-xs text-gray-600 select-none cursor-pointer">
+          <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="rounded border-gray-300" />
+          Remember this device for 30 days
+        </label>
+        <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
+        <button
+          type="button"
+          onClick={() => { setChallenge(null); setCode(""); }}
+          className="w-full text-center text-xs text-gray-500 hover:text-gray-700"
+        >
+          Back to sign in
+        </button>
+      </form>
+    );
   }
 
   return (

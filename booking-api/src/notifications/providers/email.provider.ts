@@ -65,7 +65,8 @@ export class ResendEmailProvider implements EmailProvider {
       // don't silently drop while DNS is propagating.
       const isDomainError = msg.toLowerCase().includes('domain') ||
         msg.toLowerCase().includes('not verified') ||
-        msg.toLowerCase().includes('validation_error');
+        msg.toLowerCase().includes('validation_error') ||
+        msg.toLowerCase().includes('testing emails to your own email address');
 
       if (verifiedFrom && isDomainError && adminEmail) {
         console.warn(`[Email fallback] ${verifiedFrom} not yet verified — redirecting to admin: ${adminEmail}`);

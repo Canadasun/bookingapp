@@ -10,6 +10,16 @@ import { safeNextPath } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 
+async function readJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,11 +52,11 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const body = await res.json() as { message?: string };
-        throw new Error(body.message ?? "Invalid credentials");
+        const body = await readJson<{ message?: string }>(res);
+        throw new Error(body?.message ?? "Invalid credentials");
       }
-      const data = await res.json() as { twoFactorRequired?: boolean; challengeId?: string; method?: string };
-      if (data.twoFactorRequired && data.challengeId) {
+      const data = await readJson<{ twoFactorRequired?: boolean; challengeId?: string; method?: string }>(res);
+      if (data?.twoFactorRequired && data.challengeId) {
         setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL" });
         return;
       }
@@ -71,8 +81,8 @@ function LoginForm() {
         body: JSON.stringify({ challengeId: challenge.id, code: entered, rememberDevice }),
       });
       if (!res.ok) {
-        const body = await res.json() as { message?: string };
-        throw new Error(body.message ?? "Invalid or expired code");
+        const body = await readJson<{ message?: string }>(res);
+        throw new Error(body?.message ?? "Invalid or expired code");
       }
       go();
     } catch (err) {

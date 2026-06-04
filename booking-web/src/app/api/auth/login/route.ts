@@ -3,6 +3,26 @@ import { apiBase } from "@/lib/server-api";
 
 const API = apiBase();
 
+async function readJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function errorMessage(body: Record<string, unknown> | null, fallback: string) {
+  const raw = body?.message;
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const nested = (raw as Record<string, unknown>).message;
+    if (typeof nested === "string") return nested;
+  }
+  return fallback;
+}
+
 export async function POST(req: NextRequest) {
   const input = await req.json() as { email: string; password: string };
   // A prior "remember this device" token lets a 2FA user skip the OTP here.
@@ -20,15 +40,33 @@ export async function POST(req: NextRequest) {
   });
 
   if (!upstream.ok) {
-    const err = await upstream.json().catch(() => ({})) as Record<string, unknown>;
-    return NextResponse.json(err, { status: upstream.status });
+    const err = await readJson<Record<string, unknown>>(upstream);
+    return NextResponse.json({ message: errorMessage(err, upstream.statusText || "Login failed") }, { status: upstream.status });
   }
 
-  const data = await upstream.json() as {
+  const data = await readJson<{
+    twoFactorRequired?: boolean;
+    challengeId?: string;
+    method?: string;
     accessToken: string;
     refreshToken: string;
     user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: string };
-  };
+  }>(upstream);
+
+  if (!data) {
+    return NextResponse.json({ message: "Login service returned an invalid response" }, { status: 502 });
+  }
+
+  if (data.twoFactorRequired) {
+    return NextResponse.json({
+      twoFactorRequired: true,
+      challengeId: data.challengeId,
+      method: data.method,
+    });
+  }
+  if (!data.accessToken || !data.refreshToken || !data.user) {
+    return NextResponse.json({ message: "Login service returned an incomplete session" }, { status: 502 });
+  }
 
   const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });

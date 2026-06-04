@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 
+async function readJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -46,8 +56,8 @@ function RegisterForm() {
         body: JSON.stringify({ name: form.name.trim(), email, password: form.password, role: "CLIENT", privacyConsentAccepted: true }),
       });
       if (!regRes.ok) {
-        const body = await regRes.json() as { message?: string };
-        throw new Error(body.message ?? "Registration failed");
+        const body = await readJson<{ message?: string }>(regRes);
+        throw new Error(body?.message ?? "Registration failed");
       }
       const loginRes = await fetch("/api/auth/login", {
         method: "POST",

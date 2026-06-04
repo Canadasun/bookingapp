@@ -65,6 +65,10 @@ export default function SettingsPage() {
     setTwoFA(enabled); setTwoFAMethod(method);
     try {
       const res = await api.auth.setTwoFactor(enabled, method);
+      if (res.user) {
+        setTwoFA(!!res.user.twoFactorEnabled);
+        setTwoFAMethod(res.user.twoFactorMethod ?? method);
+      }
       if (res.recoveryCodes?.length) setRecoveryCodes(res.recoveryCodes);
       if (!enabled) setRecoveryCodes(null);
       toast.success(enabled ? "Two-factor sign-in enabled" : "Two-factor sign-in turned off");

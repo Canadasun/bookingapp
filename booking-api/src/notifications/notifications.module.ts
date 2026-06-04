@@ -5,7 +5,14 @@ import { NotificationProcessor } from './notifications.processor';
 
 @Module({
   imports: [
-    BullModule.registerQueue({ name: NOTIFICATION_QUEUE }),
+    BullModule.registerQueue({
+      name: NOTIFICATION_QUEUE,
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: { age: 60 * 60 * 24, count: 1000 },
+        removeOnFail: { age: 60 * 60 * 24 * 14, count: 1000 },
+      },
+    }),
   ],
   providers: [NotificationsService, NotificationProcessor],
   exports: [NotificationsService],

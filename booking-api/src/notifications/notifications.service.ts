@@ -50,6 +50,10 @@ export class NotificationsService {
     await this.sendConfirmation(apt);
   }
 
+  private dedupe(name: string, id: string) {
+    return `${name}-${id}`;
+  }
+
   async cancelReminders(appointmentId: string) {
     const jobs = await Promise.allSettled([
       this.queue.remove(`reminder-24h-${appointmentId}`),
@@ -59,23 +63,23 @@ export class NotificationsService {
   }
 
   async sendConfirmation(apt: AppointmentWithRelations) {
-    await this.queue.add('send-confirmation', { appointmentId: apt.id });
+    await this.queue.add('send-confirmation', { appointmentId: apt.id }, { jobId: `${this.dedupe('send-confirmation', apt.id)}-${Date.now()}` });
   }
 
   async sendPendingNotification(apt: AppointmentWithRelations) {
-    await this.queue.add('send-pending', { appointmentId: apt.id });
+    await this.queue.add('send-pending', { appointmentId: apt.id }, { jobId: this.dedupe('send-pending', apt.id) });
   }
 
   async sendCancellation(apt: AppointmentWithRelations) {
-    await this.queue.add('send-cancellation', { appointmentId: apt.id });
+    await this.queue.add('send-cancellation', { appointmentId: apt.id }, { jobId: this.dedupe('send-cancellation', apt.id) });
   }
 
   async sendReschedule(apt: AppointmentWithRelations) {
-    await this.queue.add('send-reschedule', { appointmentId: apt.id });
+    await this.queue.add('send-reschedule', { appointmentId: apt.id }, { jobId: `${this.dedupe('send-reschedule', apt.id)}-${apt.startsAt.getTime()}` });
   }
 
   async sendStaffCancellation(apt: AppointmentWithRelations) {
-    await this.queue.add('send-staff-cancellation', { appointmentId: apt.id });
+    await this.queue.add('send-staff-cancellation', { appointmentId: apt.id }, { jobId: this.dedupe('send-staff-cancellation', apt.id) });
   }
 
   // A client tried to cancel past the cancellation window: alert the owner so
@@ -86,28 +90,28 @@ export class NotificationsService {
 
   // Tell a waitlisted client that a spot opened up (auto-fill on cancellation).
   async notifyWaitlistOpening(waitlistEntryId: string) {
-    await this.queue.add('waitlist-opening', { waitlistEntryId });
+    await this.queue.add('waitlist-opening', { waitlistEntryId }, { jobId: this.dedupe('waitlist-opening', waitlistEntryId) });
   }
 
   // Post-visit: ask the client to leave a review.
   async sendReviewRequest(apt: AppointmentWithRelations) {
-    await this.queue.add('review-request', { appointmentId: apt.id });
+    await this.queue.add('review-request', { appointmentId: apt.id }, { jobId: this.dedupe('review-request', apt.id) });
   }
 
   // Email the recipient of a freshly-issued gift card.
   async sendGiftCardIssued(giftCardId: string) {
-    await this.queue.add('gift-card-issued', { giftCardId }, { removeOnComplete: true, attempts: 3 });
+    await this.queue.add('gift-card-issued', { giftCardId }, { jobId: this.dedupe('gift-card-issued', giftCardId), removeOnComplete: true, attempts: 1 });
   }
 
   // Welcome a newly-registered owner.
   async sendWelcome(userId: string) {
-    await this.queue.add('welcome', { userId }, { removeOnComplete: true, attempts: 3 });
+    await this.queue.add('welcome', { userId }, { jobId: this.dedupe('welcome', userId), removeOnComplete: true, attempts: 1 });
   }
 
   // Email a password-reset link. The token is single-use (signed against the
   // current password hash) and short-lived — see AuthService.
   async sendPasswordReset(userId: string, resetToken: string) {
-    await this.queue.add('password-reset', { userId, resetToken }, { removeOnComplete: true, attempts: 3 });
+    await this.queue.add('password-reset', { userId, resetToken }, { jobId: `${this.dedupe('password-reset', userId)}-${Date.now()}`, removeOnComplete: true, attempts: 1 });
   }
 
   // Security alert: a sign-in from a new device. Includes a reset link so the
@@ -116,18 +120,18 @@ export class NotificationsService {
     await this.queue.add(
       'security-alert',
       { userId, ip: info.ip, userAgent: info.userAgent, resetToken: info.resetToken },
-      { removeOnComplete: true, attempts: 3 },
+      { jobId: `${this.dedupe('security-alert', userId)}-${Date.now()}`, removeOnComplete: true, attempts: 1 },
     );
   }
 
   // 2FA one-time code, by email or SMS.
   async sendOtp(userId: string, code: string, method: string) {
-    await this.queue.add('otp', { userId, otpCode: code, otpMethod: method }, { removeOnComplete: true, attempts: 3 });
+    await this.queue.add('otp', { userId, otpCode: code, otpMethod: method }, { jobId: `otp-${userId}-${Date.now()}`, removeOnComplete: true, attempts: 1 });
   }
 
   // Email-verification link (gates the client portal).
   async sendVerifyEmail(userId: string, token: string) {
-    await this.queue.add('verify-email', { userId, resetToken: token }, { removeOnComplete: true, attempts: 3 });
+    await this.queue.add('verify-email', { userId, resetToken: token }, { jobId: `${this.dedupe('verify-email', userId)}-${Date.now()}`, removeOnComplete: true, attempts: 1 });
   }
 
   // Marketing campaign — one job per recipient so the queue can retry individually.
@@ -135,7 +139,7 @@ export class NotificationsService {
     await this.queue.add(
       'campaign-message',
       { campaignId, clientId },
-      { removeOnComplete: true, attempts: 3, backoff: { type: 'fixed', delay: 5000 } },
+      { jobId: `campaign-message-${campaignId}-${clientId}`, removeOnComplete: true, attempts: 1 },
     );
   }
 

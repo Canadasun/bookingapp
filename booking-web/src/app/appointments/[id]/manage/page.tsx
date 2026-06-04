@@ -54,7 +54,7 @@ export default function ManageAppointmentPage() {
         `It's past the ${windowHours}-hour cancellation window — please contact ${biz.name}${contact ? ` (${contact})` : ""} to cancel. We've let them know.`,
         { duration: 8000 },
       );
-      api.appointments.publicCancel(id, "Late cancellation requested by client", token).catch(() => {});
+      api.appointments.publicLateCancelRequest(id, "Late cancellation requested by client", token).catch(() => {});
       return;
     }
 
@@ -221,7 +221,7 @@ export default function ManageAppointmentPage() {
         </div>
 
         <div className="text-center space-y-2">
-          <Link href="/my/bookings"
+          <Link href={`/my/bookings/${appointment.business.slug}`}
             className="inline-block text-sm text-violet-600 font-medium hover:underline">
             ← View all my bookings
           </Link>

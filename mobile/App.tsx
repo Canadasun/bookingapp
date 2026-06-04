@@ -1474,7 +1474,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const prev = { enabled: twoFA, method: twoFAMethod };
     setTwoFA(enabled); setTwoFAMethod(method);
     try {
-      const res = await api<{ recoveryCodes?: string[] }>('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method }) });
+      const res = await api<{ recoveryCodes?: string[]; user?: User }>('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method }) });
+      if (res.user) {
+        setAuth(getAuth().token, res.user, getAuth().refresh);
+        await persistAuth();
+        setTwoFA(!!res.user.twoFactorEnabled);
+        setTwoFAMethod(res.user.twoFactorMethod ?? method);
+      }
       if (res.recoveryCodes?.length) setRecoveryCodes(res.recoveryCodes);
       if (!enabled) setRecoveryCodes(null);
     } catch (e) {

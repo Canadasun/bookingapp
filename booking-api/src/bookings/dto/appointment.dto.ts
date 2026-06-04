@@ -37,8 +37,13 @@ export const PublicStatusSchema = z.object({
   cancelReason: z.string().optional(),
 });
 
+export const LateCancelRequestSchema = z.object({
+  cancelReason: z.string().max(1000).optional(),
+});
+
 export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
 export type RescheduleDto = z.infer<typeof RescheduleSchema>;
 export type StatusDto = z.infer<typeof StatusSchema>;
 export type PublicStatusDto = z.infer<typeof PublicStatusSchema>;
+export type LateCancelRequestDto = z.infer<typeof LateCancelRequestSchema>;
 export type UpdateAppointmentDto = z.infer<typeof UpdateAppointmentSchema>;

@@ -13,6 +13,7 @@ import { AvailabilityService } from '../availability/availability.service';
 import { GoogleCalendarService } from '../calendar-sync/google-calendar.service';
 import { CreateAppointmentDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
+import { normalizePhone } from '../common/util/phone';
 import { isPaidPlan } from '../common/util/plan-features';
 import { Prisma } from '@prisma/client';
 import { addMinutes } from 'date-fns';
@@ -487,6 +488,34 @@ export class BookingsService {
     return { ...updated, cancelFee };
   }
 
+  async requestLateCancellation(id: string, cancelReason?: string) {
+    const existing = await this.findOne(id);
+    if (!['PENDING', 'CONFIRMED'].includes(existing.status)) {
+      throw new BadRequestException('Only pending or confirmed appointments can request cancellation');
+    }
+    const cutoff = new Date(existing.startsAt.getTime() - existing.business.cancellationWindowHours * 3600 * 1000);
+    if (new Date() <= cutoff) {
+      throw new BadRequestException('This appointment is still outside the cancellation window and can be cancelled online.');
+    }
+
+    await this.notifications.sendLateCancellationRequest({
+      ...existing,
+      ...(cancelReason ? { cancelReason } : {}),
+    }).catch(() => {});
+
+    await this.logAction('APPOINTMENT', id, 'LATE_CANCEL_REQUEST', {
+      status: existing.status,
+      cancelReason: cancelReason ?? null,
+      cancellationWindowHours: existing.business.cancellationWindowHours,
+    });
+
+    return {
+      ok: true,
+      code: 'LATE_CANCEL_REQUESTED',
+      message: `It's past the ${existing.business.cancellationWindowHours}-hour cancellation window. Please contact ${existing.business.name} to cancel — we've let them know you'd like to.`,
+    };
+  }
+
   async updateDetails(id: string, dto: UpdateAppointmentDto, businessId: string, userId?: string) {
     const existing = await this.findOne(id, businessId);
     let startsAt = existing.startsAt;
@@ -514,6 +543,14 @@ export class BookingsService {
       if (conflict) throw new ConflictException('New time slot is not available');
     }
 
+    const normalizedClientPhone =
+      dto.clientPhone !== undefined && dto.clientPhone
+        ? normalizePhone(dto.clientPhone)
+        : undefined;
+    if (dto.clientPhone && !normalizedClientPhone) {
+      throw new BadRequestException('Enter a valid phone number, e.g. +1 555 123 4567');
+    }
+
     const updated = await this.prisma.appointment.update({
       where: { id },
       data: {
@@ -525,7 +562,7 @@ export class BookingsService {
                 update: {
                   ...(dto.clientName ? { name: dto.clientName } : {}),
                   ...(dto.clientEmail ? { email: dto.clientEmail } : {}),
-                  ...(dto.clientPhone !== undefined ? { phone: dto.clientPhone || null } : {}),
+                  ...(dto.clientPhone !== undefined ? { phone: normalizedClientPhone ?? null } : {}),
                 },
               },
             }

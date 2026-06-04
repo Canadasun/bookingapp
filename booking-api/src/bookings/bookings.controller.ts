@@ -8,6 +8,7 @@ import {
   RescheduleSchema, RescheduleDto,
   StatusSchema, StatusDto,
   PublicStatusSchema, PublicStatusDto,
+  LateCancelRequestSchema, LateCancelRequestDto,
   UpdateAppointmentSchema, UpdateAppointmentDto,
 } from './dto/appointment.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -45,6 +46,19 @@ export class PublicBookingsController {
   ) {
     this.assertToken(id, token);
     return this.bookingsService.updateStatus(id, dto);
+  }
+
+  // Public late-cancel request — does NOT cancel the appointment. It only alerts
+  // the owner when the client is inside the cancellation window.
+  @Post(':id/late-cancel-request')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  requestLateCancel(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(LateCancelRequestSchema)) dto: LateCancelRequestDto,
+    @Query('token') token?: string,
+  ) {
+    this.assertToken(id, token);
+    return this.bookingsService.requestLateCancellation(id, dto.cancelReason);
   }
 
   // Public reschedule — used by the client manage page redirect to booking wizard.
