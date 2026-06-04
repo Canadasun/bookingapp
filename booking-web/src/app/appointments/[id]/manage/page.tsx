@@ -134,7 +134,7 @@ export default function ManageAppointmentPage() {
                   <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Time</p>
-                    <p className="text-gray-900 font-semibold">{format(new Date(appointment.startsAt), 'h:mm a')}</p>
+                    <p className="text-gray-900 font-semibold">{format(new Date(appointment.startsAt), 'HH:mm')}</p>
                   </div>
                 </div>
               </div>

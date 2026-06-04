@@ -3,7 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { format } from 'date-fns';
+import { isPaidPlan, isProPlan } from '../common/util/plan-features';
 
 export const NOTIFICATION_QUEUE = 'notifications';
 
@@ -13,6 +13,7 @@ export interface AppointmentWithRelations {
   endsAt: Date;
   client: { name: string; email: string; phone?: string | null };
   service: { name: string };
+  business?: { plan: 'FREE' | 'BASIC' | 'PRO' };
 }
 
 @Injectable()
@@ -24,18 +25,21 @@ export class NotificationsService {
   ) {}
 
   async scheduleReminders(apt: AppointmentWithRelations) {
+    const business = apt.business ?? await this.prisma.appointment
+      .findUnique({ where: { id: apt.id }, select: { business: { select: { plan: true } } } })
+      .then((row) => row?.business);
     const now = Date.now();
     const delay24h = apt.startsAt.getTime() - now - 24 * 60 * 60 * 1000;
     const delay2h = apt.startsAt.getTime() - now - 2 * 60 * 60 * 1000;
 
-    if (delay24h > 0) {
+    if (delay24h > 0 && isPaidPlan(business?.plan)) {
       await this.queue.add(
         'reminder-24h',
         { appointmentId: apt.id },
         { delay: delay24h, jobId: `reminder-24h-${apt.id}`, removeOnComplete: true },
       );
     }
-    if (delay2h > 0) {
+    if (delay2h > 0 && isProPlan(business?.plan)) {
       await this.queue.add(
         'reminder-2h',
         { appointmentId: apt.id },

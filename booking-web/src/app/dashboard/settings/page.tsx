@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
   "America/Anchorage","Pacific/Honolulu","America/Toronto","America/Vancouver",
+  "America/Edmonton","America/Winnipeg","America/Regina","America/Halifax",
+  "America/St_Johns","America/Whitehorse",
   "Europe/London","Europe/Paris","Europe/Berlin","Asia/Dubai","Asia/Kolkata",
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
@@ -122,7 +124,12 @@ export default function SettingsPage() {
     e.preventDefault();
     if (!bizId) return;
     setSaving(true);
-    try { await api.business.update(bizId, form); toast.success("Settings saved"); }
+    try {
+      const updated = await api.business.update(bizId, form);
+      setBiz(updated);
+      setForm(updated);
+      toast.success("Settings saved");
+    }
     catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
     finally { setSaving(false); }
   }
@@ -138,7 +145,10 @@ export default function SettingsPage() {
 
   const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/book/${biz?.slug ?? ""}`;
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
-  const embedSnippet = `<script src="${embedOrigin}/embed.js" data-slug="${biz?.slug ?? ""}" async></script>`;
+  const embedSnippet = `<script src="${embedOrigin}/embed.js" data-business-id="${biz?.id ?? ""}" async></script>`;
+  const plan = biz?.plan ?? "FREE";
+  const isPro = plan === "PRO";
+  const isPaid = plan === "BASIC" || plan === "PRO";
   function copyEmbed() {
     navigator.clipboard.writeText(embedSnippet);
     setEmbedCopied(true);
@@ -222,39 +232,51 @@ export default function SettingsPage() {
             )}
 
             {section === "booking" && (
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-5">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Booking policies</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Control when and how clients can book and cancel.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Set the client booking rules that protect your calendar.</p>
                 </div>
                 <hr className="border-gray-100" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Min. notice (minutes)">
-                    <Input type="number" min={0} value={(form.minNoticeMinutes as number) ?? 120}
-                      onChange={(e) => f("minNoticeMinutes", Number(e.target.value))} />
-                  </Field>
-                  <Field label="Max advance booking (days)">
-                    <Input type="number" min={1} value={(form.maxAdvanceDays as number) ?? 60}
-                      onChange={(e) => f("maxAdvanceDays", Number(e.target.value))} />
-                  </Field>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    { label: "Minimum notice", value: (form.minNoticeMinutes as number) ?? 120, suffix: "minutes", min: 0, key: "minNoticeMinutes" as const },
+                    { label: "Advance window", value: (form.maxAdvanceDays as number) ?? 60, suffix: "days", min: 1, key: "maxAdvanceDays" as const },
+                    { label: "Cancel window", value: (form.cancellationWindowHours as number) ?? 24, suffix: "hours", min: 0, key: "cancellationWindowHours" as const },
+                  ].map((item) => (
+                    <div key={item.key} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{item.label}</p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <Input type="number" min={item.min} value={item.value}
+                          onChange={(e) => f(item.key, Number(e.target.value))}
+                          className="bg-white text-base font-semibold" />
+                        <span className="text-xs font-medium text-gray-500">{item.suffix}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <Field label="Cancellation window (hours)">
-                  <Input type="number" min={0} value={(form.cancellationWindowHours as number) ?? 24}
-                    onChange={(e) => f("cancellationWindowHours", Number(e.target.value))} />
-                  <p className="text-xs text-gray-400 mt-1">Cancel before this window = free. Inside it = the cancellation fee applies (paid plans).</p>
-                </Field>
-                <Field label="Cancellation policy (clients agree to this before booking)">
+
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-semibold text-blue-900">Cancellation rule</p>
+                  <p className="mt-1 text-xs leading-relaxed text-blue-700">
+                    Clients can cancel before the window for free. Inside the window, Pro businesses can charge the late-cancellation fee configured under Payments & fees.
+                  </p>
+                </div>
+
+                <Field label="Policy clients accept before booking">
                   <textarea
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm min-h-[90px] focus:outline-none focus:ring-2 focus:ring-violet-200"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-violet-200"
                     value={(form.cancellationPolicy as string) ?? ""}
                     onChange={(e) => f("cancellationPolicy", e.target.value)}
                     placeholder="Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee…" />
-                  <p className="text-xs text-gray-400 mt-1">Shown on your booking page — clients must accept it before they can book.</p>
+                  <p className="text-xs text-gray-400 mt-1">Shown during checkout on every business-specific booking link.</p>
                 </Field>
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Allow client reschedule</p>
-                    <p className="text-xs text-gray-400">Clients can reschedule from the manage page</p>
+                    <p className="text-sm font-semibold text-gray-800">Client self-reschedule</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Clients can move appointments from their secure manage link when outside your policy window.</p>
                   </div>
                   <button type="button" onClick={() => f("allowClientReschedule", !form.allowClientReschedule)}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.allowClientReschedule ? "bg-violet-600" : "bg-gray-200")}>
@@ -268,26 +290,27 @@ export default function SettingsPage() {
               <div className="p-6 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Payments &amp; fees</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Configure deposit collection and no-show / cancellation protection.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Configure Pro payment protection for deposits, no-shows, and late cancellations.</p>
                 </div>
                 <hr className="border-gray-100" />
-                {(biz?.plan ?? "FREE") === "FREE" && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    🔒 Deposits, no-show & cancellation fees are a <span className="font-semibold">paid-plan</span> feature. On the Free plan no money is collected at booking and clients can cancel at any time for free.{" "}
-                    <button type="button" className="underline font-semibold" onClick={() => setSection("billing")}>Upgrade</button>
+                {!isPro && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    <p className="font-semibold">Payment protection requires Pro</p>
+                    <p className="mt-1 text-xs leading-relaxed text-amber-700">Free and Basic can book appointments and send confirmations. Pro adds deposit collection, saved cards for no-shows, and late-cancellation fees.</p>
+                    <button type="button" className="mt-2 text-xs font-semibold underline" onClick={() => setSection("billing")}>View plans</button>
                   </div>
                 )}
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className={cn("flex items-center justify-between p-4 rounded-xl border", isPro ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-60")}>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Require deposit at booking</p>
-                    <p className="text-xs text-gray-400">Collect a partial payment when clients book</p>
+                    <p className="text-sm font-semibold text-gray-800">Require deposit at booking</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online.</p>
                   </div>
-                  <button type="button" onClick={() => f("requireDeposit", !form.requireDeposit)}
+                  <button type="button" disabled={!isPro} onClick={() => f("requireDeposit", !form.requireDeposit)}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.requireDeposit ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.requireDeposit ? "translate-x-6" : "translate-x-1")} />
                   </button>
                 </div>
-                {form.requireDeposit && (
+                {isPro && form.requireDeposit && (
                   <Field label="Deposit percentage">
                     <div className="flex items-center gap-2">
                       <Input type="number" min={1} max={100} value={(form.depositPercent as number) ?? 25}
@@ -296,24 +319,31 @@ export default function SettingsPage() {
                     </div>
                   </Field>
                 )}
-                <Field label="No-show fee ($, 0 = disabled)">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 shrink-0">$</span>
-                    <Input type="number" min={0} step="0.01"
-                      value={(((form.noShowFeeCents as number) ?? 0) / 100).toString()}
-                      onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-60")}>
+                    <Field label="No-show fee">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500 shrink-0">$</span>
+                        <Input type="number" min={0} step="0.01" disabled={!isPro}
+                          value={(((form.noShowFeeCents as number) ?? 0) / 100).toString()}
+                          onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Charged when you mark a confirmed appointment as a no-show.</p>
+                    </Field>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">Charged to the card on file when you mark a confirmed appointment as a no-show.</p>
-                </Field>
-                <Field label="Late-cancellation fee ($, 0 = disabled)">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 shrink-0">$</span>
-                    <Input type="number" min={0} step="0.01"
-                      value={(((form.cancellationFeeCents as number) ?? 0) / 100).toString()}
-                      onChange={(e) => f("cancellationFeeCents", Math.round(Number(e.target.value) * 100))} />
+                  <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-60")}>
+                    <Field label="Late-cancellation fee">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500 shrink-0">$</span>
+                        <Input type="number" min={0} step="0.01" disabled={!isPro}
+                          value={(((form.cancellationFeeCents as number) ?? 0) / 100).toString()}
+                          onChange={(e) => f("cancellationFeeCents", Math.round(Number(e.target.value) * 100))} />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Charged when a client cancels inside your cancellation window.</p>
+                    </Field>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">Charged to the card on file when a client cancels <em>inside</em> the cancellation window (paid plans only). Free if they cancel earlier.</p>
-                </Field>
+                </div>
               </div>
             )}
 
@@ -343,7 +373,7 @@ export default function SettingsPage() {
                     <CreditCard className="w-4 h-4 text-gray-700" />
                     <span className="text-sm font-semibold text-gray-900">Embed on your website</span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It resizes automatically.</p>
+                  <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It uses your public business id instead of an email-derived slug.</p>
                   <div className="flex items-start gap-2 bg-gray-900 rounded-xl px-4 py-3">
                     <code className="text-xs text-gray-100 flex-1 break-all font-mono">{embedSnippet}</code>
                     <button type="button" onClick={copyEmbed} className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
@@ -413,22 +443,22 @@ export default function SettingsPage() {
                 </div>
                 <hr className="border-gray-100" />
 
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications (all plans)</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications</p>
                 {[
-                  { label: "Booking confirmation", desc: "Sent immediately when a new appointment is booked" },
-                  { label: "24-hour reminder", desc: "Sent the day before the appointment (Basic & Pro)" },
-                  { label: "Cancellation notice", desc: "Sent when a booking is cancelled by client or business" },
-                  { label: "Reschedule notice", desc: "Sent when an appointment is moved to a new time" },
-                  { label: "Staff cancellation", desc: "Special email when business cancels on the client" },
-                ].map(({ label, desc }) => (
+                  { label: "Booking confirmation", desc: "Sent immediately when a new appointment is booked", active: true },
+                  { label: "24-hour reminder", desc: "Sent the day before the appointment", active: isPaid },
+                  { label: "Cancellation notice", desc: "Sent when a booking is cancelled by client or business", active: true },
+                  { label: "Reschedule notice", desc: "Sent when an appointment is moved to a new time", active: true },
+                  { label: "Staff cancellation", desc: "Special email when business cancels on the client", active: true },
+                ].map(({ label, desc, active }) => (
                   <div key={label} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0">
                     <div>
                       <p className="text-sm font-medium text-gray-700">{label}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs font-medium text-emerald-700">Active</span>
+                      <div className={cn("w-2 h-2 rounded-full", active ? "bg-emerald-500" : "bg-gray-300")} />
+                      <span className={cn("text-xs font-medium", active ? "text-emerald-700" : "text-gray-400")}>{active ? "Active" : "Basic+"}</span>
                     </div>
                   </div>
                 ))}
@@ -454,7 +484,7 @@ export default function SettingsPage() {
 
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                   <p className="text-xs font-semibold text-blue-800 mb-1">Email provider: Resend</p>
-                  <p className="text-xs text-blue-600">Emails are sent via Resend from your configured RESEND_FROM_EMAIL address. SMS uses Twilio (Pro plan). Both are configured in your server environment.</p>
+                  <p className="text-xs text-blue-600">Confirmations, cancellations, and reschedules are included on every plan. Automated reminders follow the plan shown above.</p>
                 </div>
               </div>
             )}

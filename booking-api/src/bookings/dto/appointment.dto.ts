@@ -7,6 +7,7 @@ export const CreateAppointmentSchema = z.object({
   clientId: z.string().min(1),
   startsAt: z.string().datetime(),
   notes: z.string().optional(),
+  allowOverride: z.boolean().optional(),
 });
 
 export const RescheduleSchema = z.object({
@@ -17,6 +18,15 @@ export const RescheduleSchema = z.object({
 export const StatusSchema = z.object({
   status: z.enum(['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']),
   cancelReason: z.string().optional(),
+});
+
+export const UpdateAppointmentSchema = z.object({
+  startsAt: z.string().datetime().optional(),
+  clientName: z.string().min(1).optional(),
+  clientEmail: z.string().email().optional(),
+  clientPhone: z.string().optional(),
+  notes: z.string().optional(),
+  notifyClient: z.boolean().default(true),
 });
 
 // The unauthenticated client "manage" page may ONLY cancel — never confirm /
@@ -31,3 +41,4 @@ export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
 export type RescheduleDto = z.infer<typeof RescheduleSchema>;
 export type StatusDto = z.infer<typeof StatusSchema>;
 export type PublicStatusDto = z.infer<typeof PublicStatusSchema>;
+export type UpdateAppointmentDto = z.infer<typeof UpdateAppointmentSchema>;

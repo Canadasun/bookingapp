@@ -8,6 +8,7 @@ import {
   RescheduleSchema, RescheduleDto,
   StatusSchema, StatusDto,
   PublicStatusSchema, PublicStatusDto,
+  UpdateAppointmentSchema, UpdateAppointmentDto,
 } from './dto/appointment.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -123,7 +124,7 @@ export class BookingsController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.appointmentService.create(businessId, dto, { confirmed: true });
+    return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: dto.allowOverride === true });
   }
 
   @Patch(':id/confirm')
@@ -151,6 +152,20 @@ export class BookingsController {
       throw new ForbiddenException('You do not have access to this business');
     }
     return this.appointmentService.reschedule(id, dto, businessId, { userId: user.id });
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  updateDetails(
+    @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @Body(new ZodValidationPipe(UpdateAppointmentSchema)) dto: UpdateAppointmentDto,
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.appointmentService.updateDetails(id, dto, businessId, user.id);
   }
 
   @Patch(':id/status')

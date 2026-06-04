@@ -15,6 +15,7 @@ import { BookingPayment } from "@/components/BookingPayment";
 import "react-day-picker/style.css";
 
 type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string };
+type BookingSlot = Slot & { staffId?: string; staffName?: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDuration(mins: number) {
@@ -27,8 +28,8 @@ function fmtDuration(mins: number) {
 function fmtPrice(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
-function groupSlots(slots: Slot[]) {
-  const m: Slot[] = [], a: Slot[] = [], e: Slot[] = [];
+function groupSlots<T extends Slot>(slots: T[]) {
+  const m: T[] = [], a: T[] = [], e: T[] = [];
   for (const s of slots) {
     const h = new Date(s.startsAtLocal).getHours();
     if (h < 12) m.push(s); else if (h < 17) a.push(s); else e.push(s);
@@ -92,6 +93,7 @@ function BookPageInner({ slug }: { slug: string }) {
   const rescheduleId  = searchParams.get("reschedule");
   const rescheduleToken = searchParams.get("token") ?? undefined; // HMAC manage token for the public reschedule
   const isEmbed       = searchParams.get("embed") === "1"; // rendered inside the embeddable widget iframe
+  const isBusinessIdRef = searchParams.get("ref") === "business-id";
   const rescheduleLoaded = useRef(false);
 
   // When embedded, report content height to the host page so embed.js can size
@@ -110,12 +112,12 @@ function BookPageInner({ slug }: { slug: string }) {
   const [bizId, setBizId]             = useState<string>("");
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [staffList, setStaffList]     = useState<StaffMember[]>([]);
-  const [slots, setSlots]             = useState<Slot[]>([]);
+  const [slots, setSlots]             = useState<BookingSlot[]>([]);
 
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [selectedStaff, setSelectedStaff]       = useState<StaffMember | "any" | null>(null);
   const [selectedDate, setSelectedDate]         = useState<Date | undefined>();
-  const [selectedSlot, setSelectedSlot]         = useState<Slot | null>(null);
+  const [selectedSlot, setSelectedSlot]         = useState<BookingSlot | null>(null);
 
   const [form, setForm]     = useState({ name: "", email: "", phone: "", notes: "" });
   const [errs, setErrs]     = useState<Partial<typeof form>>({});
@@ -132,7 +134,8 @@ function BookPageInner({ slug }: { slug: string }) {
 
   // Load business by slug
   useEffect(() => {
-    api.business.getBySlug(slug)
+    const loadBusiness = isBusinessIdRef ? api.business.getPublicById(slug) : api.business.getBySlug(slug);
+    loadBusiness
       .then((b) => {
         setBiz(b);
         setBizId(b.id);
@@ -142,7 +145,7 @@ function BookPageInner({ slug }: { slug: string }) {
         toast.error("Business not found");
         setLoadingBiz(false);
       });
-  }, [slug]);
+  }, [slug, isBusinessIdRef]);
 
   // Load services
   useEffect(() => {
@@ -160,8 +163,7 @@ function BookPageInner({ slug }: { slug: string }) {
   useEffect(() => {
     if (!bizId || selectedServices.length === 0) { setStaffList([]); return; }
     api.staff.list(bizId).then((all) => {
-      const ids = new Set(selectedServices.map((s) => s.id));
-      setStaffList(all.filter((st) => st.staffServices.some((ss) => ids.has(ss.serviceId))));
+      setStaffList(all.filter((st) => selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))));
     }).catch(() => {});
   }, [bizId, selectedServices]);
 
@@ -172,6 +174,8 @@ function BookPageInner({ slug }: { slug: string }) {
     api.appointments.get(rescheduleId, rescheduleToken).then((apt) => {
       const svc = allServices.find((s) => s.id === apt.service.id);
       if (svc) setSelectedServices([svc]);
+      setForm((p) => ({ ...p, name: apt.client.name, email: apt.client.email, phone: apt.client.phone ?? "" }));
+      setWl({ name: apt.client.name, email: apt.client.email });
       setStep(2);
       toast.success("Select a new date and time");
     }).catch(() => {});
@@ -185,14 +189,19 @@ function BookPageInner({ slug }: { slug: string }) {
     );
   }
 
-  async function loadSlots(staffId: string, date: Date) {
+  async function loadSlots(date: Date) {
     setLoadingSlots(true); setSlots([]);
     const serviceId = selectedServices[0]?.id;
     if (!serviceId) return;
     try {
       const d = format(date, "yyyy-MM-dd");
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setSlots(await api.availability.getSlots({ staffId, serviceId, startDate: d, endDate: d, timezone: tz }));
+      const staffTargets = selectedStaff && selectedStaff !== "any" ? [selectedStaff] : staffList;
+      const rows = await Promise.all(staffTargets.map(async (staff) => {
+        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, startDate: d, endDate: d, timezone: tz });
+        return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
+      }));
+      setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
     } catch { toast.error("Failed to load times"); }
     finally { setLoadingSlots(false); }
   }
@@ -200,10 +209,7 @@ function BookPageInner({ slug }: { slug: string }) {
   function pickDate(date?: Date) {
     if (!date) return;
     setSelectedDate(date); setSelectedSlot(null);
-    const staffId = selectedStaff && selectedStaff !== "any"
-      ? selectedStaff.id
-      : staffList[0]?.id;
-    if (staffId) loadSlots(staffId, date);
+    if (selectedStaff || staffList.length > 0) loadSlots(date);
   }
 
   function validate() {
@@ -223,7 +229,8 @@ function BookPageInner({ slug }: { slug: string }) {
     try {
       const staffId = selectedStaff && selectedStaff !== "any"
         ? selectedStaff.id
-        : staffList[0]?.id;
+        : selectedSlot.staffId;
+      if (!staffId) { toast.error("Choose an available time"); return; }
 
       if (rescheduleId) {
         const apt = await api.appointments.publicReschedule(rescheduleId, selectedSlot.startsAt, rescheduleToken);
@@ -322,7 +329,7 @@ function BookPageInner({ slug }: { slug: string }) {
             <span className="font-bold text-gray-900 truncate">{biz?.name ?? "Pulse"}</span>
           </div>
           <div className="flex items-center gap-3 text-sm shrink-0">
-            <Link href="/my/bookings"
+            <Link href={`/my/bookings/${slug}`}
               className="text-xs font-medium text-gray-500 hover:text-violet-600 transition-colors border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg">
               Find my bookings
             </Link>
@@ -359,7 +366,7 @@ function BookPageInner({ slug }: { slug: string }) {
               </div>
               <div className="flex justify-between text-gray-500 text-xs">
                 <span>When</span>
-                <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}</span>
+                <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal), "HH:mm")}</span>
               </div>
             </div>
 
@@ -370,7 +377,7 @@ function BookPageInner({ slug }: { slug: string }) {
                   title={`${selectedServices.map(s => s.name).join(" + ")} at ${biz?.name ?? "Salon"}`}
                   startsAt={booking.startsAt}
                   endsAt={booking.endsAt}
-                  description={`With ${selectedStaff !== "any" && selectedStaff ? (selectedStaff as { user: { name: string } }).user.name : "any available staff"}`}
+                  description={`With ${selectedSlot.staffName ?? (selectedStaff !== "any" && selectedStaff ? (selectedStaff as { user: { name: string } }).user.name : "staff")}`}
                   location={biz?.address}
                 />
               )}
@@ -504,8 +511,10 @@ function BookPageInner({ slug }: { slug: string }) {
                   {/* Any available */}
                   <button
                     onClick={() => { setSelectedStaff("any"); setStep(2); }}
+                    disabled={staffList.length === 0}
                     className={cn(
                       "w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all",
+                      staffList.length === 0 && "opacity-50 cursor-not-allowed",
                       selectedStaff === "any" ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50",
                     )}>
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-lg">✨</div>
@@ -515,6 +524,12 @@ function BookPageInner({ slug }: { slug: string }) {
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-300" />
                   </button>
+
+                  {staffList.length === 0 && (
+                    <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                      No provider is assigned to every selected service yet.
+                    </p>
+                  )}
 
                   {staffList.map((st) => (
                     <button key={st.id}
@@ -600,7 +615,7 @@ function BookPageInner({ slug }: { slug: string }) {
                             </p>
                             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                               {s.map((sl) => (
-                                <button key={sl.startsAt}
+                                <button key={`${sl.staffId ?? "staff"}-${sl.startsAt}`}
                                   onClick={() => { setSelectedSlot(sl); setStep(3); }}
                                   className={cn(
                                     "py-2.5 rounded-xl border text-xs font-semibold transition-all",
@@ -608,8 +623,8 @@ function BookPageInner({ slug }: { slug: string }) {
                                       ? "bg-violet-600 text-white border-violet-600"
                                       : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50",
                                   )}>
-                                  {format(parseISO(sl.startsAtLocal), "h:mm")}
-                                  <span className="text-[10px] block">{format(parseISO(sl.startsAtLocal), "a")}</span>
+                                  {format(parseISO(sl.startsAtLocal), "HH:mm")}
+                                  {selectedStaff === "any" && sl.staffName && <span className="block truncate px-1 text-[10px] font-medium opacity-70">{sl.staffName}</span>}
                                 </button>
                               ))}
                             </div>
@@ -639,8 +654,9 @@ function BookPageInner({ slug }: { slug: string }) {
                       </p>
                       <p className="text-violet-600 mt-0.5">
                         {selectedDate && format(selectedDate, "EEE, MMM d")}
-                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}`}
+                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal), "HH:mm")}`}
                         {selectedStaff !== "any" && selectedStaff && ` · ${(selectedStaff as StaffMember).user.name}`}
+                        {selectedStaff === "any" && selectedSlot?.staffName && ` · ${selectedSlot.staffName}`}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

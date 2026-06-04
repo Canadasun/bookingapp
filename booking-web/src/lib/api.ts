@@ -396,6 +396,7 @@ export const api = {
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),
+    getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
     update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt">>) =>
       req<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
@@ -493,7 +494,7 @@ export const api = {
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).
-    createManual: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string }) =>
+    createManual: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean }) =>
       req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),
@@ -501,6 +502,11 @@ export const api = {
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status, ...(cancelReason ? { cancelReason } : {}) }),
+      }),
+    update: (businessId: string, id: string, data: { startsAt?: string; clientName?: string; clientEmail?: string; clientPhone?: string; notes?: string; notifyClient?: boolean }) =>
+      req<Appointment>(`/businesses/${businessId}/bookings/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
       }),
     // Public — used by the client-facing manage page (no auth; HMAC token required)
     publicCancel: (id: string, cancelReason?: string, token?: string) =>

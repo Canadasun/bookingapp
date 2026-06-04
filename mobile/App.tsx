@@ -98,6 +98,9 @@ const STATUS_COLOR: Record<string,string> = {
   PENDING:'#F59E0B', CONFIRMED:'#10B981', CANCELLED:'#EF4444', COMPLETED:'#6B7280', NO_SHOW:'#1F2937',
 };
 
+const fmtTime = (value: string | Date) =>
+  new Date(value).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:false });
+
 // ── Auth store (token + refresh token, persisted via SecureStore) ────────────
 let _token:   string|null = null;
 let _refresh: string|null = null;
@@ -247,6 +250,7 @@ function CalendarScreen() {
   const [statusFilter, setStatusFilter] = useState<'ALL'|'PENDING'|'CONFIRMED'|'COMPLETED'|'CANCELLED'|'NO_SHOW'>('ALL');
   const [staffFilter, setStaffFilter] = useState<string>('ALL');
   const [reschedule, setReschedule] = useState<{ appointment:Appointment; date:string; slots:Slot[]; loading:boolean }|null>(null);
+  const [editAppt, setEditAppt] = useState<{ appointment:Appointment; name:string; email:string; phone:string; notes:string; notifyClient:boolean }|null>(null);
   const [acting, setActing]         = useState(false);
 
   const load = useCallback(async (silent=false) => {
@@ -338,6 +342,44 @@ function CalendarScreen() {
       Alert.alert('Rescheduled', 'The appointment was moved and the client was notified.');
     } catch(e) {
       Alert.alert('Could not reschedule', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setActing(false); }
+  }
+
+  function openEdit(a: Appointment) {
+    setSelected(null);
+    setEditAppt({
+      appointment: a,
+      name: a.client.name,
+      email: a.client.email,
+      phone: a.client.phone ?? '',
+      notes: a.notes ?? '',
+      notifyClient: true,
+    });
+  }
+
+  async function saveAppointmentEdit() {
+    if (!editAppt) return;
+    if (!editAppt.name.trim() || !editAppt.email.trim()) {
+      Alert.alert('Check details', 'Client name and email are required.');
+      return;
+    }
+    setActing(true);
+    try {
+      await api(`/businesses/${bizId()}/bookings/${editAppt.appointment.id}`, {
+        method:'PATCH',
+        body: JSON.stringify({
+          clientName: editAppt.name.trim(),
+          clientEmail: editAppt.email.trim().toLowerCase(),
+          clientPhone: editAppt.phone.trim() || undefined,
+          notes: editAppt.notes.trim(),
+          notifyClient: editAppt.notifyClient,
+        }),
+      });
+      setEditAppt(null);
+      load(true);
+      Alert.alert('Saved', editAppt.notifyClient ? 'The client was notified.' : 'Saved without notifying the client.');
+    } catch(e) {
+      Alert.alert('Could not save', e instanceof Error ? e.message : 'Please try again.');
     } finally { setActing(false); }
   }
   // No-show protection: marks NO_SHOW and charges the client's saved card off-session
@@ -461,7 +503,7 @@ function CalendarScreen() {
                 <Text style={cal.aptService}>{a.service.name}</Text>
               </View>
               <View style={{alignItems:'flex-end'}}>
-                <Text style={cal.aptTime}>{d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</Text>
+                <Text style={cal.aptTime}>{fmtTime(d)}</Text>
                 <Text style={cal.aptDur}>{fmtDur(a.service.durationMinutes)}</Text>
               </View>
             </TouchableOpacity>
@@ -478,7 +520,7 @@ function CalendarScreen() {
 
             <View style={[s.aptBlock, {borderLeftColor: STATUS_COLOR[selected.status]??GRAY_200}]}>
               <Text style={s.aptBlockDate}>
-                {new Date(selected.startsAt).toLocaleString('en-US',{weekday:'long',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                {new Date(selected.startsAt).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} at {fmtTime(selected.startsAt)}
               </Text>
               <Text style={s.aptBlockSub}>{selected.service.name} · {selected.staff.user.name}</Text>
             </View>
@@ -505,6 +547,7 @@ function CalendarScreen() {
               {selected.status==='PENDING' && <TouchableOpacity style={s.btnPrimary} disabled={acting} onPress={()=>confirm(selected.id)}><Text style={s.btnPrimaryText}>Confirm</Text></TouchableOpacity>}
               {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>complete(selected.id)}><Text style={s.btnSecondaryText}>Mark completed</Text></TouchableOpacity>}
               {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>noShow(selected.id)}><Text style={s.btnSecondaryText}>No-show &amp; charge fee</Text></TouchableOpacity>}
+              <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openEdit(selected)}><Text style={s.btnSecondaryText}>Edit details</Text></TouchableOpacity>
               {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openReschedule(selected)}><Text style={s.btnSecondaryText}>Reschedule</Text></TouchableOpacity>}
               {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>syncCalendar(selected.id)}><Text style={s.btnSecondaryText}>Sync calendar</Text></TouchableOpacity>}
               {['PENDING','CONFIRMED'].includes(selected.status) && (
@@ -539,12 +582,48 @@ function CalendarScreen() {
                 <View style={s.slotGrid}>
                   {reschedule.slots.map(sl => (
                     <TouchableOpacity key={sl.startsAt} style={s.slotBtn} disabled={acting} onPress={()=>saveReschedule(sl.startsAt)}>
-                      <Text style={s.slotText}>{new Date(sl.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })}</Text>
+                      <Text style={s.slotText}>{fmtTime(sl.startsAt)}</Text>
                     </TouchableOpacity>
                   ))}
                   {reschedule.slots.length===0 && <Text style={s.emptyText}>No available times for this date.</Text>}
                 </View>
               )}
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={!!editAppt} animationType="slide" onRequestClose={()=>setEditAppt(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setEditAppt(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Edit appointment</Text>
+          </View>
+          {editAppt && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.stepLabel}>{editAppt.appointment.service.name}</Text>
+              <Text style={s.sub}>{new Date(editAppt.appointment.startsAt).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} at {fmtTime(editAppt.appointment.startsAt)}</Text>
+
+              <Text style={[s.fieldLabel,{ marginTop:16 }]}>Client name</Text>
+              <TextInput style={s.input} value={editAppt.name} onChangeText={name=>setEditAppt({...editAppt,name})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Client email</Text>
+              <TextInput style={s.input} value={editAppt.email} autoCapitalize="none" keyboardType="email-address" onChangeText={email=>setEditAppt({...editAppt,email})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Client phone</Text>
+              <TextInput style={s.input} value={editAppt.phone} keyboardType="phone-pad" onChangeText={phone=>setEditAppt({...editAppt,phone})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Notes</Text>
+              <TextInput style={[s.input,{ minHeight:90, textAlignVertical:'top' }]} value={editAppt.notes} multiline onChangeText={notes=>setEditAppt({...editAppt,notes})}/>
+
+              <View style={[s.switchRow,{ marginTop:16 }]}>
+                <View style={{ flex:1 }}>
+                  <Text style={s.switchTitle}>Notify client</Text>
+                  <Text style={s.switchSub}>Send an email with the updated booking details.</Text>
+                </View>
+                <Switch value={editAppt.notifyClient} onValueChange={notifyClient=>setEditAppt({...editAppt,notifyClient})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
+              </View>
+
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} disabled={acting} onPress={saveAppointmentEdit}>
+                {acting ? <ActivityIndicator color="#fff"/> : <Text style={s.btnPrimaryText}>Save changes</Text>}
+              </TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -635,7 +714,7 @@ function CheckoutScreen() {
             {[
               { l:'Method', v:'Tap to Pay' },
               { l:'Date',   v: receipt.at.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) },
-              { l:'Time',   v: receipt.at.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}) },
+              { l:'Time',   v: fmtTime(receipt.at) },
               { l:'Reference', v: receipt.ref.slice(-10).toUpperCase() },
             ].map(({l,v})=>(
               <View key={l} style={co.receiptRow}>
@@ -710,6 +789,8 @@ function BookScreen() {
   const [staff, setStaff]             = useState<Staff|null|'any'>(null);
   const [date, setDate]               = useState('');
   const [slot, setSlot]               = useState<Slot|null>(null);
+  const [customStartsAt, setCustomStartsAt] = useState('');
+  const [overrideCalendar, setOverrideCalendar] = useState(false);
   const [form, setForm]               = useState({name:'',email:'',phone:''});
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [loading, setLoading]         = useState(false);
@@ -750,9 +831,8 @@ function BookScreen() {
   async function goToStaff() {
     if (selectedSvcs.length === 0) return;
     try {
-      const ids = new Set(selectedSvcs.map(s=>s.id));
       const all = await api<Staff[]>(`/businesses/${bizId()}/staff`);
-      setStaffList(all.filter(st=>st.staffServices.some(ss=>ids.has(ss.serviceId))));
+      setStaffList(all.filter(st=>selectedSvcs.every(sv => st.staffServices.some(ss=>ss.serviceId === sv.id))));
       setStep('staff');
     } catch { Alert.alert('Error','Could not load staff'); }
   }
@@ -783,13 +863,26 @@ function BookScreen() {
     setLoading(true);
     try {
       const staffId = staff && staff !== 'any' ? staff.id : (staffList[0]?.id ?? '');
+      if (customStartsAt && staff === 'any') { Alert.alert('Provider required','Choose a named provider before using a custom time.'); return; }
+      const customDate = customStartsAt.trim() ? new Date(customStartsAt.trim().replace(' ', 'T')) : null;
+      if (customStartsAt && Number.isNaN(customDate?.getTime())) { Alert.alert('Check time','Use YYYY-MM-DD HH:mm for custom owner time.'); return; }
+      const startsAt = customDate ? customDate.toISOString() : slot?.startsAt;
+      if (!staffId){ Alert.alert('Provider required','Choose a provider before booking.'); return; }
+      if (!startsAt){ Alert.alert('Time required','Choose an available time or enter a custom owner time.'); return; }
       const client = await api<{id:string; matched?:boolean}>(`/businesses/${bizId()}/clients`, {
         method:'POST', body: JSON.stringify({name:form.name.trim(),email:form.email.trim(),phone:normalizedPhone}),
       });
       // Owner/staff booking from the app → confirmed immediately (the /manual
       // endpoint skips approval and sends the client their confirmation).
       const apt = await api<{id:string}>(`/businesses/${bizId()}/bookings/manual`, {
-        method:'POST', body: JSON.stringify({staffId, serviceId:selectedSvcs[0].id, clientId:client.id, startsAt:slot!.startsAt}),
+        method:'POST', body: JSON.stringify({
+          staffId,
+          serviceId:selectedSvcs[0].id,
+          additionalServiceIds: selectedSvcs.slice(1).map(s => s.id),
+          clientId:client.id,
+          startsAt,
+          allowOverride: overrideCalendar || !!customStartsAt,
+        }),
       });
       if (client.matched) {
         Alert.alert('Existing client', 'We matched this booking to an existing client profile and synced their details.');
@@ -801,6 +894,7 @@ function BookScreen() {
 
   function reset() {
     setStep('service'); setSelectedSvcs([]); setStaff(null); setDate(''); setSlot(null);
+    setCustomStartsAt(''); setOverrideCalendar(false);
     setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId('');
   }
 
@@ -883,7 +977,7 @@ function BookScreen() {
             <TouchableOpacity style={s.backBtn} onPress={()=>setStep('service')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Choose a provider</Text>
             <TouchableOpacity style={[s.card, staff==='any'&&{borderColor:BRAND,backgroundColor:BRAND_LT}]}
-              activeOpacity={0.7} onPress={()=>{setStaff('any');setStep('date');}}>
+              activeOpacity={0.7} disabled={staffList.length===0} onPress={()=>{setStaff('any');setStep('date');}}>
               <View style={[s.avatar,{backgroundColor:GRAY_100}]}><Text style={{fontSize:18}}>✨</Text></View>
               <View style={{flex:1}}>
                 <Text style={s.clientName}>Any available</Text>
@@ -931,6 +1025,24 @@ function BookScreen() {
             <TouchableOpacity style={s.backBtn} onPress={()=>setStep('date')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Available times</Text>
             <Text style={[s.sub,{marginBottom:12}]}>{new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</Text>
+            <View style={[s.policyBox,{ marginBottom:14 }]}>
+              <Text style={s.policyTitle}>Custom owner time</Text>
+              <Text style={s.policyText}>Enter YYYY-MM-DD HH:mm to book outside generated calendar slots. Pick a named provider first; this can override calendar conflicts.</Text>
+              <TextInput style={[s.input,{ marginTop:10 }]} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400}
+                value={customStartsAt} onChangeText={(v)=>{setCustomStartsAt(v); setOverrideCalendar(!!v); if(v) setSlot(null);}}/>
+              <TouchableOpacity style={s.policyCheck} activeOpacity={0.7} onPress={()=>setOverrideCalendar(p=>!p)}>
+                <View style={[s.checkbox, overrideCalendar&&s.checkboxActive]}>
+                  {overrideCalendar&&<Ionicons name="checkmark" size={12} color="#fff"/>}
+                </View>
+                <Text style={s.policyCheckText}>Override availability and conflicts</Text>
+              </TouchableOpacity>
+              {customStartsAt && staff === 'any' && <Text style={[s.fieldHint,{ color:'#B45309' }]}>Choose a named provider before using a custom time.</Text>}
+              {customStartsAt && staff !== 'any' && (
+                <TouchableOpacity style={[s.btnSecondary,{ marginTop:10 }]} onPress={()=>setStep('details')}>
+                  <Text style={s.btnSecondaryText}>Use custom time</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             {loading&&<ActivityIndicator color={BRAND} style={{marginTop:20}}/>}
             {!loading&&slots.length===0&&<Text style={s.emptyText}>No availability on this date — try another</Text>}
             <View style={s.slotGrid}>
@@ -938,7 +1050,7 @@ function BookScreen() {
                 <TouchableOpacity key={sl.startsAt} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&s.slotBtnActive]}
                   onPress={()=>{setSlot(sl);setStep('details');}}>
                   <Text style={[s.slotText, slot?.startsAt===sl.startsAt&&s.slotTextActive]}>
-                    {new Date(sl.startsAtLocal).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                    {fmtTime(sl.startsAtLocal)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -951,7 +1063,7 @@ function BookScreen() {
             <View style={s.summaryBox}>
               <Text style={s.summaryTitle}>{selectedSvcs.map(s=>s.name).join(' + ')}</Text>
               <Text style={s.summarySub}>
-                {staff&&staff!=='any'?(staff as Staff).user.name:'Any available'} · {date.slice(5).replace('-','/')} at {slot&&new Date(slot.startsAtLocal).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                {staff&&staff!=='any'?(staff as Staff).user.name:'Any available'} · {customStartsAt ? customStartsAt : `${date.slice(5).replace('-','/')} at ${slot ? fmtTime(slot.startsAtLocal) : ''}`}
               </Text>
               <Text style={[s.summarySub,{marginTop:4}]}>{totalDuration(selectedSvcs)} · {totalPrice(selectedSvcs)}</Text>
             </View>
@@ -1181,7 +1293,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
           {msgs.map(m=>(
             <View key={m.id} style={[s.bubble, m.fromClient?s.bubbleLeft:s.bubbleRight]}>
               <Text style={[s.bubbleText, m.fromClient?s.bubbleTextLeft:s.bubbleTextRight]}>{m.content}</Text>
-              <Text style={s.bubbleTime}>{new Date(m.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>
+              <Text style={s.bubbleTime}>{fmtTime(m.createdAt)}</Text>
             </View>
           ))}
         </ScrollView>
@@ -1228,7 +1340,7 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
                 </View>
                 <Text style={s.sub} numberOfLines={1}>{t.lastMessage}</Text>
               </View>
-              <Text style={s.msgTime}>{new Date(t.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>
+              <Text style={s.msgTime}>{fmtTime(t.createdAt)}</Text>
             </TouchableOpacity>
           )}
         />
@@ -1311,7 +1423,7 @@ function NotificationsScreen() {
                 {!item.read && <View style={{ width:8, height:8, borderRadius:4, backgroundColor:BRAND }}/>}
               </View>
               {!!item.body && <Text style={s.sub} numberOfLines={2}>{item.body}</Text>}
-              <Text style={s.dateText}>{new Date(item.createdAt).toLocaleString([], { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })}</Text>
+              <Text style={s.dateText}>{new Date(item.createdAt).toLocaleDateString([], { month:'short', day:'numeric' })} {fmtTime(item.createdAt)}</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -2118,7 +2230,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                     </View>
                   </View>
                   <Text style={[ms.rowMeta,{ marginTop:2 }]}>{PK[p.kind] ?? p.kind}{p.client ? ` · ${p.client.name}` : ''}</Text>
-                  <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:2 }]}>{new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · {new Date(p.createdAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</Text>
+                  <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:2 }]}>{new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · {fmtTime(p.createdAt)}</Text>
                   {p.refundedCents > 0 && <Text style={[ms.rowMeta,{ color:'#B45309', marginTop:2 }]}>Refunded ${(p.refundedCents/100).toFixed(2)}</Text>}
                   {refundable && (
                     <TouchableOpacity style={[ms.methodChip,{ marginTop:10 }]} onPress={()=>refundPayment(p)}>
@@ -3001,7 +3113,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
           {selectedThread.messages.map(m => (
             <View key={m.id} style={[s.bubble, m.fromClient ? s.bubbleRight : s.bubbleLeft]}>
               <Text style={[s.bubbleText, m.fromClient ? s.bubbleTextRight : s.bubbleTextLeft]}>{m.content}</Text>
-              <Text style={s.bubbleTime}>{new Date(m.createdAt).toLocaleTimeString([],{ hour:'2-digit', minute:'2-digit' })}</Text>
+              <Text style={s.bubbleTime}>{fmtTime(m.createdAt)}</Text>
             </View>
           ))}
         </ScrollView>
@@ -3033,7 +3145,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
             <Text style={ms.cardLabel}>{a.business.name}</Text>
             <Text style={ms.cardValue}>{a.service.name}</Text>
             <Text style={ms.rowMeta}>{new Date(a.startsAt).toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric', year:'numeric' })}</Text>
-            <Text style={ms.rowMeta}>{new Date(a.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })} with {a.staff.user.name}</Text>
+            <Text style={ms.rowMeta}>{fmtTime(a.startsAt)} with {a.staff.user.name}</Text>
             <View style={{ marginTop:10, alignSelf:'flex-start' }}>
               <Pill label={a.status.replace('_',' ')} color={STATUS_COLOR[a.status] ?? GRAY_500}/>
             </View>
@@ -3090,7 +3202,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
             <View style={s.slotGrid}>
               {clientReschedule.slots.map(sl => (
                 <TouchableOpacity key={sl.startsAt} style={s.slotBtn} onPress={()=>saveClientReschedule(sl.startsAt)}>
-                  <Text style={s.slotText}>{new Date(sl.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })}</Text>
+                  <Text style={s.slotText}>{fmtTime(sl.startsAt)}</Text>
                 </TouchableOpacity>
               ))}
               {clientReschedule.slots.length===0 && <Text style={s.emptyText}>No available times for this date.</Text>}
@@ -3137,7 +3249,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
                   <View style={s.cardBody}>
                     <Text style={s.clientName}>{a.service.name}</Text>
                     <Text style={s.sub}>{a.business.name} · {a.staff.user.name}</Text>
-                    <Text style={s.dateText}>{new Date(a.startsAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' })} at {new Date(a.startsAt).toLocaleTimeString([],{ hour:'numeric', minute:'2-digit' })}</Text>
+                    <Text style={s.dateText}>{new Date(a.startsAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' })} at {fmtTime(a.startsAt)}</Text>
                   </View>
                   <Pill label={a.status.replace('_',' ')} color={STATUS_COLOR[a.status] ?? GRAY_500}/>
                 </TouchableOpacity>
@@ -3367,6 +3479,9 @@ const s = StyleSheet.create({
   summarySub:      { fontSize:13, color:'#5B21B6', marginTop:3 },
   fieldLabel:      { fontSize:13, fontWeight:'600', color:GRAY_700, marginBottom:6 },
   fieldHint:       { fontSize:11, color:GRAY_400, marginTop:5 },
+  switchRow:       { flexDirection:'row', alignItems:'center', justifyContent:'space-between', gap:12, padding:14, borderRadius:12, borderWidth:1, borderColor:GRAY_200, backgroundColor:GRAY_50 },
+  switchTitle:     { fontSize:14, fontWeight:'700', color:GRAY_900 },
+  switchSub:       { fontSize:12, color:GRAY_500, marginTop:2, lineHeight:17 },
   authSwitch:      { flexDirection:'row', justifyContent:'center', alignItems:'center', marginTop:20 },
   authSwitchText:  { fontSize:13, color:GRAY_500 },
   authSwitchLink:  { fontSize:13, color:BRAND, fontWeight:'700' },

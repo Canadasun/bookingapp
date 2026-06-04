@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { createHash } from 'crypto';
 import Stripe from 'stripe';
+import { isProPlan } from '../common/util/plan-features';
 
 @Injectable()
 export class PaymentsService {
@@ -90,9 +91,9 @@ export class PaymentsService {
     if (!apt) throw new BadRequestException('Appointment not found');
 
     const b = apt.business;
-    // Deposits / card-on-file are a PAID-plan feature. Free tier never collects
-    // money at booking (and clients can cancel at will).
-    if (b.plan === 'FREE') return { required: false, mode: 'none' as const };
+    // Deposits, no-show card-on-file, and cancellation-fee collection are Pro
+    // features. Lower tiers never collect money at booking.
+    if (!isProPlan(b.plan)) return { required: false, mode: 'none' as const };
 
     const customer = await this.ensureCustomer(apt.clientId);
 

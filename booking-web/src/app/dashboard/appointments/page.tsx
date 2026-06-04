@@ -24,6 +24,15 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
 }) {
   const [cancelReason, setCancelReason] = useState("");
   const [showCancelForm, setShowCancelForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [edit, setEdit] = useState({
+    clientName: apt.client.name,
+    clientEmail: apt.client.email,
+    clientPhone: apt.client.phone ?? "",
+    startsAt: format(new Date(apt.startsAt), "yyyy-MM-dd'T'HH:mm"),
+    notes: apt.notes ?? "",
+    notifyClient: "true",
+  });
   const [acting, setActing] = useState<string | null>(null);
 
   async function act(action: string, extra?: Record<string, string>) {
@@ -56,7 +65,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
               {format(new Date(apt.startsAt), "EEEE, MMMM d, yyyy")}
             </p>
             <p className="text-sm text-violet-600 mt-0.5">
-              {format(new Date(apt.startsAt), "h:mm a")} — {format(new Date(apt.endsAt), "h:mm a")}
+              {format(new Date(apt.startsAt), "HH:mm")} - {format(new Date(apt.endsAt), "HH:mm")}
             </p>
           </div>
 
@@ -112,11 +121,40 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
               </div>
             </div>
           )}
+
+          {showEditForm && (
+            <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Edit booking</p>
+              <Input value={edit.clientName} onChange={(e) => setEdit((p) => ({ ...p, clientName: e.target.value }))} placeholder="Client name" />
+              <Input type="email" value={edit.clientEmail} onChange={(e) => setEdit((p) => ({ ...p, clientEmail: e.target.value }))} placeholder="Client email" />
+              <Input value={edit.clientPhone} onChange={(e) => setEdit((p) => ({ ...p, clientPhone: e.target.value }))} placeholder="Client phone" />
+              <Input type="datetime-local" value={edit.startsAt} onChange={(e) => setEdit((p) => ({ ...p, startsAt: e.target.value }))} />
+              <Input value={edit.notes} onChange={(e) => setEdit((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" />
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={edit.notifyClient === "true"}
+                  onChange={(e) => setEdit((p) => ({ ...p, notifyClient: e.target.checked ? "true" : "false" }))}
+                  className="h-4 w-4 accent-violet-600"
+                />
+                Notify client by email
+              </label>
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowEditForm(false)}>Back</Button>
+                <Button size="sm" className="flex-1" loading={acting === "edit"} onClick={() => act("edit", edit)}>
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
-        {!showCancelForm && (
+        {!showCancelForm && !showEditForm && (
           <div className="px-6 py-4 border-t border-gray-100 space-y-2">
+            <Button className="w-full gap-2" variant="secondary" onClick={() => setShowEditForm(true)}>
+              Edit appointment
+            </Button>
             {apt.status === "PENDING" && (
               <Button className="w-full gap-2" loading={acting === "confirm"}
                 onClick={() => act("confirm")}>
@@ -194,6 +232,16 @@ export default function AppointmentsPage() {
       else if (action === "cancel") await api.appointments.updateStatus(bizId, id, "CANCELLED", extra?.cancelReason);
       else if (action === "complete") await api.appointments.updateStatus(bizId, id, "COMPLETED");
       else if (action === "noshow") await api.appointments.updateStatus(bizId, id, "NO_SHOW");
+      else if (action === "edit" && extra) {
+        await api.appointments.update(bizId, id, {
+          clientName: extra.clientName,
+          clientEmail: extra.clientEmail,
+          clientPhone: extra.clientPhone,
+          startsAt: extra.startsAt ? new Date(extra.startsAt).toISOString() : undefined,
+          notes: extra.notes,
+          notifyClient: extra.notifyClient !== "false",
+        });
+      }
       else if (action === "noshow-fee") {
         const res = await api.payments.chargeNoShow(id);
         if (res.charged) toast.success(`Charged no-show fee of ${formatPrice(res.feeCents)}`);
@@ -315,7 +363,7 @@ export default function AppointmentsPage() {
                 {rows.map((apt) => (
                   <button key={apt.id} onClick={() => setSelected(apt)} className="block w-full px-4 py-3 text-left hover:bg-gray-50">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-gray-900">{format(new Date(apt.startsAt), "EEE h:mm a")}</p>
+                    <p className="truncate text-sm font-semibold text-gray-900">{format(new Date(apt.startsAt), "EEE HH:mm")}</p>
                       <StatusBadge status={apt.status} />
                     </div>
                     <p className="mt-1 truncate text-sm text-gray-700">{apt.client.name}</p>
@@ -339,7 +387,7 @@ export default function AppointmentsPage() {
                   </div>
                   <p className="text-sm text-gray-500 mt-0.5">{apt.service.name} · {apt.staff.user.name}</p>
                   <p className="text-sm font-medium text-violet-600 mt-0.5">
-                    {format(new Date(apt.startsAt), "EEE, MMM d · h:mm a")} — {format(new Date(apt.endsAt), "h:mm a")}
+                    {format(new Date(apt.startsAt), "EEE, MMM d · HH:mm")} - {format(new Date(apt.endsAt), "HH:mm")}
                   </p>
                 </div>
                 <div className="text-xs text-gray-400 shrink-0">{formatPrice(apt.service.priceCents)}</div>

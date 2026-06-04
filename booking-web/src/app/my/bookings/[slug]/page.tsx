@@ -204,7 +204,7 @@ function BookingCard({ apt, past = false }: { apt: Appointment; past?: boolean }
           <StatusBadge status={apt.status} />
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{format(start, "h:mm a")}</span>
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{format(start, "HH:mm")}</span>
           <span>with {apt.staff?.user?.name}</span>
         </div>
         <p className="text-xs font-semibold text-violet-700 mt-1">

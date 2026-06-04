@@ -6,7 +6,7 @@ import { ResendEmailProvider } from './providers/email.provider';
 import { TwilioSmsProvider } from './providers/sms.provider';
 import { NOTIFICATION_QUEUE } from './notifications.service';
 import { signAppointmentToken } from '../common/util/appointment-token';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 function emailWrap(content: string) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse</title></head>
@@ -26,19 +26,29 @@ function emailWrap(content: string) {
 function aptDetails(apt: {
   service: { name: string; durationMinutes: number };
   staff: { user: { name: string } };
+  business: { timezone?: string | null };
   startsAt: Date; endsAt: Date;
 }) {
+  const tz = apt.business.timezone ?? 'UTC';
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#F8F9FA;border-radius:12px">
   <tr><td style="padding:16px 20px">
     <table width="100%">
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Service</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.service.name} (${apt.service.durationMinutes} min)</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${apt.staff.user.name}</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${format(apt.startsAt, 'EEEE, MMMM d, yyyy')}</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${format(apt.startsAt, 'h:mm a')} – ${format(apt.endsAt, 'h:mm a')}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'EEEE, MMMM d, yyyy')}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'HH:mm')} - ${formatInTimeZone(apt.endsAt, tz, 'HH:mm')}</td></tr>
     </table>
   </td></tr>
 </table>`;
+}
+
+function firstName(name: string) {
+  return name.trim().split(/\s+/)[0] || name;
+}
+
+function aptDate(apt: { startsAt: Date; business: { timezone?: string | null } }, pattern: string) {
+  return formatInTimeZone(apt.startsAt, apt.business.timezone ?? 'UTC', pattern);
 }
 
 @Processor(NOTIFICATION_QUEUE)
@@ -405,6 +415,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 
     if (!apt) return;
     this.currentBusinessId = apt.businessId;
+    const clientFirstName = firstName(apt.client.name);
 
     // SMS reminders are a PAID-plan feature (BASIC + PRO). Free tier gets email
     // reminders only — no texts to clients.
@@ -423,7 +434,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
           subject: `How was your visit to ${apt.business.name}?`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">How did we do? ⭐</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, thanks for visiting <strong>${apt.business.name}</strong>. We'd love your feedback on your ${apt.service.name} with ${apt.staff.user.name}.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, thanks for visiting <strong>${apt.business.name}</strong>. We'd love your feedback on your ${apt.service.name} with ${apt.staff.user.name}.</p>
 <a href="${baseUrl}/review/${apt.id}?token=${signAppointmentToken(apt.id)}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
 `),
         });
@@ -436,17 +447,17 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
           subject: `Booking request received — ${apt.service.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Booking request received ⏳</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your booking request has been received and is awaiting approval from <strong>${apt.business.name}</strong>. You'll get a confirmation email once it's approved.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your booking request has been received and is awaiting approval from <strong>${apt.business.name}</strong>. You'll get a confirmation email once it's approved.</p>
 ${aptDetails(apt)}
 <p style="margin:8px 0 0;color:#6B7280;font-size:13px">We'll notify you as soon as your appointment is confirmed.</p>
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}. Awaiting approval.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}. Awaiting approval.`);
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_NEW',
           title: `New booking — ${apt.client.name}`,
-          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')} — awaiting your approval.`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')} — awaiting your approval.`,
           linkUrl: '/dashboard/appointments',
         });
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
@@ -459,17 +470,17 @@ ${aptDetails(apt)}
           subject: `Appointment confirmed — ${apt.service.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">You're booked! ✓</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your appointment is confirmed.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment is confirmed.</p>
 ${aptDetails(apt)}
 <p style="margin:0;color:#6B7280;font-size:13px">You'll receive a reminder 24 hours before your appointment.</p>
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking confirmed — ${apt.client.name}`,
-          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')}`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}`,
           linkUrl: '/dashboard/appointments',
         });
         await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
@@ -483,12 +494,12 @@ ${aptDetails(apt)}
           subject: `Reminder: ${apt.service.name} tomorrow`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">See you tomorrow!</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, just a friendly reminder about your upcoming appointment.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, just a friendly reminder about your upcoming appointment.</p>
 ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${format(apt.startsAt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${aptDate(apt, 'HH:mm')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SENT');
         break;
       }
@@ -498,7 +509,7 @@ ${aptDetails(apt)}
         if (apt.client.phone && smsEnabled) {
           await this.sms.send({
             to: apt.client.phone,
-            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${format(apt.startsAt, 'h:mm a')}. ${manageUrl}`,
+            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'HH:mm')}. ${manageUrl}`,
           });
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SENT');
         }
@@ -512,17 +523,17 @@ ${aptDetails(apt)}
           subject: `Appointment cancelled — ${apt.service.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your appointment has been cancelled.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been cancelled.</p>
 ${aptDetails(apt)}
 ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Reason: <em>${apt.cancelReason}</em></p>` : ''}
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${format(apt.startsAt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking cancelled — ${apt.client.name}`,
-          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')}`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}`,
           linkUrl: '/dashboard/appointments',
         });
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
@@ -535,7 +546,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
           subject: `Your appointment was cancelled by ${apt.business.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled by business</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, ${apt.business.name} has cancelled your appointment. We apologise for the inconvenience.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, ${apt.business.name} has cancelled your appointment. We apologise for the inconvenience.</p>
 ${aptDetails(apt)}
 ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>Reason:</strong> ${apt.cancelReason}</p></div>` : ''}
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
@@ -552,16 +563,16 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
           subject: `Appointment rescheduled — ${apt.service.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#E9A23C;font-size:20px;font-weight:700">Appointment rescheduled</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${apt.client.name}, your appointment has been moved to a new time.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been moved to a new time.</p>
 ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${format(apt.startsAt, 'MMMM d, yyyy')} at ${format(apt.startsAt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking rescheduled — ${apt.client.name}`,
-          body: `${apt.service.name} moved to ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')}`,
+          body: `${apt.service.name} moved to ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}`,
           linkUrl: '/dashboard/appointments',
         });
         await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SENT');
@@ -610,7 +621,7 @@ ${aptDetails(apt)}
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_UPDATE',
           title: `Late cancellation request — ${apt.client.name}`,
-          body: `${apt.service.name} on ${format(apt.startsAt, 'MMM d')} at ${format(apt.startsAt, 'h:mm a')} — client wants to cancel past the window`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')} — client wants to cancel past the window`,
           linkUrl: '/dashboard/appointments',
         });
         break;

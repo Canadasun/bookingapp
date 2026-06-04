@@ -154,7 +154,7 @@ export default function MessagesPage() {
                   )}>
                     <p>{m.content}</p>
                     <p className={cn("text-xs mt-1", m.fromClient ? "text-gray-400" : "text-violet-200")}>
-                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
                     </p>
                   </div>
                 </div>

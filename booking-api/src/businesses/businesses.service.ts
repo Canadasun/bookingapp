@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
+import { applyPlanLimits } from '../common/util/plan-features';
 
 @Injectable()
 export class BusinessesService {
@@ -40,13 +41,20 @@ export class BusinessesService {
     return pub;
   }
 
+  async findPublicById(id: string) {
+    const business = await this.findOne(id);
+    const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
+    return pub;
+  }
+
   async update(id: string, dto: UpdateBusinessDto) {
-    await this.findOne(id);
+    const current = await this.findOne(id);
     const { bookingPageSettings, ...rest } = dto;
+    const limited = applyPlanLimits(current.plan, rest);
     return this.prisma.business.update({
       where: { id },
       data: {
-        ...rest,
+        ...limited,
         ...(bookingPageSettings !== undefined
           ? { bookingPageSettings: bookingPageSettings as Prisma.InputJsonValue }
           : {}),

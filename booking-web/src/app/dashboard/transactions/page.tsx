@@ -81,7 +81,7 @@ export default function TransactionsPage() {
                         {p.client ? ` · ${p.client.name}` : ""}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {format(new Date(p.createdAt), "MMM d, yyyy · h:mm a")}
+                        {format(new Date(p.createdAt), "MMM d, yyyy · HH:mm")}
                         {p.refundedCents > 0 && <span className="text-amber-600"> · {formatPrice(p.refundedCents)} refunded</span>}
                       </p>
                       {p.receiptUrl && (

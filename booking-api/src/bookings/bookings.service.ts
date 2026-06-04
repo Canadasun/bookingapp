@@ -9,10 +9,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
-import { CreateAppointmentDto, RescheduleDto, StatusDto } from './dto/appointment.dto';
+import { AvailabilityService } from '../availability/availability.service';
+import { CreateAppointmentDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { Prisma } from '@prisma/client';
 import { addMinutes } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 @Injectable()
 export class BookingsService {
@@ -21,6 +23,7 @@ export class BookingsService {
     private notifications: NotificationsService,
     private payments: PaymentsService,
     private events: EventsGateway,
+    private availability: AvailabilityService,
   ) {}
 
   async findAll(
@@ -72,7 +75,7 @@ export class BookingsService {
    * Creates an appointment with SERIALIZABLE isolation + SELECT FOR UPDATE
    * to guarantee exactly-once booking under concurrent requests.
    */
-  async create(businessId: string, dto: CreateAppointmentDto, opts: { confirmed?: boolean } = {}) {
+  async create(businessId: string, dto: CreateAppointmentDto, opts: { confirmed?: boolean; overrideConflicts?: boolean } = {}) {
     const primaryService = await this.prisma.service.findFirst({
       where: { id: dto.serviceId, businessId },
     });
@@ -119,7 +122,7 @@ export class BookingsService {
     if (!opts.confirmed) {
       const business = await this.prisma.business.findUnique({
         where: { id: businessId },
-        select: { minNoticeMinutes: true, maxAdvanceDays: true },
+        select: { minNoticeMinutes: true, maxAdvanceDays: true, timezone: true },
       });
       const now = Date.now();
       const minNoticeMs = (business?.minNoticeMinutes ?? 0) * 60_000;
@@ -130,6 +133,7 @@ export class BookingsService {
       if (startsAt.getTime() > now + maxAdvanceMs) {
         throw new BadRequestException('This time is too far in advance.');
       }
+      await this.assertStartsAtAvailable(dto.staffId, dto.serviceId, startsAt, endsAt, business?.timezone ?? 'UTC');
     }
 
     // Append additional service names to notes for display
@@ -158,18 +162,20 @@ export class BookingsService {
           `);
 
           // Re-check availability inside the transaction
-          const conflict = await tx.appointment.findFirst({
-            where: {
-              businessId,
-              staffId: dto.staffId,
-              status: { in: ['CONFIRMED', 'PENDING'] },
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
-            },
-          });
+          if (!opts.overrideConflicts) {
+            const conflict = await tx.appointment.findFirst({
+              where: {
+                businessId,
+                staffId: dto.staffId,
+                status: { in: ['CONFIRMED', 'PENDING'] },
+                startsAt: { lt: endsAt },
+                endsAt: { gt: startsAt },
+              },
+            });
 
-          if (conflict) {
-            throw new ConflictException('This time slot is no longer available');
+            if (conflict) {
+              throw new ConflictException('This time slot is no longer available');
+            }
           }
 
           return tx.appointment.create({
@@ -215,6 +221,7 @@ export class BookingsService {
     await this.logAction('APPOINTMENT', appointment.id, 'CREATE', {
       startsAt: appointment.startsAt,
       confirmed: !!opts.confirmed,
+      overrideConflicts: !!opts.overrideConflicts,
     });
 
     this.events.emitBookingUpdate(businessId, {
@@ -297,6 +304,7 @@ export class BookingsService {
       const maxAdvanceMs = (biz?.maxAdvanceDays ?? 365) * 24 * 60 * 60_000;
       if (startsAt.getTime() < now + minNoticeMs) throw new BadRequestException('This time is too soon — please pick a later slot.');
       if (startsAt.getTime() > now + maxAdvanceMs) throw new BadRequestException('This time is too far in advance.');
+      await this.assertStartsAtAvailable(existing.staffId, existing.serviceId, startsAt, endsAt, biz?.timezone ?? 'UTC');
     }
 
     const runReschedule = () =>
@@ -457,6 +465,76 @@ export class BookingsService {
     return { ...updated, cancelFee };
   }
 
+  async updateDetails(id: string, dto: UpdateAppointmentDto, businessId: string, userId?: string) {
+    const existing = await this.findOne(id, businessId);
+    let startsAt = existing.startsAt;
+    let endsAt = existing.endsAt;
+    let timeChanged = false;
+
+    if (dto.startsAt) {
+      const service = await this.prisma.service.findFirstOrThrow({
+        where: { id: existing.serviceId, businessId: existing.businessId },
+      });
+      startsAt = new Date(dto.startsAt);
+      endsAt = addMinutes(startsAt, service.durationMinutes);
+      timeChanged = startsAt.getTime() !== existing.startsAt.getTime();
+
+      const conflict = await this.prisma.appointment.findFirst({
+        where: {
+          businessId: existing.businessId,
+          staffId: existing.staffId,
+          status: { in: ['CONFIRMED', 'PENDING'] },
+          id: { not: id },
+          startsAt: { lt: endsAt },
+          endsAt: { gt: startsAt },
+        },
+      });
+      if (conflict) throw new ConflictException('New time slot is not available');
+    }
+
+    const updated = await this.prisma.appointment.update({
+      where: { id },
+      data: {
+        ...(dto.startsAt ? { startsAt, endsAt } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
+        ...(dto.clientName || dto.clientEmail || dto.clientPhone !== undefined
+          ? {
+              client: {
+                update: {
+                  ...(dto.clientName ? { name: dto.clientName } : {}),
+                  ...(dto.clientEmail ? { email: dto.clientEmail } : {}),
+                  ...(dto.clientPhone !== undefined ? { phone: dto.clientPhone || null } : {}),
+                },
+              },
+            }
+          : {}),
+      },
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+    });
+
+    if (timeChanged) await this.notifications.cancelReminders(id);
+    if (dto.notifyClient) {
+      if (timeChanged) await this.notifications.sendReschedule(updated);
+      else await this.notifications.sendConfirmation(updated);
+    }
+
+    await this.logAction('APPOINTMENT', id, 'UPDATE_DETAILS', {
+      fromStartsAt: existing.startsAt,
+      toStartsAt: startsAt,
+      clientUpdated: !!(dto.clientName || dto.clientEmail || dto.clientPhone !== undefined),
+      notesUpdated: dto.notes !== undefined,
+      notifiedClient: !!dto.notifyClient,
+    }, userId);
+
+    this.events.emitBookingUpdate(updated.businessId, {
+      type: 'UPDATE_DETAILS',
+      appointmentId: id,
+      status: updated.status,
+    });
+
+    return updated;
+  }
+
   // Auto-fill: when a slot opens (cancellation), notify the oldest waiting
   // waitlist entry that matches the freed service (or has no service preference).
   private async notifyWaitlist(businessId: string, serviceId: string) {
@@ -471,6 +549,42 @@ export class BookingsService {
     if (!entry) return;
     await this.prisma.waitlistEntry.update({ where: { id: entry.id }, data: { status: 'NOTIFIED' } });
     await this.notifications.notifyWaitlistOpening(entry.id);
+  }
+
+  private async assertStartsAtAvailable(staffId: string, serviceId: string, startsAt: Date, endsAt: Date, timezone: string) {
+    const day = formatInTimeZone(startsAt, timezone, 'yyyy-MM-dd');
+    const slots = await this.availability.getAvailableSlots({
+      staffId,
+      serviceId,
+      startDate: day,
+      endDate: day,
+      timezone,
+    });
+    if (!slots.some((slot) => slot.startsAt.getTime() === startsAt.getTime())) {
+      throw new BadRequestException('This time is outside the business availability. Please choose another slot.');
+    }
+    const localStartDay = formatInTimeZone(startsAt, timezone, 'yyyy-MM-dd');
+    const localEndDay = formatInTimeZone(endsAt, timezone, 'yyyy-MM-dd');
+    if (localStartDay !== localEndDay) {
+      throw new BadRequestException('This appointment must fit within one business day.');
+    }
+
+    const dayOfWeek = Number(formatInTimeZone(startsAt, timezone, 'i')) % 7;
+    const localStart = formatInTimeZone(startsAt, timezone, 'HH:mm');
+    const localEnd = formatInTimeZone(endsAt, timezone, 'HH:mm');
+    const rules = await this.prisma.availabilityRule.findMany({ where: { staffId, dayOfWeek } });
+    const effectiveRules = rules.length ? rules : [{ startTime: '09:00', endTime: '17:00' }];
+    const fitsRule = effectiveRules.some((rule) => localStart >= rule.startTime && localEnd <= rule.endTime);
+    if (!fitsRule) {
+      throw new BadRequestException('This appointment is longer than the available calendar window.');
+    }
+
+    const timeOff = await this.prisma.timeOff.findFirst({
+      where: { staffId, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+    });
+    if (timeOff) {
+      throw new BadRequestException('This time overlaps staff time off.');
+    }
   }
 
   private async logAction(entityType: string, entityId: string, action: string, changes?: any, userId?: string) {

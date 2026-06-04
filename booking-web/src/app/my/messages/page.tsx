@@ -101,7 +101,7 @@ export default function ClientMessagesPage() {
                   m.fromClient ? "bg-violet-600 text-white rounded-tr-sm" : "bg-white border border-gray-100 text-gray-800 rounded-tl-sm shadow-sm")}>
                   <p>{m.content}</p>
                   <p className={cn("text-xs mt-1", m.fromClient ? "text-violet-200" : "text-gray-400")}>
-                    {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
                   </p>
                 </div>
               </div>

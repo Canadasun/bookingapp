@@ -5,11 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
+import { AvailabilityService } from '../availability/availability.service';
 
 // 7 days out: within the default 60-day max-advance and past the 120-min notice
 // window, so public-booking policy checks pass.
 const SLOT_START = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 const SLOT_END = new Date(SLOT_START.getTime() + 60 * 60 * 1000);
+
+const mockAvailability = () => ({
+  getAvailableSlots: jest.fn().mockResolvedValue([
+    { startsAt: SLOT_START, endsAt: SLOT_END, startsAtLocal: '', endsAtLocal: '' },
+  ]),
+});
 
 function makeAppointment(overrides = {}) {
   return {
@@ -77,7 +84,7 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }),
     },
     business: {
-      findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60, allowClientReschedule: true }),
+      findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60, allowClientReschedule: true, timezone: 'UTC' }),
     },
     appointment: {
       findMany: jest.fn().mockResolvedValue([makeAppointment()]),
@@ -95,6 +102,12 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({}),
     },
+    availabilityRule: {
+      findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]),
+    },
+    timeOff: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => {
       return fn(txMock);
@@ -109,6 +122,7 @@ async function buildService(prismaOverrides = {}, conflictExists = false) {
       BookingsService,
       { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
       { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
+      { provide: AvailabilityService, useValue: mockAvailability() },
       { provide: PrismaService, useValue: prisma },
       {
         provide: NotificationsService,
@@ -199,8 +213,10 @@ describe('BookingsService', () => {
         staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }) },
         client: { findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }) },
         staffService: { findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
-        business: { findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60 }) },
+        business: { findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60, timezone: 'UTC' }) },
         appointment: { findFirst: jest.fn().mockResolvedValue(makeAppointment()) },
+        availabilityRule: { findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]) },
+        timeOff: { findFirst: jest.fn().mockResolvedValue(null) },
         auditLog: { create: jest.fn().mockResolvedValue({}) },
         $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock)),
       };
@@ -210,6 +226,7 @@ describe('BookingsService', () => {
           BookingsService,
           { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
+          { provide: AvailabilityService, useValue: mockAvailability() },
           { provide: PrismaService, useValue: prisma },
           {
             provide: NotificationsService,
@@ -257,6 +274,7 @@ describe('BookingsService', () => {
           BookingsService,
           { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
+          { provide: AvailabilityService, useValue: mockAvailability() },
           { provide: PrismaService, useValue: mockPrisma() },
           {
             provide: NotificationsService,
@@ -345,6 +363,7 @@ describe('BookingsService', () => {
           BookingsService,
           { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
+          { provide: AvailabilityService, useValue: mockAvailability() },
           { provide: PrismaService, useValue: mockPrisma() },
           {
             provide: NotificationsService,

@@ -42,6 +42,8 @@ export default function CheckoutPage() {
   const [selectedStaff, setSelectedStaff]     = useState<StaffMember | "any" | null>(null);
   const [selectedDate, setSelectedDate]       = useState<Date | undefined>();
   const [selectedSlot, setSelectedSlot]       = useState<Slot | null>(null);
+  const [customStartsAt, setCustomStartsAt]   = useState("");
+  const [overrideCalendar, setOverrideCalendar] = useState(false);
 
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting]     = useState(false);
@@ -59,8 +61,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!bizId || selectedServices.length === 0) { setStaffList([]); return; }
     api.staff.listAll(bizId).then((all) => {
-      const ids = new Set(selectedServices.map((s) => s.id));
-      setStaffList(all.filter((st) => st.active && st.staffServices.some((ss) => ids.has(ss.serviceId))));
+      const ids = selectedServices.map((s) => s.id);
+      setStaffList(all.filter((st) => st.active && ids.every((id) => st.staffServices.some((ss) => ss.serviceId === id))));
     }).catch(() => {});
   }, [bizId, selectedServices]);
 
@@ -113,15 +115,32 @@ export default function CheckoutPage() {
   }
 
   async function confirm() {
-    if (!bizId || !selectedSlot || selectedServices.length === 0) return;
+    if (!bizId || selectedServices.length === 0) return;
+    if (customStartsAt && selectedStaff === "any") {
+      toast.error("Choose a named provider before using a custom time");
+      return;
+    }
+    const customDate = customStartsAt ? new Date(customStartsAt) : null;
+    if (customStartsAt && Number.isNaN(customDate?.getTime())) {
+      toast.error("Enter a valid custom date and time");
+      return;
+    }
+    const startsAt = customDate ? customDate.toISOString() : selectedSlot?.startsAt;
+    if (!startsAt) {
+      toast.error("Choose an available time or enter a custom owner time");
+      return;
+    }
     setSubmitting(true);
     try {
       const client = await createOrGetClient();
       if (!client) return;
       const staffId = selectedStaff && selectedStaff !== "any" ? selectedStaff.id : staffList[0]?.id;
+      if (!staffId) { toast.error("Choose a provider before booking"); return; }
       const apt = await api.appointments.createManual(bizId, {
         staffId, serviceId: selectedServices[0].id,
-        clientId: client.id, startsAt: selectedSlot.startsAt,
+        additionalServiceIds: selectedServices.slice(1).map((s) => s.id),
+        clientId: client.id, startsAt,
+        allowOverride: overrideCalendar || !!customStartsAt,
       });
       setBooked(apt);
       toast.success("Appointment booked & confirmed!");
@@ -133,6 +152,7 @@ export default function CheckoutPage() {
   function reset() {
     setStep("client"); setSelectedClient(null); setSelectedServices([]);
     setSelectedStaff(null); setSelectedDate(undefined); setSelectedSlot(null);
+    setCustomStartsAt(""); setOverrideCalendar(false);
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
     setNewClientMode(false); setNewClient({ name: "", email: "", phone: "" });
   }
@@ -154,8 +174,8 @@ export default function CheckoutPage() {
         </p>
         <p className="text-xs text-gray-400 font-mono mb-6">#{booked.id.slice(-8).toUpperCase()}</p>
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
-          {selectedDate && <p className="text-gray-700"><span className="text-gray-400">Date: </span>{format(selectedDate, "EEE, MMM d, yyyy")}</p>}
-          {selectedSlot && <p className="text-gray-700"><span className="text-gray-400">Time: </span>{format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}</p>}
+          {(selectedDate || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Date: </span>{format(customStartsAt ? new Date(customStartsAt) : selectedDate!, "EEE, MMM d, yyyy")}</p>}
+          {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "HH:mm") : format(parseISO(selectedSlot!.startsAtLocal), "HH:mm")}</p>}
           <p className="text-gray-700"><span className="text-gray-400">Duration: </span>{fmtDuration(totalMins)}</p>
           <p className="font-semibold text-violet-700"><span className="text-gray-400">Total: </span>{fmtPrice(totalCents)}</p>
         </div>
@@ -395,7 +415,7 @@ export default function CheckoutPage() {
                           selectedSlot?.startsAt === sl.startsAt
                             ? "bg-violet-600 text-white border-violet-600"
                             : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50")}>
-                        {format(parseISO(sl.startsAtLocal), "h:mm")}
+                        {format(parseISO(sl.startsAtLocal), "HH:mm")}
                         <span className="text-[10px] block">{format(parseISO(sl.startsAtLocal), "a")}</span>
                       </button>
                     ))}
@@ -403,6 +423,28 @@ export default function CheckoutPage() {
                 )}
               </div>
             )}
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">Custom owner time</p>
+              <p className="mt-1 text-xs text-amber-700">Use this when you want to book outside the normal calendar slots. Choose a specific provider first; this can override availability and double-book conflicts.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <Input
+                  type="datetime-local"
+                  value={customStartsAt}
+                  onChange={(e) => { setCustomStartsAt(e.target.value); setSelectedSlot(null); setOverrideCalendar(!!e.target.value); }}
+                  disabled={selectedStaff === "any"}
+                />
+                <label className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700">
+                  <input type="checkbox" checked={overrideCalendar} onChange={(e) => setOverrideCalendar(e.target.checked)} className="h-4 w-4 accent-violet-600" />
+                  Override
+                </label>
+              </div>
+              {selectedStaff === "any" && <p className="mt-2 text-xs text-amber-700">Pick a named provider before using a custom time.</p>}
+              {customStartsAt && selectedStaff !== "any" && (
+                <Button type="button" variant="secondary" className="mt-3 w-full sm:w-auto" onClick={() => setStep("confirm")}>
+                  Use custom time
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -419,8 +461,9 @@ export default function CheckoutPage() {
                 { label: "Client", value: selectedClient?.name ?? newClient.name, icon: User },
                 { label: "Services", value: selectedServices.map(s => s.name).join(", "), icon: Check },
                 { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
-                { label: "Date", value: selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
-                { label: "Time", value: selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "h:mm a") : "—", icon: Check },
+                { label: "Date", value: customStartsAt ? format(new Date(customStartsAt), "EEE, MMM d, yyyy") : selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
+                { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "HH:mm") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "HH:mm") : "—", icon: Check },
+                { label: "Calendar", value: customStartsAt || overrideCalendar ? "Owner override" : "Available slot", icon: Check },
                 { label: "Total", value: fmtPrice(totalCents), icon: Check },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between py-2.5 border-b border-gray-50 last:border-0">

@@ -34,7 +34,7 @@ function TimelineSlot({ apt }: { apt: Appointment }) {
   return (
     <div className={`flex items-start gap-3 py-3 border-b border-gray-50 last:border-0 ${past ? "opacity-50" : ""}`}>
       <div className="w-14 shrink-0 text-right pt-0.5">
-        <span className="text-xs font-semibold text-gray-500">{format(start, "h:mm")}</span>
+        <span className="text-xs font-semibold text-gray-500">{format(start, "HH:mm")}</span>
         <span className="text-xs text-gray-400">{format(start, "a")}</span>
       </div>
       <div className="flex flex-col items-center pt-1.5 gap-1">
@@ -261,7 +261,7 @@ export default function OverviewPage() {
               <p className="py-10 text-sm text-gray-400 text-center">No upcoming appointments</p>
             ) : upcoming.map((apt) => (
               <div key={apt.id} className="px-5 py-3">
-                <p className="text-xs font-semibold text-violet-600">{format(new Date(apt.startsAt), "EEE, MMM d · h:mm a")}</p>
+                <p className="text-xs font-semibold text-violet-600">{format(new Date(apt.startsAt), "EEE, MMM d · HH:mm")}</p>
                 <p className="text-sm font-medium text-gray-800 mt-0.5 truncate">{apt.client.name}</p>
                 <p className="text-xs text-gray-500 truncate">{apt.service.name} · {apt.staff.user.name}</p>
               </div>

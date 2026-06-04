@@ -185,11 +185,7 @@ export default function LoginPage() {
               <LoginForm />
             </Suspense>
 
-            <p className="text-center text-sm text-gray-500 mt-6">
-              Want to book an appointment?{" "}
-              <Link href="/book" className="text-violet-600 hover:underline font-medium">Book here</Link>
-            </p>
-            <p className="text-center text-xs text-gray-500 mt-3">
+            <p className="text-center text-xs text-gray-500 mt-6">
               <Link href="/register" className="text-violet-600 hover:underline font-medium transition-colors">Create business account</Link>
             </p>
           </CardContent>
