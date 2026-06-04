@@ -98,6 +98,9 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       create: jest.fn().mockResolvedValue(makeAppointment()),
       update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
     },
+    payment: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     waitlistEntry: {
       findFirst: jest.fn().mockResolvedValue(null),
       update: jest.fn().mockResolvedValue({}),
@@ -304,6 +307,28 @@ describe('BookingsService', () => {
       const { svc } = await buildService();
       const result = await svc.confirm('apt1', 'biz1');
       expect(result.status).toBe('CONFIRMED');
+    });
+
+    it('rejects confirmation when a Basic+ mandatory deposit has not been paid', async () => {
+      const { svc } = await buildService({
+        appointment: {
+          ...mockPrisma().appointment,
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({
+            business: {
+              id: 'biz1',
+              plan: 'BASIC',
+              requireDeposit: true,
+              minNoticeMinutes: 120,
+              maxAdvanceDays: 60,
+              allowClientReschedule: true,
+              cancellationWindowHours: 24,
+              cancellationFeeCents: 0,
+            },
+          })),
+        },
+      });
+
+      await expect(svc.confirm('apt1', 'biz1')).rejects.toThrow(BadRequestException);
     });
   });
 

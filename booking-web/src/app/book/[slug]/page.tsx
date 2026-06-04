@@ -254,9 +254,17 @@ function BookPageInner({ slug }: { slug: string }) {
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before
       // showing the confirmation. Otherwise (default) go straight to success.
-      const intent = await api.payments.bookingIntent(apt.id, bizId).catch(() => null);
+      const requiresDeposit = !!biz?.requireDeposit;
+      const intent = await api.payments.bookingIntent(apt.id, bizId).catch((e) => {
+        if (requiresDeposit) {
+          throw e;
+        }
+        return null;
+      });
       if (intent?.required && intent.clientSecret && intent.publishableKey) {
         setPayInfo(intent);
+      } else if (requiresDeposit || intent?.required) {
+        toast.error("This booking requires a deposit, but payment is not available. Please contact the business.");
       } else {
         setStep(4);
       }

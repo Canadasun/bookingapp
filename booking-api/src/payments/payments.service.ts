@@ -104,7 +104,7 @@ export class PaymentsService {
         currency: 'usd',
         customer,
         receipt_email: apt.client.email, // Stripe emails the official receipt on success
-        setup_future_usage: 'off_session', // save the card for a possible no-show charge
+        ...(isProPlan(b.plan) ? { setup_future_usage: 'off_session' as const } : {}),
         // Card-only: no redirect-based methods, so the client can confirm without
         // supplying a return_url.
         automatic_payment_methods: { enabled: true, allow_redirects: 'never' },

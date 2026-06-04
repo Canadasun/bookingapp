@@ -128,6 +128,17 @@ export default function SettingsPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!bizId) return;
+    if (form.requireDeposit && !isPaid) {
+      promptUpgrade("BASIC", "Mandatory deposits");
+      return;
+    }
+    if (form.requireDeposit) {
+      const pct = Number(form.depositPercent);
+      if (!Number.isInteger(pct) || pct < 1 || pct > 100) {
+        toast.error("Deposit percentage must be between 1 and 100.");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const updated = await api.business.update(bizId, form);

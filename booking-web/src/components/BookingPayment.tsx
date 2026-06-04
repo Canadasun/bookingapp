@@ -62,8 +62,11 @@ export function BookingPayment({ info, onPaid }: { info: PayInfo; onPaid: () => 
   );
 
   if (!stripePromise || !info.clientSecret) {
-    // Misconfigured (no key) — fail open so the booking still completes.
-    return null;
+    return (
+      <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+        Payment is required for this booking, but the payment provider is not configured. Please contact the business before booking.
+      </div>
+    );
   }
 
   return (

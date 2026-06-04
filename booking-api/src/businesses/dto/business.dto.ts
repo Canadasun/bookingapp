@@ -30,7 +30,7 @@ export const CreateBusinessSchema = z.object({
   maxAdvanceDays: z.number().int().positive().default(60),
   cancellationWindowHours: z.number().int().nonnegative().default(24),
   requireDeposit: z.boolean().default(false),
-  depositPercent: z.number().int().min(0).max(100).default(25),
+  depositPercent: z.number().int().min(1).max(100).default(25),
   noShowFeeCents: z.number().int().nonnegative().default(0),
   cancellationFeeCents: z.number().int().nonnegative().default(0),
   allowClientReschedule: z.boolean().default(true),

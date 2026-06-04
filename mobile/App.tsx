@@ -1534,6 +1534,23 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   async function saveSettings() {
     if (!settingsEditor) return;
+    const plan = ((biz as any)?.plan ?? 'FREE') as 'FREE'|'BASIC'|'PRO';
+    const depositPercent = Number.parseInt(settingsEditor.depositPercent, 10);
+    if (settingsEditor.requireDeposit && plan === 'FREE') {
+      Alert.alert(
+        'Upgrade required',
+        'Mandatory deposits are available on Basic and Pro.',
+        [
+          { text:'Cancel', style:'cancel' },
+          { text:'View plans', onPress:()=>Linking.openURL(`${WEB_URL}/dashboard/settings?tab=billing`) },
+        ],
+      );
+      return;
+    }
+    if (settingsEditor.requireDeposit && (!Number.isInteger(depositPercent) || depositPercent < 1 || depositPercent > 100)) {
+      Alert.alert('Check deposit', 'Deposit percent must be between 1 and 100.');
+      return;
+    }
     try {
       const payload = {
         name: settingsEditor.name.trim(),
@@ -1544,7 +1561,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         maxAdvanceDays: Number.parseInt(settingsEditor.maxAdvanceDays, 10),
         cancellationWindowHours: Number.parseInt(settingsEditor.cancellationWindowHours, 10),
         requireDeposit: settingsEditor.requireDeposit,
-        depositPercent: Number.parseInt(settingsEditor.depositPercent, 10),
+        depositPercent,
       };
       if (!payload.name || !payload.email || !Number.isFinite(payload.minNoticeMinutes) || !Number.isFinite(payload.maxAdvanceDays)) {
         Alert.alert('Check settings', 'Business name, email, notice, and advance window are required.');

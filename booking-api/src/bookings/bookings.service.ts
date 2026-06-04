@@ -12,6 +12,7 @@ import { EventsGateway } from '../events/events.gateway';
 import { AvailabilityService } from '../availability/availability.service';
 import { CreateAppointmentDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
+import { isPaidPlan } from '../common/util/plan-features';
 import { Prisma } from '@prisma/client';
 import { addMinutes } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -248,6 +249,19 @@ export class BookingsService {
 
   async confirm(id: string, businessId?: string, userId?: string) {
     const apt = await this.findOne(id, businessId);
+    if (isPaidPlan(apt.business.plan) && apt.business.requireDeposit && apt.status === 'PENDING') {
+      const paidDeposit = await this.prisma.payment.findFirst({
+        where: {
+          appointmentId: id,
+          businessId: apt.businessId,
+          kind: 'DEPOSIT',
+          status: 'SUCCEEDED',
+        },
+      });
+      if (!paidDeposit) {
+        throw new BadRequestException('This booking requires a paid deposit before it can be confirmed.');
+      }
+    }
     const updated = await this.prisma.appointment.update({
       where: { id },
       data: { status: 'CONFIRMED' },
