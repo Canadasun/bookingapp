@@ -72,6 +72,16 @@ export class AvailabilityService {
       }),
     ]);
 
+    // Honest default: a staff with NO configured availability rules is treated as
+    // open during standard hours (every day, 9–5) so an owner can book right away
+    // before they've set up a schedule — instead of "no availability" on a brand
+    // new business. Any explicitly configured rules always take precedence.
+    const effectiveRules: AvailabilityRule[] = rules.length > 0
+      ? rules
+      : [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+          id: `default-${staffId}-${d}`, staffId, dayOfWeek: d, startTime: '09:00', endTime: '17:00',
+        }));
+
     const slots: TimeSlot[] = [];
     
     // To catch all possible slots that overlap with the UTC range [rangeStart, rangeEnd],
@@ -82,7 +92,7 @@ export class AvailabilityService {
     while (isBefore(cursor, searchEnd)) {
       const localDay = toZonedTime(cursor, businessTimezone);
       const dayOfWeek = getDay(localDay);
-      const dayRules = rules.filter((r) => r.dayOfWeek === dayOfWeek);
+      const dayRules = effectiveRules.filter((r) => r.dayOfWeek === dayOfWeek);
 
       for (const rule of dayRules) {
         const daySlots = this.generateDaySlots(
