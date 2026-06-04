@@ -116,10 +116,12 @@ export class StaffService {
     return this.prisma.staff.update({ where: { id: staff.id }, data: { active: false } });
   }
 
-  // Permanently remove a provider. Blocked for the owner (always a provider) and
-  // for providers with bookings (Appointment→Staff is Restrict to protect history
-  // — deactivate those instead). Removes the staff record + their login account.
-  async remove(id: string, businessId?: string) {
+  // Permanently remove a provider + their login. Never allowed for the owner.
+  // A provider with bookings can't be deleted outright (Appointment→Staff is
+  // Restrict, to protect history) — but with { force } the owner can delete them
+  // anyway: their bookings are first moved to the owner's own provider record
+  // (created if needed), so nothing is lost.
+  async remove(id: string, businessId?: string, opts: { force?: boolean } = {}) {
     const staff = await this.findOne(id, businessId);
     const user = await this.prisma.user.findUnique({ where: { id: staff.userId }, select: { role: true } });
     if (user?.role === 'OWNER') {
@@ -127,13 +129,38 @@ export class StaffService {
     }
     const aptCount = await this.prisma.appointment.count({ where: { staffId: staff.id } });
     if (aptCount > 0) {
-      throw new BadRequestException('This provider has bookings — deactivate them instead of deleting, to keep your booking history.');
+      if (!opts.force) {
+        // Surface a structured reason so the dashboard can offer the move-and-delete.
+        throw new BadRequestException({
+          code: 'HAS_BOOKINGS',
+          message: `This provider has ${aptCount} booking${aptCount > 1 ? 's' : ''}. Delete anyway and move ${aptCount > 1 ? 'them' : 'it'} to you (the owner)?`,
+        });
+      }
+      const ownerStaffId = await this.ensureOwnerProvider(staff.businessId);
+      if (ownerStaffId !== staff.id) {
+        await this.prisma.appointment.updateMany({ where: { staffId: staff.id }, data: { staffId: ownerStaffId } });
+      }
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.staff.delete({ where: { id: staff.id } });       // cascades services/availability/time-off
       await tx.user.delete({ where: { id: staff.userId } });    // remove their login too
     });
     return { ok: true };
+  }
+
+  // The owner is the fallback provider (sole-proprietor model). Ensure they have
+  // an active Staff record and return its id, so a departing provider's bookings
+  // have somewhere to go.
+  private async ensureOwnerProvider(businessId: string): Promise<string> {
+    const owner = await this.prisma.user.findFirst({ where: { businessId, role: 'OWNER' } });
+    if (!owner) throw new BadRequestException('No owner account found to receive the bookings.');
+    const existing = await this.prisma.staff.findUnique({ where: { userId: owner.id } });
+    if (existing) {
+      if (!existing.active) await this.prisma.staff.update({ where: { id: existing.id }, data: { active: true } });
+      return existing.id;
+    }
+    const created = await this.prisma.staff.create({ data: { businessId, userId: owner.id, active: true } });
+    return created.id;
   }
 
   findAllIncludingInactive(businessId: string) {

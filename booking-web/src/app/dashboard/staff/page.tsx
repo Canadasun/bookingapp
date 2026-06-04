@@ -96,9 +96,27 @@ export default function StaffPage() {
 
   async function removeStaff(s: StaffMember) {
     if (!bizId) return;
-    if (!confirm(`Permanently delete ${s.user.name}? This removes their profile and login. (Providers with bookings can't be deleted — deactivate them instead.)`)) return;
-    try { await api.staff.remove(bizId, s.id); toast.success("Provider deleted"); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    if (!confirm(`Permanently delete ${s.user.name}? This removes their profile and login.`)) return;
+    try {
+      await api.staff.remove(bizId, s.id);
+      toast.success("Provider deleted");
+      load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed";
+      // If blocked only because they still have bookings, offer to move those
+      // bookings to the owner and delete anyway.
+      if (/booking/i.test(msg)) {
+        if (confirm(msg)) {
+          try {
+            await api.staff.remove(bizId, s.id, true);
+            toast.success("Provider deleted — their bookings were moved to you");
+            load();
+          } catch (e2) { toast.error(e2 instanceof Error ? e2.message : "Failed"); }
+        }
+        return;
+      }
+      toast.error(msg);
+    }
   }
 
   function toggleService(id: string) {

@@ -330,6 +330,7 @@ model User {
   phone        String?
   role         Role     @default(CLIENT)
   businessId   String?
+  avatarUrl    String?
   emailVerified Boolean @default(false)
   mustResetPassword Boolean @default(false)
   twoFactorEnabled  Boolean @default(false)

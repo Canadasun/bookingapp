@@ -285,6 +285,13 @@ export const api = {
     },
   },
 
+  users: {
+    // The signed-in user's own profile (account page).
+    me: () => req<{ id: string; email: string; name: string; phone?: string | null; role: string; businessId: string | null; avatarUrl?: string | null; createdAt: string }>("/users/me"),
+    updateMe: (data: { name?: string; phone?: string; avatarUrl?: string | null }) =>
+      req<{ id: string; email: string; name: string; phone?: string | null; role: string; businessId: string | null; avatarUrl?: string | null }>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
+  },
+
   notifications: {
     list: () => req<NotificationItem[]>("/notifications"),
     unreadCount: () => req<{ count: number }>("/notifications/unread-count"),
@@ -477,8 +484,9 @@ export const api = {
       req<{ staff: StaffMember; tempPassword: string }>(`/businesses/${businessId}/staff/invite`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean }) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    remove: (businessId: string, id: string) =>
-      req<{ ok: boolean }>(`/businesses/${businessId}/staff/${id}`, { method: "DELETE" }),
+    // force=true moves the provider's bookings to the owner, then deletes them.
+    remove: (businessId: string, id: string, force?: boolean) =>
+      req<{ ok: boolean }>(`/businesses/${businessId}/staff/${id}`, { method: "DELETE", ...(force ? { body: JSON.stringify({ force: true }) } : {}) }),
     assignServices: (businessId: string, staffId: string, serviceIds: string[]) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${staffId}/services`, { method: "POST", body: JSON.stringify({ serviceIds }) }),
     setAvailability: (businessId: string, staffId: string, rules: { dayOfWeek: number; startTime: string; endTime: string }[]) =>

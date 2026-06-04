@@ -38,21 +38,22 @@ function groupSlots<T extends Slot>(slots: T[]) {
 }
 
 // ── Step indicator ────────────────────────────────────────────────────────────
-const STEPS = ["Services", "Staff", "Date & Time", "Details"];
-function StepBar({ step }: { step: number }) {
+// Labels are dynamic: sole-proprietors never see a "Provider" step.
+function StepBar({ labels, current }: { labels: string[]; current: number }) {
+  const STEPS = labels;
   return (
     <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
       {STEPS.map((label, i) => (
         <div key={label} className="flex items-center gap-2 shrink-0">
           <div className={cn(
             "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
-            i < step ? "bg-violet-600 text-white" :
-            i === step ? "bg-violet-600 text-white ring-4 ring-violet-100" :
+            i < current ? "bg-violet-600 text-white" :
+            i === current ? "bg-violet-600 text-white ring-4 ring-violet-100" :
             "bg-gray-100 text-gray-400",
           )}>
-            {i < step ? <Check className="w-3.5 h-3.5" /> : i + 1}
+            {i < current ? <Check className="w-3.5 h-3.5" /> : i + 1}
           </div>
-          <span className={cn("text-sm font-medium shrink-0", i === step ? "text-gray-900" : "text-gray-400")}>{label}</span>
+          <span className={cn("text-sm font-medium shrink-0", i === current ? "text-gray-900" : "text-gray-400")}>{label}</span>
           {i < STEPS.length - 1 && <ChevronRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />}
         </div>
       ))}
@@ -111,6 +112,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [biz, setBiz]                 = useState<Business | null>(null);
   const [bizId, setBizId]             = useState<string>("");
   const [allServices, setAllServices] = useState<Service[]>([]);
+  const [activeStaff, setActiveStaff] = useState<StaffMember[]>([]);
   const [staffList, setStaffList]     = useState<StaffMember[]>([]);
   const [slots, setSlots]             = useState<BookingSlot[]>([]);
 
@@ -159,15 +161,20 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     api.reviews.list(bizId).then(setRevStats).catch(() => {});
   }, [bizId]);
 
-  // Load staff when services selected
+  // Load the business's active providers once (the public endpoint returns active
+  // only). Their count decides whether this is a sole-proprietor (show the salon
+  // name, no provider step) or a multi-provider business (let the client choose).
   useEffect(() => {
-    if (!bizId || selectedServices.length === 0) { setStaffList([]); return; }
-    api.staff.list(bizId).then((all) => {
-      // A provider with no explicit service assignments offers everything
-      // (sole-proprietor model) — otherwise match the assigned services.
-      setStaffList(all.filter((st) => st.staffServices.length === 0 || selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))));
-    }).catch(() => {});
-  }, [bizId, selectedServices]);
+    if (!bizId) { setActiveStaff([]); return; }
+    api.staff.list(bizId).then(setActiveStaff).catch(() => {});
+  }, [bizId]);
+
+  // Service-filtered providers for the picker: a provider with no explicit service
+  // assignments offers everything (sole-proprietor) — otherwise match assignments.
+  useEffect(() => {
+    if (selectedServices.length === 0) { setStaffList([]); return; }
+    setStaffList(activeStaff.filter((st) => st.staffServices.length === 0 || selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))));
+  }, [activeStaff, selectedServices]);
 
   // Reschedule prefill
   useEffect(() => {
@@ -321,6 +328,21 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const totalCents  = selectedServices.reduce((s, x) => s + x.priceCents, 0);
   const policy      = biz?.cancellationPolicy ?? "Appointments cancelled within 24 hours may be subject to a cancellation fee.";
 
+  // Sole-proprietor first: the provider step + per-person names only appear once
+  // the business has 2+ providers. Below that, the business books under its own
+  // (salon) name. With 2+, the chosen person shows with the salon in brackets.
+  const multiProvider = activeStaff.length >= 2;
+  const salonName     = biz?.name ?? "your provider";
+  function providerText(staffName?: string): string {
+    if (!multiProvider) return salonName;
+    return staffName ? `${staffName} (${salonName})` : salonName;
+  }
+  const chosenStaffName = selectedStaff && selectedStaff !== "any"
+    ? (selectedStaff as StaffMember).user.name
+    : selectedSlot?.staffName;
+  const stepLabels  = multiProvider ? ["Services", "Provider", "Date & Time", "Details"] : ["Services", "Date & Time", "Details"];
+  const visualStep  = multiProvider ? step : (step === 0 ? 0 : step - 1);
+
   return (
     <div className={isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]"}>
       {/* Nav — hidden in embed mode (the widget lives on the salon's own site) */}
@@ -387,7 +409,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   title={`${selectedServices.map(s => s.name).join(" + ")} at ${biz?.name ?? "Salon"}`}
                   startsAt={booking.startsAt}
                   endsAt={booking.endsAt}
-                  description={`With ${selectedSlot.staffName ?? (selectedStaff !== "any" && selectedStaff ? (selectedStaff as { user: { name: string } }).user.name : "staff")}`}
+                  description={`With ${providerText(chosenStaffName)}`}
                   location={biz?.address}
                 />
               )}
@@ -412,7 +434,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-6 pt-6 pb-4">
-              <StepBar step={step} />
+              <StepBar labels={stepLabels} current={visualStep} />
             </div>
 
             {/* ── Step 0: Services ──────────────────────────────────────── */}
@@ -499,7 +521,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
                 <div className="mt-5">
                   <button
-                    onClick={() => { if (staffList.length > 1) { setStep(1); } else { setSelectedStaff(staffList[0] ?? "any"); setStep(2); } }}
+                    onClick={() => { if (multiProvider) { setStep(1); } else { setSelectedStaff(activeStaff[0] ?? "any"); setStep(2); } }}
                     disabled={selectedServices.length === 0}
                     className="w-full py-3.5 rounded-xl bg-violet-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-violet-700 transition-colors">
                     Continue — {selectedServices.length > 0 ? `${selectedServices.length} service${selectedServices.length > 1 ? "s" : ""} · ${fmtPrice(totalCents)}` : "select services"}
@@ -554,7 +576,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         {st.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
+                        <p className="font-semibold text-sm text-gray-900">{st.user.name} <span className="font-normal text-gray-400">({salonName})</span></p>
                         {st.bio && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{st.bio}</p>}
                       </div>
                       <ChevronRight className="w-4 h-4 text-gray-300" />
@@ -567,7 +589,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 2: Date + Time ───────────────────────────────────── */}
             {step === 2 && (
               <div className="px-6 pb-6">
-                <button onClick={() => setStep(staffList.length > 1 ? 1 : 0)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
+                <button onClick={() => setStep(multiProvider ? 1 : 0)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Pick a date &amp; time</h2>
@@ -665,8 +687,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       <p className="text-violet-600 mt-0.5">
                         {selectedDate && format(selectedDate, "EEE, MMM d")}
                         {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal), "HH:mm")}`}
-                        {selectedStaff !== "any" && selectedStaff && ` · ${(selectedStaff as StaffMember).user.name}`}
-                        {selectedStaff === "any" && selectedSlot?.staffName && ` · ${selectedSlot.staffName}`}
+                        {` · ${providerText(chosenStaffName)}`}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

@@ -8,17 +8,22 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, createdAt: true },
+      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true, createdAt: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
-  async update(id: string, data: { name?: string; phone?: string }) {
+  async update(id: string, data: { name?: string; phone?: string; avatarUrl?: string | null }) {
     return this.prisma.user.update({
       where: { id },
-      data,
-      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true },
+      // Only write fields that were actually provided (avatarUrl may be null to clear).
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+      },
+      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true },
     });
   }
 

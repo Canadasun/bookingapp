@@ -116,11 +116,12 @@ export class StaffController {
     @Param('id') id: string,
     @Param('businessId') businessId: string,
     @CurrentUser() user: { role: string; businessId: string | null },
+    @Body() body: { force?: boolean },
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.staffService.remove(id, businessId);
+    return this.staffService.remove(id, businessId, { force: body?.force === true });
   }
 
   @Post(':id/services')

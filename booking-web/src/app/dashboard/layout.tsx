@@ -38,6 +38,7 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/packages",     label: "Packages" },
       { href: "/dashboard/transactions", label: "Transactions" },
       { href: "/dashboard/notifications",label: "Notifications" },
+      { href: "/dashboard/account",      label: "Account" },
       { href: "/dashboard/settings",     label: "Settings" },
     ],
   },
@@ -107,9 +108,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [open, setOpen]  = useState(false);
   const [user, setUser]  = useState<SessionUser | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
 
-  useEffect(() => { setUser(getUser()); }, []);
+  // Re-read the (display) session and refresh the avatar on every navigation, so
+  // edits made on the account page show up in the header/sidebar without a reload.
+  useEffect(() => { setUser(getUser()); }, [pathname]);
+  useEffect(() => {
+    api.users.me().then((u) => setAvatar(u.avatarUrl ?? null)).catch(() => {});
+  }, [pathname]);
   useEffect(() => {
     api.notifications.unreadCount()
       .then((r) => setUnread(r.count))
@@ -155,15 +162,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* User + logout */}
         <div className="p-3 border-t border-[#E9DDCB]">
           {user && (
-            <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
-              <div className="w-8 h-8 rounded-full bg-violet-100 ring-2 ring-white flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
-                {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+            <Link href="/dashboard/account" onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2 mb-1 rounded-xl hover:bg-gray-50 transition-colors">
+              <div className="w-8 h-8 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
+                {avatar
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                  : user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
                 <p className="text-xs text-gray-400 capitalize">{user.role.toLowerCase()}</p>
               </div>
-            </div>
+            </Link>
           )}
           <button onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
@@ -212,12 +223,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <MessageSquare className="w-4.5 h-4.5" />
             </Link>
             {user && (
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white flex items-center justify-center text-violet-700 font-bold text-xs">
-                  {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+              <Link href="/dashboard/account" className="flex items-center gap-2 rounded-full hover:bg-gray-100 pr-2 transition-colors" title="Your account">
+                <div className="w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs">
+                  {avatar
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                    : user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <span className="hidden sm:inline text-sm font-medium text-gray-700">{user.name}</span>
-              </div>
+              </Link>
             )}
           </div>
         </header>

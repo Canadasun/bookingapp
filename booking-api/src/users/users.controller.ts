@@ -14,8 +14,12 @@ export class UsersController {
   }
 
   @Patch('me')
-  updateMe(@CurrentUser() user: { id: string }, @Body() data: { name?: string; phone?: string }) {
-    return this.usersService.update(user.id, data);
+  updateMe(@CurrentUser() user: { id: string }, @Body() data: { name?: string; phone?: string; avatarUrl?: string | null }) {
+    return this.usersService.update(user.id, {
+      ...(typeof data.name === 'string' ? { name: data.name.trim() } : {}),
+      ...(typeof data.phone === 'string' ? { phone: data.phone.trim() } : {}),
+      ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+    });
   }
 
   @Get('me/device-tokens')

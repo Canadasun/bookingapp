@@ -190,8 +190,12 @@ export default function CheckoutPage() {
   const today = startOfDay(new Date());
   const totalMins  = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const totalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
-  // Sole-proprietor: only show the provider step when there's more than one.
-  const showStaffStep = staffList.length > 1;
+  // Sole-proprietor first: the provider step + per-person names only appear once
+  // the business has 2+ active providers. Below that, book under the salon name.
+  const multiProvider = allStaffList.length >= 2;
+  const salonName = biz?.name ?? "—";
+  const providerText = (name?: string) => (multiProvider ? (name ? `${name} (${salonName})` : salonName) : salonName);
+  const showStaffStep = multiProvider;
   const STEPS: Step[] = showStaffStep
     ? ["client", "services", "staff", "datetime", "confirm"]
     : ["client", "services", "datetime", "confirm"];
@@ -213,7 +217,7 @@ export default function CheckoutPage() {
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
           {(selectedDate || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Date: </span>{format(customStartsAt ? new Date(customStartsAt) : selectedDate!, "EEE, MMM d, yyyy")}</p>}
           {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "HH:mm") : format(parseISO(selectedSlot!.startsAtLocal), "HH:mm")}</p>}
-          {(selectedSlot?.staffName || customStaff) && <p className="text-gray-700"><span className="text-gray-400">Provider: </span>{customStartsAt ? customStaff?.user.name : selectedSlot?.staffName}</p>}
+          <p className="text-gray-700"><span className="text-gray-400">Provider: </span>{providerText(customStartsAt ? customStaff?.user.name : selectedSlot?.staffName)}</p>
           <p className="text-gray-700"><span className="text-gray-400">Duration: </span>{fmtDuration(totalMins)}</p>
           <p className="font-semibold text-violet-700"><span className="text-gray-400">Total: </span>{fmtPrice(totalCents)}</p>
         </div>
@@ -386,7 +390,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <Button className="w-full mt-5" disabled={selectedServices.length === 0} onClick={() => { if (showStaffStep) { setStep("staff"); } else { setSelectedStaff(staffList[0] ?? "any"); setStep("datetime"); } }}>
+            <Button className="w-full mt-5" disabled={selectedServices.length === 0} onClick={() => { if (showStaffStep) { setStep("staff"); } else { setSelectedStaff(allStaffList[0] ?? "any"); setStep("datetime"); } }}>
               Continue — {selectedServices.length} service{selectedServices.length !== 1 ? "s" : ""}
             </Button>
           </div>
@@ -425,7 +429,7 @@ export default function CheckoutPage() {
                     {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
+                    <p className="font-semibold text-sm text-gray-900">{st.user.name} <span className="font-normal text-gray-400">({salonName})</span></p>
                     {st.bio && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{st.bio}</p>}
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300" />
@@ -439,7 +443,7 @@ export default function CheckoutPage() {
                     {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
+                    <p className="font-semibold text-sm text-gray-900">{st.user.name} <span className="font-normal text-gray-400">({salonName})</span></p>
                     <p className="text-xs text-amber-600 mt-0.5">Owner override provider</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300" />
@@ -564,7 +568,7 @@ export default function CheckoutPage() {
                 { label: "Client", value: selectedClient?.name ?? newClient.name, icon: User },
                 { label: "Services", value: selectedServices.map(s => s.name).join(", "), icon: Check },
                 { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
-                { label: "Provider", value: customStartsAt ? customStaff?.user.name ?? "—" : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName ?? "—", icon: Check },
+                { label: "Provider", value: providerText(customStartsAt ? customStaff?.user.name : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName), icon: Check },
                 { label: "Date", value: customStartsAt ? format(new Date(customStartsAt), "EEE, MMM d, yyyy") : selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
                 { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "HH:mm") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "HH:mm") : "—", icon: Check },
                 { label: "Calendar", value: customStartsAt || overrideCalendar ? "Owner override" : "Available slot", icon: Check },
