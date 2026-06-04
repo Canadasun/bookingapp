@@ -540,10 +540,10 @@ export const api = {
       req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),
-    updateStatus: (businessId: string, id: string, status: string, cancelReason?: string) =>
-      req<Appointment>(`/businesses/${businessId}/bookings/${id}/status`, {
+    updateStatus: (businessId: string, id: string, status: string, cancelReason?: string, chargeCancellationFee?: boolean) =>
+      req<Appointment & { cancelFee?: { charged: boolean; feeCents: number; reason?: string } }>(`/businesses/${businessId}/bookings/${id}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status, ...(cancelReason ? { cancelReason } : {}) }),
+        body: JSON.stringify({ status, ...(cancelReason ? { cancelReason } : {}), ...(chargeCancellationFee ? { chargeCancellationFee: true } : {}) }),
       }),
     update: (businessId: string, id: string, data: { startsAt?: string; clientName?: string; clientEmail?: string; clientPhone?: string; notes?: string; notifyClient?: boolean }) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}`, {

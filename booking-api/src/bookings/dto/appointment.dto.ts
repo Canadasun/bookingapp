@@ -18,6 +18,10 @@ export const RescheduleSchema = z.object({
 export const StatusSchema = z.object({
   status: z.enum(['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']),
   cancelReason: z.string().optional(),
+  // Owner-only: when cancelling, also charge the business's configured
+  // cancellation fee to the client's card on file (Pro). Ignored unless the
+  // status is CANCELLED and a card + fee are in place.
+  chargeCancellationFee: z.boolean().optional(),
 });
 
 export const UpdateAppointmentSchema = z.object({

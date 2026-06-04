@@ -17,14 +17,30 @@ import { formatPrice, cn } from "@/lib/utils";
 type Tab = "today" | "week" | "all";
 type ViewMode = "list" | "staff";
 
+// Turn the API's cancellation-fee reason code into something an owner can read.
+function feeReasonText(reason: string): string {
+  return ({
+    no_card: "no card is on file for this client",
+    plan_requires_pro: "automatic fees require the Pro plan",
+    no_fee: "no cancellation fee is configured",
+    charge_failed: "the card was declined",
+    not_found: "the appointment couldn't be found",
+  } as Record<string, string>)[reason] ?? "it couldn't be charged";
+}
+
 function AppointmentDrawer({ apt, onClose, onAction }: {
   apt: Appointment;
   onClose: () => void;
   onAction: (action: string, id: string, extra?: Record<string, string>) => Promise<void>;
 }) {
   const [cancelReason, setCancelReason] = useState("");
+  const [chargeFee, setChargeFee] = useState(false);
   const [showCancelForm, setShowCancelForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  // Owner can enforce the cancellation fee only when the business is on Pro with a
+  // fee configured (a card must also be on file — the API verifies that and tells
+  // us if it couldn't charge).
+  const feeEligible = apt.business?.plan === "PRO" && (apt.business?.cancellationFeeCents ?? 0) > 0;
   const [edit, setEdit] = useState({
     clientName: apt.client.name,
     clientEmail: apt.client.email,
@@ -112,10 +128,21 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
             <div className="space-y-2">
               <Input placeholder="Reason for cancellation (optional)" value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)} />
+              {feeEligible && (
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={chargeFee}
+                    onChange={(e) => setChargeFee(e.target.checked)}
+                    className="h-4 w-4 accent-violet-600"
+                  />
+                  Charge the {formatPrice(apt.business.cancellationFeeCents)} cancellation fee to the client&apos;s card
+                </label>
+              )}
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowCancelForm(false)}>Back</Button>
                 <Button size="sm" variant="destructive" className="flex-1" loading={acting === "cancel"}
-                  onClick={() => act("cancel", cancelReason ? { cancelReason } : {})}>
+                  onClick={() => act("cancel", { ...(cancelReason ? { cancelReason } : {}), ...(chargeFee ? { chargeFee: "true" } : {}) })}>
                   Confirm cancel
                 </Button>
               </div>
@@ -229,7 +256,14 @@ export default function AppointmentsPage() {
     if (!bizId) return;
     try {
       if (action === "confirm")    await api.appointments.confirm(bizId, id);
-      else if (action === "cancel") await api.appointments.updateStatus(bizId, id, "CANCELLED", extra?.cancelReason);
+      else if (action === "cancel") {
+        const res = await api.appointments.updateStatus(bizId, id, "CANCELLED", extra?.cancelReason, extra?.chargeFee === "true");
+        if (extra?.chargeFee === "true") {
+          if (res.cancelFee?.charged) toast.success(`Cancelled — charged ${formatPrice(res.cancelFee.feeCents)} cancellation fee`);
+          else toast.error(`Cancelled, but the fee wasn't charged${res.cancelFee?.reason ? ` — ${feeReasonText(res.cancelFee.reason)}` : ""}`);
+          setSelected(null); load(); return;
+        }
+      }
       else if (action === "complete") await api.appointments.updateStatus(bizId, id, "COMPLETED");
       else if (action === "noshow") await api.appointments.updateStatus(bizId, id, "NO_SHOW");
       else if (action === "edit" && extra) {

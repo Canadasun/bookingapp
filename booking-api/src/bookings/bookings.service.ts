@@ -367,7 +367,10 @@ export class BookingsService {
 
           return tx.appointment.update({
             where: { id },
-            data: { startsAt, endsAt, status: 'PENDING' },
+            // A client-initiated reschedule goes back to PENDING for re-approval.
+            // An owner/staff reschedule keeps the current status (a CONFIRMED
+            // booking stays CONFIRMED) — moving a time shouldn't un-confirm it.
+            data: { startsAt, endsAt, ...(opts.byClient ? { status: 'PENDING' as const } : {}) },
             include: { client: true, service: true, business: true },
           });
         },
@@ -392,6 +395,10 @@ export class BookingsService {
 
     await this.notifications.cancelReminders(id);
     await this.notifications.sendReschedule(updated);
+    // Re-arm reminders against the new time when the booking remains CONFIRMED
+    // (owner reschedule). Client reschedules drop to PENDING and get reminders
+    // when the owner re-confirms, so we don't double-schedule here.
+    if (updated.status === 'CONFIRMED') await this.notifications.scheduleReminders(updated);
     void this.googleCalendar.syncAppointment(id); // update the Google event time
     await this.logAction('APPOINTMENT', id, 'RESCHEDULE', {
       fromStartsAt: existing.startsAt,
@@ -466,11 +473,15 @@ export class BookingsService {
       auditChanges.cancellationTiming = cancellationTiming;
       auditChanges.cancellationWindowHours = biz?.cancellationWindowHours ?? null;
 
-      if (!byStaff && biz && biz.plan !== 'FREE' && biz.cancellationFeeCents > 0) {
-        if (cancellationTiming === 'late') {
-          cancelFee = await this.payments.chargeCancellationFee(id, updated.businessId);
-          auditChanges.cancelFee = cancelFee;
-        }
+      // Cancellation fee: charged only when the owner/staff explicitly opts in
+      // while cancelling (e.g. enforcing the policy after a client cancelled late
+      // — late client self-cancels are blocked above, so the owner does it). The
+      // payments service owns eligibility (Pro + a configured fee + a card on
+      // file) and is best-effort: it never throws, so the cancel always succeeds.
+      // A client self-cancel never charges.
+      if (byStaff && dto.chargeCancellationFee) {
+        cancelFee = await this.payments.chargeCancellationFee(id, updated.businessId);
+        auditChanges.cancelFee = cancelFee;
       }
 
       if (byStaff) {
