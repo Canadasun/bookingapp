@@ -4,8 +4,10 @@ import { BusinessesService } from './businesses.service';
 import { CreateBusinessSchema, UpdateBusinessSchema, CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { User } from '@prisma/client';
+import { User, Role } from '@prisma/client';
 
 @ApiTags('business')
 @ApiBearerAuth()
@@ -14,7 +16,8 @@ export class BusinessesController {
   constructor(private businessService: BusinessesService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   create(
     @Body(new ZodValidationPipe(CreateBusinessSchema)) dto: CreateBusinessDto,
     @CurrentUser() user: User,
@@ -47,7 +50,8 @@ export class BusinessesController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessSchema)) dto: UpdateBusinessDto,

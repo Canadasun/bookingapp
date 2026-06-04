@@ -7,6 +7,9 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 const BookingIntentSchema = z.object({
@@ -46,7 +49,8 @@ export class PaymentsController {
   // Owner-initiated deposit (dashboard). Scoped to the owner's business.
   @Post('deposit/:appointmentId')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   createDeposit(
     @Param('appointmentId') appointmentId: string,
@@ -58,7 +62,8 @@ export class PaymentsController {
 
   @Post('no-show/:appointmentId')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   chargeNoShow(
     @Param('appointmentId') appointmentId: string,
@@ -86,7 +91,8 @@ export class PaymentsController {
   // Owner — the business payment ledger (deposits, fees, in-person charges + refunds).
   @Get()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   list(@CurrentUser() user: { role: string; businessId: string | null }) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.paymentService.listPayments(user.businessId);
@@ -95,7 +101,8 @@ export class PaymentsController {
   // Owner — refund a payment (full or partial). Scoped to the owner's business.
   @Post(':paymentId/refund')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   refund(
     @Param('paymentId') paymentId: string,
