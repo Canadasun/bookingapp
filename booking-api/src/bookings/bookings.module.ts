@@ -4,9 +4,10 @@ import { BookingsService } from './bookings.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { AvailabilityModule } from '../availability/availability.module';
+import { CalendarSyncModule } from '../calendar-sync/calendar-sync.module';
 
 @Module({
-  imports: [NotificationsModule, PaymentsModule, AvailabilityModule],
+  imports: [NotificationsModule, PaymentsModule, AvailabilityModule, CalendarSyncModule],
   controllers: [BookingsController, PublicBookingsController],
   providers: [BookingsService],
   exports: [BookingsService],

@@ -122,6 +122,24 @@ export default function SettingsPage() {
     finally { setVerifBusy(false); }
   }
 
+  // Google Calendar connection.
+  const [cal, setCal] = useState<{ connected: boolean; email: string | null; configured: boolean } | null>(null);
+  function loadCal() { api.calendarSync.status().then(setCal).catch(() => {}); }
+  useEffect(() => { loadCal(); }, []);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("calendar");
+    if (p === "connected") { toast.success("Google Calendar connected"); loadCal(); window.history.replaceState({}, "", "/dashboard/settings"); }
+    else if (p === "error") { toast.error("Could not connect Google Calendar"); window.history.replaceState({}, "", "/dashboard/settings"); }
+  }, []);
+  async function connectCal() {
+    try { const { url } = await api.calendarSync.connect(); window.location.assign(url); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Google connect"); }
+  }
+  async function disconnectCal() {
+    try { await api.calendarSync.disconnect(); toast.success("Google Calendar disconnected"); loadCal(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect"); }
+  }
+
   // Toast the result of a returning Stripe Checkout, then reload the plan.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("billing");
@@ -292,6 +310,28 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ) : null}
+
+                {/* Google Calendar sync */}
+                {cal?.configured && (
+                  <div className="rounded-xl border border-gray-100 bg-white p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
+                      {cal.connected ? (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">Connected{cal.email ? ` as ${cal.email}` : ""} — new bookings sync to your calendar.</p>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-0.5">Connect so confirmed bookings appear on your Google Calendar automatically.</p>
+                      )}
+                    </div>
+                    {cal.connected ? (
+                      <button type="button" onClick={disconnectCal}
+                        className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors shrink-0">Disconnect</button>
+                    ) : (
+                      <button type="button" onClick={connectCal}
+                        className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors shrink-0">Connect</button>
+                    )}
+                  </div>
+                )}
+
                 <Field label="Logo">
                   <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={async (url) => {
                     f("logoUrl", url ?? "");

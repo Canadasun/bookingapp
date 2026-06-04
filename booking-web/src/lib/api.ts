@@ -313,6 +313,12 @@ export const api = {
     submit: (businessId: string, docUrl: string) =>
       req<{ verificationStatus: VerificationStatus }>(`/businesses/${businessId}/verification`, { method: "POST", body: JSON.stringify({ docUrl }) }),
   },
+  calendarSync: {
+    // Returns the Google OAuth consent URL to connect the owner's calendar.
+    connect: () => req<{ url: string }>("/calendar-sync/google/connect"),
+    status: () => req<{ connected: boolean; email: string | null; since: string | null; configured: boolean }>("/calendar-sync/google/status"),
+    disconnect: () => req<{ ok: boolean }>("/calendar-sync/google/disconnect", { method: "POST" }),
+  },
   // Platform admin (Role.ADMIN) — review the business-verification queue.
   adminVerifications: {
     list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),

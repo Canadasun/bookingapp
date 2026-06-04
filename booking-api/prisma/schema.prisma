@@ -123,6 +123,7 @@ model Business {
   users              User[]
   referralsMade      Referral[] @relation("referrer")
   referralReceived   Referral?  @relation("referred")
+  googleCalendar     GoogleCalendarConnection?
   staff              Staff[]
   services           Service[]
   serviceCategories  ServiceCategory[]
@@ -569,6 +570,7 @@ model Appointment {
   // Saved card used for this booking (for no-show auto-charge, incl. card-on-file)
   stripePaymentMethodId String?
   notes                String?
+  googleEventId        String?           // Google Calendar event id (when the business has calendar sync on)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -869,4 +871,19 @@ model Referral {
   referred Business @relation("referred", fields: [referredBusinessId], references: [id], onDelete: Cascade)
 
   @@index([referrerBusinessId])
+}
+
+// A business's connected Google Calendar (OAuth). One per business.
+model GoogleCalendarConnection {
+  id           String    @id @default(cuid())
+  businessId   String    @unique
+  email        String?   // the connected Google account
+  refreshToken String              // long-lived; used to mint access tokens
+  accessToken  String?
+  expiresAt    DateTime?
+  calendarId   String    @default("primary")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
