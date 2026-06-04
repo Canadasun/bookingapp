@@ -39,7 +39,7 @@ export class AuthController {
   verifyTwoFactor(@Body(new ZodValidationPipe(VerifyTwoFactorSchema)) dto: VerifyTwoFactorDto, @Req() req: Request) {
     const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
     const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
-    return this.authService.verifyTwoFactor(dto.challengeId, dto.code, { ip: fwd || req.ip, userAgent });
+    return this.authService.verifyTwoFactor(dto.challengeId, dto.code, { ip: fwd || req.ip, userAgent }, dto.rememberDevice);
   }
 
   // Authenticated — turn 2FA on/off and pick the delivery method.

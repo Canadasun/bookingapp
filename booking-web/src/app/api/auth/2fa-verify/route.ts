@@ -6,7 +6,7 @@ const API = apiBase();
 // Second factor: exchange the OTP from the login challenge for session cookies.
 // Mirrors /api/auth/login's cookie handling exactly.
 export async function POST(req: NextRequest) {
-  const body = await req.json() as { challengeId: string; code: string };
+  const body = await req.json() as { challengeId: string; code: string; rememberDevice?: boolean };
   const upstream = await fetch(`${API}/auth/2fa/verify`, {
     method: "POST",
     headers: {
@@ -25,11 +25,19 @@ export async function POST(req: NextRequest) {
   const data = await upstream.json() as {
     accessToken: string;
     refreshToken: string;
+    trustedDeviceToken?: string;
     user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: string };
   };
 
   const secure = process.env.NODE_ENV === "production";
   const res = NextResponse.json({ user: data.user });
+  // "Remember this device": persist the trusted-device token (30 days) so the
+  // next sign-in on this device skips the 2FA prompt.
+  if (data.trustedDeviceToken) {
+    res.cookies.set("booking_td", data.trustedDeviceToken, {
+      httpOnly: true, secure, sameSite: "strict", path: "/", maxAge: 60 * 60 * 24 * 30,
+    });
+  }
   res.cookies.set("booking_token", data.accessToken, {
     httpOnly: true,
     secure,

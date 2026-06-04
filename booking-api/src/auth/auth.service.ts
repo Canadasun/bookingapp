@@ -148,6 +148,22 @@ export class AuthService {
     return `${process.env.JWT_SECRET ?? ''}${passwordHash}`;
   }
 
+  // Trusted-device ("remember this device") token for 2FA. Bound to the user's
+  // current passwordHash so changing the password revokes every trusted device.
+  private trustedDeviceSecret(passwordHash: string): string {
+    return `td:${process.env.JWT_SECRET ?? ''}${passwordHash}`;
+  }
+  private mintTrustedDeviceToken(user: User): string {
+    return this.jwt.sign({ sub: user.id, kind: 'td' }, { secret: this.trustedDeviceSecret(user.passwordHash), expiresIn: '30d' });
+  }
+  private isTrustedDevice(user: User, token?: string): boolean {
+    if (!token) return false;
+    try {
+      const p = this.jwt.verify(token, { secret: this.trustedDeviceSecret(user.passwordHash) }) as { sub?: string; kind?: string };
+      return p?.sub === user.id && p?.kind === 'td';
+    } catch { return false; }
+  }
+
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Always succeed so we never reveal whether an email is registered.
@@ -189,8 +205,10 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    // Opt-in 2FA: password ok, but require a one-time code before issuing tokens.
-    if (user.twoFactorEnabled) {
+    // Opt-in 2FA: password ok, but require a one-time code before issuing tokens —
+    // UNLESS this device was previously remembered (trusted), so we don't bug the
+    // user with a code on every sign-in from the same device.
+    if (user.twoFactorEnabled && !this.isTrustedDevice(user, dto.trustedDeviceToken)) {
       const challengeId = await this.createLoginChallenge(user);
       return { twoFactorRequired: true as const, challengeId, method: user.twoFactorMethod };
     }
@@ -210,7 +228,7 @@ export class AuthService {
     return ch.id;
   }
 
-  async verifyTwoFactor(challengeId: string, code: string, ctx?: { ip?: string; userAgent?: string }) {
+  async verifyTwoFactor(challengeId: string, code: string, ctx?: { ip?: string; userAgent?: string }, rememberDevice?: boolean) {
     const ch = await this.prisma.otpChallenge.findUnique({ where: { id: challengeId } });
     if (!ch || ch.consumedAt || ch.expiresAt < new Date() || ch.attempts >= 5) {
       throw new UnauthorizedException('Invalid or expired code');
@@ -240,7 +258,10 @@ export class AuthService {
     await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { consumedAt: new Date() } });
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ch.userId } });
     await this.recordLoginAndMaybeAlert(user, ctx);
-    return this.issueTokens(user);
+    const tokens = await this.issueTokens(user);
+    // "Remember this device": hand back a trusted-device token the client stores,
+    // so future logins from here skip the 2FA prompt.
+    return rememberDevice ? { ...tokens, trustedDeviceToken: this.mintTrustedDeviceToken(user) } : tokens;
   }
 
   // A readable one-time code, e.g. "a3f9c-1e7d2".

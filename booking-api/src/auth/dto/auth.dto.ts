@@ -22,6 +22,9 @@ export const RegisterSchema = z.object({
 export const LoginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
+  // Trusted-device token from a prior "remember this device" — lets a 2FA user
+  // skip the OTP on a known device.
+  trustedDeviceToken: z.string().optional(),
 });
 
 export const RefreshSchema = z.object({
@@ -46,6 +49,8 @@ export const VerifyTwoFactorSchema = z.object({
   challengeId: z.string().min(1),
   // Accepts either the 6-digit OTP or an 11-char recovery code ("xxxxx-xxxxx").
   code: z.string().trim().min(4).max(32),
+  // "Remember this device" — skip 2FA on this device for future logins.
+  rememberDevice: z.boolean().optional(),
 });
 
 export const SetTwoFactorSchema = z.object({

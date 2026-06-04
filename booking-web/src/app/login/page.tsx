@@ -24,6 +24,7 @@ function LoginForm() {
   const [code, setCode] = useState("");
   const [recoveryMode, setRecoveryMode] = useState(false); // enter a recovery code instead of the OTP
   const [recovery, setRecovery] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true); // skip 2FA on this device next time
 
   function go() {
     router.push(next.startsWith("/") ? next : "/dashboard");
@@ -66,7 +67,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/2fa-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.id, code: entered }),
+        body: JSON.stringify({ challengeId: challenge.id, code: entered, rememberDevice }),
       });
       if (!res.ok) {
         const body = await res.json() as { message?: string };
@@ -115,6 +116,10 @@ function LoginForm() {
             className="text-center text-lg tracking-[0.4em]"
           />
         )}
+        <label className="flex items-center gap-2 text-xs text-slate-600 select-none cursor-pointer">
+          <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="rounded border-slate-300" />
+          Remember this device for 30 days (skip codes here)
+        </label>
         <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
         <button
           type="button"
