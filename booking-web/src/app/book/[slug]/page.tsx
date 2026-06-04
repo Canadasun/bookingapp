@@ -88,12 +88,12 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
   );
 }
 
-function BookPageInner({ slug }: { slug: string }) {
+export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?: "slug" | "id" }) {
   const searchParams  = useSearchParams();
   const rescheduleId  = searchParams.get("reschedule");
   const rescheduleToken = searchParams.get("token") ?? undefined; // HMAC manage token for the public reschedule
   const isEmbed       = searchParams.get("embed") === "1"; // rendered inside the embeddable widget iframe
-  const isBusinessIdRef = searchParams.get("ref") === "business-id";
+  const isBusinessIdRef = lookup === "id" || searchParams.get("ref") === "business-id";
   const rescheduleLoaded = useRef(false);
 
   // When embedded, report content height to the host page so embed.js can size

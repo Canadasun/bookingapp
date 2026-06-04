@@ -4,9 +4,7 @@ import { normalizePhone } from '../../common/util/phone';
 // Optional phone normalized to E.164 (so Twilio can deliver SMS to the owner).
 // A bare 10-digit number is treated as +1; anything present must be complete.
 const phoneSchema = z
-  .string()
-  .trim()
-  .optional()
+  .preprocess((v) => v === null ? undefined : v, z.string().trim().optional())
   .transform((v, ctx) => {
     if (!v) return undefined;
     const normalized = normalizePhone(v);
@@ -17,14 +15,19 @@ const phoneSchema = z
     return normalized;
   });
 
+const optionalString = (max?: number) => z.preprocess(
+  (v) => v === null ? undefined : v,
+  (max ? z.string().max(max) : z.string()).optional(),
+);
+
 export const CreateBusinessSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
   email: z.string().email(),
   phone: phoneSchema,
   timezone: z.string().default('America/New_York'),
-  address: z.string().optional(),
-  logoUrl: z.string().max(2048).optional(),
+  address: optionalString(),
+  logoUrl: optionalString(2048),
   bookingPageSettings: z.record(z.unknown()).optional(),
   minNoticeMinutes: z.number().int().nonnegative().default(120),
   maxAdvanceDays: z.number().int().positive().default(60),
@@ -34,7 +37,7 @@ export const CreateBusinessSchema = z.object({
   noShowFeeCents: z.number().int().nonnegative().default(0),
   cancellationFeeCents: z.number().int().nonnegative().default(0),
   allowClientReschedule: z.boolean().default(true),
-  cancellationPolicy: z.string().optional(),
+  cancellationPolicy: optionalString(),
   plan: z.enum(['FREE', 'BASIC', 'PRO']).optional(),
 });
 

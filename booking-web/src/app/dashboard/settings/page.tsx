@@ -141,7 +141,26 @@ export default function SettingsPage() {
     }
     setSaving(true);
     try {
-      const updated = await api.business.update(bizId, form);
+      const payload: Partial<Business> = {
+        name: String(form.name ?? "").trim(),
+        slug: String(form.slug ?? "").trim(),
+        email: String(form.email ?? "").trim().toLowerCase(),
+        phone: String(form.phone ?? "").trim() || undefined,
+        timezone: String(form.timezone ?? "America/New_York"),
+        address: String(form.address ?? "").trim() || undefined,
+        logoUrl: String(form.logoUrl ?? "").trim() || undefined,
+        bookingPageSettings: bookingSettings,
+        minNoticeMinutes: Number(form.minNoticeMinutes ?? 120),
+        maxAdvanceDays: Number(form.maxAdvanceDays ?? 60),
+        cancellationWindowHours: Number(form.cancellationWindowHours ?? 24),
+        requireDeposit: !!form.requireDeposit,
+        depositPercent: Math.max(1, Number(form.depositPercent ?? 25)),
+        noShowFeeCents: Math.max(0, Number(form.noShowFeeCents ?? 0)),
+        cancellationFeeCents: Math.max(0, Number(form.cancellationFeeCents ?? 0)),
+        allowClientReschedule: form.allowClientReschedule !== false,
+        cancellationPolicy: String(form.cancellationPolicy ?? "").trim() || undefined,
+      };
+      const updated = await api.business.update(bizId, payload);
       setBiz(updated);
       setForm(updated);
       toast.success("Settings saved");
@@ -151,15 +170,14 @@ export default function SettingsPage() {
   }
 
   function copyUrl() {
-    const url = `${window.location.origin}/book`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(bookingUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   if (loading) return <LoadingSpinner />;
 
-  const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/book/${biz?.slug ?? ""}`;
+  const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/b/${biz?.id ?? ""}`;
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const embedSnippet = `<script src="${embedOrigin}/embed.js" data-business-id="${biz?.id ?? ""}" async></script>`;
   const plan = biz?.plan ?? "FREE";
@@ -395,7 +413,7 @@ export default function SettingsPage() {
                 <div className="bg-violet-50 border border-violet-100 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Globe className="w-4 h-4 text-violet-600" />
-                    <span className="text-sm font-semibold text-violet-700">Your booking page</span>
+                    <span className="text-sm font-semibold text-violet-700">Your secure booking page</span>
                   </div>
                   <div className="flex items-center gap-2 bg-white border border-violet-200 rounded-xl px-4 py-3">
                     <code className="text-sm text-violet-600 flex-1 truncate">{bookingUrl}</code>
@@ -403,7 +421,7 @@ export default function SettingsPage() {
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-violet-500 mt-2">Share this link on your website, Instagram bio, or Google Business profile.</p>
+                  <p className="text-xs text-violet-500 mt-2">Share this non-email public link on your website, Instagram bio, or Google Business profile.</p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">
@@ -411,7 +429,7 @@ export default function SettingsPage() {
                     <CreditCard className="w-4 h-4 text-gray-700" />
                     <span className="text-sm font-semibold text-gray-900">Embed on your website</span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It uses your public business id instead of an email-derived slug.</p>
+                  <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It uses your public business ID instead of an email-derived slug.</p>
                   <div className="flex items-start gap-2 bg-gray-900 rounded-xl px-4 py-3">
                     <code className="text-xs text-gray-100 flex-1 break-all font-mono">{embedSnippet}</code>
                     <button type="button" onClick={copyEmbed} className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
@@ -423,8 +441,8 @@ export default function SettingsPage() {
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Quick stats</p>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Business slug</span>
-                    <code className="text-gray-800 font-medium">{biz?.slug}</code>
+                    <span className="text-gray-600">Public booking ID</span>
+                    <code className="text-gray-800 font-medium">{biz?.id}</code>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Timezone</span>
