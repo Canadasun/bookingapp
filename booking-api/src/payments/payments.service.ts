@@ -5,7 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { createHash } from 'crypto';
 import Stripe from 'stripe';
-import { isProPlan } from '../common/util/plan-features';
+import { isPaidPlan, isProPlan } from '../common/util/plan-features';
 
 @Injectable()
 export class PaymentsService {
@@ -91,9 +91,9 @@ export class PaymentsService {
     if (!apt) throw new BadRequestException('Appointment not found');
 
     const b = apt.business;
-    // Deposits, no-show card-on-file, and cancellation-fee collection are Pro
-    // features. Lower tiers never collect money at booking.
-    if (!isProPlan(b.plan)) return { required: false, mode: 'none' as const };
+    // Free never collects money at booking. Basic+ can collect deposits; Pro
+    // also supports card-on-file protection for later automatic fees.
+    if (!isPaidPlan(b.plan)) return { required: false, mode: 'none' as const };
 
     const customer = await this.ensureCustomer(apt.clientId);
 
@@ -124,7 +124,7 @@ export class PaymentsService {
       return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey() };
     }
 
-    if (b.noShowFeeCents > 0) {
+    if (isProPlan(b.plan) && b.noShowFeeCents > 0) {
       const intent = await this.getStripe().setupIntents.create({
         customer,
         usage: 'off_session',
@@ -157,6 +157,9 @@ export class PaymentsService {
     input: { amountCents: number; description?: string; clientId?: string; idempotencyKey?: string },
   ) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    if (!isPaidPlan(business.plan)) {
+      throw new BadRequestException('Manual charges require Basic or Pro.');
+    }
     const chargeClient = input.clientId
       ? await this.prisma.client.findUnique({ where: { id: input.clientId }, select: { email: true } })
       : null;
@@ -541,6 +544,10 @@ export class PaymentsService {
       include: { service: true, client: true, business: true },
     });
     if (!apt) throw new BadRequestException('Appointment not found');
+    if (!isProPlan(apt.business.plan)) {
+      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+      return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. Automatic no-show charging requires Pro; collect manually on Basic.' };
+    }
 
     const feeCents = apt.business.noShowFeeCents > 0
       ? apt.business.noShowFeeCents
@@ -586,6 +593,7 @@ export class PaymentsService {
       include: { service: true, client: true, business: true },
     });
     if (!apt) return { charged: false, feeCents: 0, reason: 'not_found' };
+    if (!isProPlan(apt.business.plan)) return { charged: false, feeCents: 0, reason: 'plan_requires_pro' };
     const feeCents = apt.business.cancellationFeeCents;
     if (feeCents <= 0) return { charged: false, feeCents: 0, reason: 'no_fee' };
     if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {

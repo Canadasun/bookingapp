@@ -104,6 +104,11 @@ export default function SettingsPage() {
     if (p) window.history.replaceState({}, "", "/dashboard/settings");
   }, [bizId]);
 
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab && SECTIONS.some((s) => s.id === tab)) setSection(tab as Section);
+  }, []);
+
   async function upgrade(plan: "BASIC" | "PRO") {
     setBillingBusy(plan);
     try {
@@ -149,6 +154,10 @@ export default function SettingsPage() {
   const plan = biz?.plan ?? "FREE";
   const isPro = plan === "PRO";
   const isPaid = plan === "BASIC" || plan === "PRO";
+  function promptUpgrade(target: "BASIC" | "PRO", feature: string) {
+    toast.info(`${feature} requires ${target === "BASIC" ? "Basic or Pro" : "Pro"}.`);
+    setSection("billing");
+  }
   function copyEmbed() {
     navigator.clipboard.writeText(embedSnippet);
     setEmbedCopied(true);
@@ -260,7 +269,7 @@ export default function SettingsPage() {
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
                   <p className="text-sm font-semibold text-blue-900">Cancellation rule</p>
                   <p className="mt-1 text-xs leading-relaxed text-blue-700">
-                    Clients can cancel before the window for free. Inside the window, Pro businesses can charge the late-cancellation fee configured under Payments & fees.
+                    Clients can cancel before the window for free. Basic+ businesses can collect deposits and charge manually; Pro can add automatic late-cancellation fees when a saved card is available.
                   </p>
                 </div>
 
@@ -290,27 +299,33 @@ export default function SettingsPage() {
               <div className="p-6 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Payments &amp; fees</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Configure Pro payment protection for deposits, no-shows, and late cancellations.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Deposits and manual charges are Basic+. Automatic saved-card fees are Pro.</p>
                 </div>
                 <hr className="border-gray-100" />
-                {!isPro && (
+                {!isPaid && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                    <p className="font-semibold">Payment protection requires Pro</p>
-                    <p className="mt-1 text-xs leading-relaxed text-amber-700">Free and Basic can book appointments and send confirmations. Pro adds deposit collection, saved cards for no-shows, and late-cancellation fees.</p>
-                    <button type="button" className="mt-2 text-xs font-semibold underline" onClick={() => setSection("billing")}>View plans</button>
+                    <p className="font-semibold">Payments require Basic+</p>
+                    <p className="mt-1 text-xs leading-relaxed text-amber-700">Free can book appointments and send confirmations. Basic adds deposits and manual charges. Pro adds automatic saved-card fee protection.</p>
+                    <button type="button" className="mt-2 text-xs font-semibold underline" onClick={() => promptUpgrade("BASIC", "Payments")}>View plans</button>
                   </div>
                 )}
-                <div className={cn("flex items-center justify-between p-4 rounded-xl border", isPro ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-60")}>
+                {isPaid && !isPro && (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                    <p className="font-semibold">Basic payment tools are active</p>
+                    <p className="mt-1 text-xs leading-relaxed text-blue-700">You can collect deposits at booking and take manual charges. Upgrade to Pro for automatic no-show and late-cancellation charges.</p>
+                  </div>
+                )}
+                <div className={cn("flex items-center justify-between p-4 rounded-xl border", isPaid ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50")}>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Require deposit at booking</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online.</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online. Basic+</p>
                   </div>
-                  <button type="button" disabled={!isPro} onClick={() => f("requireDeposit", !form.requireDeposit)}
+                  <button type="button" onClick={() => isPaid ? f("requireDeposit", !form.requireDeposit) : promptUpgrade("BASIC", "Deposits")}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.requireDeposit ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.requireDeposit ? "translate-x-6" : "translate-x-1")} />
                   </button>
                 </div>
-                {isPro && form.requireDeposit && (
+                {isPaid && form.requireDeposit && (
                   <Field label="Deposit percentage">
                     <div className="flex items-center gap-2">
                       <Input type="number" min={1} max={100} value={(form.depositPercent as number) ?? 25}
@@ -321,28 +336,40 @@ export default function SettingsPage() {
                 )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-60")}>
+                  <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>
                     <Field label="No-show fee">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 shrink-0">$</span>
-                        <Input type="number" min={0} step="0.01" disabled={!isPro}
+                        <Input type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic no-show fees")}
                           value={(((form.noShowFeeCents as number) ?? 0) / 100).toString()}
                           onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Charged when you mark a confirmed appointment as a no-show.</p>
+                      <p className="text-xs text-gray-400 mt-1">Pro automatic charge. Basic+ can still charge manually from checkout.</p>
+                      {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", "Automatic no-show fees")} className="mt-2 text-xs font-semibold text-violet-600 hover:underline">Upgrade to unlock</button>}
                     </Field>
                   </div>
-                  <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-60")}>
+                  <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>
                     <Field label="Late-cancellation fee">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 shrink-0">$</span>
-                        <Input type="number" min={0} step="0.01" disabled={!isPro}
+                        <Input type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic late-cancellation fees")}
                           value={(((form.cancellationFeeCents as number) ?? 0) / 100).toString()}
                           onChange={(e) => f("cancellationFeeCents", Math.round(Number(e.target.value) * 100))} />
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Charged when a client cancels inside your cancellation window.</p>
+                      <p className="text-xs text-gray-400 mt-1">Pro automatic charge when a client cancels inside your window.</p>
+                      {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", "Automatic late-cancellation fees")} className="mt-2 text-xs font-semibold text-violet-600 hover:underline">Upgrade to unlock</button>}
                     </Field>
                   </div>
+                </div>
+                <div className={cn("flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50")}>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Manual charges</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Basic+ businesses can charge a client manually from checkout for fees, balances, or add-ons.</p>
+                  </div>
+                  <button type="button" onClick={() => isPaid ? toast.success("Manual charges are available on your plan") : promptUpgrade("BASIC", "Manual charges")}
+                    className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", isPaid ? "bg-violet-600" : "bg-gray-200")}>
+                    <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", isPaid ? "translate-x-6" : "translate-x-1")} />
+                  </button>
                 </div>
               </div>
             )}
@@ -446,20 +473,27 @@ export default function SettingsPage() {
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications</p>
                 {[
                   { label: "Booking confirmation", desc: "Sent immediately when a new appointment is booked", active: true },
-                  { label: "24-hour reminder", desc: "Sent the day before the appointment", active: isPaid },
+                  { label: "24-hour reminder", desc: "Sent the day before the appointment", active: isPaid, upgrade: "BASIC" as const },
                   { label: "Cancellation notice", desc: "Sent when a booking is cancelled by client or business", active: true },
                   { label: "Reschedule notice", desc: "Sent when an appointment is moved to a new time", active: true },
                   { label: "Staff cancellation", desc: "Special email when business cancels on the client", active: true },
-                ].map(({ label, desc, active }) => (
+                ].map(({ label, desc, active, upgrade }) => (
                   <div key={label} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0">
                     <div>
                       <p className="text-sm font-medium text-gray-700">{label}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className={cn("w-2 h-2 rounded-full", active ? "bg-emerald-500" : "bg-gray-300")} />
-                      <span className={cn("text-xs font-medium", active ? "text-emerald-700" : "text-gray-400")}>{active ? "Active" : "Basic+"}</span>
-                    </div>
+                    {active ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-xs font-medium text-emerald-700">Active</span>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => promptUpgrade(upgrade ?? "BASIC", label)}
+                        className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1 hover:bg-violet-50 transition-colors shrink-0">
+                        Basic+
+                      </button>
+                    )}
                   </div>
                 ))}
 
@@ -607,14 +641,14 @@ export default function SettingsPage() {
                     {
                       id: "BASIC", name: "Basic", price: "$10", period: "/mo",
                       desc: "Great for growing salons",
-                      features: ["Everything in Free","Email reminders (24h)","Offers & promotions","Client portal","Cancellation policies"],
+                      features: ["Everything in Free","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
                     {
                       id: "PRO", name: "Pro", price: "$20", period: "/mo",
                       desc: "Full power for busy businesses",
                       highlight: true,
-                      features: ["Everything in Basic","SMS reminders (2h)","Deposit collection","No-show fee charging","Priority support","Analytics"],
+                      features: ["Everything in Basic","SMS reminders (2h)","Automatic no-show fees","Late-cancellation fees","Priority support","Analytics"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
                   ].map((plan) => (

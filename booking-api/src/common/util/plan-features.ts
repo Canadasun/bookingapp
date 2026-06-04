@@ -13,10 +13,17 @@ export function applyPlanLimits<T extends {
   noShowFeeCents?: number;
   cancellationFeeCents?: number;
 }>(plan: PlanTier, data: T): T {
-  if (!isProPlan(plan)) {
+  if (!isPaidPlan(plan)) {
     return {
       ...data,
       requireDeposit: false,
+      noShowFeeCents: 0,
+      cancellationFeeCents: 0,
+    };
+  }
+  if (!isProPlan(plan)) {
+    return {
+      ...data,
       noShowFeeCents: 0,
       cancellationFeeCents: 0,
     };
