@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import { api, Business, VerificationStatus } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -20,11 +20,12 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
-type Section = "profile" | "booking" | "payments" | "online" | "notifications" | "security" | "billing";
+type Section = "profile" | "booking" | "calendar" | "payments" | "online" | "notifications" | "security" | "billing";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
   { id: "booking",       label: "Booking policies",   icon: Clock,       desc: "Notice, cancellations, advance limits" },
+  { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar" },
   { id: "payments",      label: "Payments & fees",    icon: DollarSign,  desc: "Deposits, no-show fees" },
   { id: "online",        label: "Online booking",     icon: Globe,       desc: "Booking page link, availability" },
   { id: "notifications", label: "Notifications",      icon: Bell,        desc: "Emails & SMS sent to clients" },
@@ -315,27 +316,6 @@ export default function SettingsPage() {
                   </div>
                 ) : null}
 
-                {/* Google Calendar sync */}
-                {cal?.configured && (
-                  <div className="rounded-xl border border-gray-100 bg-white p-4 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
-                      {cal.connected ? (
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">Connected{cal.email ? ` as ${cal.email}` : ""} — new bookings sync to your calendar.</p>
-                      ) : (
-                        <p className="text-xs text-gray-500 mt-0.5">Connect so confirmed bookings appear on your Google Calendar automatically.</p>
-                      )}
-                    </div>
-                    {cal.connected ? (
-                      <button type="button" onClick={disconnectCal}
-                        className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors shrink-0">Disconnect</button>
-                    ) : (
-                      <button type="button" onClick={connectCal}
-                        className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors shrink-0">Connect</button>
-                    )}
-                  </div>
-                )}
-
                 <Field label="Logo">
                   <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={async (url) => {
                     f("logoUrl", url ?? "");
@@ -421,6 +401,46 @@ export default function SettingsPage() {
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.allowClientReschedule ? "translate-x-6" : "translate-x-1")} />
                   </button>
                 </div>
+              </div>
+            )}
+
+            {section === "calendar" && (
+              <div className="p-6 space-y-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Calendar sync</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Push confirmed bookings to your Google Calendar automatically.</p>
+                </div>
+                {!cal ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : !cal.configured ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-amber-900">Not available yet</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Google Calendar sync isn’t enabled on the server. Contact support to turn it on.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-gray-100 bg-white p-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <span className={cn("inline-flex w-9 h-9 rounded-lg items-center justify-center shrink-0", cal.connected ? "bg-green-50" : "bg-violet-50")}>
+                        <CalendarDays className={cn("w-4 h-4", cal.connected ? "text-green-600" : "text-violet-600")} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
+                        {cal.connected ? (
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">Connected{cal.email ? ` as ${cal.email}` : ""} — new bookings sync automatically.</p>
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-0.5">Connect so confirmed bookings appear on your Google Calendar.</p>
+                        )}
+                      </div>
+                    </div>
+                    {cal.connected ? (
+                      <button type="button" onClick={disconnectCal}
+                        className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors shrink-0">Disconnect</button>
+                    ) : (
+                      <button type="button" onClick={connectCal}
+                        className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors shrink-0">Connect</button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
