@@ -154,8 +154,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         "fixed inset-y-0 left-0 z-40 w-60 bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5",
         open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}>
-        {/* Logo — back to the landing page (session stays active). */}
-        <Link href="/" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Pulse home">
+        {/* Logo — stay inside the app (the dashboard home), not the marketing page.
+            Tapping it on mobile previously dumped owners onto "/", which reads as a
+            sign-out. Keep them in the dashboard. */}
+        <Link href="/dashboard" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Dashboard home">
           <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center shrink-0">
             <Calendar className="w-4 h-4 text-white" />
           </div>

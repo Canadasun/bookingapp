@@ -6,13 +6,20 @@ import { LoggedInHome } from "@/components/LoggedInHome";
 
 // Decode the role from the (non-HttpOnly) booking_user cookie, server-side, so a
 // signed-in user gets their dedicated home with no flash of the marketing page.
-async function sessionRole(): Promise<string | undefined> {
-  const raw = (await cookies()).get("booking_user")?.value;
-  if (!raw) return undefined;
-  for (const v of [raw, decodeURIComponent(raw)]) {
-    try { return JSON.parse(Buffer.from(v, "base64").toString("utf8"))?.role; } catch { /* try next */ }
+// `authed` falls back to the session token/refresh cookies: on mobile the readable
+// booking_user cookie can briefly drop while the httpOnly session cookies survive —
+// without this an owner who taps "home" would be shown the signed-out marketing page.
+async function sessionInfo(): Promise<{ role?: string; authed: boolean }> {
+  const jar = await cookies();
+  const authed = !!(jar.get("booking_token")?.value || jar.get("booking_refresh")?.value || jar.get("booking_user")?.value);
+  const raw = jar.get("booking_user")?.value;
+  let role: string | undefined;
+  if (raw) {
+    for (const v of [raw, decodeURIComponent(raw)]) {
+      try { role = JSON.parse(Buffer.from(v, "base64").toString("utf8"))?.role; break; } catch { /* try next */ }
+    }
   }
-  return undefined;
+  return { role, authed };
 }
 
 const features = [
@@ -29,8 +36,10 @@ const stats = [
 
 export default async function LandingPage() {
   // Signed-in owners/staff/admins get a dedicated home, not the marketing page.
-  const role = await sessionRole();
-  if (role && role !== "CLIENT") return <LoggedInHome />;
+  // If a session exists but the role cookie was dropped (mobile), still show the
+  // logged-in home rather than flashing the marketing page.
+  const { role, authed } = await sessionInfo();
+  if ((role && role !== "CLIENT") || (authed && !role)) return <LoggedInHome />;
 
   return (
     <div className="flex flex-col min-h-screen brand-shell">

@@ -40,7 +40,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
 }
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 
@@ -103,6 +103,9 @@ const STATUS_COLOR: Record<string,string> = {
 
 const fmtTime = (value: string | Date) =>
   new Date(value).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:false });
+
+// Human duration, e.g. 75 → "1h 15m". Shared across the calendar and the service editor.
+function fmtDur(min:number){ const h=Math.floor(min/60), r=min%60; if(h&&r) return `${h}h ${r}m`; return h?`${h}h`:`${min}m`; }
 
 // ── Auth store (token + refresh token, persisted via SecureStore) ────────────
 let _token:   string|null = null;
@@ -252,6 +255,8 @@ function CalendarScreen() {
   const [selected, setSelected]     = useState<Appointment|null>(null);
   const [statusFilter, setStatusFilter] = useState<'ALL'|'PENDING'|'CONFIRMED'|'COMPLETED'|'CANCELLED'|'NO_SHOW'>('ALL');
   const [staffFilter, setStaffFilter] = useState<string>('ALL');
+  // Calendar date strip: null = full upcoming agenda; a toDateString() key = that day only.
+  const [dayFilter, setDayFilter] = useState<string|null>(null);
   const [reschedule, setReschedule] = useState<{ appointment:Appointment; date:string; slots:Slot[]; loading:boolean }|null>(null);
   const [editAppt, setEditAppt] = useState<{ appointment:Appointment; name:string; email:string; phone:string; notes:string; notifyClient:boolean }|null>(null);
   const [acting, setActing]         = useState(false);
@@ -421,17 +426,23 @@ function CalendarScreen() {
   }
   // Future-and-today days ascending; always include today (even if empty).
   const todayMs = new Date(TODAY_KEY).getTime();
-  const dayKeys = Array.from(new Set([TODAY_KEY, ...byDay.keys()]))
+  const allDayKeys = Array.from(new Set([TODAY_KEY, ...byDay.keys()]))
     .filter(k => new Date(k).getTime() >= todayMs)
     .sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+  // A 14-day horizontal strip starting today, so the screen reads as a calendar.
+  const STRIP_DAYS = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+i);
+    const key = d.toDateString();
+    return { key, date: d, count: (byDay.get(key) ?? []).length };
+  });
+  // When a strip day is picked, show only that day; otherwise the full upcoming agenda.
+  const dayKeys = dayFilter ? [dayFilter] : allDayKeys;
   const sections = dayKeys.map(k => ({
     key: k,
     isToday: k === TODAY_KEY,
     title: new Date(k).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}).toUpperCase(),
     data: (byDay.get(k) ?? []).sort((a,b)=> +new Date(a.startsAt) - +new Date(b.startsAt)),
   }));
-
-  function fmtDur(min:number){ const h=Math.floor(min/60), r=min%60; if(h&&r) return `${h}h ${r}m`; return h?`${h}h`:`${min}m`; }
 
   function openMenu() {
     Alert.alert('Calendar', undefined, [
@@ -481,6 +492,29 @@ function CalendarScreen() {
         ))}
       </ScrollView>
 
+      {/* Calendar date strip — tap a day to focus it; dot = has appointments */}
+      <View style={cal.stripWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16 }}>
+          <TouchableOpacity onPress={()=>setDayFilter(null)} style={[cal.allDay, dayFilter===null && cal.allDayOn]}>
+            <Ionicons name="albums-outline" size={16} color={dayFilter===null ? '#fff' : GRAY_500}/>
+            <Text style={[cal.allDayText, dayFilter===null && { color:'#fff' }]}>All</Text>
+          </TouchableOpacity>
+          {STRIP_DAYS.map(({ key, date, count }) => {
+            const on = dayFilter === key;
+            const isToday = key === TODAY_KEY;
+            return (
+              <TouchableOpacity key={key} onPress={()=>setDayFilter(on ? null : key)} style={[cal.dayCell, on && cal.dayCellOn]}>
+                <Text style={[cal.dayDow, on && { color:'#fff' }, !on && isToday && { color:BRAND }]}>
+                  {date.toLocaleDateString('en-US',{ weekday:'short' }).toUpperCase()}
+                </Text>
+                <Text style={[cal.dayNum, on && { color:'#fff' }, !on && isToday && { color:BRAND }]}>{date.getDate()}</Text>
+                <View style={[cal.dayDot, count>0 && (on ? { backgroundColor:'#fff' } : { backgroundColor:BRAND })]}/>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       <SectionList
         sections={sections}
         keyExtractor={(a)=>a.id}
@@ -494,7 +528,7 @@ function CalendarScreen() {
           </View>
         )}
         renderSectionFooter={({section})=> (section as any).data.length===0
-          ? <Text style={cal.emptyDay}>No appointments or events today.</Text>
+          ? <Text style={cal.emptyDay}>No appointments this day.</Text>
           : null}
         renderItem={({item:a})=>{
           const d = new Date(a.startsAt);
@@ -2208,8 +2242,22 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <ScrollView contentContainerStyle={s.listContent}>
               <Text style={s.fieldLabel}>Name</Text>
               <TextInput style={s.input} value={serviceEditor.name} onChangeText={name=>setServiceEditor({...serviceEditor,name})}/>
-              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Duration minutes</Text>
-              <TextInput style={s.input} value={serviceEditor.durationMinutes} keyboardType="number-pad" onChangeText={durationMinutes=>setServiceEditor({...serviceEditor,durationMinutes})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>How long it takes</Text>
+              <View style={{ flexDirection:'row', gap:10 }}>
+                <View style={{ flex:1 }}>
+                  <TextInput style={s.input} keyboardType="number-pad" placeholder="0"
+                    value={String(Math.floor((Number(serviceEditor.durationMinutes)||0)/60))}
+                    onChangeText={h=>{ const hh=Math.max(0,Number.parseInt(h||'0',10)||0); const mm=(Number(serviceEditor.durationMinutes)||0)%60; setServiceEditor({...serviceEditor, durationMinutes:String(hh*60+mm)}); }}/>
+                  <Text style={[ms.rowMeta,{ textAlign:'center', marginTop:4 }]}>hours</Text>
+                </View>
+                <View style={{ flex:1 }}>
+                  <TextInput style={s.input} keyboardType="number-pad" placeholder="00"
+                    value={String((Number(serviceEditor.durationMinutes)||0)%60).padStart(2,'0')}
+                    onChangeText={m=>{ const mm=Math.min(59,Math.max(0,Number.parseInt(m||'0',10)||0)); const hh=Math.floor((Number(serviceEditor.durationMinutes)||0)/60); setServiceEditor({...serviceEditor, durationMinutes:String(hh*60+mm)}); }}/>
+                  <Text style={[ms.rowMeta,{ textAlign:'center', marginTop:4 }]}>minutes</Text>
+                </View>
+              </View>
+              <Text style={[ms.rowMeta,{ color:BRAND, marginTop:6 }]}>Total: {fmtDur(Number(serviceEditor.durationMinutes)||0)}</Text>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Price</Text>
               <TextInput style={s.input} value={serviceEditor.price} keyboardType="decimal-pad" onChangeText={price=>setServiceEditor({...serviceEditor,price})}/>
               <View style={[ms.card,{ marginTop:14, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
@@ -3385,6 +3433,15 @@ const cal = StyleSheet.create({
   aptService:    { fontSize:13, color:GRAY_500, marginTop:2 },
   aptTime:       { fontSize:15, fontWeight:'600', color:GRAY_900 },
   aptDur:        { fontSize:13, color:GRAY_500, marginTop:2 },
+  stripWrap:     { paddingVertical:10, borderBottomWidth:1, borderBottomColor:GRAY_100, backgroundColor:'#fff' },
+  allDay:        { width:52, borderRadius:14, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff', alignItems:'center', justifyContent:'center', paddingVertical:8, gap:2 },
+  allDayOn:      { backgroundColor:BRAND, borderColor:BRAND },
+  allDayText:    { fontSize:11, fontWeight:'700', color:GRAY_500 },
+  dayCell:       { width:52, borderRadius:14, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff', alignItems:'center', paddingVertical:8 },
+  dayCellOn:     { backgroundColor:BRAND, borderColor:BRAND },
+  dayDow:        { fontSize:10, fontWeight:'700', color:GRAY_400, letterSpacing:0.4 },
+  dayNum:        { fontSize:18, fontWeight:'700', color:GRAY_900, marginTop:2 },
+  dayDot:        { width:5, height:5, borderRadius:3, marginTop:4, backgroundColor:'transparent' },
 });
 
 // Checkout / Tap to Pay styles
@@ -4174,6 +4231,61 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
 // ── Tab navigator ────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
 
+// The tab bar lives inside the SafeAreaProvider so it can read the bottom inset.
+// Without this the bar sat flush at height:64 and its targets overlapped the home
+// indicator — "extreme down, hard to reach". We lift it above the inset and give
+// the row more height + breathing room so every tab is an easy tap.
+function MainTabs({ msgClient, setMsgClient, onLogout }: {
+  msgClient: Client|null;
+  setMsgClient: (c:Client|null)=>void;
+  onLogout: ()=>void;
+}) {
+  const insets = useSafeAreaInsets();
+  const barHeight = 60 + Math.max(insets.bottom, 8);
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: GRAY_900,
+        tabBarInactiveTintColor: GRAY_400,
+        // Active tab = rounded grey pill behind the icon + label.
+        tabBarActiveBackgroundColor: GRAY_100,
+        tabBarStyle: {
+          backgroundColor:'#fff', borderTopColor:GRAY_100,
+          height: barHeight,
+          paddingTop:8, paddingBottom: Math.max(insets.bottom, 8), paddingHorizontal:6,
+        },
+        tabBarItemStyle: { borderRadius:16, marginHorizontal:4, marginTop:6, marginBottom:6, paddingVertical:2 },
+        tabBarLabelStyle: { fontSize:11, fontWeight:'600' },
+        tabBarIcon: ({ color, size, focused }) => {
+          const icons: Record<string,[string,string]> = {
+            Calendar:['calendar','calendar-outline'], Checkout:['card','card-outline'],
+            Customers:['people','people-outline'], Messages:['chatbubbles','chatbubbles-outline'],
+            Alerts:['notifications','notifications-outline'], Menu:['menu','menu-outline'],
+          };
+          const pair = icons[route.name] ?? ['ellipse','ellipse-outline'];
+          return <Ionicons name={(focused ? pair[0] : pair[1]) as any} size={24} color={color}/>;
+        },
+      })}
+    >
+      <Tab.Screen name="Calendar" component={CalendarScreen}/>
+      <Tab.Screen name="Checkout" component={CheckoutScreen}/>
+      <Tab.Screen name="Customers">
+        {()=><ClientsScreen onMessage={c=>setMsgClient(c)}/>}
+      </Tab.Screen>
+      <Tab.Screen name="Messages">
+        {()=><MessagesScreen initialClient={msgClient} onClearClient={()=>setMsgClient(null)}/>}
+      </Tab.Screen>
+      <Tab.Screen name="Alerts" component={NotificationsScreen}/>
+      <Tab.Screen name="Menu">
+        {()=><MenuScreen onLogout={onLogout}/>}
+      </Tab.Screen>
+      {/* Hidden route — opened from the Calendar "+" to add an appointment. */}
+      <Tab.Screen name="Book" component={BookScreen} options={{ tabBarButton: () => null }}/>
+    </Tab.Navigator>
+  );
+}
+
 export default function App() {
   const [token, setToken]             = useState<string|null>(null);
   const [user, setUser]               = useState<User|null>(null);
@@ -4242,42 +4354,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="#fff"/>
       <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarActiveTintColor: GRAY_900,
-            tabBarInactiveTintColor: GRAY_400,
-            // Active tab = rounded grey pill behind the icon + label.
-            tabBarActiveBackgroundColor: GRAY_100,
-            tabBarStyle: { backgroundColor:'#fff', borderTopColor:GRAY_100, height:64, paddingTop:6, paddingBottom:8, paddingHorizontal:6 },
-            tabBarItemStyle: { borderRadius:16, marginHorizontal:4, marginVertical:6 },
-            tabBarLabelStyle: { fontSize:11, fontWeight:'600' },
-            tabBarIcon: ({ color, size, focused }) => {
-              const icons: Record<string,[string,string]> = {
-                Calendar:['calendar','calendar-outline'], Checkout:['card','card-outline'],
-                Customers:['people','people-outline'], Messages:['chatbubbles','chatbubbles-outline'],
-                Alerts:['notifications','notifications-outline'], Menu:['menu','menu-outline'],
-              };
-              const pair = icons[route.name] ?? ['ellipse','ellipse-outline'];
-              return <Ionicons name={(focused ? pair[0] : pair[1]) as any} size={size} color={color}/>;
-            },
-          })}
-        >
-          <Tab.Screen name="Calendar" component={CalendarScreen}/>
-          <Tab.Screen name="Checkout" component={CheckoutScreen}/>
-          <Tab.Screen name="Customers">
-            {()=><ClientsScreen onMessage={c=>setMsgClient(c)}/>}
-          </Tab.Screen>
-          <Tab.Screen name="Messages">
-            {()=><MessagesScreen initialClient={msgClient} onClearClient={()=>setMsgClient(null)}/>}
-          </Tab.Screen>
-          <Tab.Screen name="Alerts" component={NotificationsScreen}/>
-          <Tab.Screen name="Menu">
-            {()=><MenuScreen onLogout={handleLogout}/>}
-          </Tab.Screen>
-          {/* Hidden route — opened from the Calendar "+" to add an appointment. */}
-          <Tab.Screen name="Book" component={BookScreen} options={{ tabBarButton: () => null }}/>
-        </Tab.Navigator>
+        <MainTabs msgClient={msgClient} setMsgClient={setMsgClient} onLogout={handleLogout}/>
       </NavigationContainer>
     </SafeAreaProvider>
     </ErrorBoundary>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, ChevronLeft, Mail, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -82,10 +82,13 @@ export default function MessagesPage() {
   return (
     <div className="max-w-5xl mx-auto h-[calc(100vh-130px)] flex gap-4">
 
-      {/* Thread list */}
-      <div className="w-72 shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+      {/* Thread list — full-width on mobile; hidden there once a thread is open */}
+      <div className={cn(
+        "w-full md:w-72 shrink-0 bg-white rounded-2xl border border-gray-100 shadow-sm flex-col overflow-hidden",
+        selected ? "hidden md:flex" : "flex",
+      )}>
         <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Messages</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Conversations</h3>
           {unread > 0 && (
             <span className="text-xs font-bold text-white bg-violet-600 rounded-full px-2 py-0.5">{unread}</span>
           )}
@@ -121,8 +124,11 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {/* Thread view */}
-      <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+      {/* Thread view — full-width on mobile; hidden there until a thread is open */}
+      <div className={cn(
+        "flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm flex-col overflow-hidden",
+        selected ? "flex" : "hidden md:flex",
+      )}>
         {!selected ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
             <MessageSquare className="w-12 h-12 text-gray-200 mb-3" />
@@ -131,15 +137,22 @@ export default function MessagesPage() {
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm">
+            {/* Header — the back arrow returns to the list on mobile */}
+            <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 sm:gap-3">
+              <button onClick={() => setSelected(null)}
+                className="md:hidden -ml-1 p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors" aria-label="Back to conversations">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
                 {selected.client.name.slice(0, 2).toUpperCase()}
               </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">{selected.client.name}</p>
-                <p className="text-xs text-gray-400">{selected.client.email}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 truncate">{selected.client.name}</p>
+                <p className="text-xs text-gray-400 truncate">{selected.client.email}</p>
               </div>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-2 py-1 shrink-0">
+                <Mail className="w-3 h-3" /> In-app{plan !== "FREE" && <> · <Smartphone className="w-3 h-3" /> SMS</>}
+              </span>
             </div>
 
             {/* Messages */}

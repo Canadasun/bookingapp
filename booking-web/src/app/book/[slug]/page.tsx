@@ -423,9 +423,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       <div className="max-w-2xl mx-auto px-5 py-8">
         {/* Prestige: verified businesses get a trust strip that reassures clients */}
         {biz?.verificationStatus === "VERIFIED" && step !== 4 && !slotTaken && (
-          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 px-4 py-3">
-            <ShieldCheck className="w-5 h-5 text-violet-600 shrink-0" />
-            <p className="text-sm text-gray-700">
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 px-3 py-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+            <p className="text-xs text-gray-700">
               <span className="font-semibold text-gray-900">{biz?.name}</span> is a <span className="font-semibold text-violet-700">Pulse-verified business</span> — identity confirmed for safe, trusted booking.
             </p>
           </div>
