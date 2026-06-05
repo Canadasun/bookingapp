@@ -559,8 +559,10 @@ export const api = {
     },
     get: (businessId: string, id: string) =>
       req<Client & { appointments: Appointment[]; totalSpentCents: number }>(`/businesses/${businessId}/clients/${id}`),
+    // `matched: true` means the booking synced to an existing client (deduped on
+    // email/phone) rather than creating a new profile.
     create: (businessId: string, data: { name: string; email: string; phone?: string; notes?: string }) =>
-      req<Client>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
+      req<Client & { matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     duplicates: (businessId: string) =>

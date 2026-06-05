@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
+import { ImageUpload } from "@/components/ImageUpload";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", bio: "" });
+  const [form, setForm] = useState({ name: "", email: "", bio: "", avatarUrl: "" });
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   // One-time temp password to surface to the owner after inviting a staff member.
@@ -51,10 +52,10 @@ export default function StaffPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"" }); setSelectedServiceIds([]); setShowModal(true); }
+  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"" }); setSelectedServiceIds([]); setShowModal(true); }
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "" });
+    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "" });
     setSelectedServiceIds(s.staffServices.map((ss) => ss.serviceId));
     setShowModal(true);
   }
@@ -69,10 +70,14 @@ export default function StaffPage() {
         const res = await api.staff.invite(bizId, {
           name: form.name, email: form.email, bio: form.bio || undefined, serviceIds: selectedServiceIds,
         });
+        // Invite can't carry an avatar — set it right after on the new staff record.
+        if (form.avatarUrl && res.staff?.id) {
+          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl }).catch(() => {});
+        }
         setInvited({ email: form.email, password: res.tempPassword });
         toast.success("Staff invited — copy the temporary password now");
       } else {
-        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined });
+        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "" });
         await api.staff.assignServices(bizId, editing.id, selectedServiceIds);
         toast.success("Staff updated");
       }
@@ -150,8 +155,11 @@ export default function StaffPage() {
           {staff.map((s) => (
             <Card key={s.id} className={!s.active ? "opacity-60" : ""}>
               <CardContent className="py-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">
-                  {initials(s.user.name)}
+                <div className="w-10 h-10 rounded-full bg-violet-100 overflow-hidden flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">
+                  {s.avatarUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={s.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    : initials(s.user.name)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -212,6 +220,11 @@ export default function StaffPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Bio (optional)</label>
                 <Input placeholder="Specialises in…" value={form.bio} onChange={(e) => setForm((p) => ({...p,bio:e.target.value}))}/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Photo (optional)</label>
+                <ImageUpload value={form.avatarUrl || null} kind="AVATAR" shape="circle"
+                  onChange={(url) => setForm((p) => ({ ...p, avatarUrl: url ?? "" }))} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Services offered</label>

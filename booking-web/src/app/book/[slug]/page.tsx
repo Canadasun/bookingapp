@@ -130,6 +130,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [loadingSlots, setLoadingSlots]     = useState(false);
   const [loadingBiz, setLoadingBiz]         = useState(true);
   const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string } | null>(null);
+  const [clientMatched, setClientMatched]   = useState(false);
   const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
   const [wl, setWl]                         = useState({ name: "", email: "" });
   const [wlSaving, setWlSaving]             = useState(false);
@@ -258,6 +259,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       const client = await api.clients.create(bizId, {
         name: form.name, email: form.email, phone: form.phone || undefined, notes: form.notes || undefined,
       });
+      setClientMatched(!!client.matched);
 
       // Book first (primary) service; backend handles duration
       const apt = await api.appointments.create(bizId, {
@@ -482,7 +484,13 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re booked!</h2>
             <p className="text-gray-500 mb-1">Confirmation sent to <span className="font-medium text-gray-800">{form.email}</span></p>
-            <p className="text-xs text-gray-400 font-mono mb-6">#{booking.id.slice(-8).toUpperCase()}</p>
+            <p className="text-xs text-gray-400 font-mono mb-3">#{booking.id.slice(-8).toUpperCase()}</p>
+            {clientMatched && (
+              <p className="mb-6 inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-100 px-3 py-1 text-xs font-medium text-violet-700">
+                <Check className="w-3.5 h-3.5" /> Synced to your existing profile with {biz?.name ?? "this business"}
+              </p>
+            )}
+            {!clientMatched && <div className="mb-6" />}
 
             <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 mb-6 text-sm">
               {selectedServices.map((s) => (

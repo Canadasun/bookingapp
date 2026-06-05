@@ -42,6 +42,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import * as SecureStore from 'expo-secure-store';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -67,6 +68,16 @@ function resolveApiBase(): string {
 }
 
 const API_BASE = resolveApiBase();
+// Uploads are stored by the web as same-origin "/proxy/uploads/:id"; rewrite those
+// (and bare "/uploads/:id") onto the API host so the native app can load them.
+// Absolute http(s) URLs are returned untouched. Returns null when there's no image.
+function uploadUri(u?: string | null): string | null {
+  if (!u) return null;
+  if (/^https?:\/\//.test(u)) return u;
+  const apiRoot = API_BASE.replace(/\/api\/?$/, '');
+  const path = u.replace(/^\/proxy/, '');
+  return `${apiRoot}${path.startsWith('/') ? '' : '/'}${path}`;
+}
 const BIZ_ID   = process.env.EXPO_PUBLIC_BUSINESS_ID ?? '';
 const BRAND     = '#E9A23C'; // amber/gold brand
 const BRAND_LT  = '#FBE8CF'; // light tint for selected backgrounds
@@ -84,7 +95,7 @@ interface Appointment { id:string; startsAt:string; endsAt:string; status:string
 interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
 interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null }
 interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:number; startTime:string; endTime:string }
-interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string }
+interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string; avatarUrl?:string }
 interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }
 type BookingSlot = Slot & { staffId?:string; staffName?:string };
 interface Client { id:string; name:string; email:string; phone?:string; totalVisits?:number; lastVisit?:string }
@@ -2289,7 +2300,9 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(staff ?? []).map(st => (
             <View key={st.id} style={ms.row}>
-              <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+              {uploadUri(st.avatarUrl)
+                ? <Image source={{ uri: uploadUri(st.avatarUrl)! }} style={s.avatarImg} contentFit="cover"/>
+                : <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>}
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{st.user.name}</Text>
                 <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
@@ -3230,7 +3243,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={ms.card}>
             <Text style={ms.cardLabel}>Business</Text>
-            <View style={{ flexDirection:'row', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              {uploadUri((biz as any)?.logoUrl) && (
+                <Image source={{ uri: uploadUri((biz as any).logoUrl)! }} style={s.bizLogoImg} contentFit="cover"/>
+              )}
               <Text style={ms.cardValue}>{biz?.name ?? '—'}</Text>
               {(biz as any)?.verificationStatus === 'VERIFIED' && <VerifiedPill/>}
             </View>
@@ -4424,7 +4440,9 @@ const s = StyleSheet.create({
   backText:        { color:BRAND, fontSize:14, fontWeight:'500' },
   svcDot:          { width:12, height:12, borderRadius:99, marginRight:4 },
   avatar:          { width:40, height:40, borderRadius:20, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
+  avatarImg:       { width:40, height:40, borderRadius:20, backgroundColor:GRAY_100 },
   avatarText:      { color:BRAND, fontWeight:'700', fontSize:13 },
+  bizLogoImg:      { width:44, height:44, borderRadius:12, backgroundColor:GRAY_100 },
   checkbox:        { width:20, height:20, borderRadius:10, borderWidth:2, borderColor:GRAY_200, alignItems:'center', justifyContent:'center', marginLeft:8 },
   checkboxActive:  { borderColor:BRAND, backgroundColor:BRAND },
   cartBar:         { backgroundColor:BRAND_LT, borderRadius:12, padding:12, marginTop:8, alignItems:'center' },
