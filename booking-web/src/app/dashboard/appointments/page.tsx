@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   format, isToday, isThisWeek,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
-  isSameMonth, addMonths, subMonths,
+  isSameMonth, addMonths, subMonths, addDays, addWeeks, subWeeks, isSameDay,
 } from "date-fns";
 import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,7 +19,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatPrice, cn } from "@/lib/utils";
 
 type Tab = "today" | "week" | "all";
-type ViewMode = "list" | "staff" | "calendar";
+type ViewMode = "list" | "staff" | "calendar" | "week";
 
 // Turn the API's cancellation-fee reason code into something an owner can read.
 function feeReasonText(reason: string): string {
@@ -421,6 +421,61 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
   );
 }
 
+// Week view — seven day columns with each day's appointments in time order.
+function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect }: {
+  weekStart: Date; appts: Appointment[];
+  onPrev: () => void; onNext: () => void; onToday: () => void;
+  onSelect: (a: Appointment) => void;
+}) {
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const byDay = new Map<string, Appointment[]>();
+  for (const a of appts) {
+    const k = format(new Date(a.startsAt), "yyyy-MM-dd");
+    (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(a);
+  }
+  const weekEnd = addDays(weekStart, 6);
+  const rangeLabel = format(weekStart, "MMM d") + " – " + format(weekEnd, isSameMonth(weekStart, weekEnd) ? "d" : "MMM d");
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <p className="text-sm font-semibold text-gray-900">{rangeLabel}</p>
+        <div className="flex items-center gap-1">
+          <button onClick={onToday} className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">This week</button>
+          <button onClick={onPrev} aria-label="Previous week" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={onNext} aria-label="Next week" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-x divide-gray-50">
+        {days.map((day) => {
+          const k = format(day, "yyyy-MM-dd");
+          const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+          return (
+            <div key={k} className="min-h-[180px]">
+              <div className={cn("px-2 py-2 text-center border-b border-gray-50", isSameDay(day, new Date()) && "bg-violet-50")}>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase">{format(day, "EEE")}</p>
+                <p className={cn("text-sm font-bold", isSameDay(day, new Date()) ? "text-violet-700" : "text-gray-700")}>{format(day, "d")}</p>
+              </div>
+              <div className="p-1.5 space-y-1">
+                {list.map((a) => (
+                  <button key={a.id} onClick={() => onSelect(a)}
+                    className="block w-full text-left rounded-lg border border-gray-100 px-2 py-1.5 hover:bg-gray-50">
+                    <span className="flex items-center gap-1">
+                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
+                      <span className="text-[11px] font-semibold text-gray-700">{format(new Date(a.startsAt), "HH:mm")}</span>
+                    </span>
+                    <span className="block truncate text-[11px] text-gray-600">{a.client.name}</span>
+                  </button>
+                ))}
+                {list.length === 0 && <p className="px-1 py-2 text-[11px] text-gray-300 text-center">—</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function AppointmentsPage() {
   const user = getUser();
   const isStaff = user?.role === "STAFF";
@@ -435,6 +490,7 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [calMonth, setCalMonth] = useState<Date>(() => new Date());
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [showBlock, setShowBlock] = useState(false);
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string } }[]>([]);
@@ -605,11 +661,11 @@ export default function AppointmentsPage() {
         </select>
 
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-          {(["list","staff","calendar"] as ViewMode[]).map((v) => (
+          {(["list","staff","week","calendar"] as ViewMode[]).map((v) => (
             <button key={v} onClick={() => setViewMode(v)}
               className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                 viewMode === v ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}>
-              {v === "list" ? "List" : v === "staff" ? "Staff board" : "Month"}
+              {v === "list" ? "List" : v === "staff" ? "Staff board" : v === "week" ? "Week" : "Month"}
             </button>
           ))}
         </div>
@@ -629,6 +685,15 @@ export default function AppointmentsPage() {
           onPrev={() => setCalMonth((m) => subMonths(m, 1))}
           onNext={() => setCalMonth((m) => addMonths(m, 1))}
           onToday={() => setCalMonth(new Date())}
+          onSelect={setSelected}
+        />
+      ) : viewMode === "week" ? (
+        <WeekView
+          weekStart={weekStart}
+          appts={calendarAppts}
+          onPrev={() => setWeekStart((w) => subWeeks(w, 1))}
+          onNext={() => setWeekStart((w) => addWeeks(w, 1))}
+          onToday={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }))}
           onSelect={setSelected}
         />
       ) : filtered.length === 0 ? (
