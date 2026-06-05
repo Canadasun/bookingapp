@@ -42,45 +42,35 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function formatHHMM(totalMinutes: number) {
+function formatPolicyDuration(totalMinutes: number) {
   const safe = Math.max(0, Math.floor(Number.isFinite(totalMinutes) ? totalMinutes : 0));
-  const h = Math.floor(safe / 60);
-  const m = safe % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const days = Math.floor(safe / 1440);
+  const hours = Math.floor((safe % 1440) / 60);
+  const minutes = safe % 60;
+  if (days > 0) return `${days} day${days === 1 ? "" : "s"}${hours ? ` ${hours} hr` : ""}${minutes ? ` ${minutes} min` : ""}`;
+  if (hours > 0) return `${hours} hr${hours === 1 ? "" : "s"}${minutes ? ` ${minutes} min` : ""}`;
+  return `${minutes} min`;
 }
 
-function parseHHMM(value: string) {
-  const match = value.trim().match(/^(\d{1,5}):([0-5]\d)$/);
-  if (!match) return null;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
+function PolicyNumberInput({ value, min = 0, unit, onChange }: {
+  value: number; min?: number; unit: "hours" | "days"; onChange: (minutes: number) => void;
+}) {
+  const multiplier = unit === "days" ? 1440 : 60;
+  const safe = Math.max(min, Math.floor(Number.isFinite(value) ? value : min));
+  const displayValue = Math.max(min / multiplier, safe / multiplier);
 
-function PolicyTimeInput({ value, min = 0, onChange }: { value: number; min?: number; onChange: (minutes: number) => void }) {
-  const [text, setText] = useState(formatHHMM(value));
-  useEffect(() => { setText(formatHHMM(value)); }, [value]);
   return (
-    <Input
-      inputMode="numeric"
-      placeholder="HH:MM"
-      value={text}
-      onChange={(e) => {
-        const next = e.target.value;
-        setText(next);
-        const parsed = parseHHMM(next);
-        if (parsed !== null && parsed >= min) onChange(parsed);
-      }}
-      onBlur={() => {
-        const parsed = parseHHMM(text);
-        if (parsed === null || parsed < min) {
-          toast.error("Enter time as HH:MM");
-          setText(formatHHMM(value));
-        } else {
-          setText(formatHHMM(parsed));
-          onChange(parsed);
-        }
-      }}
-      className="bg-white text-base font-semibold tabular-nums"
-    />
+    <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
+      <Input
+        type="number"
+        min={min / multiplier}
+        step={unit === "days" ? 1 : 1}
+        value={Number.isInteger(displayValue) ? displayValue : Number(displayValue.toFixed(1))}
+        onChange={(e) => onChange(Math.max(min, Math.round((Number(e.target.value) || 0) * multiplier)))}
+        className="h-8 w-20 border-0 bg-transparent p-0 text-base font-semibold tabular-nums shadow-none focus-visible:ring-0"
+      />
+      <span className="ml-2 text-sm font-medium text-gray-500">{unit}</span>
+    </div>
   );
 }
 
@@ -496,37 +486,42 @@ export default function SettingsPage() {
                 </div>
                 <hr className="border-gray-100" />
 
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
                   {[
                     {
-                      label: "Minimum notice",
-                      desc: "How long before start clients can book",
+                      label: "Minimum booking notice",
+                      desc: "Clients must book at least this far before the appointment starts.",
                       value: (form.minNoticeMinutes as number) ?? 120,
-                      min: 0,
+                      min: 60,
+                      unit: "hours" as const,
                       key: "minNoticeMinutes" as const,
                     },
                     {
-                      label: "Advance window",
-                      desc: "How far ahead clients can book",
+                      label: "Booking opens up to",
+                      desc: "The farthest date clients can choose on your booking page.",
                       value: (form.maxAdvanceMinutes as number) ?? (((form.maxAdvanceDays as number) ?? 60) * 1440),
-                      min: 1,
+                      min: 7 * 1440,
+                      unit: "days" as const,
                       key: "maxAdvanceMinutes" as const,
                     },
                     {
-                      label: "Cancel window",
-                      desc: "Free self-cancel cutoff before start",
+                      label: "Cancel / reschedule cutoff",
+                      desc: "How many days before the appointment clients can still change it themselves.",
                       value: (form.cancellationWindowMinutes as number) ?? (((form.cancellationWindowHours as number) ?? 24) * 60),
                       min: 0,
+                      unit: "days" as const,
                       key: "cancellationWindowMinutes" as const,
                     },
                   ].map((item) => (
-                    <div key={item.key} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{item.label}</p>
-                      <p className="mt-1 min-h-8 text-xs leading-relaxed text-gray-500">{item.desc}</p>
-                      <div className="mt-3">
-                        <PolicyTimeInput value={item.value} min={item.min} onChange={(minutes) => f(item.key, minutes)} />
+                    <div key={item.key} className="grid gap-3 border-b border-gray-100 p-4 last:border-0 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.desc}</p>
                       </div>
-                      <p className="mt-1 text-[11px] text-gray-400">HH:MM</p>
+                      <div className="sm:text-right">
+                        <PolicyNumberInput value={item.value} min={item.min} unit={item.unit} onChange={(minutes) => f(item.key, minutes)} />
+                        <p className="mt-1 text-xs text-gray-400">Currently {formatPolicyDuration(item.value)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -534,7 +529,7 @@ export default function SettingsPage() {
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
                   <p className="text-sm font-semibold text-blue-900">Cancellation rule</p>
                   <p className="mt-1 text-xs leading-relaxed text-blue-700">
-                    Clients can cancel before the HH:MM cancel window for free. Basic+ businesses can collect deposits and charge manually; Pro can add automatic late-cancellation fees when a saved card is available.
+                    Clients can cancel for free until the cancel window begins. Inside that window, Basic+ businesses can collect deposits and charge manually; Pro can add automatic late-cancellation fees when a saved card is available.
                   </p>
                 </div>
 
