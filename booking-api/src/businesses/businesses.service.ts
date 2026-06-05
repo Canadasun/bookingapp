@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
@@ -42,6 +42,9 @@ export class BusinessesService {
   // subscription expiry) — keep only what the booking flow legitimately needs.
   async findBySlugPublic(slug: string) {
     const business = await this.findBySlug(slug);
+    // A deactivated business is hidden from the public — its booking page reads
+    // as "not found" so no new bookings can come in while it's paused.
+    if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
     const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
     // Active locations so the booking page can offer a location step (multi-location).
     const locations = await this.prisma.location.findMany({
@@ -54,8 +57,81 @@ export class BusinessesService {
 
   async findPublicById(id: string) {
     const business = await this.findOne(id);
+    if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
     const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
     return pub;
+  }
+
+  // Owner pauses their business: keeps all data, hides the public booking page,
+  // and stops new public bookings. Fully reversible via reactivate().
+  async deactivate(id: string) {
+    await this.findOne(id);
+    return this.prisma.business.update({ where: { id }, data: { suspended: true } });
+  }
+
+  async reactivate(id: string) {
+    await this.findOne(id);
+    return this.prisma.business.update({ where: { id }, data: { suspended: false } });
+  }
+
+  // Permanent, irreversible account deletion: erases the business and ALL of its
+  // data (clients, bookings, staff, catalogue, payments, the owner's user, …).
+  // Requires the owner to type the business name back as a safety confirmation.
+  // Order matters: appointments first (they Restrict staff/service/client deletes),
+  // then everything else, then the users, then the business itself.
+  async deleteAccount(id: string, confirmation: string) {
+    const business = await this.findOne(id);
+    if (confirmation.trim().toLowerCase() !== business.name.trim().toLowerCase()) {
+      throw new BadRequestException('Type your business name exactly to confirm deletion.');
+    }
+    const users = await this.prisma.user.findMany({ where: { businessId: id }, select: { id: true } });
+    const userIds = users.map((u) => u.id);
+    const byBiz = { where: { businessId: id } };
+    await this.prisma.$transaction(async (tx) => {
+      // appointment-scoped + appointments (clears the Restrict edges)
+      await tx.refund.deleteMany(byBiz);
+      await tx.payment.deleteMany(byBiz);
+      await tx.review.deleteMany(byBiz);
+      await tx.message.deleteMany(byBiz);
+      await tx.serviceDue.deleteMany(byBiz);
+      await tx.appointment.deleteMany(byBiz);
+      // catalogue / people / everything else owned by the business (their
+      // grandchildren — staffServices, availability, redemptions — cascade)
+      await tx.waitlistEntry.deleteMany(byBiz);
+      await tx.clientPackage.deleteMany(byBiz);
+      await tx.invoice.deleteMany(byBiz);
+      await tx.staffTask.deleteMany(byBiz);
+      await tx.giftCard.deleteMany(byBiz);
+      await tx.package.deleteMany(byBiz);
+      await tx.offer.deleteMany(byBiz);
+      await tx.campaign.deleteMany(byBiz);
+      await tx.transaction.deleteMany(byBiz);
+      await tx.subscription.deleteMany(byBiz);
+      await tx.uploadedFile.deleteMany(byBiz);
+      await tx.googleCalendarConnection.deleteMany(byBiz);
+      await tx.notificationDelivery.deleteMany(byBiz);
+      await tx.client.deleteMany(byBiz);
+      await tx.service.deleteMany(byBiz);
+      await tx.serviceCategory.deleteMany(byBiz);
+      await tx.resource.deleteMany(byBiz);
+      await tx.location.deleteMany(byBiz);
+      await tx.dataErasureRequest.deleteMany(byBiz);
+      await tx.privacyConsent.deleteMany(byBiz);
+      await tx.staff.deleteMany(byBiz);
+      // user-scoped rows for the owner + any staff users in this business
+      if (userIds.length) {
+        const byUser = { where: { userId: { in: userIds } } };
+        await tx.auditLog.deleteMany(byUser);
+        await tx.deviceToken.deleteMany(byUser);
+        await tx.loginEvent.deleteMany(byUser);
+        await tx.notification.deleteMany(byUser);
+        await tx.otpChallenge.deleteMany(byUser);
+        await tx.refreshSession.deleteMany(byUser);
+      }
+      await tx.user.deleteMany({ where: { businessId: id } });
+      await tx.business.delete({ where: { id } });
+    });
+    return { deleted: true };
   }
 
   async update(id: string, dto: UpdateBusinessDto) {

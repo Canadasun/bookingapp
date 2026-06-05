@@ -78,6 +78,7 @@ export interface Business {
   currency: "CAD" | "USD";
   plan: "FREE" | "BASIC" | "PRO";
   planExpiresAt?: string;
+  suspended?: boolean;
   verificationStatus?: VerificationStatus;
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
@@ -494,6 +495,10 @@ export const api = {
     getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
     update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt">>) =>
       req<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deactivate: (id: string) => req<Business>(`/businesses/${id}/deactivate`, { method: "POST" }),
+    reactivate: (id: string) => req<Business>(`/businesses/${id}/reactivate`, { method: "POST" }),
+    remove: (id: string, confirmation: string) =>
+      req<{ deleted: boolean }>(`/businesses/${id}`, { method: "DELETE", body: JSON.stringify({ confirmation }) }),
   },
 
   services: {

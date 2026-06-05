@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, Power, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { api, Business, VerificationStatus, IntakeQuestion } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -20,7 +20,7 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
-type Section = "profile" | "booking" | "calendar" | "payments" | "online" | "notifications" | "security" | "billing";
+type Section = "profile" | "booking" | "calendar" | "payments" | "online" | "notifications" | "security" | "billing" | "account";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
@@ -31,6 +31,7 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: str
   { id: "notifications", label: "Notifications",      icon: Bell,        desc: "Emails & SMS sent to clients" },
   { id: "security",      label: "Security",           icon: ShieldCheck, desc: "Two-factor sign-in, password" },
   { id: "billing",       label: "Billing & plan",     icon: CreditCard,  desc: "Subscription plan, upgrade" },
+  { id: "account",       label: "Account",            icon: Power,       desc: "Pause or close your business" },
 ];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -205,6 +206,9 @@ export default function SettingsPage() {
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
   const [referralInput, setReferralInput] = useState("");
+  const [acctBusy, setAcctBusy] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [delConfirm, setDelConfirm] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
   const [refCopied, setRefCopied] = useState(false);
 
@@ -285,6 +289,29 @@ export default function SettingsPage() {
       const { url } = await api.subscriptions.portal();
       window.location.assign(url);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not open billing portal"); setBillingBusy(null); }
+  }
+
+  // Account: pause (reversible) vs. permanent delete.
+  async function toggleActive() {
+    if (!bizId || !biz) return;
+    setAcctBusy(true);
+    try {
+      const updated = biz.suspended ? await api.business.reactivate(bizId) : await api.business.deactivate(bizId);
+      setBiz(updated);
+      toast.success(updated.suspended ? "Your business is now paused — your booking page is hidden." : "Welcome back — your business is live again.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not update your account"); }
+    finally { setAcctBusy(false); }
+  }
+
+  async function deleteAccount() {
+    if (!bizId) return;
+    setAcctBusy(true);
+    try {
+      await api.business.remove(bizId, delConfirm);
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+      toast.success("Your account and all its data have been permanently deleted.");
+      window.location.assign("/");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete your account"); setAcctBusy(false); }
   }
 
   async function save(e: React.FormEvent) {
@@ -974,6 +1001,95 @@ export default function SettingsPage() {
                     className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors shrink-0">
                     Change
                   </a>
+                </div>
+              </div>
+            )}
+
+            {section === "account" && (
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Account</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Pause your business if you need a break, or close it for good.</p>
+                </div>
+
+                {/* Pause / Reactivate — the prominent, reversible option */}
+                <div className="rounded-xl border border-gray-200 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {biz?.suspended ? "Your business is paused" : "Pause your business"}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1 max-w-md">
+                        {biz?.suspended
+                          ? "Your public booking page is hidden and no new online bookings can come in. Your data is safe — reactivate any time."
+                          : "Temporarily hide your public booking page and stop new online bookings. Nothing is deleted — turn it back on whenever you’re ready."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={toggleActive}
+                      disabled={acctBusy}
+                      variant={biz?.suspended ? "primary" : "outline"}
+                      className="shrink-0 gap-1.5"
+                    >
+                      <Power className="w-4 h-4" />
+                      {biz?.suspended ? "Reactivate" : "Pause"}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Delete — de-emphasized, tucked at the bottom behind a confirm step */}
+                <div className="pt-2">
+                  {!showDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDelete(true)}
+                      className="text-xs text-gray-400 hover:text-red-600 underline underline-offset-2"
+                    >
+                      Delete your business permanently
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-red-200 bg-red-50/50 p-5 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-red-800">Delete this business permanently</p>
+                          <p className="text-xs text-red-700/80 mt-1 max-w-md">
+                            This erases your business and <strong>everything in it</strong> — clients, bookings, staff, services, payments and your login. This cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-medium text-red-800">
+                          Type <span className="font-mono">{biz?.name}</span> to confirm
+                        </label>
+                        <Input
+                          value={delConfirm}
+                          onChange={(e) => setDelConfirm(e.target.value)}
+                          placeholder={biz?.name ?? ""}
+                          className="max-w-sm border-red-300 focus-visible:ring-red-400"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          type="button"
+                          onClick={deleteAccount}
+                          disabled={acctBusy || delConfirm.trim().toLowerCase() !== (biz?.name ?? "").trim().toLowerCase()}
+                          className="gap-1.5 bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Permanently delete
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowDelete(false); setDelConfirm(""); }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

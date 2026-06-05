@@ -113,6 +113,13 @@ export class BookingsService {
     if (!primaryService) throw new NotFoundException('Service not found');
     if (primaryService.active === false) throw new BadRequestException('Service is not available');
 
+    // A deactivated business accepts no new public bookings (owner/manual
+    // bookings, which pass `confirmed`, are still allowed while paused).
+    if (!opts.confirmed) {
+      const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { suspended: true } });
+      if (biz?.suspended) throw new BadRequestException('This business is not currently accepting online bookings');
+    }
+
     // Tenant integrity: the staff and client must belong to THIS business, the
     // staff must be active, and actually offer the selected service. Otherwise a
     // crafted request could attach another business's staff/client to a booking.

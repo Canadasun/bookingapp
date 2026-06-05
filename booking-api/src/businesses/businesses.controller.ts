@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessSchema, UpdateBusinessSchema, CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
@@ -61,5 +61,42 @@ export class BusinessesController {
       throw new ForbiddenException('You do not have access to this business');
     }
     return this.businessService.update(id, dto);
+  }
+
+  // Pause the business (reversible) — hides the public booking page, keeps data.
+  @Post(':id/deactivate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  deactivate(@Param('id') id: string, @CurrentUser() user: User) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.businessService.deactivate(id);
+  }
+
+  @Post(':id/reactivate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  reactivate(@Param('id') id: string, @CurrentUser() user: User) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.businessService.reactivate(id);
+  }
+
+  // Permanently delete the business and ALL its data. Irreversible. Requires the
+  // owner to type the business name back as `confirmation`.
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  remove(
+    @Param('id') id: string,
+    @Body() body: { confirmation?: string },
+    @CurrentUser() user: User,
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.businessService.deleteAccount(id, body?.confirmation ?? '');
   }
 }
