@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AvailabilityService } from './availability.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoogleCalendarService } from '../calendar-sync/google-calendar.service';
 import { addMinutes, addDays } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 
@@ -66,6 +67,7 @@ async function buildService(prismaOverrides = {}) {
     providers: [
       AvailabilityService,
       { provide: PrismaService, useValue: prisma },
+      { provide: GoogleCalendarService, useValue: { busyIntervals: jest.fn().mockResolvedValue([]) } },
     ],
   }).compile();
   return { svc: module.get<AvailabilityService>(AvailabilityService), prisma };

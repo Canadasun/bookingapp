@@ -455,7 +455,7 @@ export default function SettingsPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
                         {cal.connected ? (
-                          <p className="text-xs text-gray-500 mt-0.5 truncate">Connected{cal.email ? ` as ${cal.email}` : ""} — new bookings sync automatically.</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Connected{cal.email ? ` as ${cal.email}` : ""} — bookings sync to your calendar, and personal events on it automatically block those times from booking.</p>
                         ) : (
                           <p className="text-xs text-gray-500 mt-0.5">Connect so confirmed bookings appear on your Google Calendar.</p>
                         )}

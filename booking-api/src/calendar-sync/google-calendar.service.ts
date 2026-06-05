@@ -144,6 +144,43 @@ export class GoogleCalendarService {
     return { token: tok.access_token, calendarId: conn.calendarId };
   }
 
+  // Busy time ranges from the connected Google Calendar over [timeMin, timeMax],
+  // so the booking flow can hide slots when the owner has a personal event.
+  // Best-effort: returns [] when not connected or on any error (never blocks
+  // availability). All-day and "free"/cancelled events are ignored.
+  async busyIntervals(businessId: string, timeMinISO: string, timeMaxISO: string): Promise<{ start: Date; end: Date }[]> {
+    try {
+      const auth = await this.accessTokenFor(businessId);
+      if (!auth) return [];
+      const params = new URLSearchParams({
+        timeMin: timeMinISO,
+        timeMax: timeMaxISO,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '250',
+        fields: 'items(start,end,status,transparency)',
+      });
+      const res = await fetch(`${CAL_API}/calendars/${encodeURIComponent(auth.calendarId)}/events?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) return [];
+      const data = await res.json() as {
+        items?: Array<{ start?: { dateTime?: string }; end?: { dateTime?: string }; status?: string; transparency?: string }>;
+      };
+      const out: { start: Date; end: Date }[] = [];
+      for (const ev of data.items ?? []) {
+        if (ev.status === 'cancelled' || ev.transparency === 'transparent') continue;
+        const s = ev.start?.dateTime; const e = ev.end?.dateTime;
+        if (!s || !e) continue; // skip all-day (date-only) events
+        out.push({ start: new Date(s), end: new Date(e) });
+      }
+      return out;
+    } catch (e) {
+      this.logger.warn(`Google busy fetch failed for ${businessId}: ${e}`);
+      return [];
+    }
+  }
+
   // ── Event sync (best-effort — never throws into the booking flow) ──────────
   async syncAppointment(appointmentId: string): Promise<void> {
     try {

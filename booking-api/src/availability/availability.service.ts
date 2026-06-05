@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoogleCalendarService } from '../calendar-sync/google-calendar.service';
 import { GetSlotsDto, TimeSlot } from './dto/availability.dto';
 import {
   addDays,
@@ -20,7 +21,7 @@ interface Interval {
 
 @Injectable()
 export class AvailabilityService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private google: GoogleCalendarService) {}
 
   async getAvailableSlots(dto: GetSlotsDto): Promise<TimeSlot[]> {
     const { staffId, serviceId, startDate, endDate, timezone } = dto;
@@ -29,7 +30,7 @@ export class AvailabilityService {
       this.prisma.service.findUnique({ where: { id: serviceId } }),
       this.prisma.staff.findUnique({
         where: { id: staffId },
-        include: { business: true },
+        include: { business: true, user: { select: { role: true } } },
       }),
     ]);
 
@@ -126,7 +127,19 @@ export class AvailabilityService {
     // callers additionally honour the business's min-notice window.
     const minNoticeMs = dto.enforceNotice === 'false' ? 0 : (staff.business.minNoticeMinutes ?? 0) * 60_000;
     const earliest = new Date(Date.now() + minNoticeMs);
-    return slots.filter((s) => s.startsAt >= earliest);
+    let bookable = slots.filter((s) => s.startsAt >= earliest);
+
+    // Two-way Google Calendar: for the owner's own provider, also hide any slot
+    // that clashes with a personal event on their connected Google Calendar — so
+    // their real-life schedule (and anything the waitlist would book into) stays
+    // in sync. Best-effort: a Google hiccup never removes availability.
+    if (staff.user?.role === 'OWNER' && bookable.length) {
+      const busy = await this.google.busyIntervals(staff.businessId, rangeStart.toISOString(), rangeEnd.toISOString());
+      if (busy.length) {
+        bookable = bookable.filter((s) => !busy.some((b) => s.startsAt < b.end && s.endsAt > b.start));
+      }
+    }
+    return bookable;
   }
 
   private generateDaySlots(
