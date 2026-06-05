@@ -70,8 +70,9 @@ export interface Business {
   id: string; name: string; slug: string; timezone: string;
   email: string; phone?: string; address?: string; logoUrl?: string;
   bookingPageSettings: Record<string, unknown>;
-  minNoticeMinutes: number; maxAdvanceDays: number;
-  cancellationWindowHours: number; requireDeposit: boolean;
+  notificationSettings?: NotificationSettings;
+  minNoticeMinutes: number; maxAdvanceDays: number; maxAdvanceMinutes?: number;
+  cancellationWindowHours: number; cancellationWindowMinutes?: number; requireDeposit: boolean;
   depositPercent: number; noShowFeeCents: number; cancellationFeeCents: number; collectCardOnFile: boolean; allowClientReschedule: boolean;
   cancellationPolicy: string;
   currency: "CAD" | "USD";
@@ -80,11 +81,20 @@ export interface Business {
   verificationStatus?: VerificationStatus;
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
+  locations?: { id: string; name: string; address?: string | null }[];
   createdAt: string; updatedAt: string;
 }
 
 export interface IntakeQuestion { id: string; label: string; required?: boolean }
 export interface IntakeAnswer { label: string; answer: string }
+export interface NotificationSettings {
+  emailConfirmation?: boolean;
+  emailReminder24h?: boolean;
+  emailCancellation?: boolean;
+  emailReschedule?: boolean;
+  emailStaffCancellation?: boolean;
+  smsReminder2h?: boolean;
+}
 
 export interface ServiceCategory {
   id: string; name: string; description?: string;
@@ -94,6 +104,8 @@ export interface ServiceCategory {
 }
 
 export interface Resource { id: string; businessId: string; name: string; active: boolean; createdAt: string; updatedAt: string }
+
+export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; active: boolean; createdAt: string; updatedAt: string }
 
 export interface InvoiceLineItem { description: string; quantity: number; unitCents: number; amountCents: number }
 export interface Invoice {
@@ -126,7 +138,7 @@ export interface AvailabilityRule {
 
 export interface StaffMember {
   id: string; userId: string; businessId: string;
-  bio?: string; avatarUrl?: string; active: boolean; permissions?: string[];
+  bio?: string; avatarUrl?: string; active: boolean; permissions?: string[]; locationId?: string | null;
   createdAt: string; updatedAt: string;
   user: { name: string; email?: string; phone?: string; role?: string };
   staffServices: StaffService[];
@@ -149,7 +161,7 @@ export interface ClientWithStats extends Client {
 export interface Appointment {
   id: string; startsAt: string; endsAt: string; status: string;
   notes?: string; cancelReason?: string;
-  depositCents?: number; stripePaymentIntentId?: string;
+  depositCents?: number; totalPriceCents?: number; stripePaymentIntentId?: string;
   intakeAnswers?: IntakeAnswer[];
   businessId: string;
   createdAt: string; updatedAt: string;
@@ -157,6 +169,7 @@ export interface Appointment {
   service: Service;
   staff: StaffMember;
   business: Business;
+  location?: { id: string; name: string } | null;
   // HMAC token for the public manage link (present on client-facing responses:
   // booking confirmation, guest lookup, client portal).
   manageToken?: string;
@@ -387,7 +400,7 @@ export const api = {
   payments: {
     // Public — booking wizard asks whether a deposit / card-on-file is required.
     bookingIntent: (appointmentId: string, businessId: string) =>
-      req<{ required: boolean; mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string }>(
+      req<{ required: boolean; mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string; currency?: "CAD" | "USD" }>(
         "/payments/booking-intent", { method: "POST", body: JSON.stringify({ appointmentId, businessId }) }, null),
     // Owner — charge the configured no-show fee on the saved card.
     chargeNoShow: (appointmentId: string) =>
@@ -505,6 +518,16 @@ export const api = {
       req<{ ok: boolean }>(`/businesses/${businessId}/resources/${id}`, { method: "DELETE" }),
   },
 
+  locations: {
+    list: (businessId: string) => req<Location[]>(`/businesses/${businessId}/locations`),
+    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string }) =>
+      req<Location>(`/businesses/${businessId}/locations`, { method: "POST", body: JSON.stringify(data) }),
+    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean }) =>
+      req<Location>(`/businesses/${businessId}/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    remove: (businessId: string, id: string) =>
+      req<{ ok: boolean }>(`/businesses/${businessId}/locations/${id}`, { method: "DELETE" }),
+  },
+
   invoices: {
     list: (businessId: string) => req<Invoice[]>(`/businesses/${businessId}/invoices`),
     get: (businessId: string, id: string) => req<Invoice>(`/businesses/${businessId}/invoices/${id}`),
@@ -540,7 +563,7 @@ export const api = {
     // Owner-only: creates the staff login + returns a one-time temp password.
     invite: (businessId: string, data: { name: string; email: string; bio?: string; serviceIds?: string[] }) =>
       req<{ staff: StaffMember; tempPassword: string }>(`/businesses/${businessId}/staff/invite`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[] }) =>
+    update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null }) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     // force=true moves the provider's bookings to the owner, then deletes them.
     remove: (businessId: string, id: string, force?: boolean) =>

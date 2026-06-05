@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { format, addDays, startOfDay, isBefore, isAfter } from "date-fns";
+import { format, addMinutes, startOfDay, isBefore, isAfter } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { parseISO } from "date-fns";
 import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus, Repeat } from "lucide-react";
@@ -220,6 +220,7 @@ export default function CheckoutPage() {
   const newClientName = `${newClient.firstName.trim()} ${newClient.lastName.trim()}`.trim();
 
   const today = startOfDay(new Date());
+  const advanceLimit = addMinutes(new Date(), biz?.maxAdvanceMinutes ?? ((biz?.maxAdvanceDays ?? 60) * 1440));
   const totalMins  = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const totalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
   // Sole-proprietor first: the provider step + per-person names only appear once
@@ -513,7 +514,7 @@ export default function CheckoutPage() {
               mode="single"
               selected={selectedDate}
               onSelect={pickDate}
-              disabled={(date) => isBefore(date, today) || isAfter(date, addDays(today, biz?.maxAdvanceDays ?? 60))}
+              disabled={(date) => isBefore(date, today) || isAfter(startOfDay(date), startOfDay(advanceLimit))}
               className="mx-auto"
             />
             {selectedDate && (
@@ -562,7 +563,7 @@ export default function CheckoutPage() {
                   <Input
                     type="date"
                     min={format(today, "yyyy-MM-dd")}
-                    max={format(addDays(today, biz?.maxAdvanceDays ?? 60), "yyyy-MM-dd")}
+                    max={format(advanceLimit, "yyyy-MM-dd")}
                     value={customDate}
                     onChange={(e) => { setCustomDate(e.target.value); setSelectedSlot(null); setOverrideCalendar(!!e.target.value && !!customTime); }}
                   />

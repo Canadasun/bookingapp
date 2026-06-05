@@ -16,12 +16,12 @@ function MetricCard({ label, value, icon: Icon, accent }: {
   label: string; value: string | number; icon: React.ElementType; accent: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
-        <Icon className="w-5 h-5" />
+    <div className="min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-start gap-3 sm:gap-4">
+      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
+        <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
       </div>
-      <div>
-        <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
+      <div className="min-w-0">
+        <p className="max-w-full truncate text-xl sm:text-2xl font-bold text-gray-900 leading-none tabular-nums">{value}</p>
         <p className="text-xs text-gray-500 mt-1">{label}</p>
       </div>
     </div>
@@ -132,7 +132,7 @@ export default function OverviewPage() {
 
   if (loading) return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4"><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /></div>
       <div className="grid md:grid-cols-5 gap-5">
         <div className="md:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-1">
           {Array.from({length:6}).map((_,i)=><SkeletonRow key={i}/>)}
@@ -160,14 +160,14 @@ export default function OverviewPage() {
     .slice(0, 5);
   const weekCompleted = appointments
     .filter((a) => a.status === "COMPLETED" && isThisWeek(new Date(a.startsAt)));
-  const weekRevenue  = weekCompleted.reduce((s, a) => s + a.service.priceCents, 0);
+  const weekRevenue  = weekCompleted.reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
   const newThisMonth = clients.filter((c) => isThisMonth(new Date(c.createdAt))).length;
   const greeting = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
   const pendingBookings = appointments.filter((a) => a.status === "PENDING").length;
   const cancelledThisWeek = appointments.filter((a) => a.status === "CANCELLED" && isThisWeek(new Date(a.startsAt))).length;
   const noShowsThisMonth = appointments.filter((a) => a.status === "NO_SHOW" && isThisMonth(new Date(a.startsAt))).length;
   const serviceCounts = weekCompleted.reduce<Record<string, number>>((acc, apt) => {
-    acc[apt.service.name] = (acc[apt.service.name] ?? 0) + 1;
+	    acc[apt.service.name] = (acc[apt.service.name] ?? 0) + 1;
     return acc;
   }, {});
   const topService = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0];
@@ -181,11 +181,11 @@ export default function OverviewPage() {
   ].filter((a) => a.value > 0);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto min-w-0 space-y-5 sm:space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-bold text-gray-900">
             Good {greeting}{user ? `, ${user.name.split(" ")[0]}` : ""}
           </h2>
@@ -234,14 +234,14 @@ export default function OverviewPage() {
 
       {/* Get verified — one-click request, lands the business in the admin queue */}
       {!isStaff && (verifStatus === "UNVERIFIED" || verifStatus === "REJECTED") && (
-        <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex items-center gap-3">
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <ShieldCheck className="w-6 h-6 text-violet-600 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-violet-900">Get your business verified</p>
             <p className="text-xs text-violet-700 mt-0.5">Earn a standout verified badge clients trust — shown on your booking page, emails and their portal. One click to request it.</p>
           </div>
           <button onClick={requestVerification} disabled={verifBusy}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
+            className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
             {verifBusy ? "Submitting…" : "Get verified"}
           </button>
         </div>
@@ -255,7 +255,7 @@ export default function OverviewPage() {
 
       {/* Metrics */}
       {!isStaff && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <MetricCard label="Revenue this week" value={formatPrice(weekRevenue)}
             icon={TrendingUp} accent="bg-emerald-50 text-emerald-600" />
           <MetricCard label="Appointments today" value={today.length}
@@ -268,14 +268,14 @@ export default function OverviewPage() {
       )}
 
       {!isStaff && (
-        <div className="grid md:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[
             { label: "Cancelled this week", value: cancelledThisWeek },
             { label: "No-shows this month", value: noShowsThisMonth },
             { label: "Top service this week", value: topService ? `${topService[0]} (${topService[1]})` : "—" },
             { label: "Waitlist", value: waitlistCount },
           ].map((m) => (
-            <div key={m.label} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div key={m.label} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium text-gray-400">{m.label}</p>
               <p className="mt-1 text-lg font-bold text-gray-900 truncate">{m.value}</p>
             </div>

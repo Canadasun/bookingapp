@@ -13,8 +13,16 @@ export interface AppointmentWithRelations {
   endsAt: Date;
   client: { name: string; email: string; phone?: string | null };
   service: { name: string };
-  business?: { plan: 'FREE' | 'BASIC' | 'PRO' };
+  business?: { plan: 'FREE' | 'BASIC' | 'PRO'; notificationSettings?: unknown };
 }
+
+type NotificationKey =
+  | 'emailConfirmation'
+  | 'emailReminder24h'
+  | 'emailCancellation'
+  | 'emailReschedule'
+  | 'emailStaffCancellation'
+  | 'smsReminder2h';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
@@ -70,20 +78,20 @@ export class NotificationsService implements OnModuleInit {
 
   async scheduleReminders(apt: AppointmentWithRelations) {
     const business = apt.business ?? await this.prisma.appointment
-      .findUnique({ where: { id: apt.id }, select: { business: { select: { plan: true } } } })
+      .findUnique({ where: { id: apt.id }, select: { business: { select: { plan: true, notificationSettings: true } } } })
       .then((row) => row?.business);
     const now = Date.now();
     const delay24h = apt.startsAt.getTime() - now - 24 * 60 * 60 * 1000;
     const delay2h = apt.startsAt.getTime() - now - 2 * 60 * 60 * 1000;
 
-    if (delay24h > 0 && isPaidPlan(business?.plan)) {
+    if (delay24h > 0 && isPaidPlan(business?.plan) && this.enabled(business?.notificationSettings, 'emailReminder24h')) {
       await this.queue.add(
         'reminder-24h',
         { appointmentId: apt.id },
         { delay: delay24h, jobId: `reminder-24h-${apt.id}`, removeOnComplete: true },
       );
     }
-    if (delay2h > 0 && isProPlan(business?.plan)) {
+    if (delay2h > 0 && isProPlan(business?.plan) && this.enabled(business?.notificationSettings, 'smsReminder2h')) {
       await this.queue.add(
         'reminder-2h',
         { appointmentId: apt.id },
@@ -98,6 +106,17 @@ export class NotificationsService implements OnModuleInit {
     return `${name}-${id}`;
   }
 
+  private enabled(settings: unknown, key: NotificationKey) {
+    return !settings || typeof settings !== 'object' || (settings as Record<string, unknown>)[key] !== false;
+  }
+
+  private async appointmentSettingEnabled(apt: AppointmentWithRelations, key: NotificationKey) {
+    const settings = apt.business?.notificationSettings ?? await this.prisma.appointment
+      .findUnique({ where: { id: apt.id }, select: { business: { select: { notificationSettings: true } } } })
+      .then((row) => row?.business.notificationSettings);
+    return this.enabled(settings, key);
+  }
+
   async cancelReminders(appointmentId: string) {
     const jobs = await Promise.allSettled([
       this.queue.remove(`reminder-24h-${appointmentId}`),
@@ -107,6 +126,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async sendConfirmation(apt: AppointmentWithRelations) {
+    if (!(await this.appointmentSettingEnabled(apt, 'emailConfirmation'))) return;
     await this.queue.add('send-confirmation', { appointmentId: apt.id }, { jobId: `${this.dedupe('send-confirmation', apt.id)}-${Date.now()}` });
   }
 
@@ -115,14 +135,17 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async sendCancellation(apt: AppointmentWithRelations) {
+    if (!(await this.appointmentSettingEnabled(apt, 'emailCancellation'))) return;
     await this.queue.add('send-cancellation', { appointmentId: apt.id }, { jobId: this.dedupe('send-cancellation', apt.id) });
   }
 
   async sendReschedule(apt: AppointmentWithRelations) {
+    if (!(await this.appointmentSettingEnabled(apt, 'emailReschedule'))) return;
     await this.queue.add('send-reschedule', { appointmentId: apt.id }, { jobId: `${this.dedupe('send-reschedule', apt.id)}-${apt.startsAt.getTime()}` });
   }
 
   async sendStaffCancellation(apt: AppointmentWithRelations) {
+    if (!(await this.appointmentSettingEnabled(apt, 'emailStaffCancellation'))) return;
     await this.queue.add('send-staff-cancellation', { appointmentId: apt.id }, { jobId: this.dedupe('send-staff-cancellation', apt.id) });
   }
 

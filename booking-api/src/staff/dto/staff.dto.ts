@@ -13,6 +13,7 @@ export const UpdateStaffSchema = z.object({
   avatarUrl: z.string().url().optional(),
   active: z.boolean().optional(),
   permissions: z.array(z.enum(STAFF_PERMISSIONS)).max(10).optional(),
+  locationId: z.string().nullable().optional(),
 });
 export type UpdateStaffDto = z.infer<typeof UpdateStaffSchema>;
 

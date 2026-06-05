@@ -10,10 +10,11 @@ interface PayInfo {
   clientSecret?: string;
   amountCents?: number;
   publishableKey?: string;
+  currency?: "CAD" | "USD";
 }
 
-function fmt(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+function fmt(cents: number, currency: "CAD" | "USD" = "CAD") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 
 function PaymentForm({ info, onPaid }: { info: PayInfo; onPaid: () => void }) {
@@ -43,7 +44,7 @@ function PaymentForm({ info, onPaid }: { info: PayInfo; onPaid: () => void }) {
       <Button type="submit" className="w-full py-6 text-base font-semibold" loading={loading} disabled={!stripe}>
         {info.mode === "setup"
           ? "Save card & confirm booking"
-          : `Pay ${fmt(info.amountCents ?? 0)} deposit & confirm`}
+          : `Pay ${fmt(info.amountCents ?? 0, info.currency)} deposit & confirm`}
       </Button>
       <p className="text-center text-xs text-gray-400">Secured by Stripe · your card is not charged for the full service now.</p>
     </form>
@@ -77,7 +78,7 @@ export function BookingPayment({ info, onPaid }: { info: PayInfo; onPaid: () => 
       <p className="text-sm text-gray-500 mb-5">
         {info.mode === "setup"
           ? "We keep your card on file for the cancellation/no-show policy. You're not charged now."
-          : `A ${fmt(info.amountCents ?? 0)} deposit secures your appointment.`}
+          : `A ${fmt(info.amountCents ?? 0, info.currency)} deposit secures your appointment.`}
       </p>
       <Elements stripe={stripePromise} options={{ clientSecret: info.clientSecret, appearance: { theme: "stripe" } }}>
         <PaymentForm info={info} onPaid={onPaid} />

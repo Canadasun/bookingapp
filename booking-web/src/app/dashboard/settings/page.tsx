@@ -42,6 +42,48 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function formatHHMM(totalMinutes: number) {
+  const safe = Math.max(0, Math.floor(Number.isFinite(totalMinutes) ? totalMinutes : 0));
+  const h = Math.floor(safe / 60);
+  const m = safe % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function parseHHMM(value: string) {
+  const match = value.trim().match(/^(\d{1,5}):([0-5]\d)$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function PolicyTimeInput({ value, min = 0, onChange }: { value: number; min?: number; onChange: (minutes: number) => void }) {
+  const [text, setText] = useState(formatHHMM(value));
+  useEffect(() => { setText(formatHHMM(value)); }, [value]);
+  return (
+    <Input
+      inputMode="numeric"
+      placeholder="HH:MM"
+      value={text}
+      onChange={(e) => {
+        const next = e.target.value;
+        setText(next);
+        const parsed = parseHHMM(next);
+        if (parsed !== null && parsed >= min) onChange(parsed);
+      }}
+      onBlur={() => {
+        const parsed = parseHHMM(text);
+        if (parsed === null || parsed < min) {
+          toast.error("Enter time as HH:MM");
+          setText(formatHHMM(value));
+        } else {
+          setText(formatHHMM(parsed));
+          onChange(parsed);
+        }
+      }}
+      className="bg-white text-base font-semibold tabular-nums"
+    />
+  );
+}
+
 // Owner-defined intake/consultation questions shown to clients at booking.
 // Saved independently of the main settings form.
 function IntakeFormEditor({ bizId, initial }: { bizId: string; initial: IntakeQuestion[] }) {
@@ -151,6 +193,11 @@ export default function SettingsPage() {
 
   const f = (k: keyof Business, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
   const bookingSettings = (form.bookingPageSettings ?? {}) as Record<string, unknown>;
+  const notificationSettings = (form.notificationSettings ?? {}) as NonNullable<Business["notificationSettings"]>;
+  const nf = (k: keyof NonNullable<Business["notificationSettings"]>, v: boolean) => setForm((p) => ({
+    ...p,
+    notificationSettings: { ...((p.notificationSettings ?? {}) as Record<string, unknown>), [k]: v },
+  }));
   const bf = (k: string, v: unknown) => setForm((p) => ({
     ...p,
     bookingPageSettings: { ...((p.bookingPageSettings ?? {}) as Record<string, unknown>), [k]: v },
@@ -256,6 +303,8 @@ export default function SettingsPage() {
     }
     setSaving(true);
     try {
+      const maxAdvanceMinutes = Number(form.maxAdvanceMinutes ?? ((form.maxAdvanceDays ?? 60) as number) * 1440);
+      const cancellationWindowMinutes = Number(form.cancellationWindowMinutes ?? ((form.cancellationWindowHours ?? 24) as number) * 60);
       const payload: Partial<Business> = {
         name: String(form.name ?? "").trim(),
         slug: String(form.slug ?? "").trim(),
@@ -265,9 +314,12 @@ export default function SettingsPage() {
         address: String(form.address ?? "").trim() || undefined,
         logoUrl: String(form.logoUrl ?? "").trim() || undefined,
         bookingPageSettings: bookingSettings,
+        notificationSettings: (form.notificationSettings ?? {}) as Business["notificationSettings"],
         minNoticeMinutes: Number(form.minNoticeMinutes ?? 120),
-        maxAdvanceDays: Number(form.maxAdvanceDays ?? 60),
-        cancellationWindowHours: Number(form.cancellationWindowHours ?? 24),
+        maxAdvanceMinutes,
+        maxAdvanceDays: Math.max(1, Math.ceil(maxAdvanceMinutes / 1440)),
+        cancellationWindowMinutes,
+        cancellationWindowHours: Math.floor(cancellationWindowMinutes / 60),
         requireDeposit: !!form.requireDeposit,
         depositPercent: Math.max(1, Number(form.depositPercent ?? 25)),
         taxRatePercent: Math.max(0, Math.min(100, Number(form.taxRatePercent ?? 0))),
@@ -446,18 +498,35 @@ export default function SettingsPage() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    { label: "Minimum notice", value: (form.minNoticeMinutes as number) ?? 120, suffix: "minutes", min: 0, key: "minNoticeMinutes" as const },
-                    { label: "Advance window", value: (form.maxAdvanceDays as number) ?? 60, suffix: "days", min: 1, key: "maxAdvanceDays" as const },
-                    { label: "Cancel window", value: (form.cancellationWindowHours as number) ?? 24, suffix: "hours", min: 0, key: "cancellationWindowHours" as const },
+                    {
+                      label: "Minimum notice",
+                      desc: "How long before start clients can book",
+                      value: (form.minNoticeMinutes as number) ?? 120,
+                      min: 0,
+                      key: "minNoticeMinutes" as const,
+                    },
+                    {
+                      label: "Advance window",
+                      desc: "How far ahead clients can book",
+                      value: (form.maxAdvanceMinutes as number) ?? (((form.maxAdvanceDays as number) ?? 60) * 1440),
+                      min: 1,
+                      key: "maxAdvanceMinutes" as const,
+                    },
+                    {
+                      label: "Cancel window",
+                      desc: "Free self-cancel cutoff before start",
+                      value: (form.cancellationWindowMinutes as number) ?? (((form.cancellationWindowHours as number) ?? 24) * 60),
+                      min: 0,
+                      key: "cancellationWindowMinutes" as const,
+                    },
                   ].map((item) => (
                     <div key={item.key} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{item.label}</p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Input type="number" min={item.min} value={item.value}
-                          onChange={(e) => f(item.key, Number(e.target.value))}
-                          className="bg-white text-base font-semibold" />
-                        <span className="text-xs font-medium text-gray-500">{item.suffix}</span>
+                      <p className="mt-1 min-h-8 text-xs leading-relaxed text-gray-500">{item.desc}</p>
+                      <div className="mt-3">
+                        <PolicyTimeInput value={item.value} min={item.min} onChange={(minutes) => f(item.key, minutes)} />
                       </div>
+                      <p className="mt-1 text-[11px] text-gray-400">HH:MM</p>
                     </div>
                   ))}
                 </div>
@@ -465,7 +534,7 @@ export default function SettingsPage() {
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
                   <p className="text-sm font-semibold text-blue-900">Cancellation rule</p>
                   <p className="mt-1 text-xs leading-relaxed text-blue-700">
-                    Clients can cancel before the window for free. Basic+ businesses can collect deposits and charge manually; Pro can add automatic late-cancellation fees when a saved card is available.
+                    Clients can cancel before the HH:MM cancel window for free. Basic+ businesses can collect deposits and charge manually; Pro can add automatic late-cancellation fees when a saved card is available.
                   </p>
                 </div>
 
@@ -737,30 +806,41 @@ export default function SettingsPage() {
 
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications</p>
                 {[
-                  { label: "Booking confirmation", desc: "Sent immediately when a new appointment is booked", active: true },
-                  { label: "24-hour reminder", desc: "Sent the day before the appointment", active: isPaid, upgrade: "BASIC" as const },
-                  { label: "Cancellation notice", desc: "Sent when a booking is cancelled by client or business", active: true },
-                  { label: "Reschedule notice", desc: "Sent when an appointment is moved to a new time", active: true },
-                  { label: "Staff cancellation", desc: "Special email when business cancels on the client", active: true },
-                ].map(({ label, desc, active, upgrade }) => (
-                  <div key={label} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">{label}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                    </div>
-                    {active ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-xs font-medium text-emerald-700">Active</span>
+                  { key: "emailConfirmation" as const, label: "Booking confirmation", desc: "Sent immediately when a new appointment is booked", allowed: true },
+                  { key: "emailReminder24h" as const, label: "24-hour reminder", desc: "Sent the day before the appointment", allowed: isPaid, upgrade: "BASIC" as const },
+                  { key: "emailCancellation" as const, label: "Cancellation notice", desc: "Sent when a booking is cancelled by client or business", allowed: true },
+                  { key: "emailReschedule" as const, label: "Reschedule notice", desc: "Sent when an appointment is moved to a new time", allowed: true },
+                  { key: "emailStaffCancellation" as const, label: "Staff cancellation", desc: "Special email when business cancels on the client", allowed: true },
+                ].map(({ key, label, desc, allowed, upgrade }) => {
+                  const enabled = notificationSettings[key] !== false;
+                  return (
+                    <div key={key} className="flex flex-col gap-3 py-3 border-b border-gray-50 last:border-0 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                       </div>
-                    ) : (
-                      <button type="button" onClick={() => promptUpgrade(upgrade ?? "BASIC", label)}
-                        className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1 hover:bg-violet-50 transition-colors shrink-0">
-                        Basic+
-                      </button>
-                    )}
-                  </div>
-                ))}
+                      {allowed ? (
+                        <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
+                          {[
+                            { label: "On", value: true },
+                            { label: "Off", value: false },
+                          ].map((opt) => (
+                            <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
+                              className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                                enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => promptUpgrade(upgrade ?? "BASIC", label)}
+                          className="self-start text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors shrink-0">
+                          Basic+
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
 
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">SMS notifications (Pro plan only)</p>
                 <div className="flex items-start justify-between gap-4 py-3">
@@ -769,9 +849,20 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Sent 2 hours before the appointment via Twilio</p>
                   </div>
                   {biz?.plan === "PRO" ? (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span className="text-xs font-medium text-emerald-700">Active</span>
+                    <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
+                      {[
+                        { label: "On", value: true },
+                        { label: "Off", value: false },
+                      ].map((opt) => {
+                        const enabled = notificationSettings.smsReminder2h !== false;
+                        return (
+                          <button key={opt.label} type="button" onClick={() => nf("smsReminder2h", opt.value)}
+                            className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                              enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
+                            {opt.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
                     <button type="button" onClick={() => setSection("billing")}
@@ -1030,7 +1121,7 @@ export default function SettingsPage() {
             )}
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-              {section !== "billing" && section !== "notifications" && section !== "security" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
+              {section !== "billing" && section !== "security" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
             </div>
           </form>
         </div>

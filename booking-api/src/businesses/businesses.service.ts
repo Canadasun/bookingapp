@@ -11,8 +11,13 @@ export class BusinessesService {
   async create(dto: CreateBusinessDto, ownerId: string) {
     const existing = await this.prisma.business.findUnique({ where: { slug: dto.slug } });
     if (existing) throw new ConflictException('Slug already taken');
+    const { bookingPageSettings, notificationSettings, ...rest } = dto;
     const business = await this.prisma.business.create({
-      data: { ...dto, bookingPageSettings: (dto.bookingPageSettings ?? {}) as Prisma.InputJsonValue },
+      data: {
+        ...rest,
+        bookingPageSettings: (bookingPageSettings ?? {}) as Prisma.InputJsonValue,
+        notificationSettings: (notificationSettings ?? {}) as Prisma.InputJsonValue,
+      },
     });
     await this.prisma.user.update({
       where: { id: ownerId },
@@ -38,7 +43,13 @@ export class BusinessesService {
   async findBySlugPublic(slug: string) {
     const business = await this.findBySlug(slug);
     const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
-    return pub;
+    // Active locations so the booking page can offer a location step (multi-location).
+    const locations = await this.prisma.location.findMany({
+      where: { businessId: business.id, active: true },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, address: true },
+    });
+    return { ...pub, locations };
   }
 
   async findPublicById(id: string) {
@@ -49,14 +60,26 @@ export class BusinessesService {
 
   async update(id: string, dto: UpdateBusinessDto) {
     const current = await this.findOne(id);
-    const { bookingPageSettings, ...rest } = dto;
+    const { bookingPageSettings, notificationSettings, ...rest } = dto;
     const limited = applyPlanLimits(current.plan, rest);
+    const data = {
+      ...limited,
+      ...(limited.maxAdvanceMinutes !== undefined
+        ? { maxAdvanceDays: Math.max(1, Math.ceil(limited.maxAdvanceMinutes / 1440)) }
+        : {}),
+      ...(limited.cancellationWindowMinutes !== undefined
+        ? { cancellationWindowHours: Math.floor(limited.cancellationWindowMinutes / 60) }
+        : {}),
+    };
     return this.prisma.business.update({
       where: { id },
       data: {
-        ...limited,
+        ...data,
         ...(bookingPageSettings !== undefined
           ? { bookingPageSettings: bookingPageSettings as Prisma.InputJsonValue }
+          : {}),
+        ...(notificationSettings !== undefined
+          ? { notificationSettings: notificationSettings as Prisma.InputJsonValue }
           : {}),
       },
     });

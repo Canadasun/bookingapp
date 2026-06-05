@@ -29,6 +29,7 @@ export const CreateBusinessSchema = z.object({
   address: optionalString(),
   logoUrl: optionalString(2048),
   bookingPageSettings: z.record(z.unknown()).optional(),
+  notificationSettings: z.record(z.unknown()).optional(),
   intakeQuestions: z.array(z.object({
     id: z.string().min(1),
     label: z.string().min(1).max(200),
@@ -37,7 +38,9 @@ export const CreateBusinessSchema = z.object({
   taxRatePercent: z.number().min(0).max(100).optional(),
   minNoticeMinutes: z.number().int().nonnegative().default(120),
   maxAdvanceDays: z.number().int().positive().default(60),
+  maxAdvanceMinutes: z.number().int().positive().default(86400),
   cancellationWindowHours: z.number().int().nonnegative().default(24),
+  cancellationWindowMinutes: z.number().int().nonnegative().default(1440),
   requireDeposit: z.boolean().default(false),
   depositPercent: z.number().int().min(1).max(100).default(25),
   noShowFeeCents: z.number().int().nonnegative().default(0),

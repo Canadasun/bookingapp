@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, Service, StaffMember } from "@/lib/api";
+import { api, Service, StaffMember, Location } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,10 +25,13 @@ const staffPermissionSummary = [
 export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locName, setLocName] = useState("");
+  const [showLocations, setShowLocations] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState<{ name: string; email: string; bio: string; avatarUrl: string; permissions: string[] }>({ name: "", email: "", bio: "", avatarUrl: "", permissions: [] });
+  const [form, setForm] = useState<{ name: string; email: string; bio: string; avatarUrl: string; permissions: string[]; locationId: string }>({ name: "", email: "", bio: "", avatarUrl: "", permissions: [], locationId: "" });
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   // One-time temp password to surface to the owner after inviting a staff member.
@@ -44,18 +47,22 @@ export default function StaffPage() {
     }
     setLoading(true);
     try {
-      const [s, svcs] = await Promise.all([api.staff.listAll(bizId), api.services.listAll(bizId)]);
-      setStaff(s); setServices(svcs.filter((sv) => sv.active));
+      const [s, svcs, locs] = await Promise.all([
+        api.staff.listAll(bizId),
+        api.services.listAll(bizId),
+        api.locations.list(bizId).catch(() => [] as Location[]),
+      ]);
+      setStaff(s); setServices(svcs.filter((sv) => sv.active)); setLocations(locs);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
 
   useEffect(() => { load(); }, [load]);
 
-  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"", permissions:[] }); setSelectedServiceIds([]); setShowModal(true); }
+  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"", permissions:[], locationId:"" }); setSelectedServiceIds([]); setShowModal(true); }
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "", permissions: s.permissions ?? [] });
+    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "", permissions: s.permissions ?? [], locationId: s.locationId ?? "" });
     setSelectedServiceIds(s.staffServices.map((ss) => ss.serviceId));
     setShowModal(true);
   }
@@ -71,13 +78,13 @@ export default function StaffPage() {
           name: form.name, email: form.email, bio: form.bio || undefined, serviceIds: selectedServiceIds,
         });
         // Invite can't carry an avatar/permissions — set them right after on the new staff record.
-        if ((form.avatarUrl || form.permissions.length) && res.staff?.id) {
-          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions }).catch(() => {});
+        if ((form.avatarUrl || form.permissions.length || form.locationId) && res.staff?.id) {
+          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions, locationId: form.locationId || null }).catch(() => {});
         }
         setInvited({ email: form.email, password: res.tempPassword });
         toast.success("Staff invited — copy the temporary password now");
       } else {
-        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "", permissions: form.permissions });
+        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "", permissions: form.permissions, locationId: form.locationId || null });
         await api.staff.assignServices(bizId, editing.id, selectedServiceIds);
         toast.success("Staff updated");
       }
@@ -97,6 +104,19 @@ export default function StaffPage() {
     if (!bizId) return;
     try { await api.staff.update(bizId, s.id, { active: true }); toast.success("Reactivated"); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  }
+
+  async function addLocation() {
+    const n = locName.trim();
+    if (!n || !bizId) return;
+    try { await api.locations.create(bizId, { name: n }); setLocName(""); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+  }
+  async function removeLocation(l: Location) {
+    if (!bizId) return;
+    if (!confirm(`Delete "${l.name}"? Staff there become unassigned.`)) return;
+    try { await api.locations.remove(bizId, l.id); load(); }
+    catch { toast.error("Failed to delete"); }
   }
 
   async function removeStaff(s: StaffMember) {
@@ -149,6 +169,34 @@ export default function StaffPage() {
           </div>
         </div>
       )}
+
+      {/* Locations / branches */}
+      <div className="mb-5 rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <button onClick={() => setShowLocations((s) => !s)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+          <span className="text-sm font-semibold text-gray-900">Locations {locations.length > 0 && <span className="text-gray-400 font-normal">({locations.length})</span>}</span>
+          <span className="text-xs text-violet-600 font-medium">{showLocations ? "Hide" : "Manage"}</span>
+        </button>
+        {showLocations && (
+          <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-2">
+            <p className="text-xs text-gray-400">Add branches, then assign each staff member to one. Clients booking a location only see that location&apos;s providers. Single-location businesses can leave this empty.</p>
+            <div className="flex flex-wrap gap-2">
+              {locations.map((l) => (
+                <span key={l.id} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 border border-gray-200 px-3 py-1 text-sm text-gray-700">
+                  {l.name}
+                  <button onClick={() => removeLocation(l)} className="text-gray-400 hover:text-red-600" aria-label={`Delete ${l.name}`}>×</button>
+                </span>
+              ))}
+              {locations.length === 0 && <span className="text-xs text-gray-400">No locations yet.</span>}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Input placeholder="e.g. Downtown · West End" value={locName}
+                onChange={(e) => setLocName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLocation(); } }} />
+              <Button size="sm" onClick={addLocation} disabled={!locName.trim()}>Add</Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" /> : (
         <div className="space-y-3">
@@ -226,6 +274,17 @@ export default function StaffPage() {
                 <ImageUpload value={form.avatarUrl || null} kind="AVATAR" shape="circle"
                   onChange={(url) => setForm((p) => ({ ...p, avatarUrl: url ?? "" }))} />
               </div>
+              {locations.filter((l) => l.active).length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                  <select value={form.locationId} onChange={(e) => setForm((p) => ({ ...p, locationId: e.target.value }))}
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    <option value="">— Any / unassigned —</option>
+                    {locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-400">Clients booking this location only see providers assigned to it.</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
                 <p className="text-xs text-gray-400 -mt-1 mb-2">Owners have full access. Grant this staff member extra access below.</p>

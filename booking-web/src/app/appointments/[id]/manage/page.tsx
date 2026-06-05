@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { format, isBefore, subHours } from 'date-fns';
+import { format, isBefore, subMinutes } from 'date-fns';
 import { Calendar, Clock, User, Scissors, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AddToCalendar } from '@/components/AddToCalendar';
 import { api, Appointment } from '@/lib/api';
@@ -12,6 +12,12 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ClientMessaging } from '@/components/ClientMessaging';
 import { toast } from 'sonner';
+
+function formatHHMM(totalMinutes: number) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
 
 export default function ManageAppointmentPage() {
   const { id } = useParams<{ id: string }>();
@@ -38,8 +44,8 @@ export default function ManageAppointmentPage() {
   async function cancel() {
     if (!appointment) return;
 
-    const windowHours = appointment.business.cancellationWindowHours;
-    const cutoff = subHours(new Date(appointment.startsAt), windowHours);
+    const windowMinutes = appointment.business.cancellationWindowMinutes ?? appointment.business.cancellationWindowHours * 60;
+    const cutoff = subMinutes(new Date(appointment.startsAt), windowMinutes);
     const isLate = !isBefore(new Date(), cutoff); // now is inside the window → too late
 
     // Past the cancellation window: cannot self-cancel online. Tell the client to
@@ -48,7 +54,7 @@ export default function ManageAppointmentPage() {
       const biz = appointment.business;
       const contact = [biz.phone, biz.email].filter(Boolean).join(" · ");
       toast.error(
-        `It's past the ${windowHours}-hour cancellation window — please contact ${biz.name}${contact ? ` (${contact})` : ""} to cancel. We've let them know.`,
+        `It's past the ${formatHHMM(windowMinutes)} cancellation window — please contact ${biz.name}${contact ? ` (${contact})` : ""} to cancel. We've let them know.`,
         { duration: 8000 },
       );
       api.appointments.publicLateCancelRequest(id, "Late cancellation requested by client", token).catch(() => {});

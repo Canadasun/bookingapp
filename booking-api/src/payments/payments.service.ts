@@ -107,7 +107,8 @@ export class PaymentsService {
     const customer = await this.ensureCustomer(apt.clientId);
 
     if (b.requireDeposit) {
-      const depositCents = Math.max(50, Math.round(apt.service.priceCents * (b.depositPercent / 100)));
+      const totalPriceCents = apt.totalPriceCents || apt.service.priceCents;
+      const depositCents = Math.max(50, Math.round(totalPriceCents * (b.depositPercent / 100)));
       const intent = await this.getStripe().paymentIntents.create({
         amount: depositCents,
         currency: this.currencyOf(b),
@@ -130,7 +131,7 @@ export class PaymentsService {
         kind: 'DEPOSIT', status: 'PENDING',
         description: `Deposit — ${apt.service.name}`,
       });
-      return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey() };
+      return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey(), currency: b.currency };
     }
 
     // Card-on-file (no upfront charge): collect a saveable card when the owner
@@ -142,7 +143,7 @@ export class PaymentsService {
         automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { appointmentId, businessId, kind: 'card_on_file' },
       }, { idempotencyKey: this.idempotencyKey(['card-on-file', businessId, appointmentId]) });
-      return { required: true, mode: 'setup' as const, clientSecret: intent.client_secret, amountCents: 0, publishableKey: this.publishableKey() };
+      return { required: true, mode: 'setup' as const, clientSecret: intent.client_secret, amountCents: 0, publishableKey: this.publishableKey(), currency: b.currency };
     }
 
     return { required: false, mode: 'none' as const };
@@ -621,7 +622,7 @@ export class PaymentsService {
 
     const feeCents = apt.business.noShowFeeCents > 0
       ? apt.business.noShowFeeCents
-      : Math.round(apt.service.priceCents * 0.5); // fallback: 50% of service price
+      : Math.round((apt.totalPriceCents || apt.service.priceCents) * 0.5); // fallback: 50% of appointment price
 
     if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
       // No saved card — can't auto-charge; mark NO_SHOW for manual collection.

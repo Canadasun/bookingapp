@@ -13,6 +13,7 @@ import { ServiceDueModule } from './service-due/service-due.module';
 import { ServicesModule } from './services/services.module';
 import { ResourcesModule } from './resources/resources.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { LocationsModule } from './locations/locations.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { ClientsModule } from './clients/clients.module';
@@ -70,6 +71,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     ServicesModule,
     ResourcesModule,
     InvoicesModule,
+    LocationsModule,
     AvailabilityModule,
     BookingsModule,
     ClientsModule,

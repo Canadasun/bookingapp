@@ -92,8 +92,9 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Details */}
           {[
             { label: "Service",  value: `${apt.service.name} (${apt.service.durationMinutes} min)` },
-            { label: "Price",    value: formatPrice(apt.service.priceCents) },
+            { label: "Price",    value: formatPrice(apt.totalPriceCents || apt.service.priceCents) },
             { label: "Staff",    value: apt.staff.user.name },
+            ...(apt.location ? [{ label: "Location", value: apt.location.name }] : []),
           ].map(({ label, value }) => (
             <div key={label} className="flex justify-between text-sm">
               <span className="text-gray-500">{label}</span>
@@ -741,7 +742,7 @@ export default function AppointmentsPage() {
                     {format(new Date(apt.startsAt), "EEE, MMM d · HH:mm")} - {format(new Date(apt.endsAt), "HH:mm")}
                   </p>
                 </div>
-                <div className="text-xs text-gray-400 shrink-0">{formatPrice(apt.service.priceCents)}</div>
+                <div className="text-xs text-gray-400 shrink-0">{formatPrice(apt.totalPriceCents || apt.service.priceCents)}</div>
               </div>
             </Card>
           ))}

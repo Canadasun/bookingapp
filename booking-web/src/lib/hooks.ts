@@ -19,7 +19,7 @@ export function useBusinessId() {
   return bizId;
 }
 
-export function useEvents(onUpdate: (data: any) => void) {
+export function useEvents(onUpdate: (data: unknown) => void) {
   const bizId = useBusinessId();
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export function useEvents(onUpdate: (data: any) => void) {
           socket?.emit("joinBusiness", bizId);
         });
 
-        socket.on("bookingUpdated", (data) => {
+        socket.on("bookingUpdated", (data: unknown) => {
           onUpdate(data);
         });
       })

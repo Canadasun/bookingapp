@@ -47,7 +47,7 @@ export default function ReportsPage() {
     const completed = appts.filter((a) => a.status === "COMPLETED");
     const cancelled = appts.filter((a) => a.status === "CANCELLED");
     const noShow = appts.filter((a) => a.status === "NO_SHOW");
-    const bookedRevenue = completed.reduce((s, a) => s + a.service.priceCents, 0);
+    const bookedRevenue = completed.reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
     const collected = payments
       .filter((p) => p.status === "SUCCEEDED")
       .reduce((s, p) => s + (p.amountCents - (p.refundedCents ?? 0)), 0);
@@ -60,7 +60,7 @@ export default function ReportsPage() {
       const key = format(m, "yyyy-MM");
       const cents = completed
         .filter((a) => format(new Date(a.startsAt), "yyyy-MM") === key)
-        .reduce((s, a) => s + a.service.priceCents, 0);
+        .reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
       return { label: format(m, "MMM"), cents };
     });
     const maxMonth = Math.max(1, ...byMonth.map((m) => m.cents));
@@ -70,7 +70,7 @@ export default function ReportsPage() {
     for (const a of appts) {
       const e = svc.get(a.service.id) ?? { name: a.service.name, count: 0, cents: 0 };
       e.count += 1;
-      if (a.status === "COMPLETED") e.cents += a.service.priceCents;
+      if (a.status === "COMPLETED") e.cents += (a.totalPriceCents || a.service.priceCents);
       svc.set(a.service.id, e);
     }
     const topServices = Array.from(svc.values()).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -92,9 +92,9 @@ export default function ReportsPage() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+    <div className="max-w-5xl mx-auto min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div className="min-w-0">
           <h2 className="text-xl font-bold text-gray-900">Reports</h2>
           <p className="text-sm text-gray-500">Performance across all your appointments</p>
         </div>
@@ -102,7 +102,7 @@ export default function ReportsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
           { label: "Revenue (completed)", value: money(r.bookedRevenue), icon: TrendingUp, tone: "emerald" },
           { label: "Collected payments", value: money(r.collected), icon: TrendingUp, tone: "violet" },
@@ -112,9 +112,9 @@ export default function ReportsPage() {
           const Icon = k.icon;
           const tone: Record<string, string> = { emerald: "bg-emerald-50 text-emerald-700", violet: "bg-violet-50 text-violet-700", amber: "bg-amber-50 text-amber-700" };
           return (
-            <div key={k.label} className="rounded-2xl border border-gray-100 bg-white p-4">
+            <div key={k.label} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4">
               <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center mb-2", tone[k.tone])}><Icon className="w-4 h-4" /></div>
-              <p className="text-2xl font-bold text-gray-900 leading-none">{k.value}</p>
+              <p className="max-w-full truncate text-xl sm:text-2xl font-bold text-gray-900 leading-none tabular-nums">{k.value}</p>
               <p className="text-xs text-gray-500 mt-1">{k.label}</p>
               {k.sub && <p className="text-[11px] text-gray-400 mt-0.5">{k.sub}</p>}
             </div>

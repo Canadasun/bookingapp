@@ -7,11 +7,11 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 
+const VERIFY_DEST = { href: "/dashboard", label: "Go to your dashboard" };
+
 export default function VerifyEmailPage() {
   const router = useRouter();
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
-  // Email verification is for business accounts; send them to their dashboard.
-  const dest = { href: "/dashboard", label: "Go to your dashboard" };
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token");
@@ -20,7 +20,7 @@ export default function VerifyEmailPage() {
       .then(() => {
         setState("ok");
         // Auto-return (middleware sends them via sign-in if needed).
-        setTimeout(() => router.push(dest.href), 2500);
+        setTimeout(() => router.push(VERIFY_DEST.href), 2500);
       })
       .catch(() => setState("error"));
   }, [router]);
@@ -40,8 +40,8 @@ export default function VerifyEmailPage() {
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
               <h1 className="text-lg font-bold text-slate-900 mt-4">Email verified</h1>
               <p className="text-sm text-slate-500 mt-1">Taking you to your account… you can also continue below.</p>
-              <Link href={dest.href} className="inline-block mt-6 bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
-                {dest.label}
+              <Link href={VERIFY_DEST.href} className="inline-block mt-6 bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
+                {VERIFY_DEST.label}
               </Link>
             </>
           )}

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ShieldCheck, Building2, RefreshCw, FileText, ExternalLink, Check, X, LogOut } from "lucide-react";
+import { ShieldCheck, RefreshCw, FileText, ExternalLink, Check, X, LogOut } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";

@@ -87,6 +87,7 @@ model Business {
   address     String?
   logoUrl     String?
   bookingPageSettings Json @default("{}")
+  notificationSettings Json @default("{}")
   // Owner-defined intake/consultation questions shown at booking. Array of
   // { id, label, required }. Answers are stored per appointment (intakeAnswers).
   intakeQuestions Json @default("[]")
@@ -96,7 +97,9 @@ model Business {
   // Booking policies
   minNoticeMinutes      Int     @default(120)
   maxAdvanceDays        Int     @default(60)
+  maxAdvanceMinutes     Int     @default(86400) // 60 days; minute-based for HH:MM policy UI
   cancellationWindowHours Int   @default(24)
+  cancellationWindowMinutes Int @default(1440)
   requireDeposit        Boolean @default(false)
   depositPercent        Int     @default(25)
   noShowFeeCents        Int     @default(0)
@@ -137,6 +140,7 @@ model Business {
   services           Service[]
   resources          Resource[]
   invoices           Invoice[]
+  locations          Location[]
   serviceCategories  ServiceCategory[]
   appointments       Appointment[]
   clients            Client[]
@@ -471,9 +475,11 @@ model Staff {
   avatarUrl  String?
   active     Boolean  @default(true)
   permissions String[] @default([]) // extra access for staff: VIEW_MONEY, MANAGE_SERVICES, MANAGE_STAFF
+  locationId String?            // which location this provider works at (multi-location)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  location          Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   business          Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
   staffServices     StaffService[]
@@ -483,6 +489,7 @@ model Staff {
   tasks             StaffTask[]
 
   @@index([businessId])
+  @@index([locationId])
 }
 
 // Owner-assigned tasks for staff (least-privilege: a staff member only ever sees
@@ -573,6 +580,26 @@ model Resource {
 
   business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   services Service[]
+
+  @@index([businessId])
+}
+
+// A physical location/branch. Optional — single-location businesses have none and
+// behave as before. Staff are assigned to a location; appointments record theirs.
+model Location {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  address    String?
+  phone      String?
+  timezone   String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff        Staff[]
+  appointments Appointment[]
 
   @@index([businessId])
 }
@@ -697,6 +724,7 @@ model Appointment {
   status               AppointmentStatus @default(PENDING)
   cancelReason         String?
   depositCents         Int?
+  totalPriceCents      Int               @default(0) // snapshot of all selected services at booking time
   stripePaymentIntentId String?
   // Saved card used for this booking (for no-show auto-charge, incl. card-on-file)
   stripePaymentMethodId String?
@@ -704,10 +732,12 @@ model Appointment {
   googleEventId        String?           // Google Calendar event id (when the business has calendar sync on)
   recurringGroupId     String?           // shared id linking occurrences of a recurring series
   intakeAnswers        Json?             // client's answers to the business intake questions, [{ label, answer }]
+  locationId           String?           // which location this appointment is at (multi-location)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
   business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location          Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
   staff             Staff             @relation(fields: [staffId], references: [id], onDelete: Restrict)
   service           Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   client            Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
@@ -720,6 +750,7 @@ model Appointment {
   @@index([startsAt])
   @@index([staffId, startsAt, endsAt])
   @@index([recurringGroupId])
+  @@index([locationId])
 }
 
 model NotificationLog {

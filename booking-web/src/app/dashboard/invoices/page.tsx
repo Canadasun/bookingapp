@@ -5,7 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Plus, X, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { api, Invoice, ClientWithStats } from "@/lib/api";
+import { api, Invoice, ClientWithStats, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export default function InvoicesPage() {
   const bizId = user?.businessId ?? "";
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);
+  const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
 
@@ -35,12 +36,14 @@ export default function InvoicesPage() {
     if (!bizId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [inv, cl] = await Promise.all([
+      const [inv, cl, b] = await Promise.all([
         api.invoices.list(bizId),
         api.clients.list(bizId).catch(() => ({ data: [] as ClientWithStats[] })),
+        api.business.get(bizId).catch(() => null),
       ]);
       setInvoices(inv);
       setClients(cl.data);
+      setBiz(b);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load invoices"); }
     finally { setLoading(false); }
   }, [bizId]);
@@ -79,14 +82,14 @@ export default function InvoicesPage() {
       )}
 
       {showNew && (
-        <NewInvoiceModal bizId={bizId} clients={clients} onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
+        <NewInvoiceModal bizId={bizId} clients={clients} currency={biz?.currency ?? "CAD"} onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
       )}
     </div>
   );
 }
 
-function NewInvoiceModal({ bizId, clients, onClose, onCreated }: {
-  bizId: string; clients: ClientWithStats[]; onClose: () => void; onCreated: (inv: Invoice) => void;
+function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
+  bizId: string; clients: ClientWithStats[]; currency: "CAD" | "USD"; onClose: () => void; onCreated: (inv: Invoice) => void;
 }) {
   const [clientId, setClientId] = useState("");
   const [notes, setNotes] = useState("");
@@ -165,7 +168,7 @@ function NewInvoiceModal({ bizId, clients, onClose, onCreated }: {
 
           <div className="flex items-center justify-between border-t border-gray-100 pt-3">
             <span className="text-sm text-gray-500">Subtotal</span>
-            <span className="text-sm font-semibold text-gray-900">{money(subtotal, "CAD")}</span>
+            <span className="text-sm font-semibold text-gray-900">{money(subtotal, currency)}</span>
           </div>
           <p className="text-xs text-gray-400 -mt-2">Tax is applied automatically from your business rate.</p>
 

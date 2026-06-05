@@ -36,7 +36,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   const currency = (biz?.currency ?? "CAD") as "CAD" | "USD";
   const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(c / 100);
   const rate = biz?.taxRatePercent ?? 0;
-  const subtotal = apt.service.priceCents;
+  const subtotal = apt.totalPriceCents || apt.service.priceCents;
   const taxCents = Math.round(subtotal * (rate / 100));
   const total = subtotal + taxCents;
   const tipsCollected = payments.reduce((s, p) => s + (p.status === "SUCCEEDED" ? (p.tipCents ?? 0) : 0), 0);

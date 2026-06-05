@@ -30,9 +30,8 @@ export class ClientsService {
           _count: { select: { appointments: true } },
           appointments: {
             where: { status: 'COMPLETED' },
-            include: { service: { select: { priceCents: true } } },
+            select: { startsAt: true, totalPriceCents: true, service: { select: { priceCents: true } } },
             orderBy: { startsAt: 'desc' },
-            take: 1,
           },
         },
         orderBy: { name: 'asc' },
@@ -54,7 +53,7 @@ export class ClientsService {
         updatedAt: c.updatedAt,
         totalVisits: c._count.appointments,
         lastVisit: c.appointments[0]?.startsAt ?? null,
-        totalSpentCents: c.appointments.reduce((sum, a) => sum + a.service.priceCents, 0),
+        totalSpentCents: c.appointments.reduce((sum, a) => sum + (a.totalPriceCents || a.service.priceCents), 0),
       })),
       total,
       page,
@@ -80,7 +79,7 @@ export class ClientsService {
 
     const totalSpentCents = client.appointments
       .filter((a) => a.status === 'COMPLETED')
-      .reduce((sum, a) => sum + a.service.priceCents, 0);
+      .reduce((sum, a) => sum + (a.totalPriceCents || a.service.priceCents), 0);
 
     return { ...client, totalSpentCents };
   }

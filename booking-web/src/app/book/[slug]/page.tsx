@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
-import { format, startOfDay, addDays, parseISO, isBefore, isAfter } from "date-fns";
+import { format, startOfDay, addMinutes, parseISO, isBefore, isAfter } from "date-fns";
 import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
@@ -16,7 +16,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { getUser, type SessionUser } from "@/lib/auth";
 import "react-day-picker/style.css";
 
-type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string };
+type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string; currency?: "CAD" | "USD" };
 type BookingSlot = Slot & { staffId?: string; staffName?: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -116,6 +116,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [activeStaff, setActiveStaff] = useState<StaffMember[]>([]);
   const [staffList, setStaffList]     = useState<StaffMember[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
   const [slots, setSlots]             = useState<BookingSlot[]>([]);
 
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -183,8 +184,11 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   // assignments offers everything (sole-proprietor) — otherwise match assignments.
   useEffect(() => {
     if (selectedServices.length === 0) { setStaffList([]); return; }
-    setStaffList(activeStaff.filter((st) => st.staffServices.length === 0 || selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))));
-  }, [activeStaff, selectedServices]);
+    setStaffList(activeStaff.filter((st) =>
+      (st.staffServices.length === 0 || selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))) &&
+      (!selectedLocationId || st.locationId === selectedLocationId),
+    ));
+  }, [activeStaff, selectedServices, selectedLocationId]);
 
   // Reschedule prefill
   useEffect(() => {
@@ -381,6 +385,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   );
 
   const today       = startOfDay(new Date());
+  const advanceLimit = addMinutes(new Date(), biz?.maxAdvanceMinutes ?? ((biz?.maxAdvanceDays ?? 60) * 1440));
   const { morning, afternoon, evening } = groupSlots(slots);
   const totalMins   = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const totalCents  = selectedServices.reduce((s, x) => s + x.priceCents, 0);
@@ -570,6 +575,23 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 0: Services ──────────────────────────────────────── */}
             {step === 0 && (
               <div className="px-6 pb-6">
+                {/* Location picker — only when the business has more than one */}
+                {(biz?.locations?.length ?? 0) > 1 && (
+                  <div className="mb-5">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Choose a location</p>
+                    <div className="flex flex-wrap gap-2">
+                      {biz!.locations!.map((l) => (
+                        <button key={l.id} onClick={() => setSelectedLocationId((cur) => cur === l.id ? "" : l.id)}
+                          className={cn("rounded-xl border px-3 py-2 text-left transition-colors",
+                            selectedLocationId === l.id ? "border-violet-500 bg-violet-50" : "border-gray-200 hover:bg-gray-50")}>
+                          <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "text-violet-700" : "text-gray-800")}>{l.name}</span>
+                          {l.address && <span className="block text-xs text-gray-400">{l.address}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Choose services</h2>
                 <p className="text-sm text-gray-400 mb-4">Select one or more services</p>
 
@@ -728,7 +750,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   mode="single"
                   selected={selectedDate}
                   onSelect={pickDate}
-                  disabled={(date) => isBefore(date, today) || isAfter(date, addDays(today, biz?.maxAdvanceDays ?? 60))}
+                  disabled={(date) => isBefore(date, today) || isAfter(startOfDay(date), startOfDay(advanceLimit))}
                   className="mx-auto"
                 />
 

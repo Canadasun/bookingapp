@@ -71,6 +71,24 @@ function aptDate(apt: { startsAt: Date; business: { timezone?: string | null } }
   return formatInTimeZone(apt.startsAt, apt.business.timezone ?? 'UTC', pattern);
 }
 
+type NotificationKey =
+  | 'emailConfirmation'
+  | 'emailReminder24h'
+  | 'emailCancellation'
+  | 'emailReschedule'
+  | 'emailStaffCancellation'
+  | 'smsReminder2h';
+
+function notificationEnabled(settings: unknown, key: NotificationKey) {
+  return !settings || typeof settings !== 'object' || (settings as Record<string, unknown>)[key] !== false;
+}
+
+function policyWindowLabel(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 @Processor(NOTIFICATION_QUEUE, {
   concurrency: Number(process.env.NOTIFICATION_WORKER_CONCURRENCY ?? 1),
   limiter: {
@@ -635,9 +653,9 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     this.currentBusinessId = apt.businessId;
     const clientFirstName = esc(firstName(apt.client.name));
 
-    // SMS reminders are a PAID-plan feature (BASIC + PRO) — unlocked for all
-    // during testing. Free tier otherwise gets email reminders only.
-    const smsEnabled = effectivePlan(apt.business.plan) !== 'FREE';
+    const smsEnabled = effectivePlan(apt.business.plan) === 'PRO';
+    const settings = apt.business.notificationSettings;
+    const shouldSend = (key: NotificationKey) => notificationEnabled(settings, key);
 
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     // HMAC manage token so the link proves the recipient got the email (the
@@ -683,6 +701,10 @@ ${aptDetails(apt)}
       }
 
       case 'send-confirmation': {
+        if (!shouldSend('emailConfirmation')) {
+          await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
         await this.email.send({
           to: apt.client.email,
           subject: `Appointment confirmed — ${apt.service.name}`,
@@ -707,6 +729,10 @@ ${aptDetails(apt)}
 
       case 'reminder-24h': {
         if (apt.status === 'CANCELLED') break;
+        if (!shouldSend('emailReminder24h')) {
+          await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
         await this.email.send({
           to: apt.client.email,
           subject: `Reminder: ${apt.service.name} tomorrow`,
@@ -724,6 +750,10 @@ ${aptDetails(apt)}
 
       case 'reminder-2h': {
         if (apt.status === 'CANCELLED') break;
+        if (!shouldSend('smsReminder2h')) {
+          await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
         if (apt.client.phone && smsEnabled) {
           await this.sms.send({
             to: apt.client.phone,
@@ -736,6 +766,10 @@ ${aptDetails(apt)}
       }
 
       case 'send-cancellation': {
+        if (!shouldSend('emailCancellation')) {
+          await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
         await this.email.send({
           to: apt.client.email,
           subject: `Appointment cancelled — ${apt.service.name}`,
@@ -759,6 +793,10 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
       }
 
       case 'send-staff-cancellation': {
+        if (!shouldSend('emailStaffCancellation')) {
+          await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
         await this.email.send({
           to: apt.client.email,
           subject: `Your appointment was cancelled by ${apt.business.name}`,
@@ -776,6 +814,10 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
       }
 
       case 'send-reschedule': {
+        if (!shouldSend('emailReschedule')) {
+          await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
         await this.email.send({
           to: apt.client.email,
           subject: `Appointment rescheduled — ${apt.service.name}`,
@@ -827,7 +869,7 @@ ${aptDetails(apt)}
             subject: `Late cancellation request — ${apt.client.name}`,
             html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#D97706;font-size:20px;font-weight:700">Late cancellation request</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${apt.client.name} asked to cancel <strong>after</strong> your ${apt.business.cancellationWindowHours}-hour cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${apt.client.name} asked to cancel <strong>after</strong> your ${policyWindowLabel(apt.business.cancellationWindowMinutes ?? apt.business.cancellationWindowHours * 60)} cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
 ${aptDetails(apt)}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>

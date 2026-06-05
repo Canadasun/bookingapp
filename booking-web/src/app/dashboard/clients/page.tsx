@@ -16,6 +16,12 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ClientMergeModal } from "@/components/ClientMergeModal";
 import { formatPrice, cn } from "@/lib/utils";
 
+const DAY_MS = 86_400_000;
+
+function dueAtForCadence(cadenceDays: number) {
+  return new Date(Date.now() + cadenceDays * DAY_MS).toISOString();
+}
+
 export default function ClientsPage() {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +189,7 @@ export default function ClientsPage() {
     if (!bizId || !selected) return;
     setDueBusy(true);
     try {
-      const dueAt = new Date(Date.now() + cadenceDays * 86_400_000).toISOString();
+      const dueAt = dueAtForCadence(cadenceDays);
       await api.serviceDue.set(bizId, { clientId: selected.id, cadenceDays, dueAt });
       setDueSet(cadenceDays);
       toast.success("Follow-up routine set — you'll be reminded when it's due");

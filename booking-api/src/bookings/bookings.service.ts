@@ -54,7 +54,7 @@ export class BookingsService {
     const [data, total] = await Promise.all([
       this.prisma.appointment.findMany({
         where,
-        include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
         orderBy: { startsAt: 'desc' },
         skip,
         take: limit,
@@ -66,11 +66,11 @@ export class BookingsService {
 
   async findOne(id: string, businessId?: string) {
     const apt = await this.prisma.appointment.findFirst({
-      where: { 
+      where: {
         id,
         ...(businessId ? { businessId } : {})
       },
-      include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
     });
     if (!apt) throw new NotFoundException('Appointment not found');
     return apt;
@@ -81,6 +81,25 @@ export class BookingsService {
   // restricted to their selected services.
   private async hasExplicitServiceAssignments(staffId: string): Promise<boolean> {
     return (await this.prisma.staffService.count({ where: { staffId } })) > 0;
+  }
+
+  private maxAdvanceMs(business?: { maxAdvanceMinutes?: number | null; maxAdvanceDays?: number | null } | null) {
+    const minutes = business?.maxAdvanceMinutes ?? ((business?.maxAdvanceDays ?? 365) * 24 * 60);
+    return minutes * 60_000;
+  }
+
+  private cancellationWindowMinutes(business?: { cancellationWindowMinutes?: number | null; cancellationWindowHours?: number | null } | null) {
+    return business?.cancellationWindowMinutes ?? ((business?.cancellationWindowHours ?? 0) * 60);
+  }
+
+  private cancellationCutoff(startsAt: Date, business?: { cancellationWindowMinutes?: number | null; cancellationWindowHours?: number | null } | null) {
+    return new Date(startsAt.getTime() - this.cancellationWindowMinutes(business) * 60_000);
+  }
+
+  private formatPolicyMinutes(minutes: number) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
   /**
@@ -111,6 +130,7 @@ export class BookingsService {
 
     // Sum durations of all selected services
     let totalDurationMinutes = primaryService.durationMinutes;
+    let totalPriceCents = primaryService.priceCents;
     const additionalServiceNames: string[] = [];
     if (dto.additionalServiceIds?.length) {
       const ids = [...new Set(dto.additionalServiceIds)];
@@ -131,6 +151,7 @@ export class BookingsService {
         throw new BadRequestException('This staff member does not offer one of the selected services');
       }
       totalDurationMinutes += extras.reduce((sum, s) => sum + s.durationMinutes, 0);
+      totalPriceCents += extras.reduce((sum, s) => sum + s.priceCents, 0);
       additionalServiceNames.push(...extras.map((s) => s.name));
     }
 
@@ -142,11 +163,11 @@ export class BookingsService {
     if (!opts.confirmed) {
       const business = await this.prisma.business.findUnique({
         where: { id: businessId },
-        select: { minNoticeMinutes: true, maxAdvanceDays: true, timezone: true },
+        select: { minNoticeMinutes: true, maxAdvanceDays: true, maxAdvanceMinutes: true, timezone: true },
       });
       const now = Date.now();
       const minNoticeMs = (business?.minNoticeMinutes ?? 0) * 60_000;
-      const maxAdvanceMs = (business?.maxAdvanceDays ?? 365) * 24 * 60 * 60_000;
+      const maxAdvanceMs = this.maxAdvanceMs(business);
       if (startsAt.getTime() < now + minNoticeMs) {
         throw new BadRequestException('This time is too soon — please pick a later slot.');
       }
@@ -234,12 +255,15 @@ export class BookingsService {
               clientId: dto.clientId,
               startsAt,
               endsAt,
+              totalPriceCents,
               notes: notesWithServices,
               // Owner/staff-initiated bookings skip the approval queue and are
               // confirmed immediately; public self-service stays PENDING.
               ...(opts.confirmed ? { status: 'CONFIRMED' as const } : {}),
               ...(opts.recurringGroupId ? { recurringGroupId: opts.recurringGroupId } : {}),
               ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
+              // Multi-location: the appointment inherits its provider's location.
+              ...(staff.locationId ? { locationId: staff.locationId } : {}),
             },
             include: { client: true, service: true, staff: { include: { user: true } }, business: true },
           });
@@ -402,7 +426,7 @@ export class BookingsService {
       }
       const now = Date.now();
       const minNoticeMs = (biz?.minNoticeMinutes ?? 0) * 60_000;
-      const maxAdvanceMs = (biz?.maxAdvanceDays ?? 365) * 24 * 60 * 60_000;
+      const maxAdvanceMs = this.maxAdvanceMs(biz);
       if (startsAt.getTime() < now + minNoticeMs) throw new BadRequestException('This time is too soon — please pick a later slot.');
       if (startsAt.getTime() > now + maxAdvanceMs) throw new BadRequestException('This time is too far in advance.');
       await this.assertStartsAtAvailable(existing.staffId, existing.serviceId, startsAt, endsAt, biz?.timezone ?? 'UTC');
@@ -500,12 +524,13 @@ export class BookingsService {
     // staff (byStaff=true) can always cancel.
     if (dto.status === 'CANCELLED' && !byStaff) {
       const biz = existing.business;
-      const cutoff = biz && new Date(existing.startsAt.getTime() - biz.cancellationWindowHours * 3600 * 1000);
+      const cutoff = biz && this.cancellationCutoff(existing.startsAt, biz);
       if (cutoff && new Date() > cutoff) {
+        const windowLabel = this.formatPolicyMinutes(this.cancellationWindowMinutes(biz));
         await this.notifications.sendLateCancellationRequest(existing).catch(() => {});
         throw new ForbiddenException({
           code: 'TOO_LATE_TO_CANCEL',
-          message: `It's past the ${biz!.cancellationWindowHours}-hour cancellation window. Please contact ${biz!.name} to cancel — we've let them know you'd like to.`,
+          message: `It's past the ${windowLabel} cancellation window. Please contact ${biz!.name} to cancel — we've let them know you'd like to.`,
         });
       }
     }
@@ -535,13 +560,14 @@ export class BookingsService {
       // and early cancels are always free. Best-effort: never blocks the cancel.
       const biz = updated.business;
       const cancellationTiming =
-        biz && new Date() > new Date(updated.startsAt.getTime() - biz.cancellationWindowHours * 3600 * 1000)
+        biz && new Date() > this.cancellationCutoff(updated.startsAt, biz)
           ? 'late'
           : 'early';
       auditChanges.cancelReason = dto.cancelReason ?? null;
       auditChanges.cancelledBy = byStaff ? 'staff' : 'client';
       auditChanges.cancellationTiming = cancellationTiming;
       auditChanges.cancellationWindowHours = biz?.cancellationWindowHours ?? null;
+      auditChanges.cancellationWindowMinutes = this.cancellationWindowMinutes(biz);
 
       // Cancellation fee: charged only when the owner/staff explicitly opts in
       // while cancelling (e.g. enforcing the policy after a client cancelled late
@@ -613,7 +639,7 @@ export class BookingsService {
     if (!['PENDING', 'CONFIRMED'].includes(existing.status)) {
       throw new BadRequestException('Only pending or confirmed appointments can request cancellation');
     }
-    const cutoff = new Date(existing.startsAt.getTime() - existing.business.cancellationWindowHours * 3600 * 1000);
+    const cutoff = this.cancellationCutoff(existing.startsAt, existing.business);
     if (new Date() <= cutoff) {
       throw new BadRequestException('This appointment is still outside the cancellation window and can be cancelled online.');
     }
@@ -632,12 +658,14 @@ export class BookingsService {
       status: existing.status,
       cancelReason: cancelReason ?? null,
       cancellationWindowHours: existing.business.cancellationWindowHours,
+      cancellationWindowMinutes: this.cancellationWindowMinutes(existing.business),
     });
+    const windowLabel = this.formatPolicyMinutes(this.cancellationWindowMinutes(existing.business));
 
     return {
       ok: true,
       code: 'LATE_CANCEL_REQUESTED',
-      message: `It's past the ${existing.business.cancellationWindowHours}-hour cancellation window. Please contact ${existing.business.name} to cancel — we've let them know you'd like to.`,
+      message: `It's past the ${windowLabel} cancellation window. Please contact ${existing.business.name} to cancel — we've let them know you'd like to.`,
     };
   }
 
