@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, CalendarCheck, CreditCard, Link2, Users, ArrowRight, Sparkles, CalendarPlus } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, CreditCard, Link2, Users, ArrowRight, Sparkles, CalendarPlus,
+  Star, Gift, Megaphone, Globe, ShoppingBag, Heart, MessageSquare } from "lucide-react";
 import { getUser, type SessionUser } from "@/lib/auth";
 
 function homeFor(user: SessionUser | null): string | null {
@@ -70,6 +71,71 @@ export function LandingBottomCta() {
         </Link>
       </div>
     </>
+  );
+}
+
+// Business solutions to "sell" to a signed-in owner: what they already have
+// (linking into the app) plus a roadmap of what's coming.
+const SOLUTIONS_LIVE = [
+  { icon: CalendarCheck, title: "24/7 online booking", desc: "Clients book themselves, day or night.", href: "/dashboard/services" },
+  { icon: CreditCard, title: "Deposits & no-show protection", desc: "Take a card at booking, charge no-shows.", href: "/dashboard/settings" },
+  { icon: Star, title: "Reviews that build trust", desc: "Collect and showcase 5-star feedback.", href: "/dashboard/reviews" },
+  { icon: Gift, title: "Gift cards & packages", desc: "Sell ahead and lock in repeat visits.", href: "/dashboard/gift-cards" },
+  { icon: Megaphone, title: "Offers & marketing", desc: "Win-backs and promos to fill your book.", href: "/dashboard/marketing" },
+  { icon: Users, title: "Waitlist auto-fill", desc: "A cancellation instantly offers the slot on.", href: "/dashboard/waitlist" },
+];
+const SOLUTIONS_SOON = [
+  { icon: Globe, title: "Your own website", desc: "A booking-ready site for your business in minutes." },
+  { icon: ShoppingBag, title: "Online store", desc: "Sell products and bundles right from your page." },
+  { icon: Heart, title: "Loyalty & rewards", desc: "Points and perks that keep clients coming back." },
+  { icon: MessageSquare, title: "2-way client texting", desc: "Chat with booked clients without sharing your number." },
+];
+
+// Logged-in owners: a "grow your business" section that sells what's live and
+// teases what's next.
+export function LandingSolutions() {
+  const [user, setUser] = useState<SessionUser | null>(null);
+  useEffect(() => { setUser(getUser()); }, []);
+  if (!user || user.role === "CLIENT") return null;
+
+  return (
+    <section className="py-16 bg-[#19212B]">
+      <div className="max-w-6xl mx-auto px-6">
+        <h2 className="text-2xl font-bold text-white">Everything to grow your business</h2>
+        <p className="text-white/50 mt-1 mb-8">Tools that pay for themselves — already included in Pulse.</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {SOLUTIONS_LIVE.map(({ icon: Icon, title, desc, href }) => (
+            <Link key={title} href={href}
+              className="group rounded-2xl bg-white/[0.06] border border-white/10 p-5 hover:bg-white/[0.1] transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center mb-3">
+                <Icon className="w-5 h-5 text-violet-300" />
+              </div>
+              <h3 className="font-semibold text-white text-sm mb-1">{title}</h3>
+              <p className="text-white/50 text-xs leading-relaxed">{desc}</p>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-violet-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                Open <ArrowRight className="w-3 h-3" />
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        <p className="text-white/50 mt-10 mb-4 text-sm font-semibold uppercase tracking-wide">Coming soon</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {SOLUTIONS_SOON.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="rounded-2xl bg-white/[0.03] border border-dashed border-white/15 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-white/60" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-300/80 bg-amber-300/10 rounded-full px-2 py-0.5">Soon</span>
+              </div>
+              <h3 className="font-semibold text-white/90 text-sm mb-1">{title}</h3>
+              <p className="text-white/40 text-xs leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 

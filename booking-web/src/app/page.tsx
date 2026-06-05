@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Calendar, Bell, CreditCard, Clock, Star, Shield, ArrowRight, Sparkles } from "lucide-react";
-import { LandingAuthCta, LandingResources, LandingHeroCta, LandingBottomCta, LandingFooterLinks } from "@/components/LandingClient";
+import { LandingAuthCta, LandingResources, LandingSolutions, LandingHeroCta, LandingBottomCta, LandingFooterLinks } from "@/components/LandingClient";
 
 const features = [
   { icon: Clock,       title: "24/7 Online Booking",       desc: "Clients book appointments any time — no phone tag, no back-and-forth." },
@@ -93,8 +93,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Logged-in owners: account-aware setup shortcuts */}
+      {/* Logged-in owners: account-aware setup shortcuts + business solutions */}
       <LandingResources />
+      <LandingSolutions />
 
       {/* Features */}
       <section className="py-24 bg-white/72 border-y border-[#E9DDCB]">
