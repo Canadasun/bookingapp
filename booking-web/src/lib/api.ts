@@ -222,6 +222,13 @@ export interface TaskItem {
   createdAt: string; completedAt?: string | null;
 }
 
+export interface ServiceDueItem {
+  id: string; clientId: string; serviceId?: string | null;
+  cadenceDays?: number | null; dueAt: string; status: "SCHEDULED" | "DUE" | "CANCELLED";
+  client: { id: string; name: string; email: string };
+  service?: { id: string; name: string } | null;
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -516,6 +523,18 @@ export const api = {
       if (enforceNotice === false) q.set("enforceNotice", "false");
       return req<Slot[]>(`/availability/slots?${q.toString()}`);
     },
+  },
+
+  serviceDue: {
+    list: (businessId: string) => req<ServiceDueItem[]>(`/businesses/${businessId}/service-due`),
+    set: (businessId: string, data: { clientId: string; serviceId?: string | null; cadenceDays?: number | null; dueAt: string }) =>
+      req<ServiceDueItem>(`/businesses/${businessId}/service-due`, { method: "POST", body: JSON.stringify(data) }),
+    approve: (businessId: string, id: string) =>
+      req<ServiceDueItem>(`/businesses/${businessId}/service-due/${id}/approve`, { method: "POST" }),
+    reschedule: (businessId: string, id: string, data: { cadenceDays?: number | null; dueAt?: string }) =>
+      req<ServiceDueItem>(`/businesses/${businessId}/service-due/${id}/reschedule`, { method: "POST", body: JSON.stringify(data) }),
+    cancel: (businessId: string, id: string) =>
+      req<ServiceDueItem>(`/businesses/${businessId}/service-due/${id}/cancel`, { method: "POST" }),
   },
 
   tasks: {

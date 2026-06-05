@@ -146,6 +146,7 @@ model Business {
   refunds            Refund[]
   uploads            UploadedFile[]
   staffTasks         StaffTask[]
+  serviceDues        ServiceDue[]
   subscription       Subscription?
   privacyConsents    PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
@@ -497,6 +498,31 @@ model StaffTask {
   @@index([staffId])
 }
 
+// Recurring service-due tracker: the owner sets when a client's next visit is due
+// (a cadence like every 8 weeks, or a one-off date). A daily scan flips it to DUE
+// and raises an in-app prompt; the owner approves (client gets a rebook nudge and
+// the cadence auto-advances) or reschedules/cancels.
+model ServiceDue {
+  id             String    @id @default(cuid())
+  businessId     String
+  clientId       String
+  serviceId      String?
+  cadenceDays    Int?      // null = one-off custom date (no auto-advance)
+  dueAt          DateTime
+  status         String    @default("SCHEDULED") // SCHEDULED | DUE | CANCELLED
+  lastNotifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([clientId])
+  @@index([status, dueAt])
+}
+
 model Service {
   id              String   @id @default(cuid())
   businessId      String
@@ -517,6 +543,7 @@ model Service {
   category        ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   staffServices   StaffService[]
   appointments    Appointment[]
+  serviceDues     ServiceDue[]
 
   @@index([businessId])
   @@index([categoryId])
@@ -594,6 +621,7 @@ model Client {
   messages     Message[]
   packages     ClientPackage[]
   payments     Payment[]
+  serviceDues  ServiceDue[]
 
   @@unique([businessId, email])
   @@index([businessId])

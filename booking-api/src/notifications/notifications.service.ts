@@ -35,9 +35,23 @@ export class NotificationsService implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: true,
       });
+      await this.queue.add('service-due-scan', {}, {
+        repeat: { pattern: '0 13 * * *' }, // 13:00 UTC daily
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     } catch (e) {
-      this.logger.warn(`Could not schedule win-back scan: ${e instanceof Error ? e.message : e}`);
+      this.logger.warn(`Could not schedule scans: ${e instanceof Error ? e.message : e}`);
     }
+  }
+
+  // Invite a lapsed/due client to book their next visit (reuses the win-back email).
+  async sendRebookNudge(clientId: string) {
+    await this.queue.add('rebook-reminder', { clientId }, {
+      jobId: `rebook-${clientId}-${Date.now()}`,
+      removeOnComplete: true,
+      attempts: 1,
+    });
   }
 
   async scheduleReminders(apt: AppointmentWithRelations) {

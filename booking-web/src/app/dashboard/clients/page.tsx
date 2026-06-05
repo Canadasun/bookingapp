@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonList, SkeletonCard } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, cn } from "@/lib/utils";
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
@@ -32,6 +32,8 @@ export default function ClientsPage() {
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [dueBusy, setDueBusy] = useState(false);
+  const [dueSet, setDueSet] = useState<number | null>(null);
 
   const router = useRouter();
   const user = getUser();
@@ -65,6 +67,7 @@ export default function ClientsPage() {
     if (!bizId) return;
     setSelected(c);
     setEditMode(false);
+    setDueSet(null);
     setLoadingDetail(true);
     try {
       const [detail, payments, packages, messages] = await Promise.all([
@@ -149,6 +152,19 @@ export default function ClientsPage() {
   function rebook() {
     if (!selected) return;
     router.push(`/dashboard/checkout?client=${selected.id}`);
+  }
+
+  async function setNextDue(cadenceDays: number) {
+    if (!bizId || !selected) return;
+    setDueBusy(true);
+    try {
+      const dueAt = new Date(Date.now() + cadenceDays * 86_400_000).toISOString();
+      await api.serviceDue.set(bizId, { clientId: selected.id, cadenceDays, dueAt });
+      setDueSet(cadenceDays);
+      toast.success("Follow-up routine set — you'll be reminded when it's due");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not set follow-up");
+    } finally { setDueBusy(false); }
   }
 
   const detail = selected as (ClientWithStats & {
@@ -269,6 +285,28 @@ export default function ClientsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Recurring follow-up: set when this client's next visit is due */}
+              <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
+                <p className="text-sm font-semibold text-violet-900">Next visit due</p>
+                <p className="text-xs text-violet-700 mt-0.5">
+                  {dueSet
+                    ? `Routine set — we'll remind you when it's due, and you can approve a rebook nudge.`
+                    : `Put this client on a routine (e.g. grooming every 8 weeks). You'll be prompted to invite them back when it's due.`}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[
+                    { d: 14, l: "2 weeks" }, { d: 30, l: "Monthly" }, { d: 42, l: "6 weeks" }, { d: 56, l: "8 weeks" },
+                  ].map(({ d, l }) => (
+                    <button key={d} disabled={dueBusy} onClick={() => setNextDue(d)}
+                      className={cn("text-xs font-semibold rounded-lg px-3 py-1.5 border transition-colors disabled:opacity-50",
+                        dueSet === d ? "bg-violet-600 text-white border-violet-600" : "bg-white border-violet-200 text-violet-700 hover:bg-violet-100")}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {selected.notes && (
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Notes</p>

@@ -192,6 +192,26 @@ export class NotificationProcessor extends WorkerHost {
     }
   }
 
+  // Service-due: any SCHEDULED tracker whose date has arrived becomes DUE and
+  // raises an in-app prompt to the owner ("approve to invite them to rebook").
+  private async runServiceDueScan() {
+    const due = await this.prisma.serviceDue.findMany({
+      where: { status: 'SCHEDULED', dueAt: { lte: new Date() } },
+      include: { client: { select: { name: true } }, service: { select: { name: true } } },
+      take: 300,
+    });
+    for (const d of due) {
+      await this.prisma.serviceDue.update({ where: { id: d.id }, data: { status: 'DUE' } });
+      const svc = d.service?.name ? `${d.service.name} ` : '';
+      await this.notifyOwners(d.businessId, {
+        kind: 'SYSTEM',
+        title: `Follow-up due — ${d.client.name}`,
+        body: `${d.client.name}'s ${svc}visit is due. Approve to invite them to rebook, or reschedule it.`,
+        linkUrl: '/dashboard/followups',
+      }).catch(() => {});
+    }
+  }
+
   // In-app inbox notification to a business's owner(s). Best-effort.
   private async notifyOwners(
     businessId: string,
@@ -509,6 +529,12 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     // Daily lapsed-client scan → "we haven't seen you in ~3 months" win-backs.
     if (job.name === 'winback-scan') {
       await this.runWinbackScan();
+      return;
+    }
+
+    // Daily service-due scan → flips due trackers to DUE + prompts the owner.
+    if (job.name === 'service-due-scan') {
+      await this.runServiceDueScan();
       return;
     }
 
