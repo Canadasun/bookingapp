@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
@@ -17,12 +17,28 @@ export interface AppointmentWithRelations {
 }
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectQueue(NOTIFICATION_QUEUE) private queue: Queue,
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {}
+
+  // Register the daily lapsed-client win-back scan. Idempotent (BullMQ dedupes
+  // repeatable jobs by name+pattern); best-effort so a Redis hiccup can't block boot.
+  async onModuleInit() {
+    try {
+      await this.queue.add('winback-scan', {}, {
+        repeat: { pattern: '0 14 * * *' }, // 14:00 UTC daily
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
+    } catch (e) {
+      this.logger.warn(`Could not schedule win-back scan: ${e instanceof Error ? e.message : e}`);
+    }
+  }
 
   async scheduleReminders(apt: AppointmentWithRelations) {
     const business = apt.business ?? await this.prisma.appointment

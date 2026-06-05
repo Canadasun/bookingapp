@@ -347,7 +347,7 @@ export default function SettingsPage() {
                   }} />
                 </Field>
                 <Field label="Business name">
-                  <Input value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="Demo Salon" />
+                  <Input value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="e.g. Paws & Claws Grooming" />
                 </Field>
                 <Field label="Contact email">
                   <Input type="email" value={(form.email as string) ?? ""} onChange={(e) => f("email", e.target.value)} />

@@ -144,6 +144,54 @@ export class NotificationProcessor extends WorkerHost {
     };
   }
 
+  // Win-back: email clients who completed a visit but haven't been back (or booked)
+  // in ~3 months, inviting them to rebook. Paid feature (Basic/Pro). Each client is
+  // emailed at most once per 6 months (checked against the delivery log), so it
+  // never nags. Runs daily via the 'winback-scan' repeatable job.
+  private async runWinbackScan() {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
+    const sixMonthsAgo = new Date(Date.now() - 180 * 86_400_000);
+    const paid = await this.prisma.business.findMany({
+      where: { plan: { in: ['BASIC', 'PRO'] } },
+      select: { id: true },
+    });
+    const bizIds = paid.map((b) => b.id);
+    if (!bizIds.length) return;
+
+    const lapsed = await this.prisma.client.findMany({
+      where: {
+        businessId: { in: bizIds },
+        // Has completed a visit before, but nothing (booked or attended) in 90 days.
+        appointments: { some: { status: 'COMPLETED' }, none: { startsAt: { gte: ninetyDaysAgo } } },
+      },
+      include: { business: true },
+      take: 200,
+    });
+
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    for (const c of lapsed) {
+      if (!c.email) continue;
+      const already = await this.prisma.notificationDelivery.findFirst({
+        where: { recipient: c.email, type: 'rebook-reminder', status: 'SENT', createdAt: { gt: sixMonthsAgo } },
+        select: { id: true },
+      });
+      if (already) continue;
+      this.currentType = 'rebook-reminder';
+      this.currentBusinessId = c.businessId;
+      const bookUrl = `${baseUrl}/book/${c.business.slug}`;
+      await this.email.send({
+        to: c.email,
+        subject: `We haven't seen you in a while — ${c.business.name}`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">It's been a while 💛</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(c.name)}, it's been about three months since your last visit to <strong>${esc(c.business.name)}</strong>. We hope you're doing well — and we'd love to see you again!</p>
+<p style="margin:0 0 20px;color:#374151;font-size:14px">Whenever you're ready, you can book your next visit online in a couple of taps.</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
+`),
+      }).catch(() => {});
+    }
+  }
+
   // In-app inbox notification to a business's owner(s). Best-effort.
   private async notifyOwners(
     businessId: string,
@@ -455,6 +503,12 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 <a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
 `),
       });
+      return;
+    }
+
+    // Daily lapsed-client scan → "we haven't seen you in ~3 months" win-backs.
+    if (job.name === 'winback-scan') {
+      await this.runWinbackScan();
       return;
     }
 

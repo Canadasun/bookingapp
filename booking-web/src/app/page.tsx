@@ -105,7 +105,7 @@ export default function LandingPage() {
               Everything you need to run your schedule
             </h2>
             <p className="text-slate-500 max-w-xl mx-auto">
-              Built for service businesses — salons, clinics, coaches, and more.
+              Built for solo professionals — pet groomers, lash &amp; brow artists, hair stylists, estheticians, and the appointments you keep coming back for.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">

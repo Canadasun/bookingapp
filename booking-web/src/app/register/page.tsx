@@ -109,7 +109,7 @@ export default function RegisterPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Business name</label>
-                <Input placeholder="Jane's Salon" value={form.businessName} onChange={(e) => f("businessName", e.target.value)}
+                <Input placeholder="e.g. Paws & Claws Grooming · Bliss Lash Studio" value={form.businessName} onChange={(e) => f("businessName", e.target.value)}
                   className={errs.businessName ? "border-red-400" : ""} />
                 {errs.businessName && <p className="text-xs text-red-500 mt-1">{errs.businessName}</p>}
               </div>
