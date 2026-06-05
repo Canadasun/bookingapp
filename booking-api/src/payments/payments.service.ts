@@ -418,6 +418,34 @@ export class PaymentsService {
     if (prev && prev.plan !== effectivePlan) {
       await this.notifications.sendPlanChanged(businessId, effectivePlan).catch(() => {});
     }
+    // When a referred business becomes a paying customer, grant the referrer their
+    // reward (once). Best-effort: a reward hiccup never breaks the subscription.
+    if (effectivePlan !== 'FREE') {
+      await this.grantReferralReward(businessId).catch(() => {});
+    }
+  }
+
+  // Grant the referrer of `referredBusinessId` an account credit, applied to their
+  // next Pulse invoice. Controlled by REFERRAL_REWARD_CENTS (default $10; set 0 to
+  // disable). Idempotent via ReferralsService.claimPendingReward.
+  private async grantReferralReward(referredBusinessId: string) {
+    const rewardCents = parseInt(this.configService.get<string>('REFERRAL_REWARD_CENTS') ?? '1000', 10);
+    if (!rewardCents || rewardCents <= 0) return;
+    const referrerId = await this.referrals.claimPendingReward(referredBusinessId);
+    if (!referrerId) return;
+    const referrer = await this.prisma.business.findUnique({
+      where: { id: referrerId },
+      select: { id: true, name: true, email: true },
+    });
+    if (!referrer) return;
+    // Negative balance transaction = credit on the customer's Stripe balance,
+    // automatically deducted from their next subscription invoice.
+    const customerId = await this.ensureBusinessCustomer(referrer);
+    await this.getStripe().customers.createBalanceTransaction(customerId, {
+      amount: -rewardCents,
+      currency: 'usd',
+      description: 'Pulse referral reward — a business you referred subscribed',
+    });
   }
 
   private async ensureBusinessCustomer(business: { id: string; name: string; email: string }): Promise<string> {

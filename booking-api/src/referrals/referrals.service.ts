@@ -53,6 +53,24 @@ export class ReferralsService {
     }
   }
 
+  // Atomically claim a pending reward for a referred business that just became a
+  // paying customer. The status filter makes this idempotent: the first caller
+  // flips PENDING→REWARDED (count 1) and gets the referrer id; any later call
+  // (e.g. a redelivered Stripe webhook) matches 0 rows and returns null, so the
+  // reward is granted exactly once.
+  async claimPendingReward(referredBusinessId: string): Promise<string | null> {
+    const res = await this.prisma.referral.updateMany({
+      where: { referredBusinessId, status: 'PENDING' },
+      data: { status: 'REWARDED' },
+    });
+    if (res.count === 0) return null;
+    const ref = await this.prisma.referral.findUnique({
+      where: { referredBusinessId },
+      select: { referrerBusinessId: true },
+    });
+    return ref?.referrerBusinessId ?? null;
+  }
+
   // The dashboard view: my code + who I've referred.
   async getMyReferrals(businessId: string) {
     const code = await this.getOrCreateCode(businessId);

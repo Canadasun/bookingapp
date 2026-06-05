@@ -33,7 +33,7 @@ async function build(paymentRow: unknown) {
       { provide: PrismaService, useValue: prisma },
       { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('sk_test_x') } },
       { provide: NotificationsService, useValue: {} },
-      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false) } },
+      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
     ],
   }).compile();
   const svc = module.get<PaymentsService>(PaymentsService);
@@ -118,7 +118,7 @@ describe('PaymentsService subscriptions', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
         { provide: NotificationsService, useValue: {} },
-      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false) } },
+      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
       ],
     }).compile();
     const svc = module.get<PaymentsService>(PaymentsService);
