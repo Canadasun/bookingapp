@@ -1,6 +1,19 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { Calendar, Bell, CreditCard, Clock, Star, Shield, ArrowRight, Sparkles } from "lucide-react";
 import { LandingAuthCta, LandingResources, LandingSolutions, LandingHeroCta, LandingBottomCta, LandingFooterLinks } from "@/components/LandingClient";
+import { LoggedInHome } from "@/components/LoggedInHome";
+
+// Decode the role from the (non-HttpOnly) booking_user cookie, server-side, so a
+// signed-in user gets their dedicated home with no flash of the marketing page.
+async function sessionRole(): Promise<string | undefined> {
+  const raw = (await cookies()).get("booking_user")?.value;
+  if (!raw) return undefined;
+  for (const v of [raw, decodeURIComponent(raw)]) {
+    try { return JSON.parse(Buffer.from(v, "base64").toString("utf8"))?.role; } catch { /* try next */ }
+  }
+  return undefined;
+}
 
 const features = [
   { icon: Clock,       title: "24/7 Online Booking",       desc: "Clients book appointments any time — no phone tag, no back-and-forth." },
@@ -14,7 +27,11 @@ const stats = [
   { value: "80%",  label: "Reduction in no-shows" },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Signed-in owners/staff/admins get a dedicated home, not the marketing page.
+  const role = await sessionRole();
+  if (role && role !== "CLIENT") return <LoggedInHome />;
+
   return (
     <div className="flex flex-col min-h-screen brand-shell">
       {/* Nav */}
