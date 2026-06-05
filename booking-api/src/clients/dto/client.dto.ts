@@ -30,6 +30,7 @@ export const CreateClientSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   phone: phoneSchema,
   notes: z.string().optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
 });
 
 export const UpdateClientSchema = CreateClientSchema.partial();

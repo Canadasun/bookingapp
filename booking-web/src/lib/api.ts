@@ -125,7 +125,7 @@ export interface Slot {
 }
 
 export interface Client {
-  id: string; name: string; email: string; phone?: string; notes?: string;
+  id: string; name: string; email: string; phone?: string; notes?: string; tags?: string[];
   businessId: string; createdAt: string; updatedAt: string;
 }
 
@@ -568,7 +568,7 @@ export const api = {
     // email/phone) rather than creating a new profile.
     create: (businessId: string, data: { name: string; email: string; phone?: string; notes?: string }) =>
       req<Client & { matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string }) =>
+    update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[] }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     duplicates: (businessId: string) =>
       req<Array<{ clients: Array<{ id: string; name: string; email: string; phone?: string | null; createdAt: string; appointments: number }> }>>(`/businesses/${businessId}/clients/duplicates`),

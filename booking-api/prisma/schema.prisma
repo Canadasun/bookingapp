@@ -612,6 +612,7 @@ model Client {
   email      String
   phone      String?
   notes      String?
+  tags       String[] @default([]) // owner labels, e.g. "VIP", "New", "Sensitive skin"
   // Link to User account if client has registered
   userId     String?
   // Stripe Customer for saved cards (deposits / no-show auto-charge)

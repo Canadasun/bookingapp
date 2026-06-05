@@ -40,6 +40,7 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
       { href: "/dashboard/packages",     label: "Packages" },
       { href: "/dashboard/transactions", label: "Transactions" },
+      { href: "/dashboard/reports",      label: "Reports" },
       { href: "/dashboard/notifications",label: "Notifications" },
       { href: "/dashboard/account",      label: "Account" },
       { href: "/dashboard/settings",     label: "Settings" },

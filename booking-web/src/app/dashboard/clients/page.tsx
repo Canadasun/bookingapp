@@ -36,6 +36,8 @@ export default function ClientsPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [dueBusy, setDueBusy] = useState(false);
   const [dueSet, setDueSet] = useState<number | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const [tagBusy, setTagBusy] = useState(false);
 
   const router = useRouter();
   const user = getUser();
@@ -129,6 +131,25 @@ export default function ClientsPage() {
     setEditMode(true);
   }
 
+  async function saveTags(tags: string[]) {
+    if (!bizId || !selected) return;
+    setTagBusy(true);
+    try {
+      const updated = await api.clients.update(bizId, selected.id, { tags });
+      setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
+      load(search, page);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not update tags"); }
+    finally { setTagBusy(false); }
+  }
+  function addTag() {
+    const t = tagInput.trim();
+    if (!t || !selected) return;
+    const existing = selected.tags ?? [];
+    if (existing.some((x) => x.toLowerCase() === t.toLowerCase())) { setTagInput(""); return; }
+    setTagInput("");
+    saveTags([...existing, t].slice(0, 20));
+  }
+
   async function saveEdit() {
     if (!bizId || !selected) return;
     if (!editForm.name.trim() || !editForm.email.trim()) { toast.error("Name and email are required"); return; }
@@ -206,7 +227,12 @@ export default function ClientsPage() {
                   {c.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{c.name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-gray-900 truncate">{c.name}</p>
+                    {(c.tags ?? []).slice(0, 3).map((t) => (
+                      <span key={t} className="rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 text-[10px] font-medium">{t}</span>
+                    ))}
+                  </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
                     <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.email}</span>
                     {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{c.phone}</span>}
@@ -309,6 +335,27 @@ export default function ClientsPage() {
                       {l}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Tags</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(selected.tags ?? []).map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
+                      {t}
+                      <button disabled={tagBusy} onClick={() => saveTags((selected.tags ?? []).filter((x) => x !== t))}
+                        className="text-violet-400 hover:text-red-600" aria-label={`Remove ${t}`}>×</button>
+                    </span>
+                  ))}
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                    onBlur={addTag}
+                    placeholder="+ Add tag"
+                    className="text-xs px-2 py-1 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-200 w-24" />
                 </div>
               </div>
 
