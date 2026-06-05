@@ -91,6 +91,7 @@ model Business {
   // { id, label, required }. Answers are stored per appointment (intakeAnswers).
   intakeQuestions Json @default("[]")
   taxRatePercent  Float @default(0) // sales tax applied to totals/receipts (e.g. 13 = 13%)
+  invoiceSeq      Int   @default(0) // per-business invoice number counter
 
   // Booking policies
   minNoticeMinutes      Int     @default(120)
@@ -135,6 +136,7 @@ model Business {
   staff              Staff[]
   services           Service[]
   resources          Resource[]
+  invoices           Invoice[]
   serviceCategories  ServiceCategory[]
   appointments       Appointment[]
   clients            Client[]
@@ -575,6 +577,32 @@ model Resource {
   @@index([businessId])
 }
 
+// A standalone invoice: arbitrary line items, a per-business sequential number,
+// and a lifecycle status. Tax is captured at issue time from the business rate.
+model Invoice {
+  id            String   @id @default(cuid())
+  businessId    String
+  clientId      String?
+  number        Int      // per-business sequence (from Business.invoiceSeq)
+  status        String   @default("DRAFT") // DRAFT | SENT | PAID | VOID
+  lineItems     Json     @default("[]")    // [{ description, quantity, unitCents, amountCents }]
+  notes         String?
+  currency      String   @default("CAD")
+  subtotalCents Int      @default(0)
+  taxRatePercent Float   @default(0)
+  taxCents      Int      @default(0)
+  totalCents    Int      @default(0)
+  dueAt         DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([clientId])
+}
+
 model ServiceCategory {
   id          String   @id @default(cuid())
   businessId  String
@@ -650,6 +678,7 @@ model Client {
   packages     ClientPackage[]
   payments     Payment[]
   serviceDues  ServiceDue[]
+  invoices     Invoice[]
 
   @@unique([businessId, email])
   @@index([businessId])

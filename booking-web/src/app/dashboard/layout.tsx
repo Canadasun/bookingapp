@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
-  DollarSign, BarChart3,
+  DollarSign, BarChart3, FileText,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -41,6 +41,7 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
       { href: "/dashboard/packages",     label: "Packages" },
       { href: "/dashboard/transactions", label: "Transactions" },
+      { href: "/dashboard/invoices",     label: "Invoices" },
       { href: "/dashboard/reports",      label: "Reports" },
       { href: "/dashboard/notifications",label: "Notifications" },
       { href: "/dashboard/account",      label: "Account" },
@@ -144,6 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(perms.includes("VIEW_MONEY")
       ? [
           { href: "/dashboard/transactions", label: "Transactions", icon: DollarSign },
+          { href: "/dashboard/invoices",     label: "Invoices",     icon: FileText },
           { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },
         ]
       : []),

@@ -95,6 +95,15 @@ export interface ServiceCategory {
 
 export interface Resource { id: string; businessId: string; name: string; active: boolean; createdAt: string; updatedAt: string }
 
+export interface InvoiceLineItem { description: string; quantity: number; unitCents: number; amountCents: number }
+export interface Invoice {
+  id: string; businessId: string; clientId?: string | null; number: number;
+  status: "DRAFT" | "SENT" | "PAID" | "VOID"; lineItems: InvoiceLineItem[]; notes?: string | null;
+  currency: string; subtotalCents: number; taxRatePercent: number; taxCents: number; totalCents: number;
+  dueAt?: string | null; createdAt: string; updatedAt: string;
+  client?: { id: string; name: string; email: string; phone?: string } | null;
+}
+
 export interface Service {
   id: string; name: string; description?: string;
   durationMinutes: number; priceCents: number;
@@ -494,6 +503,17 @@ export const api = {
       req<Resource>(`/businesses/${businessId}/resources/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     remove: (businessId: string, id: string) =>
       req<{ ok: boolean }>(`/businesses/${businessId}/resources/${id}`, { method: "DELETE" }),
+  },
+
+  invoices: {
+    list: (businessId: string) => req<Invoice[]>(`/businesses/${businessId}/invoices`),
+    get: (businessId: string, id: string) => req<Invoice>(`/businesses/${businessId}/invoices/${id}`),
+    create: (businessId: string, data: { clientId?: string | null; notes?: string; dueAt?: string; lineItems: { description: string; quantity: number; unitCents: number }[] }) =>
+      req<Invoice>(`/businesses/${businessId}/invoices`, { method: "POST", body: JSON.stringify(data) }),
+    setStatus: (businessId: string, id: string, status: "DRAFT" | "SENT" | "PAID" | "VOID") =>
+      req<Invoice>(`/businesses/${businessId}/invoices/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    remove: (businessId: string, id: string) =>
+      req<{ ok: boolean }>(`/businesses/${businessId}/invoices/${id}`, { method: "DELETE" }),
   },
 
   serviceCategories: {
