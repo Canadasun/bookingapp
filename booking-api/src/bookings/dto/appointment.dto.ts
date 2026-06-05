@@ -10,6 +10,13 @@ export const CreateAppointmentSchema = z.object({
   allowOverride: z.boolean().optional(),
 });
 
+// Owner-initiated recurring series: the base booking + how it repeats. Each
+// occurrence is created CONFIRMED; conflicting occurrences are skipped.
+export const CreateRecurringSchema = CreateAppointmentSchema.extend({
+  frequency: z.enum(['WEEKLY', 'BIWEEKLY', 'MONTHLY']),
+  count: z.number().int().min(2).max(26),
+});
+
 export const RescheduleSchema = z.object({
   startsAt: z.string().datetime(),
   staffId: z.string().optional(),
@@ -46,6 +53,7 @@ export const LateCancelRequestSchema = z.object({
 });
 
 export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
+export type CreateRecurringDto = z.infer<typeof CreateRecurringSchema>;
 export type RescheduleDto = z.infer<typeof RescheduleSchema>;
 export type StatusDto = z.infer<typeof StatusSchema>;
 export type PublicStatusDto = z.infer<typeof PublicStatusSchema>;

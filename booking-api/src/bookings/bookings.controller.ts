@@ -5,6 +5,7 @@ import { BookingsService } from './bookings.service';
 import { verifyAppointmentToken } from '../common/util/appointment-token';
 import {
   CreateAppointmentSchema, CreateAppointmentDto,
+  CreateRecurringSchema, CreateRecurringDto,
   RescheduleSchema, RescheduleDto,
   StatusSchema, StatusDto,
   PublicStatusSchema, PublicStatusDto,
@@ -139,6 +140,22 @@ export class BookingsController {
       throw new ForbiddenException('You do not have access to this business');
     }
     return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: dto.allowOverride === true });
+  }
+
+  // Owner/staff-initiated recurring series (dashboard). Creates N confirmed
+  // occurrences; conflicting ones are skipped and reported.
+  @Post('recurring')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  createRecurring(
+    @Param('businessId') businessId: string,
+    @Body(new ZodValidationPipe(CreateRecurringSchema)) dto: CreateRecurringDto,
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.appointmentService.createRecurring(businessId, dto, { confirmed: true });
   }
 
   @Patch(':id/confirm')

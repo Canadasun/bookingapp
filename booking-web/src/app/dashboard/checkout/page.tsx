@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { format, addDays, startOfDay, isBefore, isAfter } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { parseISO } from "date-fns";
-import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus } from "lucide-react";
+import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Client, Slot, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -48,6 +48,7 @@ export default function CheckoutPage() {
   const [customTime, setCustomTime]           = useState("");
   const [customStaffId, setCustomStaffId]     = useState("");
   const [overrideCalendar, setOverrideCalendar] = useState(false);
+  const [recurring, setRecurring] = useState<{ enabled: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "MONTHLY"; count: number }>({ enabled: false, frequency: "WEEKLY", count: 4 });
 
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting]     = useState(false);
@@ -178,14 +179,23 @@ export default function CheckoutPage() {
           ? selectedStaff.id
           : selectedSlot?.staffId;
       if (!staffId) { toast.error("Choose a provider before booking"); return; }
-      const apt = await api.appointments.createManual(bizId, {
+      const common = {
         staffId, serviceId: selectedServices[0].id,
         additionalServiceIds: selectedServices.slice(1).map((s) => s.id),
         clientId: client.id, startsAt,
         allowOverride: overrideCalendar || !!customStartsAt,
-      });
-      setBooked(apt);
-      toast.success("Appointment booked & confirmed!");
+      };
+      if (recurring.enabled) {
+        const res = await api.appointments.createRecurring(bizId, { ...common, frequency: recurring.frequency, count: recurring.count });
+        setBooked(res.created[0] ?? null);
+        toast.success(
+          `Booked ${res.created.length} of ${recurring.count} appointments${res.skipped.length ? ` — ${res.skipped.length} skipped (conflicts)` : ""}`,
+        );
+      } else {
+        const apt = await api.appointments.createManual(bizId, common);
+        setBooked(apt);
+        toast.success("Appointment booked & confirmed!");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Booking failed");
     } finally { setSubmitting(false); }
@@ -195,6 +205,7 @@ export default function CheckoutPage() {
     setStep("client"); setSelectedClient(null); setSelectedServices([]);
     setSelectedStaff(null); setSelectedDate(undefined); setSelectedSlot(null);
     setCustomDate(""); setCustomTime(""); setCustomStaffId(""); setOverrideCalendar(false);
+    setRecurring({ enabled: false, frequency: "WEEKLY", count: 4 });
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
     setNewClientMode(false); setNewClient({ firstName: "", lastName: "", email: "", phone: "" });
   }
@@ -619,8 +630,43 @@ export default function CheckoutPage() {
               ))}
             </div>
 
+            {/* Recurring series — repeat this booking on a schedule */}
+            <div className="mb-5 rounded-xl border border-gray-100 p-3">
+              <label className="flex items-center justify-between gap-3 cursor-pointer">
+                <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <Repeat className="w-4 h-4 text-violet-600" /> Repeat this appointment
+                </span>
+                <input type="checkbox" className="h-4 w-4 accent-violet-600"
+                  checked={recurring.enabled}
+                  onChange={(e) => setRecurring((p) => ({ ...p, enabled: e.target.checked }))} />
+              </label>
+              {recurring.enabled && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Frequency</label>
+                    <select value={recurring.frequency}
+                      onChange={(e) => setRecurring((p) => ({ ...p, frequency: e.target.value as typeof p.frequency }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
+                      <option value="WEEKLY">Weekly</option>
+                      <option value="BIWEEKLY">Every 2 weeks</option>
+                      <option value="MONTHLY">Monthly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Occurrences</label>
+                    <select value={recurring.count}
+                      onChange={(e) => setRecurring((p) => ({ ...p, count: Number(e.target.value) }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
+                      {[2, 3, 4, 5, 6, 8, 10, 12].map((n) => <option key={n} value={n}>{n} times</option>)}
+                    </select>
+                  </div>
+                  <p className="col-span-2 text-xs text-gray-400">Creates {recurring.count} confirmed bookings; any that conflict are skipped.</p>
+                </div>
+              )}
+            </div>
+
             <Button className="w-full" loading={submitting} onClick={confirm}>
-              <CheckCircle2 className="w-4 h-4 mr-2" /> Confirm booking
+              <CheckCircle2 className="w-4 h-4 mr-2" /> {recurring.enabled ? `Book ${recurring.count} appointments` : "Confirm booking"}
             </Button>
           </div>
         )}

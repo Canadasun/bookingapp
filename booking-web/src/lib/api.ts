@@ -586,6 +586,10 @@ export const api = {
     // and sends the client their confirmation immediately (skips approval).
     createManual: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean }) =>
       req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
+    // Owner-initiated recurring series. Returns the created occurrences + any
+    // dates skipped due to conflicts.
+    createRecurring: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "MONTHLY"; count: number }) =>
+      req<{ groupId: string; created: { id: string; startsAt: string }[]; skipped: string[] }>(`/businesses/${businessId}/bookings/recurring`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),
     updateStatus: (businessId: string, id: string, status: string, cancelReason?: string, chargeCancellationFee?: boolean) =>

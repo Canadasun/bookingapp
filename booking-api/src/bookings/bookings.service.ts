@@ -11,12 +11,13 @@ import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
 import { AvailabilityService } from '../availability/availability.service';
 import { GoogleCalendarService } from '../calendar-sync/google-calendar.service';
-import { CreateAppointmentDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import { CreateAppointmentDto, CreateRecurringDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
 import { isPaidPlan } from '../common/util/plan-features';
 import { Prisma } from '@prisma/client';
-import { addMinutes } from 'date-fns';
+import { addMinutes, addWeeks, addMonths } from 'date-fns';
+import { randomUUID } from 'node:crypto';
 import { formatInTimeZone } from 'date-fns-tz';
 
 @Injectable()
@@ -86,7 +87,7 @@ export class BookingsService {
    * Creates an appointment with SERIALIZABLE isolation + SELECT FOR UPDATE
    * to guarantee exactly-once booking under concurrent requests.
    */
-  async create(businessId: string, dto: CreateAppointmentDto, opts: { confirmed?: boolean; overrideConflicts?: boolean } = {}) {
+  async create(businessId: string, dto: CreateAppointmentDto, opts: { confirmed?: boolean; overrideConflicts?: boolean; recurringGroupId?: string } = {}) {
     const primaryService = await this.prisma.service.findFirst({
       where: { id: dto.serviceId, businessId },
     });
@@ -209,6 +210,7 @@ export class BookingsService {
               // Owner/staff-initiated bookings skip the approval queue and are
               // confirmed immediately; public self-service stays PENDING.
               ...(opts.confirmed ? { status: 'CONFIRMED' as const } : {}),
+              ...(opts.recurringGroupId ? { recurringGroupId: opts.recurringGroupId } : {}),
             },
             include: { client: true, service: true, staff: { include: { user: true } }, business: true },
           });
@@ -265,6 +267,41 @@ export class BookingsService {
 
     // Manage token so the confirmation screen can link straight to the manage page.
     return { ...appointment, manageToken: signAppointmentToken(appointment.id) };
+  }
+
+  // Owner-initiated recurring series. Creates `count` occurrences spaced by the
+  // chosen frequency, all sharing a recurringGroupId. The first occurrence must
+  // succeed; later occurrences that hit a conflict are skipped and reported so the
+  // owner can rebook those individually.
+  async createRecurring(businessId: string, dto: CreateRecurringDto, opts: { confirmed?: boolean } = {}) {
+    const { frequency, count } = dto;
+    const base: CreateAppointmentDto = {
+      staffId: dto.staffId, serviceId: dto.serviceId, additionalServiceIds: dto.additionalServiceIds,
+      clientId: dto.clientId, startsAt: dto.startsAt, notes: dto.notes, allowOverride: dto.allowOverride,
+    };
+    const baseStart = new Date(dto.startsAt);
+    const groupId = randomUUID();
+    const created: Array<{ id: string; startsAt: Date }> = [];
+    const skipped: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const occStart =
+        frequency === 'MONTHLY' ? addMonths(baseStart, i)
+        : addWeeks(baseStart, i * (frequency === 'BIWEEKLY' ? 2 : 1));
+      try {
+        const apt = await this.create(
+          businessId,
+          { ...base, startsAt: occStart.toISOString() },
+          { confirmed: opts.confirmed, overrideConflicts: base.allowOverride === true, recurringGroupId: groupId },
+        );
+        created.push({ id: apt.id, startsAt: apt.startsAt });
+      } catch (err) {
+        if (i === 0) throw err; // a series must start with a valid first booking
+        skipped.push(occStart.toISOString());
+      }
+    }
+
+    return { groupId, created, skipped };
   }
 
   async confirm(id: string, businessId?: string, userId?: string) {
