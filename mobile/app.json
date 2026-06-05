@@ -10,7 +10,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.canadasun.Mobile",
-      "buildNumber": "3",
+      "buildNumber": "8",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDisplayName": "Pulse"
@@ -38,6 +41,7 @@
           "imageWidth": 120
         }
       ],
+      "expo-notifications",
       "expo-secure-store"
     ],
     "extra": {
