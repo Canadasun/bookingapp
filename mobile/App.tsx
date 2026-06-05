@@ -244,6 +244,16 @@ function Pill({ label, color }: { label:string; color:string }) {
 function PriceTag({ cents }: { cents:number }) {
   return <Text style={s.price}>${(cents/100).toFixed(2)}</Text>;
 }
+// Small "Verified" trust pill — mirrors the (now compact) web badge. Only render
+// when the business has been approved by a Pulse admin.
+function VerifiedPill() {
+  return (
+    <View style={s.verifiedPill}>
+      <Ionicons name="shield-checkmark" size={10} color="#fff"/>
+      <Text style={s.verifiedPillText}>Verified</Text>
+    </View>
+  );
+}
 
 // ── Appointments screen ──────────────────────────────────────────────────────
 function CalendarScreen() {
@@ -3220,7 +3230,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={ms.card}>
             <Text style={ms.cardLabel}>Business</Text>
-            <Text style={ms.cardValue}>{biz?.name ?? '—'}</Text>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <Text style={ms.cardValue}>{biz?.name ?? '—'}</Text>
+              {(biz as any)?.verificationStatus === 'VERIFIED' && <VerifiedPill/>}
+            </View>
           </View>
           <View style={ms.card}>
             <Text style={ms.cardLabel}>Plan</Text>
@@ -4381,6 +4394,8 @@ const s = StyleSheet.create({
   price:           { fontSize:13, fontWeight:'700', color:GRAY_700 },
   pill:            { paddingHorizontal:8, paddingVertical:3, borderRadius:99, borderWidth:1 },
   pillText:        { fontSize:10, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.5 },
+  verifiedPill:    { flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'#6D5BD0', borderRadius:99, paddingHorizontal:7, paddingVertical:2 },
+  verifiedPillText:{ fontSize:10, fontWeight:'700', color:'#fff' },
   // Detail sheet
   overlay:         { position:'absolute', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.4)', justifyContent:'flex-end', zIndex:99 },
   sheet:           { backgroundColor:'#fff', borderTopLeftRadius:20, borderTopRightRadius:20, padding:20, paddingBottom:Platform.OS==='ios'?34:20, maxHeight:'90%' },
