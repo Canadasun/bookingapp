@@ -6,6 +6,7 @@ import { AlertTriangle, Bell, CalendarClock, CheckCheck, CreditCard, Mail, Messa
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { api, DeviceToken, NotificationDelivery, NotificationItem, NotificationKind } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,25 @@ export default function NotificationsPage() {
   const [deliverySearch, setDeliverySearch] = useState("");
   const [devices, setDevices] = useState<DeviceToken[]>([]);
   const [devicesLoading, setDevicesLoading] = useState(false);
+  const [preview, setPreview] = useState<{ title: string; desc: string; body: string } | null>(null);
+  const [bizName, setBizName] = useState("your business");
+
+  useEffect(() => {
+    const u = getUser();
+    if (u?.businessId) api.business.get(u.businessId).then((b) => setBizName(b.name)).catch(() => {});
+  }, []);
+
+  // Fill the {{tokens}} with realistic sample data so the owner sees exactly what
+  // a client receives.
+  const sample: Record<string, string> = {
+    client: "Jamie Rivera",
+    service: "Full groom",
+    business: bizName,
+    staff: bizName,
+    time: "Sat, Jun 14 at 2:30 PM",
+    reason: "We're sorry for the inconvenience.",
+  };
+  const renderTemplate = (body: string) => body.replace(/\{\{(\w+)\}\}/g, (_, k) => sample[k] ?? `{{${k}}}`);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -279,7 +299,7 @@ export default function NotificationsPage() {
               </div>
               <p className="mt-1 text-xs text-gray-400">{desc}</p>
               <p className="mt-3 rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">{body}</p>
-              <Button size="sm" variant="outline" className="mt-3" onClick={() => toast.info("Template editing will save to business notification settings in the next backend migration.")}>
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => setPreview({ title, desc, body })}>
                 Preview template
               </Button>
             </div>
@@ -316,6 +336,40 @@ export default function NotificationsPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Template preview — shows the message rendered with realistic data */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPreview(null)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-violet-500" />
+                <p className="text-sm font-semibold text-gray-900">{preview.title}</p>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{preview.desc}</p>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Preview — what the client sees</p>
+                {/* Email-style preview card */}
+                <div className="rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="bg-[#E9A23C] px-4 py-2.5"><p className="text-white text-sm font-bold">{bizName}</p></div>
+                  <div className="p-4 bg-white">
+                    <p className="text-sm text-gray-700 leading-relaxed">{renderTemplate(preview.body)}</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Template</p>
+                <p className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600 font-mono">{preview.body}</p>
+                <p className="text-[11px] text-gray-400 mt-1.5">Tokens like <code className="text-violet-600">{"{{client}}"}</code> are filled in automatically when sent. Custom editing is coming soon.</p>
+              </div>
+              <Button className="w-full" onClick={() => setPreview(null)}>Close</Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
