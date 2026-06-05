@@ -1482,6 +1482,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [giftRedeem, setGiftRedeem] = useState({ code:'', amount:'' });
   const [packageTab, setPackageTab] = useState<'products'|'issued'>('products');
   const [packageEditor, setPackageEditor] = useState<{ name:string; serviceId:string; credits:string; price:string }|null>(null);
+  const [packageIssue, setPackageIssue] = useState<{ client:Client|null; search:string; packageId:string; results:Client[] }|null>(null);
+  const [campaignEditor, setCampaignEditor] = useState<{ name:string; channel:'EMAIL'|'SMS'; audience:'ALL'|'RECENT'|'LAPSED'; subject:string; body:string; count:number|null }|null>(null);
   const [taskEditor, setTaskEditor] = useState<{ title:string; staffId:string; dueAt:string; notes:string }|null>(null);
   const [settingsEditor, setSettingsEditor] = useState<{ name:string; email:string; phone:string; address:string; minNoticeMinutes:string; maxAdvanceDays:string; cancellationWindowHours:string; requireDeposit:boolean; depositPercent:string }|null>(null);
   const [timeOffEditor, setTimeOffEditor] = useState<{ staffId:string; name:string; startsAt:string; endsAt:string; reason:string }|null>(null);
@@ -1684,6 +1686,37 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     setServices(serviceRows);
   }
 
+  async function searchPackageClients(q: string) {
+    if (!packageIssue) return;
+    setPackageIssue({ ...packageIssue, search:q });
+    if (q.trim().length < 2) {
+      setPackageIssue({ ...packageIssue, search:q, results:[] });
+      return;
+    }
+    try {
+      const res = await api<{data:Client[]}>(`/businesses/${bizId()}/clients?search=${encodeURIComponent(q.trim())}&page=1&limit=8`);
+      setPackageIssue({ ...packageIssue, search:q, results:res.data });
+    } catch {
+      setPackageIssue({ ...packageIssue, search:q, results:[] });
+    }
+  }
+
+  async function issuePackageToClient() {
+    if (!packageIssue?.client) { Alert.alert('Pick a client', 'Choose who receives the package.'); return; }
+    if (!packageIssue.packageId) { Alert.alert('Pick a package', 'Choose a package product.'); return; }
+    try {
+      await api(`/businesses/${bizId()}/packages/issued`, {
+        method:'POST',
+        body: JSON.stringify({ clientId: packageIssue.client.id, packageId: packageIssue.packageId }),
+      });
+      setPackageIssue(null);
+      setPackageTab('issued');
+      await loadPackages();
+    } catch(e) {
+      Alert.alert('Could not issue package', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
   function packageServiceName(serviceId?: string | null) {
     return (services ?? []).find(sv => sv.id === serviceId)?.name ?? 'Any service';
   }
@@ -1747,6 +1780,87 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           await loadPackages();
         } catch(e) {
           Alert.alert('Could not void package', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  const campaignAudiences = [
+    { value:'ALL' as const, label:'All' },
+    { value:'RECENT' as const, label:'Recent' },
+    { value:'LAPSED' as const, label:'Win-back' },
+  ];
+
+  async function openCampaignComposer() {
+    const editor = { name:'', channel:'EMAIL' as const, audience:'ALL' as const, subject:'', body:'Hi {name}, ', count:null };
+    setCampaignEditor(editor);
+    try {
+      const r = await api<{count:number}>(`/businesses/${bizId()}/campaigns/audience?channel=${editor.channel}&audience=${editor.audience}`);
+      setCampaignEditor({ ...editor, count:r.count });
+    } catch {}
+  }
+
+  async function updateCampaignAudience(next: Partial<NonNullable<typeof campaignEditor>>) {
+    if (!campaignEditor) return;
+    const updated = { ...campaignEditor, ...next, count:null };
+    setCampaignEditor(updated);
+    try {
+      const r = await api<{count:number}>(`/businesses/${bizId()}/campaigns/audience?channel=${updated.channel}&audience=${updated.audience}`);
+      setCampaignEditor({ ...updated, count:r.count });
+    } catch {
+      setCampaignEditor(updated);
+    }
+  }
+
+  async function saveCampaign(thenSend: boolean) {
+    if (!campaignEditor?.name.trim()) { Alert.alert('Campaign name required', 'Add an internal campaign name.'); return; }
+    if (!campaignEditor.body.trim()) { Alert.alert('Message required', 'Write a message.'); return; }
+    if (campaignEditor.channel === 'EMAIL' && !campaignEditor.subject.trim()) { Alert.alert('Subject required', 'Email campaigns need a subject.'); return; }
+    try {
+      const c = await api<any>(`/businesses/${bizId()}/campaigns`, {
+        method:'POST',
+        body: JSON.stringify({
+          name: campaignEditor.name.trim(),
+          channel: campaignEditor.channel,
+          audience: campaignEditor.audience,
+          subject: campaignEditor.channel === 'EMAIL' ? campaignEditor.subject.trim() : undefined,
+          body: campaignEditor.body,
+        }),
+      });
+      if (thenSend) {
+        await api(`/businesses/${bizId()}/campaigns/${c.id}/send`, { method:'POST' });
+      }
+      setCampaignEditor(null);
+      setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`));
+    } catch(e) {
+      Alert.alert('Could not save campaign', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function sendCampaign(c: any) {
+    Alert.alert('Send campaign', `Send "${c.name}" now?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Send', onPress: async () => {
+        try {
+          const r = await api<any>(`/businesses/${bizId()}/campaigns/${c.id}/send`, { method:'POST' });
+          setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`));
+          Alert.alert('Sending', `Sending to ${r?.recipientCount ?? 0} client${(r?.recipientCount ?? 0) === 1 ? '' : 's'}.`);
+        } catch(e) {
+          Alert.alert('Could not send campaign', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  async function removeCampaign(c: any) {
+    Alert.alert('Delete campaign', `Delete "${c.name}"?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/campaigns/${c.id}`, { method:'DELETE' });
+          setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`));
+        } catch(e) {
+          Alert.alert('Could not delete campaign', e instanceof Error ? e.message : 'Please try again.');
         }
       }},
     ]);
@@ -2391,7 +2505,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'marketing') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Marketing"/>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <Text style={s.headerTitle}>Marketing</Text>
+        <TouchableOpacity onPress={openCampaignComposer}>
+          <Ionicons name="add" size={24} color={BRAND}/>
+        </TouchableOpacity>
+      </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(campaigns ?? []).map(c => (
@@ -2408,11 +2528,61 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 {c.status==='SENT' ? `Sent to ${c.sentCount} of ${c.recipientCount}` : `${c.recipientCount} recipients`}
                 {c.sentAt ? ` · ${new Date(c.sentAt).toLocaleDateString()}` : ''}
               </Text>
+              {c.status === 'DRAFT' && (
+                <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>sendCampaign(c)}><Text style={ms.smallActionText}>Send</Text></TouchableOpacity>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>removeCampaign(c)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
+                </View>
+              )}
             </View>
           ))}
-          {campaigns && campaigns.length===0 && <Text style={ms.empty}>No campaigns yet. Create one on the web dashboard.</Text>}
+          {campaigns && campaigns.length===0 && <Text style={ms.empty}>No campaigns yet.</Text>}
         </ScrollView>
       )}
+      <Modal visible={!!campaignEditor} animationType="slide" onRequestClose={()=>setCampaignEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setCampaignEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>New campaign</Text>
+          </View>
+          {campaignEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.fieldLabel}>Campaign name</Text>
+              <TextInput style={s.input} value={campaignEditor.name} placeholder="June promo" placeholderTextColor={GRAY_400} onChangeText={name=>setCampaignEditor({...campaignEditor,name})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Channel</Text>
+              <View style={{ flexDirection:'row', gap:8 }}>
+                {(['EMAIL','SMS'] as const).map(ch => (
+                  <TouchableOpacity key={ch} style={[ms.methodChip, campaignEditor.channel === ch && ms.methodChipOn]} onPress={()=>updateCampaignAudience({ channel:ch })}>
+                    <Text style={[ms.methodChipText, campaignEditor.channel === ch && { color:BRAND }]}>{ch === 'EMAIL' ? 'Email' : 'Text'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Audience</Text>
+              <View style={{ flexDirection:'row', gap:8 }}>
+                {campaignAudiences.map(a => (
+                  <TouchableOpacity key={a.value} style={[ms.methodChip, campaignEditor.audience === a.value && ms.methodChipOn]} onPress={()=>updateCampaignAudience({ audience:a.value })}>
+                    <Text style={[ms.methodChipText, campaignEditor.audience === a.value && { color:BRAND }]}>{a.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={[ms.rowMeta,{ marginTop:8 }]}>{campaignEditor.count === null ? 'Counting recipients...' : `${campaignEditor.count} recipient${campaignEditor.count === 1 ? '' : 's'}`}</Text>
+              {campaignEditor.channel === 'EMAIL' && (
+                <>
+                  <Text style={[s.fieldLabel,{ marginTop:12 }]}>Subject</Text>
+                  <TextInput style={s.input} value={campaignEditor.subject} placeholder="A special offer for you" placeholderTextColor={GRAY_400} onChangeText={subject=>setCampaignEditor({...campaignEditor,subject})}/>
+                </>
+              )}
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Message</Text>
+              <TextInput style={[s.input,{ minHeight:130, textAlignVertical:'top' }]} multiline value={campaignEditor.body} placeholder="Hi {name}, ..." placeholderTextColor={GRAY_400} onChangeText={body=>setCampaignEditor({...campaignEditor,body})}/>
+              <Text style={s.fieldHint}>Use {'{name}'} and {'{business}'} as merge tags.</Text>
+              <View style={{ flexDirection:'row', gap:10, marginTop:18 }}>
+                <TouchableOpacity style={[s.btnSecondary,{ flex:1 }]} onPress={()=>saveCampaign(false)}><Text style={s.btnSecondaryText}>Save draft</Text></TouchableOpacity>
+                <TouchableOpacity style={[s.btnPrimary,{ flex:1 }]} onPress={()=>saveCampaign(true)} disabled={campaignEditor.count === 0}><Text style={s.btnPrimaryText}>Send now</Text></TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
@@ -2499,7 +2669,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <TouchableOpacity onPress={()=>setPackageEditor({ name:'', serviceId:'', credits:'5', price:'' })}>
             <Ionicons name="add" size={24} color={BRAND}/>
           </TouchableOpacity>
-        ) : <View style={{ width:24 }}/>}
+        ) : (
+          <TouchableOpacity onPress={()=>setPackageIssue({ client:null, search:'', packageId:'', results:[] })}>
+            <Ionicons name="add" size={24} color={BRAND}/>
+          </TouchableOpacity>
+        )}
       </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
@@ -2583,6 +2757,57 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 })}
               </ScrollView>
               <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={savePackageProduct}><Text style={s.btnPrimaryText}>Create package</Text></TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+      <Modal visible={!!packageIssue} animationType="slide" onRequestClose={()=>setPackageIssue(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setPackageIssue(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Issue package</Text>
+          </View>
+          {packageIssue && (
+            <ScrollView contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
+              <Text style={s.fieldLabel}>Client</Text>
+              {packageIssue.client ? (
+                <View style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
+                  <View>
+                    <Text style={ms.rowTitle}>{packageIssue.client.name}</Text>
+                    <Text style={ms.rowMeta}>{packageIssue.client.email}</Text>
+                  </View>
+                  <TouchableOpacity onPress={()=>setPackageIssue({...packageIssue,client:null,search:'',results:[]})}><Text style={[ms.smallActionText,{ color:BRAND }]}>Change</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <TextInput style={s.input} value={packageIssue.search} placeholder="Search name or email" placeholderTextColor={GRAY_400} onChangeText={searchPackageClients}/>
+                  {packageIssue.results.map(c => (
+                    <TouchableOpacity key={c.id} style={ms.row} onPress={()=>setPackageIssue({...packageIssue,client:c,search:c.name,results:[]})}>
+                      <View style={s.avatar}><Text style={s.avatarText}>{c.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+                      <View style={{ flex:1 }}>
+                        <Text style={ms.rowTitle}>{c.name}</Text>
+                        <Text style={ms.rowMeta}>{c.email}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Package</Text>
+              {(packages ?? []).filter(p => p.active !== false).map(p => {
+                const selected = packageIssue.packageId === p.id;
+                return (
+                  <TouchableOpacity key={p.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]} onPress={()=>setPackageIssue({...packageIssue,packageId:p.id})}>
+                    <View style={[ms.dot,{ backgroundColor:BRAND }]}/>
+                    <View style={{ flex:1 }}>
+                      <Text style={ms.rowTitle}>{p.name}</Text>
+                      <Text style={ms.rowMeta}>{p.credits} credits · {packageServiceName(p.serviceId)} · ${(p.priceCents/100).toFixed(2)}</Text>
+                    </View>
+                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? BRAND : GRAY_400}/>
+                  </TouchableOpacity>
+                );
+              })}
+              {packages && packages.length===0 && <Text style={ms.empty}>Create a package product first.</Text>}
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={issuePackageToClient}><Text style={s.btnPrimaryText}>Issue package</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
