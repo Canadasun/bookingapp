@@ -111,7 +111,7 @@ export interface StaffMember {
   id: string; userId: string; businessId: string;
   bio?: string; avatarUrl?: string; active: boolean;
   createdAt: string; updatedAt: string;
-  user: { name: string; email: string; phone?: string };
+  user: { name: string; email?: string; phone?: string; role?: string };
   staffServices: StaffService[];
   availabilityRules?: AvailabilityRule[];
 }

@@ -202,8 +202,9 @@ export default function CheckoutPage() {
   const totalMins  = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const totalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
   // Sole-proprietor first: the provider step + per-person names only appear once
-  // the business has 2+ active providers. Below that, book under the salon name.
-  const multiProvider = allStaffList.length >= 2;
+  // the business has an added non-owner provider. The owner-provider still exists
+  // behind the scenes so bookings/calendar sync have a staffId.
+  const multiProvider = allStaffList.some((st) => st.user.role !== "OWNER");
   const salonName = biz?.name ?? "—";
   const providerText = (name?: string) => (multiProvider ? (name ? `${name} (${salonName})` : salonName) : salonName);
   const showStaffStep = multiProvider;

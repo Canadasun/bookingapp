@@ -49,7 +49,7 @@ function mockPrisma(overrides: Record<string, unknown> = {}) {
   return {
     service: { findUnique: jest.fn().mockResolvedValue(makeService()) },
     staff: { findUnique: jest.fn().mockResolvedValue(makeStaff()) },
-    staffService: { findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
+    staffService: { count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
     appointment: { findMany: jest.fn().mockResolvedValue([]) },
     timeOff: { findMany: jest.fn().mockResolvedValue([]) },
     availabilityRule: {
@@ -94,6 +94,24 @@ describe('AvailabilityService', () => {
       expect(slots[0].startsAt).toEqual(localUtc(MONDAY, '09:00'));
       expect(slots[0].endsAt).toEqual(localUtc(MONDAY, '10:00'));
       expect(slots[7].startsAt).toEqual(localUtc(MONDAY, '16:00'));
+    });
+
+    it('treats providers with no explicit assignments as offering all services', async () => {
+      const { svc, prisma } = await buildService({
+        staffService: {
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      });
+      const slots = await svc.getAvailableSlots({
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        startDate: MONDAY,
+        endDate: MONDAY,
+        timezone: TZ,
+      });
+      expect(slots).toHaveLength(8);
+      expect(prisma.staffService.findFirst).not.toHaveBeenCalled();
     });
 
     it('returns no slots on a day with no availability rule (Tuesday)', async () => {

@@ -75,10 +75,11 @@ export class BookingsService {
     return apt;
   }
 
-  // A business with one active provider (sole proprietor) doesn't require
-  // per-service staff assignment — the lone provider offers everything.
-  private async hasMultipleStaff(businessId: string): Promise<boolean> {
-    return (await this.prisma.staff.count({ where: { businessId, active: true } })) > 1;
+  // Providers with no explicit service assignments offer every service. This is
+  // the owner-provider default for sole proprietors, while assigned staff remain
+  // restricted to their selected services.
+  private async hasExplicitServiceAssignments(staffId: string): Promise<boolean> {
+    return (await this.prisma.staffService.count({ where: { staffId } })) > 0;
   }
 
   /**
@@ -99,12 +100,12 @@ export class BookingsService {
     if (!staff) throw new NotFoundException('Staff not found');
     const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId } });
     if (!client) throw new NotFoundException('Client not found');
-    const offersService = await this.prisma.staffService.findFirst({ where: { staffId: dto.staffId, serviceId: dto.serviceId } });
-    // Owner override (manual custom-time booking) can assign any active staff to
-    // the service. Single-provider (sole-proprietor) businesses also skip this —
-    // the lone provider offers every service without explicit assignment.
-    if (!offersService && !opts.overrideConflicts && (await this.hasMultipleStaff(businessId))) {
-      throw new BadRequestException('This staff member does not offer the selected service');
+    const staffHasExplicitAssignments = await this.hasExplicitServiceAssignments(dto.staffId);
+    if (staffHasExplicitAssignments && !opts.overrideConflicts) {
+      const offersService = await this.prisma.staffService.findFirst({ where: { staffId: dto.staffId, serviceId: dto.serviceId } });
+      if (!offersService) {
+        throw new BadRequestException('This staff member does not offer the selected service');
+      }
     }
 
     // Sum durations of all selected services
@@ -118,11 +119,14 @@ export class BookingsService {
       if (extras.length !== ids.length) {
         throw new BadRequestException('One or more selected services are unavailable');
       }
-      // Every additional service must also be offered by the chosen staff member.
-      const offered = await this.prisma.staffService.count({
-        where: { staffId: dto.staffId, serviceId: { in: ids } },
-      });
-      if (offered !== ids.length && !opts.overrideConflicts && (await this.hasMultipleStaff(businessId))) {
+      // Every additional service must also be offered by providers that use
+      // explicit service assignments. Owner/default providers offer all.
+      const offered = staffHasExplicitAssignments && !opts.overrideConflicts
+        ? await this.prisma.staffService.count({
+            where: { staffId: dto.staffId, serviceId: { in: ids } },
+          })
+        : ids.length;
+      if (offered !== ids.length) {
         throw new BadRequestException('This staff member does not offer one of the selected services');
       }
       totalDurationMinutes += extras.reduce((sum, s) => sum + s.durationMinutes, 0);

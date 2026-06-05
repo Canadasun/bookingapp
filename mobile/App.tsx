@@ -84,8 +84,9 @@ interface Appointment { id:string; startsAt:string; endsAt:string; status:string
 interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
 interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null }
 interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:number; startTime:string; endTime:string }
-interface Staff { id:string; user:{name:string; email?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string }
+interface Staff { id:string; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string }
 interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }
+type BookingSlot = Slot & { staffId?:string; staffName?:string };
 interface Client { id:string; name:string; email:string; phone?:string; totalVisits?:number; lastVisit?:string }
 interface Message { id:string; content:string; fromClient:boolean; read:boolean; createdAt:string }
 interface NotificationItem { id:string; kind:'BOOKING_NEW'|'BOOKING_UPDATE'|'PAYMENT'|'SYSTEM'; title:string; body?:string|null; linkUrl?:string|null; read:boolean; createdAt:string }
@@ -784,11 +785,12 @@ function BookScreen() {
   const [step, setStep]               = useState<Step>('service');
   const [services, setServices]       = useState<Service[]>([]);
   const [staffList, setStaffList]     = useState<Staff[]>([]);
-  const [slots, setSlots]             = useState<Slot[]>([]);
+  const [slots, setSlots]             = useState<BookingSlot[]>([]);
   const [selectedSvcs, setSelectedSvcs] = useState<Service[]>([]);
   const [staff, setStaff]             = useState<Staff|null|'any'>(null);
   const [date, setDate]               = useState('');
-  const [slot, setSlot]               = useState<Slot|null>(null);
+  const [slot, setSlot]               = useState<BookingSlot|null>(null);
+  const [showStaffStep, setShowStaffStep] = useState(false);
   const [customStartsAt, setCustomStartsAt] = useState('');
   const [overrideCalendar, setOverrideCalendar] = useState(false);
   const [form, setForm]               = useState({name:'',email:'',phone:''});
@@ -832,19 +834,32 @@ function BookScreen() {
     if (selectedSvcs.length === 0) return;
     try {
       const all = await api<Staff[]>(`/businesses/${bizId()}/staff`);
-      setStaffList(all.filter(st=>selectedSvcs.every(sv => st.staffServices.some(ss=>ss.serviceId === sv.id))));
-      setStep('staff');
+      const filtered = all.filter(st => st.staffServices.length === 0 || selectedSvcs.every(sv => st.staffServices.some(ss=>ss.serviceId === sv.id)));
+      const hasAddedStaff = all.some(st => st.user.role !== 'OWNER');
+      setStaffList(filtered);
+      setShowStaffStep(hasAddedStaff);
+      if (hasAddedStaff) {
+        setStep('staff');
+      } else {
+        setStaff(filtered[0] ?? 'any');
+        setStep('date');
+      }
     } catch { Alert.alert('Error','Could not load staff'); }
   }
 
   async function pickDate(d: string) {
     setDate(d); setLoading(true); setSlots([]);
     try {
-      const staffId = staff && staff !== 'any' ? staff.id : (staffList[0]?.id ?? '');
       const serviceId = selectedSvcs[0]?.id ?? '';
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const data = await api<Slot[]>(`/availability/slots?staffId=${staffId}&serviceId=${serviceId}&startDate=${d}&endDate=${d}&timezone=${tz}`);
-      setSlots(data); setStep('time');
+      const targets = staff && staff !== 'any' ? [staff] : staffList;
+      if (targets.length === 0 || !serviceId) { Alert.alert('Provider required','No active provider is available for this service.'); return; }
+      const rows = await Promise.all(targets.map(async st => {
+        const data = await api<Slot[]>(`/availability/slots?staffId=${st.id}&serviceId=${serviceId}&startDate=${d}&endDate=${d}&timezone=${tz}`);
+        return data.map(sl => ({...sl, staffId:st.id, staffName:st.user.name}));
+      }));
+      setSlots(rows.flat().sort((a,b)=>new Date(a.startsAt).getTime()-new Date(b.startsAt).getTime()));
+      setStep('time');
     } catch { Alert.alert('Error','Could not load times'); }
     finally { setLoading(false); }
   }
@@ -862,11 +877,12 @@ function BookScreen() {
     if (!policyAccepted){ Alert.alert('Policy required','Please accept the cancellation policy to continue.'); return; }
     setLoading(true);
     try {
-      const staffId = staff && staff !== 'any' ? staff.id : (staffList[0]?.id ?? '');
-      if (customStartsAt && staff === 'any') { Alert.alert('Provider required','Choose a named provider before using a custom time.'); return; }
       const customDate = customStartsAt.trim() ? new Date(customStartsAt.trim().replace(' ', 'T')) : null;
       if (customStartsAt && Number.isNaN(customDate?.getTime())) { Alert.alert('Check time','Use YYYY-MM-DD HH:mm for custom owner time.'); return; }
       const startsAt = customDate ? customDate.toISOString() : slot?.startsAt;
+      const staffId = customDate
+        ? (staff && staff !== 'any' ? staff.id : (staffList[0]?.id ?? ''))
+        : (staff && staff !== 'any' ? staff.id : (slot?.staffId ?? staffList[0]?.id ?? ''));
       if (!staffId){ Alert.alert('Provider required','Choose a provider before booking.'); return; }
       if (!startsAt){ Alert.alert('Time required','Choose an available time or enter a custom owner time.'); return; }
       const client = await api<{id:string; matched?:boolean}>(`/businesses/${bizId()}/clients`, {
@@ -894,7 +910,7 @@ function BookScreen() {
 
   function reset() {
     setStep('service'); setSelectedSvcs([]); setStaff(null); setDate(''); setSlot(null);
-    setCustomStartsAt(''); setOverrideCalendar(false);
+    setStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
     setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId('');
   }
 
@@ -1001,7 +1017,7 @@ function BookScreen() {
 
           {/* ── Date strip ─────────────────────────────────────────── */}
           {step==='date' && <>
-            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('staff')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
+            <TouchableOpacity style={s.backBtn} onPress={()=>setStep(showStaffStep ? 'staff' : 'service')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Pick a date</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:16}}>
               {dateStrip.map(d=>{
@@ -1027,7 +1043,7 @@ function BookScreen() {
             <Text style={[s.sub,{marginBottom:12}]}>{new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</Text>
             <View style={[s.policyBox,{ marginBottom:14 }]}>
               <Text style={s.policyTitle}>Custom owner time</Text>
-              <Text style={s.policyText}>Enter YYYY-MM-DD HH:mm to book outside generated calendar slots. Pick a named provider first; this can override calendar conflicts.</Text>
+              <Text style={s.policyText}>Enter YYYY-MM-DD HH:mm to book outside generated calendar slots. This uses the owner provider for solo businesses and can override calendar conflicts.</Text>
               <TextInput style={[s.input,{ marginTop:10 }]} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400}
                 value={customStartsAt} onChangeText={(v)=>{setCustomStartsAt(v); setOverrideCalendar(!!v); if(v) setSlot(null);}}/>
               <TouchableOpacity style={s.policyCheck} activeOpacity={0.7} onPress={()=>setOverrideCalendar(p=>!p)}>
@@ -1036,8 +1052,7 @@ function BookScreen() {
                 </View>
                 <Text style={s.policyCheckText}>Override availability and conflicts</Text>
               </TouchableOpacity>
-              {customStartsAt && staff === 'any' && <Text style={[s.fieldHint,{ color:'#B45309' }]}>Choose a named provider before using a custom time.</Text>}
-              {customStartsAt && staff !== 'any' && (
+              {customStartsAt && (
                 <TouchableOpacity style={[s.btnSecondary,{ marginTop:10 }]} onPress={()=>setStep('details')}>
                   <Text style={s.btnSecondaryText}>Use custom time</Text>
                 </TouchableOpacity>
@@ -1047,11 +1062,12 @@ function BookScreen() {
             {!loading&&slots.length===0&&<Text style={s.emptyText}>No availability on this date — try another</Text>}
             <View style={s.slotGrid}>
               {slots.map(sl=>(
-                <TouchableOpacity key={sl.startsAt} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&s.slotBtnActive]}
+                <TouchableOpacity key={`${sl.staffId ?? 'staff'}-${sl.startsAt}`} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotBtnActive]}
                   onPress={()=>{setSlot(sl);setStep('details');}}>
-                  <Text style={[s.slotText, slot?.startsAt===sl.startsAt&&s.slotTextActive]}>
+                  <Text style={[s.slotText, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotTextActive]}>
                     {fmtTime(sl.startsAtLocal)}
                   </Text>
+                  {showStaffStep && sl.staffName && <Text style={[s.sub,{fontSize:10,textAlign:'center',marginTop:2}]} numberOfLines={1}>{sl.staffName}</Text>}
                 </TouchableOpacity>
               ))}
             </View>
@@ -1063,7 +1079,7 @@ function BookScreen() {
             <View style={s.summaryBox}>
               <Text style={s.summaryTitle}>{selectedSvcs.map(s=>s.name).join(' + ')}</Text>
               <Text style={s.summarySub}>
-                {staff&&staff!=='any'?(staff as Staff).user.name:'Any available'} · {customStartsAt ? customStartsAt : `${date.slice(5).replace('-','/')} at ${slot ? fmtTime(slot.startsAtLocal) : ''}`}
+                {staff&&staff!=='any'?(staff as Staff).user.name:(slot?.staffName ?? 'Owner provider')} · {customStartsAt ? customStartsAt : `${date.slice(5).replace('-','/')} at ${slot ? fmtTime(slot.startsAtLocal) : ''}`}
               </Text>
               <Text style={[s.summarySub,{marginTop:4}]}>{totalDuration(selectedSvcs)} · {totalPrice(selectedSvcs)}</Text>
             </View>

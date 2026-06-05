@@ -21,10 +21,12 @@ export class StaffService {
   constructor(private prisma: PrismaService) {}
 
   // Public (booking flow): names only — never expose staff emails here.
-  findAll(businessId: string) {
+  async findAll(businessId: string) {
+    await this.ensureOwnerProvider(businessId);
     return this.prisma.staff.findMany({
       where: { businessId, active: true },
-      include: { user: { select: { name: true } }, staffServices: true },
+      include: { user: { select: { name: true, role: true } }, staffServices: true },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
@@ -35,7 +37,7 @@ export class StaffService {
         ...(businessId ? { businessId } : {})
       },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, role: true } },
         staffServices: { include: { service: true } },
         availabilityRules: true,
       },
@@ -50,7 +52,7 @@ export class StaffService {
     if (!user) throw new NotFoundException('User not found in this business');
     return this.prisma.staff.create({
       data: { businessId, userId: dto.userId, bio: dto.bio, avatarUrl: dto.avatarUrl },
-      include: { user: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, email: true, role: true } } },
     });
   }
 
@@ -105,7 +107,7 @@ export class StaffService {
         ...(dto.active !== undefined ? { active: dto.active } : {}),
       },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, role: true } },
         staffServices: { include: { service: { select: { id: true, name: true, active: true } } } },
       },
     });
@@ -151,7 +153,7 @@ export class StaffService {
   // The owner is the fallback provider (sole-proprietor model). Ensure they have
   // an active Staff record and return its id, so a departing provider's bookings
   // have somewhere to go.
-  private async ensureOwnerProvider(businessId: string): Promise<string> {
+  async ensureOwnerProvider(businessId: string): Promise<string> {
     const owner = await this.prisma.user.findFirst({ where: { businessId, role: 'OWNER' } });
     if (!owner) throw new BadRequestException('No owner account found to receive the bookings.');
     const existing = await this.prisma.staff.findUnique({ where: { userId: owner.id } });
@@ -163,11 +165,12 @@ export class StaffService {
     return created.id;
   }
 
-  findAllIncludingInactive(businessId: string) {
+  async findAllIncludingInactive(businessId: string) {
+    await this.ensureOwnerProvider(businessId);
     return this.prisma.staff.findMany({
       where: { businessId },
       include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
+        user: { select: { id: true, name: true, email: true, phone: true, role: true } },
         staffServices: { include: { service: { select: { id: true, name: true, active: true } } } },
         availabilityRules: true,
       },

@@ -82,6 +82,7 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }),
     },
     staffService: {
+      count: jest.fn().mockResolvedValue(1),
       findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }),
     },
     business: {
@@ -162,6 +163,23 @@ describe('BookingsService', () => {
       expect(result.status).toBe('PENDING');
     });
 
+    it('allows an unassigned owner provider to offer all services', async () => {
+      const { svc, prisma } = await buildService({
+        staffService: {
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      });
+      const result = await svc.create('biz1', {
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        clientId: 'client1',
+        startsAt: SLOT_START.toISOString(),
+      });
+      expect(result.status).toBe('PENDING');
+      expect(prisma.staffService.findFirst).not.toHaveBeenCalled();
+    });
+
     it('throws ConflictException when slot is taken', async () => {
       const { svc } = await buildService({}, true);
       await expect(
@@ -217,7 +235,7 @@ describe('BookingsService', () => {
         service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }) },
         staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }) },
         client: { findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }) },
-        staffService: { findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
+        staffService: { count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
         business: { findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60, timezone: 'UTC' }) },
         appointment: { findFirst: jest.fn().mockResolvedValue(makeAppointment()) },
         availabilityRule: { findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]) },

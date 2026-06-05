@@ -54,7 +54,7 @@ export default function StaffPage() {
   function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"" }); setSelectedServiceIds([]); setShowModal(true); }
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.user.name, email: s.user.email, bio: s.bio ?? "" });
+    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "" });
     setSelectedServiceIds(s.staffServices.map((ss) => ss.serviceId));
     setShowModal(true);
   }
@@ -158,7 +158,7 @@ export default function StaffPage() {
                     <p className="font-semibold text-gray-900">{s.user.name}</p>
                     {!s.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">inactive</span>}
                   </div>
-                  <p className="text-xs text-gray-500">{s.user.email}</p>
+                  {s.user.email && <p className="text-xs text-gray-500">{s.user.email}</p>}
                   {s.staffServices.length > 0 && (
                     <div className="flex gap-1 mt-1.5 flex-wrap">
                       {s.staffServices.map((ss) => {

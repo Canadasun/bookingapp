@@ -375,9 +375,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const policy      = biz?.cancellationPolicy ?? "Appointments cancelled within 24 hours may be subject to a cancellation fee.";
 
   // Sole-proprietor first: the provider step + per-person names only appear once
-  // the business has 2+ providers. Below that, the business books under its own
-  // (salon) name. With 2+, the chosen person shows with the salon in brackets.
-  const multiProvider = activeStaff.length >= 2;
+  // the business has an added non-owner provider. The owner-provider exists in
+  // the API for booking logic, but should not make solo shops choose staff.
+  const multiProvider = activeStaff.some((st) => st.user.role !== "OWNER");
   const salonName     = biz?.name ?? "your provider";
   function providerText(staffName?: string): string {
     if (!multiProvider) return salonName;

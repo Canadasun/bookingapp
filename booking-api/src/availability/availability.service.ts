@@ -43,14 +43,12 @@ export class AvailabilityService {
       throw new NotFoundException('Staff does not belong to this service’s business');
     }
     if (!staff.active) throw new NotFoundException('Staff is not available');
-    const offersService = await this.prisma.staffService.findFirst({
-      where: { staffId, serviceId },
-    });
-    if (!offersService) {
-      // Sole-proprietor businesses (one active provider) skip per-service staff
-      // assignment — the lone provider offers everything.
-      const staffCount = await this.prisma.staff.count({ where: { businessId: staff.businessId, active: true } });
-      if (staffCount > 1) throw new NotFoundException('Staff does not offer this service');
+    const assignedServiceCount = await this.prisma.staffService.count({ where: { staffId } });
+    if (assignedServiceCount > 0) {
+      const offersService = await this.prisma.staffService.findFirst({
+        where: { staffId, serviceId },
+      });
+      if (!offersService) throw new NotFoundException('Staff does not offer this service');
     }
 
     const businessTimezone = staff.business.timezone;

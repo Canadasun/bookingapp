@@ -113,7 +113,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
         <Link href="/dashboard/staff" className="text-gray-400 hover:text-gray-600"><ChevronLeft className="w-5 h-5" /></Link>
         <div>
           <h2 className="text-xl font-bold text-gray-900">{staff.user.name}</h2>
-          <p className="text-sm text-gray-500">{staff.user.email}</p>
+          {staff.user.email && <p className="text-sm text-gray-500">{staff.user.email}</p>}
         </div>
       </div>
 
