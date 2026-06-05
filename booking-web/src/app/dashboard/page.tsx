@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { api, Appointment, ClientWithStats, NotificationDelivery } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
 import { formatPrice } from "@/lib/utils";
 import { getUser } from "@/lib/auth";
@@ -180,9 +181,12 @@ export default function OverviewPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">
-            Good {greeting}{user ? `, ${user.name.split(" ")[0]}` : ""}
-          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xl font-bold text-gray-900">
+              Good {greeting}{user ? `, ${user.name.split(" ")[0]}` : ""}
+            </h2>
+            {verifStatus === "VERIFIED" && <VerifiedBadge size="md" />}
+          </div>
           <p className="text-sm text-gray-400 mt-0.5">{format(now, "EEEE, MMMM d, yyyy")}</p>
         </div>
         <Link href="/dashboard/appointments"

@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, Suspense, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, addDays, parseISO, isBefore, isAfter } from "date-fns";
-import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star } from "lucide-react";
+import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -421,6 +421,15 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       )}
 
       <div className="max-w-2xl mx-auto px-5 py-8">
+        {/* Prestige: verified businesses get a trust strip that reassures clients */}
+        {biz?.verificationStatus === "VERIFIED" && step !== 4 && !slotTaken && (
+          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 px-4 py-3">
+            <ShieldCheck className="w-5 h-5 text-violet-600 shrink-0" />
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold text-gray-900">{biz?.name}</span> is a <span className="font-semibold text-violet-700">Pulse-verified business</span> — identity confirmed for safe, trusted booking.
+            </p>
+          </div>
+        )}
         {/* Slot taken mid-checkout → offer the waitlist with details already entered */}
         {slotTaken ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
