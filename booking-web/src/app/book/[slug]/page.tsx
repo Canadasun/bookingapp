@@ -124,7 +124,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [selectedSlot, setSelectedSlot]         = useState<BookingSlot | null>(null);
 
   const [form, setForm]     = useState({ name: "", email: "", phone: "", notes: "" });
-  const [errs, setErrs]     = useState<Partial<typeof form>>({});
+  const [intake, setIntake] = useState<Record<string, string>>({}); // questionId → answer
+  const [errs, setErrs]     = useState<Record<string, string>>({});
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [submitting, setSubmitting]         = useState(false);
   const [loadingSlots, setLoadingSlots]     = useState(false);
@@ -231,10 +232,13 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   }
 
   function validate() {
-    const e: Partial<typeof form> = {};
+    const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Required";
     if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
     if (form.phone && !/^\+?[\d\s\-()+]{7,}$/.test(form.phone)) e.phone = "Invalid phone";
+    for (const q of biz?.intakeQuestions ?? []) {
+      if (q.required && !(intake[q.id] ?? "").trim()) e[`intake_${q.id}`] = "Required";
+    }
     setErrs(e);
     return Object.keys(e).length === 0;
   }
@@ -261,6 +265,11 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       });
       setClientMatched(!!client.matched);
 
+      // Collect answers to the business intake questions (by label, for display).
+      const intakeAnswers = (biz?.intakeQuestions ?? [])
+        .map((q) => ({ label: q.label, answer: (intake[q.id] ?? "").trim() }))
+        .filter((a) => a.answer);
+
       // Book first (primary) service; backend handles duration
       const apt = await api.appointments.create(bizId, {
         staffId,
@@ -269,6 +278,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         clientId: client.id,
         startsAt: selectedSlot.startsAt,
         notes: form.notes || undefined,
+        intakeAnswers: intakeAnswers.length ? intakeAnswers : undefined,
       });
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before
@@ -845,6 +855,24 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     </div>
                     );
                   })}
+
+                  {/* Intake / consultation questions (owner-defined) */}
+                  {(biz?.intakeQuestions ?? []).map((q) => (
+                    <div key={q.id}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        {q.label}{q.required ? " *" : ""}
+                      </label>
+                      <textarea
+                        value={intake[q.id] ?? ""}
+                        onChange={(e) => { setIntake((p) => ({ ...p, [q.id]: e.target.value })); setErrs((p) => ({ ...p, [`intake_${q.id}`]: "" })); }}
+                        placeholder="Your answer"
+                        className={cn(
+                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 min-h-[64px]",
+                          errs[`intake_${q.id}`] ? "border-red-400" : "border-gray-200",
+                        )} />
+                      {errs[`intake_${q.id}`] && <p className="text-xs text-red-500 mt-1">{errs[`intake_${q.id}`]}</p>}
+                    </div>
+                  ))}
 
                   {/* Cancellation policy */}
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">

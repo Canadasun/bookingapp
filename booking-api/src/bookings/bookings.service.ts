@@ -211,6 +211,7 @@ export class BookingsService {
               // confirmed immediately; public self-service stays PENDING.
               ...(opts.confirmed ? { status: 'CONFIRMED' as const } : {}),
               ...(opts.recurringGroupId ? { recurringGroupId: opts.recurringGroupId } : {}),
+              ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
             },
             include: { client: true, service: true, staff: { include: { user: true } }, business: true },
           });

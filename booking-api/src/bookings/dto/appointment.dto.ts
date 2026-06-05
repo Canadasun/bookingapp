@@ -8,6 +8,11 @@ export const CreateAppointmentSchema = z.object({
   startsAt: z.string().datetime(),
   notes: z.string().optional(),
   allowOverride: z.boolean().optional(),
+  // Answers to the business intake questions, captured at booking.
+  intakeAnswers: z.array(z.object({
+    label: z.string().min(1).max(200),
+    answer: z.string().max(2000),
+  })).max(20).optional(),
 });
 
 // Owner-initiated recurring series: the base booking + how it repeats. Each

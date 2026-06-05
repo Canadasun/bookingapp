@@ -119,6 +119,21 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
             </div>
           )}
 
+          {/* Intake / consultation answers */}
+          {apt.intakeAnswers && apt.intakeAnswers.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Intake form</p>
+              <div className="space-y-2">
+                {apt.intakeAnswers.map((a, i) => (
+                  <div key={i} className="bg-gray-50 rounded-lg px-3 py-2">
+                    <p className="text-xs font-medium text-gray-500">{a.label}</p>
+                    <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap">{a.answer}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Deposit */}
           {apt.depositCents && (
             <div className="flex justify-between text-sm">

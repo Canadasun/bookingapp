@@ -87,6 +87,9 @@ model Business {
   address     String?
   logoUrl     String?
   bookingPageSettings Json @default("{}")
+  // Owner-defined intake/consultation questions shown at booking. Array of
+  // { id, label, required }. Answers are stored per appointment (intakeAnswers).
+  intakeQuestions Json @default("[]")
 
   // Booking policies
   minNoticeMinutes      Int     @default(120)
@@ -646,6 +649,7 @@ model Appointment {
   notes                String?
   googleEventId        String?           // Google Calendar event id (when the business has calendar sync on)
   recurringGroupId     String?           // shared id linking occurrences of a recurring series
+  intakeAnswers        Json?             // client's answers to the business intake questions, [{ label, answer }]
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 

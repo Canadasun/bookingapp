@@ -78,8 +78,12 @@ export interface Business {
   plan: "FREE" | "BASIC" | "PRO";
   planExpiresAt?: string;
   verificationStatus?: VerificationStatus;
+  intakeQuestions?: IntakeQuestion[];
   createdAt: string; updatedAt: string;
 }
+
+export interface IntakeQuestion { id: string; label: string; required?: boolean }
+export interface IntakeAnswer { label: string; answer: string }
 
 export interface ServiceCategory {
   id: string; name: string; description?: string;
@@ -133,6 +137,7 @@ export interface Appointment {
   id: string; startsAt: string; endsAt: string; status: string;
   notes?: string; cancelReason?: string;
   depositCents?: number; stripePaymentIntentId?: string;
+  intakeAnswers?: IntakeAnswer[];
   businessId: string;
   createdAt: string; updatedAt: string;
   client: Client;
@@ -580,7 +585,7 @@ export const api = {
       ),
     // Public-by-id — requires the HMAC manage token from the emailed link.
     get: (id: string, token?: string) => req<Appointment>(`/bookings/${id}${token ? `?token=${encodeURIComponent(token)}` : ""}`, undefined, null),
-    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string }) =>
+    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[] }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).
