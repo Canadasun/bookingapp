@@ -40,6 +40,11 @@ export class NotificationsService implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: true,
       });
+      await this.queue.add('birthday-scan', {}, {
+        repeat: { pattern: '0 15 * * *' }, // 15:00 UTC daily
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     } catch (e) {
       this.logger.warn(`Could not schedule scans: ${e instanceof Error ? e.message : e}`);
     }

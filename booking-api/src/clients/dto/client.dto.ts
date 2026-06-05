@@ -31,6 +31,11 @@ export const CreateClientSchema = z.object({
   phone: phoneSchema,
   notes: z.string().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+  // "MM-DD" (empty clears it).
+  birthday: z.preprocess(
+    (v) => (v === '' || v === null ? undefined : v),
+    z.string().regex(/^\d{2}-\d{2}$/, 'Use MM-DD').optional(),
+  ),
 });
 
 export const UpdateClientSchema = CreateClientSchema.partial();

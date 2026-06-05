@@ -616,6 +616,7 @@ model Client {
   phone      String?
   notes      String?
   tags       String[] @default([]) // owner labels, e.g. "VIP", "New", "Sensitive skin"
+  birthday   String?  // "MM-DD" — drives the daily birthday-greeting automation
   // Link to User account if client has registered
   userId     String?
   // Stripe Customer for saved cards (deposits / no-show auto-charge)

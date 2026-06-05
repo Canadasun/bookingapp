@@ -147,6 +147,48 @@ export class NotificationProcessor extends WorkerHost {
   // Win-back: email clients who completed a visit but haven't been back (or booked)
   // in ~3 months, inviting them to rebook. Paid feature (Basic/Pro). Each client is
   // emailed at most once per 6 months (checked against the delivery log), so it
+  // Daily birthday greeting for clients whose stored "MM-DD" is today. Paid plans
+  // only; deduped so a client gets at most one greeting per year.
+  private async runBirthdayScan() {
+    const now = new Date();
+    const mmdd = `${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+    const paid = await this.prisma.business.findMany({
+      where: { plan: { in: ['BASIC', 'PRO'] } },
+      select: { id: true },
+    });
+    const bizIds = paid.map((b) => b.id);
+    if (!bizIds.length) return;
+
+    const birthdayClients = await this.prisma.client.findMany({
+      where: { businessId: { in: bizIds }, birthday: mmdd },
+      include: { business: true },
+      take: 200,
+    });
+
+    const sixMonthsAgo = new Date(Date.now() - 180 * 86_400_000);
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    for (const c of birthdayClients) {
+      if (!c.email) continue;
+      const already = await this.prisma.notificationDelivery.findFirst({
+        where: { recipient: c.email, type: 'birthday', status: 'SENT', createdAt: { gt: sixMonthsAgo } },
+        select: { id: true },
+      });
+      if (already) continue;
+      this.currentType = 'birthday';
+      this.currentBusinessId = c.businessId;
+      const bookUrl = `${baseUrl}/book/${c.business.slug}`;
+      await this.email.send({
+        to: c.email,
+        subject: `Happy birthday from ${c.business.name}! 🎉`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Happy birthday, ${esc(firstName(c.name))}! 🎂</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Everyone at <strong>${esc(c.business.name)}</strong> wishes you a wonderful day. Treat yourself — we'd love to help you celebrate.</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a birthday treat →</a>
+`),
+      }).catch(() => {});
+    }
+  }
+
   // never nags. Runs daily via the 'winback-scan' repeatable job.
   private async runWinbackScan() {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
@@ -569,6 +611,12 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     // Daily service-due scan → flips due trackers to DUE + prompts the owner.
     if (job.name === 'service-due-scan') {
       await this.runServiceDueScan();
+      return;
+    }
+
+    // Daily birthday scan → greet clients whose birthday is today.
+    if (job.name === 'birthday-scan') {
+      await this.runBirthdayScan();
       return;
     }
 

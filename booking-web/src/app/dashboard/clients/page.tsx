@@ -32,7 +32,7 @@ export default function ClientsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingClient, setDeletingClient] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", notes: "", birthday: "" });
   const [savingEdit, setSavingEdit] = useState(false);
   const [dueBusy, setDueBusy] = useState(false);
   const [dueSet, setDueSet] = useState<number | null>(null);
@@ -127,6 +127,7 @@ export default function ClientsPage() {
       email: selected.email ?? "",
       phone: selected.phone ?? "",
       notes: selected.notes ?? "",
+      birthday: selected.birthday ?? "",
     });
     setEditMode(true);
   }
@@ -160,6 +161,7 @@ export default function ClientsPage() {
         email: editForm.email.trim(),
         phone: editForm.phone.trim() || undefined,
         notes: editForm.notes.trim() || undefined,
+        birthday: editForm.birthday || undefined,
       });
       setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
       setEditMode(false);
@@ -293,6 +295,12 @@ export default function ClientsPage() {
                       <Input type={type} value={editForm[k]} onChange={(e) => setEditForm((p) => ({ ...p, [k]: e.target.value }))} />
                     </div>
                   ))}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
+                    <Input type="date" value={editForm.birthday ? `2000-${editForm.birthday}` : ""}
+                      onChange={(e) => setEditForm((p) => ({ ...p, birthday: e.target.value ? e.target.value.slice(5) : "" }))} />
+                    <p className="mt-1 text-xs text-gray-400">Used for an automatic birthday greeting (year is ignored).</p>
+                  </div>
                   <div className="flex gap-2 pt-1">
                     <Button variant="secondary" className="flex-1" onClick={() => setEditMode(false)}>Cancel</Button>
                     <Button className="flex-1" loading={savingEdit} onClick={saveEdit}>Save</Button>
@@ -302,6 +310,7 @@ export default function ClientsPage() {
                 <div className="space-y-1.5 text-sm">
                   <div className="flex items-center gap-2 text-gray-600"><Mail className="w-4 h-4 text-gray-400" />{selected.email}</div>
                   {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{selected.phone}</div>}
+                  {selected.birthday && <div className="flex items-center gap-2 text-gray-600"><span className="w-4 text-center">🎂</span>{format(new Date(`2000-${selected.birthday}T00:00:00`), "MMMM d")}</div>}
                 </div>
               )}
               <div className="grid grid-cols-3 gap-3">

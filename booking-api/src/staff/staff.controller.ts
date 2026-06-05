@@ -12,7 +12,9 @@ import {
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 import { z } from 'zod';
@@ -92,10 +94,12 @@ export class StaffController {
     return this.staffService.create(businessId, dto);
   }
 
+  // Owner/admin always; staff with MANAGE_STAFF may edit team profiles — but only
+  // owners/admins may change another member's permissions (no privilege escalation).
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_STAFF')
   update(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -104,6 +108,9 @@ export class StaffController {
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
+    }
+    if (dto.permissions !== undefined && user.role !== 'OWNER' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only owners can change staff permissions');
     }
     return this.staffService.update(id, dto, businessId);
   }
@@ -126,8 +133,8 @@ export class StaffController {
 
   @Post(':id/services')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_STAFF')
   assignServices(
     @Param('id') id: string,
     @Param('businessId') businessId: string,

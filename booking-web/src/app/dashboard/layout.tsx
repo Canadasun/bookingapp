@@ -136,9 +136,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   // Staff get the base nav plus anything their granted permissions unlock.
+  const perms = user?.permissions ?? [];
   const staffNav: NavItem[] = [
     ...STAFF_NAV,
-    ...((user?.permissions ?? []).includes("VIEW_MONEY")
+    ...(perms.includes("MANAGE_SERVICES") ? [{ href: "/dashboard/services", label: "Services", icon: Scissors }] : []),
+    ...(perms.includes("MANAGE_STAFF") ? [{ href: "/dashboard/staff", label: "Staff", icon: Users }] : []),
+    ...(perms.includes("VIEW_MONEY")
       ? [
           { href: "/dashboard/transactions", label: "Transactions", icon: DollarSign },
           { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },

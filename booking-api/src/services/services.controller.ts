@@ -7,9 +7,8 @@ import {
 } from './dto/service.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 // ── Services ─────────────────────────────────────────────────────────────────
@@ -47,8 +46,8 @@ export class ServicesController {
 
   @Post()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateServiceSchema)) dto: CreateServiceDto,
@@ -62,8 +61,8 @@ export class ServicesController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
   update(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -78,8 +77,8 @@ export class ServicesController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
   remove(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -119,8 +118,8 @@ export class ServiceCategoriesController {
 
   @Post()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateCategorySchema)) dto: CreateCategoryDto,
@@ -134,8 +133,8 @@ export class ServiceCategoriesController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
   update(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -150,8 +149,8 @@ export class ServiceCategoriesController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
   remove(
     @Param('id') id: string,
     @Param('businessId') businessId: string,

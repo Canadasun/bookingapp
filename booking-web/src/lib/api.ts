@@ -127,7 +127,7 @@ export interface Slot {
 }
 
 export interface Client {
-  id: string; name: string; email: string; phone?: string; notes?: string; tags?: string[];
+  id: string; name: string; email: string; phone?: string; notes?: string; tags?: string[]; birthday?: string;
   businessId: string; createdAt: string; updatedAt: string;
 }
 
@@ -568,9 +568,9 @@ export const api = {
       req<Client & { appointments: Appointment[]; totalSpentCents: number }>(`/businesses/${businessId}/clients/${id}`),
     // `matched: true` means the booking synced to an existing client (deduped on
     // email/phone) rather than creating a new profile.
-    create: (businessId: string, data: { name: string; email: string; phone?: string; notes?: string }) =>
+    create: (businessId: string, data: { name: string; email: string; phone?: string; notes?: string; birthday?: string }) =>
       req<Client & { matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[] }) =>
+    update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[]; birthday?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     duplicates: (businessId: string) =>
       req<Array<{ clients: Array<{ id: string; name: string; email: string; phone?: string | null; createdAt: string; appointments: number }> }>>(`/businesses/${businessId}/clients/duplicates`),
