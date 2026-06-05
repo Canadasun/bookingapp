@@ -84,13 +84,15 @@ interface Appointment { id:string; startsAt:string; endsAt:string; status:string
 interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
 interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null }
 interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:number; startTime:string; endTime:string }
-interface Staff { id:string; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string }
+interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string }
 interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }
 type BookingSlot = Slot & { staffId?:string; staffName?:string };
 interface Client { id:string; name:string; email:string; phone?:string; totalVisits?:number; lastVisit?:string }
 interface Message { id:string; content:string; fromClient:boolean; read:boolean; createdAt:string }
 interface NotificationItem { id:string; kind:'BOOKING_NEW'|'BOOKING_UPDATE'|'PAYMENT'|'SYSTEM'; title:string; body?:string|null; linkUrl?:string|null; read:boolean; createdAt:string }
 interface NotificationDelivery { id:string; channel:'EMAIL'|'SMS'|'PUSH'; recipient:string; type:string; status:'SENT'|'FAILED'|'SKIPPED'; error?:string|null; createdAt:string; retryReason?:string|null }
+interface TaskItem { id:string; title:string; notes?:string|null; dueAt?:string|null; status:'OPEN'|'DONE'; staffId?:string|null; staff?:{id:string;user:{name:string}}|null }
+interface ServiceDueItem { id:string; status:'SCHEDULED'|'DUE'|'SENT'|'CANCELLED'; dueAt:string; cadenceDays?:number|null; client:{id:string;name:string;email?:string;phone?:string}; service?:{id:string;name:string}|null }
 interface ClientPortalAppointment extends Appointment { business:{id:string;name:string;slug?:string;phone?:string;address?:string}; manageToken?:string }
 interface ClientPortalMessageThread { businessId:string; businessName:string; clientId:string; messages:Message[] }
 interface ClientPortalOffer { id:string; title:string; description?:string; discount?:string; expiresAt?:string; business:{id:string;name:string;slug?:string} }
@@ -1451,7 +1453,7 @@ function NotificationsScreen() {
 // ── Menu / Settings hub ──────────────────────────────────────────────────────
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
-  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'soon';
+  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'soon';
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const nav = useNavigation<any>();
@@ -1465,15 +1467,20 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [campaigns, setCampaigns] = useState<any[] | null>(null);
   const [giftcards, setGiftcards] = useState<any[] | null>(null);
   const [packages, setPackages] = useState<any[] | null>(null);
+  const [tasks, setTasks]       = useState<TaskItem[] | null>(null);
+  const [followups, setFollowups] = useState<ServiceDueItem[] | null>(null);
   const [appts, setAppts]       = useState<Appointment[] | null>(null); // for Reports
   const [payments, setPayments] = useState<any[] | null>(null);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
   const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean }|null>(null);
+  const [taskEditor, setTaskEditor] = useState<{ title:string; staffId:string; dueAt:string; notes:string }|null>(null);
   const [settingsEditor, setSettingsEditor] = useState<{ name:string; email:string; phone:string; address:string; minNoticeMinutes:string; maxAdvanceDays:string; cancellationWindowHours:string; requireDeposit:boolean; depositPercent:string }|null>(null);
   const [timeOffEditor, setTimeOffEditor] = useState<{ staffId:string; name:string; startsAt:string; endsAt:string; reason:string }|null>(null);
   const [staffServiceEditor, setStaffServiceEditor] = useState<{ staffId:string; name:string; serviceIds:string[] }|null>(null);
+  const [followupBusy, setFollowupBusy] = useState<string|null>(null);
+  const [followupSnoozing, setFollowupSnoozing] = useState<string|null>(null);
   const [availabilityEditor, setAvailabilityEditor] = useState<{
     staffId:string;
     name:string;
@@ -1552,6 +1559,117 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     } catch(e) {
       Alert.alert('Could not save service', e instanceof Error ? e.message : 'Please try again.');
     }
+  }
+
+  async function loadTasks() {
+    const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN';
+    const [taskRows, staffRows] = await Promise.all([
+      api<TaskItem[]>(`/businesses/${bizId()}/tasks`),
+      isOwner ? api<Staff[]>(`/businesses/${bizId()}/staff/all`).catch(() => staff ?? []) : Promise.resolve(staff ?? []),
+    ]);
+    setTasks(taskRows);
+    setStaff(staffRows.filter(st => st.active !== false));
+  }
+
+  async function saveTask() {
+    if (!taskEditor?.title.trim()) { Alert.alert('Task title required', 'Add what needs to be done.'); return; }
+    try {
+      await api(`/businesses/${bizId()}/tasks`, {
+        method:'POST',
+        body: JSON.stringify({
+          title: taskEditor.title.trim(),
+          staffId: taskEditor.staffId || null,
+          dueAt: taskEditor.dueAt.trim() ? new Date(taskEditor.dueAt.trim().replace(' ', 'T')).toISOString() : undefined,
+          notes: taskEditor.notes.trim() || undefined,
+        }),
+      });
+      setTaskEditor(null);
+      await loadTasks();
+    } catch(e) {
+      Alert.alert('Could not save task', e instanceof Error ? e.message : 'Use a valid due date like 2026-06-05 14:00.');
+    }
+  }
+
+  async function toggleTask(t: TaskItem) {
+    try {
+      await api(`/businesses/${bizId()}/tasks/${t.id}`, {
+        method:'PATCH',
+        body: JSON.stringify({ status: t.status === 'DONE' ? 'OPEN' : 'DONE' }),
+      });
+      await loadTasks();
+    } catch(e) {
+      Alert.alert('Could not update task', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function removeTask(t: TaskItem) {
+    Alert.alert('Delete task', `Delete "${t.title}"?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/tasks/${t.id}`, { method:'DELETE' });
+          await loadTasks();
+        } catch(e) {
+          Alert.alert('Could not delete task', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  const followupCadences = [
+    { days:14, label:'2 weeks' },
+    { days:30, label:'Monthly' },
+    { days:42, label:'6 weeks' },
+    { days:56, label:'8 weeks' },
+  ];
+
+  function cadenceLabel(days?: number | null) {
+    if (!days) return 'One-off';
+    return followupCadences.find(c => c.days === days)?.label ?? `Every ${days} days`;
+  }
+
+  async function loadFollowups() {
+    setFollowups(await api<ServiceDueItem[]>(`/businesses/${bizId()}/service-due`));
+  }
+
+  async function approveFollowup(it: ServiceDueItem) {
+    setFollowupBusy(it.id);
+    try {
+      await api(`/businesses/${bizId()}/service-due/${it.id}/approve`, { method:'POST' });
+      await loadFollowups();
+      Alert.alert('Invite sent', `${it.client.name} was invited to rebook.`);
+    } catch(e) {
+      Alert.alert('Could not send invite', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setFollowupBusy(null); }
+  }
+
+  async function snoozeFollowup(it: ServiceDueItem, cadenceDays: number) {
+    setFollowupBusy(it.id);
+    try {
+      await api(`/businesses/${bizId()}/service-due/${it.id}/reschedule`, {
+        method:'POST',
+        body: JSON.stringify({ cadenceDays }),
+      });
+      setFollowupSnoozing(null);
+      await loadFollowups();
+    } catch(e) {
+      Alert.alert('Could not reschedule', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setFollowupBusy(null); }
+  }
+
+  async function cancelFollowup(it: ServiceDueItem) {
+    Alert.alert('Stop follow-up', `Stop reminders for ${it.client.name}?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Stop', style:'destructive', onPress: async () => {
+        setFollowupBusy(it.id);
+        try {
+          await api(`/businesses/${bizId()}/service-due/${it.id}/cancel`, { method:'POST' });
+          await loadFollowups();
+        } catch(e) {
+          Alert.alert('Could not stop follow-up', e instanceof Error ? e.message : 'Please try again.');
+        } finally { setFollowupBusy(null); }
+      }},
+    ]);
   }
 
   async function saveSettings() {
@@ -1718,6 +1836,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'marketing' && !campaigns){ setLoading(true); setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`)); }
       else if (v === 'giftcards' && !giftcards){ setLoading(true); setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`)); }
       else if (v === 'packages' && !packages){ setLoading(true); setPackages(await api<any[]>(`/businesses/${bizId()}/packages`)); }
+      else if (v === 'tasks' && !tasks){ setLoading(true); await loadTasks(); }
+      else if (v === 'followups' && !followups){ setLoading(true); await loadFollowups(); }
       else if ((v === 'settings' || v === 'booking' || v === 'subscriptions' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
       else if (v === 'notifications' && !deliveries) { setLoading(true); setDeliveries(await api<NotificationDelivery[]>(`/notifications/deliveries?limit=50`)); }
       else if (v === 'reports' && !appts) {
@@ -2121,6 +2241,140 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'tasks') {
+    const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN';
+    const openTasks = (tasks ?? []).filter(t => t.status !== 'DONE');
+    const doneTasks = (tasks ?? []).filter(t => t.status === 'DONE');
+    const renderTask = (t: TaskItem) => {
+      const due = t.dueAt ? new Date(t.dueAt) : null;
+      const overdue = !!due && t.status !== 'DONE' && due.getTime() < Date.now();
+      return (
+        <View key={t.id} style={ms.row}>
+          <TouchableOpacity onPress={()=>toggleTask(t)} style={[ms.checkCircle, t.status === 'DONE' && ms.checkCircleOn]}>
+            {t.status === 'DONE' && <Ionicons name="checkmark" size={14} color="#fff"/>}
+          </TouchableOpacity>
+          <View style={{ flex:1 }}>
+            <Text style={[ms.rowTitle, t.status === 'DONE' && { color:GRAY_400, textDecorationLine:'line-through' }]}>{t.title}</Text>
+            <Text style={[ms.rowMeta, overdue && { color:'#DC2626', fontWeight:'700' }]} numberOfLines={2}>
+              {t.staff?.user?.name ? `${t.staff.user.name} · ` : ''}{due ? `${due.toLocaleDateString()} ${fmtTime(due.toISOString())}` : 'No due date'}{t.notes ? ` · ${t.notes}` : ''}
+            </Text>
+          </View>
+          {isOwner && (
+            <TouchableOpacity style={ms.iconAction} onPress={()=>removeTask(t)}>
+              <Ionicons name="trash-outline" size={18} color="#DC2626"/>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    };
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <Text style={s.headerTitle}>Tasks</Text>
+          {isOwner && (
+            <TouchableOpacity onPress={()=>setTaskEditor({ title:'', staffId:'', dueAt:'', notes:'' })}>
+              <Ionicons name="add" size={24} color={BRAND}/>
+            </TouchableOpacity>
+          )}
+        </View>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {openTasks.map(renderTask)}
+            {openTasks.length === 0 && <Text style={ms.empty}>No open tasks.</Text>}
+            {doneTasks.length > 0 && <Text style={[ms.cardLabel,{ marginTop:12, marginBottom:8, marginLeft:2 }]}>DONE</Text>}
+            {doneTasks.map(renderTask)}
+          </ScrollView>
+        )}
+        <Modal visible={!!taskEditor} animationType="slide" onRequestClose={()=>setTaskEditor(null)}>
+          <SafeAreaView style={s.screen}>
+            <View style={s.header}>
+              <TouchableOpacity onPress={()=>setTaskEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <Text style={s.headerTitle}>New task</Text>
+            </View>
+            {taskEditor && (
+              <ScrollView contentContainerStyle={s.listContent}>
+                <Text style={s.fieldLabel}>Task</Text>
+                <TextInput style={s.input} value={taskEditor.title} placeholder="Restock products, call client..." placeholderTextColor={GRAY_400} onChangeText={title=>setTaskEditor({...taskEditor,title})}/>
+                <Text style={[s.fieldLabel,{ marginTop:12 }]}>Assign to</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:8 }}>
+                  <TouchableOpacity style={[dst.chip, !taskEditor.staffId && dst.chipOn, { marginRight:8 }]} onPress={()=>setTaskEditor({...taskEditor,staffId:''})}>
+                    <Text style={[dst.chipDow, !taskEditor.staffId && dst.chipTextOn]}>Any</Text>
+                  </TouchableOpacity>
+                  {(staff ?? []).map(st => {
+                    const selected = taskEditor.staffId === st.id;
+                    return (
+                      <TouchableOpacity key={st.id} style={[dst.chip, selected && dst.chipOn, { marginRight:8 }]} onPress={()=>setTaskEditor({...taskEditor,staffId:st.id})}>
+                        <Text style={[dst.chipDow, selected && dst.chipTextOn]}>{st.user.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                <Text style={[s.fieldLabel,{ marginTop:12 }]}>Due date</Text>
+                <TextInput style={s.input} value={taskEditor.dueAt} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400} onChangeText={dueAt=>setTaskEditor({...taskEditor,dueAt})}/>
+                <Text style={[s.fieldLabel,{ marginTop:12 }]}>Notes</Text>
+                <TextInput style={[s.input,{ minHeight:86, textAlignVertical:'top' }]} multiline value={taskEditor.notes} placeholder="Optional details" placeholderTextColor={GRAY_400} onChangeText={notes=>setTaskEditor({...taskEditor,notes})}/>
+                <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveTask}><Text style={s.btnPrimaryText}>Add task</Text></TouchableOpacity>
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
+
+  if (view === 'followups') {
+    const due = (followups ?? []).filter(it => it.status === 'DUE');
+    const scheduled = (followups ?? []).filter(it => it.status === 'SCHEDULED');
+    const renderFollowup = (it: ServiceDueItem, isDue: boolean) => (
+      <View key={it.id} style={[ms.card, isDue && { borderColor:'#FCD34D', backgroundColor:'#FFFBEB' }]}>
+        <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
+          <View style={[s.avatar,{ backgroundColor:isDue ? '#FEF3C7' : BRAND_LT }]}><Ionicons name={isDue ? 'mail-unread-outline' : 'time-outline'} size={18} color={isDue ? '#B45309' : BRAND}/></View>
+          <View style={{ flex:1 }}>
+            <Text style={ms.rowTitle}>{it.client.name}</Text>
+            <Text style={ms.rowMeta}>{it.service?.name ? `${it.service.name} · ` : ''}{cadenceLabel(it.cadenceDays)} · {isDue ? 'due now' : `next ${new Date(it.dueAt).toLocaleDateString()}`}</Text>
+          </View>
+        </View>
+        {isDue && followupSnoozing !== it.id && (
+          <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:12 }}>
+            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>approveFollowup(it)}><Text style={ms.smallActionText}>Approve</Text></TouchableOpacity>
+            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>setFollowupSnoozing(it.id)}><Text style={ms.smallActionText}>Reschedule</Text></TouchableOpacity>
+            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>cancelFollowup(it)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Stop</Text></TouchableOpacity>
+          </View>
+        )}
+        {followupSnoozing === it.id && (
+          <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:12 }}>
+            {followupCadences.map(c => (
+              <TouchableOpacity key={c.days} disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>snoozeFollowup(it, c.days)}>
+                <Text style={ms.smallActionText}>{c.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={ms.smallAction} onPress={()=>setFollowupSnoozing(null)}><Text style={ms.smallActionText}>Cancel</Text></TouchableOpacity>
+          </View>
+        )}
+        {!isDue && (
+          <TouchableOpacity disabled={followupBusy===it.id} style={[ms.smallAction,{ alignSelf:'flex-start', marginTop:12 }]} onPress={()=>cancelFollowup(it)}>
+            <Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Stop</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+    return (
+      <SafeAreaView style={s.screen}>
+        <Head title="Follow-ups"/>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {due.length > 0 && <Text style={[ms.cardLabel,{ marginBottom:8, marginLeft:2, color:'#B45309' }]}>DUE NOW</Text>}
+            {due.map(it => renderFollowup(it, true))}
+            {scheduled.length > 0 && <Text style={[ms.cardLabel,{ marginTop:12, marginBottom:8, marginLeft:2 }]}>SCHEDULED</Text>}
+            {scheduled.map(it => renderFollowup(it, false))}
+            {followups && followups.length === 0 && <Text style={ms.empty}>No follow-ups yet. Set a client&apos;s next-visit cadence from their profile on web.</Text>}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   if (view === 'booking') {
     const bookingUrl = `${WEB_URL}/book/${biz?.slug ?? ''}`;
     return (
@@ -2493,6 +2747,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Items & Services', icon:'pricetags-outline',       onPress:()=>open('services') },
     { label:'Online Booking',   icon:'globe-outline',           onPress:()=>open('booking') },
     { label:'Waitlist',         icon:'hourglass-outline',       onPress:()=>open('waitlist') },
+    { label:'Tasks',            icon:'checkbox-outline',        onPress:()=>open('tasks') },
+    { label:'Follow-ups',       icon:'repeat-outline',          onPress:()=>open('followups') },
     { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
     { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
     { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
@@ -2595,6 +2851,9 @@ const ms = StyleSheet.create({
   methodChipText:{ fontSize:14, fontWeight:'600', color:GRAY_700 },
   smallAction: { borderWidth:1, borderColor:GRAY_200, borderRadius:10, paddingHorizontal:10, paddingVertical:7 },
   smallActionText:{ fontSize:12, fontWeight:'700', color:GRAY_700 },
+  iconAction:  { width:34, height:34, borderRadius:10, alignItems:'center', justifyContent:'center', backgroundColor:'#FEF2F2' },
+  checkCircle: { width:26, height:26, borderRadius:13, borderWidth:2, borderColor:GRAY_200, alignItems:'center', justifyContent:'center' },
+  checkCircleOn:{ borderColor:'#10B981', backgroundColor:'#10B981' },
   notifRow:    { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingVertical:14, paddingHorizontal:4 },
   notifRowBorder:{ borderBottomWidth:1, borderBottomColor:GRAY_50 },
   statusOn:    { flexDirection:'row', alignItems:'center', gap:6 },
