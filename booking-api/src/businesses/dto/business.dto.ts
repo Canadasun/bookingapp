@@ -39,6 +39,7 @@ export const CreateBusinessSchema = z.object({
   collectCardOnFile: z.boolean().default(false),
   allowClientReschedule: z.boolean().default(true),
   cancellationPolicy: optionalString(),
+  currency: z.enum(['CAD', 'USD']).default('CAD'),
   plan: z.enum(['FREE', 'BASIC', 'PRO']).optional(),
 });
 

@@ -27,6 +27,15 @@ function fmtDuration(mins: number) {
   return h > 0 ? `${h}h` : `${m}m`;
 }
 
+// Scrollable duration picker options (minutes) + a readable hours:minutes label.
+const DURATION_OPTIONS = [10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240];
+function fmtDurationLong(mins: number) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  const hLabel = h > 0 ? `${h} hr${h > 1 ? "s" : ""}` : "";
+  const mLabel = m > 0 ? `${m} min` : "";
+  return [hLabel, mLabel].filter(Boolean).join(" ") || `${mins} min`;
+}
+
 // ── Service form modal ────────────────────────────────────────────────────────
 interface ServiceFormState {
   name: string; description: string; durationMinutes: string;
@@ -104,18 +113,39 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
           </div>
 
           {[
-            { k: "name",            label: "Service name *",     type: "text",   ph: "e.g. Deep Conditioning" },
+            { k: "name",            label: "Service name *",     type: "text",   ph: "e.g. Full groom · Lash fill · Cut & style" },
             { k: "description",     label: "Description",        type: "text",   ph: "Optional detail" },
-            { k: "durationMinutes", label: "Duration (minutes)", type: "number", ph: "60" },
-            { k: "priceCents",      label: "Price ($) *",        type: "number", ph: "45.00" },
-            { k: "bufferBeforeMin", label: "Buffer before (min)", type: "number", ph: "0" },
-            { k: "bufferAfterMin",  label: "Buffer after (min)",  type: "number", ph: "0" },
           ].map(({ k, label, type, ph }) => (
             <div key={k}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
               <Input type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
+                onChange={e => f(k as keyof ServiceFormState, e.target.value)} />
+            </div>
+          ))}
+
+          {/* Duration — scrollable picker (hours:minutes), not a raw minutes box */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">How long does it take?</label>
+            <select
+              value={form.durationMinutes}
+              onChange={e => f("durationMinutes", e.target.value)}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+              {(DURATION_OPTIONS.includes(Number(form.durationMinutes)) ? DURATION_OPTIONS : [Number(form.durationMinutes), ...DURATION_OPTIONS])
+                .filter((m) => m > 0)
+                .map((m) => <option key={m} value={String(m)}>{fmtDurationLong(m)}</option>)}
+            </select>
+          </div>
+
+          {[
+            { k: "priceCents",      label: "Price *",             type: "number", ph: "45.00", step: "0.01" },
+            { k: "bufferBeforeMin", label: "Buffer before (min)", type: "number", ph: "0" },
+            { k: "bufferAfterMin",  label: "Buffer after (min)",  type: "number", ph: "0" },
+          ].map(({ k, label, type, ph, step }) => (
+            <div key={k}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+              <Input type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
                 onChange={e => f(k as keyof ServiceFormState, e.target.value)}
-                min={type === "number" ? 0 : undefined} step={k === "priceCents" ? "0.01" : undefined} />
+                min={0} step={step} />
             </div>
           ))}
 

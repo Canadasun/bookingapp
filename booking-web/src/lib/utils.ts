@@ -5,8 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+// Prices default to CAD (the platform's primary market); pass "USD" for US
+// businesses. Using the en-US locale renders CAD as "CA$" and USD as "$", so the
+// two are visually distinct.
+export function formatPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 
 export function formatDateTime(iso: string) {

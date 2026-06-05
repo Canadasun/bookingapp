@@ -107,6 +107,9 @@ model Business {
   // Cancellation policy text shown to clients before booking
   cancellationPolicy String @default("Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee.")
 
+  // Display + charge currency for this business's prices/charges (CAD default).
+  currency String @default("CAD")
+
   // Referral program: each business has a shareable code; new businesses that
   // apply someone's code at subscription checkout get a discount.
   referralCode String? @unique

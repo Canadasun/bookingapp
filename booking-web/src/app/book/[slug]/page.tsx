@@ -27,8 +27,8 @@ function fmtDuration(mins: number) {
   if (h > 0) return `${h}h`;
   return `${m}m`;
 }
-function fmtPrice(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 function groupSlots<T extends Slot>(slots: T[]) {
   const m: T[] = [], a: T[] = [], e: T[] = [];

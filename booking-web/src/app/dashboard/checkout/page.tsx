@@ -18,8 +18,8 @@ function fmtDuration(mins: number) {
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   return h > 0 ? `${h}h` : `${m}m`;
 }
-function fmtPrice(cents: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
 
 type Step = "client" | "services" | "staff" | "datetime" | "confirm";

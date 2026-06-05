@@ -216,6 +216,7 @@ export default function SettingsPage() {
         noShowFeeCents: Math.max(0, Number(form.noShowFeeCents ?? 0)),
         cancellationFeeCents: Math.max(0, Number(form.cancellationFeeCents ?? 0)),
         collectCardOnFile: !!form.collectCardOnFile,
+        currency: (form.currency as "CAD" | "USD") ?? "CAD",
         allowClientReschedule: form.allowClientReschedule !== false,
         cancellationPolicy: String(form.cancellationPolicy ?? "").trim() || undefined,
       };
@@ -362,9 +363,18 @@ export default function SettingsPage() {
                     </select>
                   </Field>
                 </div>
-                <Field label="Address">
-                  <Input value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
-                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Address">
+                    <Input value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
+                  </Field>
+                  <Field label="Currency">
+                    <select value={(form.currency as string) ?? "CAD"} onChange={(e) => f("currency", e.target.value)}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                      <option value="CAD">CAD — Canadian dollar (CA$)</option>
+                      <option value="USD">USD — US dollar ($)</option>
+                    </select>
+                  </Field>
+                </div>
               </div>
             )}
 

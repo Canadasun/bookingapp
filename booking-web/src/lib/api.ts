@@ -74,6 +74,7 @@ export interface Business {
   cancellationWindowHours: number; requireDeposit: boolean;
   depositPercent: number; noShowFeeCents: number; cancellationFeeCents: number; collectCardOnFile: boolean; allowClientReschedule: boolean;
   cancellationPolicy: string;
+  currency: "CAD" | "USD";
   plan: "FREE" | "BASIC" | "PRO";
   planExpiresAt?: string;
   verificationStatus?: VerificationStatus;

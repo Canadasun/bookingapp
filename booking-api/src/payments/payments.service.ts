@@ -37,6 +37,11 @@ export class PaymentsService {
     return this.configService.get<string>('STRIPE_PUBLISHABLE_KEY') ?? '';
   }
 
+  // Stripe currency code (lowercase) for a business; defaults to CAD.
+  private currencyOf(b: { currency?: string | null } | null | undefined): string {
+    return (b?.currency ?? 'CAD').toLowerCase();
+  }
+
   private idempotencyKey(parts: Array<string | number | null | undefined>): string {
     const raw = parts.map((p) => String(p ?? '')).join(':');
     const digest = createHash('sha256').update(raw).digest('hex').slice(0, 32);
@@ -103,7 +108,7 @@ export class PaymentsService {
       const depositCents = Math.max(50, Math.round(apt.service.priceCents * (b.depositPercent / 100)));
       const intent = await this.getStripe().paymentIntents.create({
         amount: depositCents,
-        currency: 'usd',
+        currency: this.currencyOf(b),
         customer,
         receipt_email: apt.client.email, // Stripe emails the official receipt on success
         ...(isProPlan(b.plan) ? { setup_future_usage: 'off_session' as const } : {}),
@@ -169,7 +174,7 @@ export class PaymentsService {
       : null;
     const intent = await this.getStripe().paymentIntents.create({
       amount: input.amountCents,
-      currency: 'usd',
+      currency: this.currencyOf(business),
       ...(chargeClient?.email ? { receipt_email: chargeClient.email } : {}),
       // Card-only, no redirect methods — the reader confirms on-device.
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
@@ -201,7 +206,7 @@ export class PaymentsService {
       paymentIntentId: intent.id,
       clientSecret: intent.client_secret,
       amountCents: input.amountCents,
-      currency: 'usd',
+      currency: this.currencyOf(business),
       status: intent.status,
       publishableKey: this.publishableKey(),
     };
@@ -599,7 +604,7 @@ export class PaymentsService {
 
     const intent = await this.getStripe().paymentIntents.create({
       amount: feeCents,
-      currency: 'usd',
+      currency: this.currencyOf(apt.business),
       customer: apt.client.stripeCustomerId,
       payment_method: apt.stripePaymentMethodId,
       receipt_email: apt.client.email,
@@ -640,7 +645,7 @@ export class PaymentsService {
     try {
       const intent = await this.getStripe().paymentIntents.create({
         amount: feeCents,
-        currency: 'usd',
+        currency: this.currencyOf(apt.business),
         customer: apt.client.stripeCustomerId,
         payment_method: apt.stripePaymentMethodId,
         receipt_email: apt.client.email,
