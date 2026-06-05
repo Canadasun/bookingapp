@@ -6,7 +6,7 @@ import {
   FolderPlus, ChevronDown, ChevronRight, Tag, X, Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, Service, ServiceCategory } from "@/lib/api";
+import { api, Service, ServiceCategory, Resource } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,22 +41,23 @@ function fmtDurationLong(mins: number) {
 interface ServiceFormState {
   name: string; description: string; durationMinutes: string;
   priceCents: string; bufferBeforeMin: string; bufferAfterMin: string;
-  capacity: string;
+  capacity: string; resourceId: string;
   color: string; active: boolean; categoryId: string;
 }
 const EMPTY_SVC: ServiceFormState = {
   name: "", description: "", durationMinutes: "60", priceCents: "",
-  bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", color: "#E9A23C", active: true, categoryId: "",
+  bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", resourceId: "", color: "#E9A23C", active: true, categoryId: "",
 };
 
 interface ServiceModalProps {
   bizId: string;
   editing: Service | null;
   categories: ServiceCategory[];
+  resources: Resource[];
   onClose: () => void;
   onSaved: () => void;
 }
-function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceModalProps) {
+function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved }: ServiceModalProps) {
   const [form, setForm] = useState<ServiceFormState>(() =>
     editing ? {
       name: editing.name, description: editing.description ?? "",
@@ -65,6 +66,7 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
       bufferBeforeMin: String(editing.bufferBeforeMin),
       bufferAfterMin: String(editing.bufferAfterMin),
       capacity: String(editing.capacity ?? 1),
+      resourceId: editing.resourceId ?? "",
       color: editing.color, active: editing.active,
       categoryId: editing.categoryId ?? "",
     } : EMPTY_SVC
@@ -85,6 +87,7 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
         bufferBeforeMin: Number(form.bufferBeforeMin),
         bufferAfterMin: Number(form.bufferAfterMin),
         capacity: Math.max(1, Number(form.capacity) || 1),
+        resourceId: form.resourceId || null,
         color: form.color, active: form.active,
         sortOrder: editing?.sortOrder ?? 0,
         categoryId: form.categoryId || null,
@@ -178,6 +181,19 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
                 : "1 = standard one-on-one booking. Increase for group classes."}
             </p>
           </div>
+
+          {/* Room / resource this service occupies */}
+          {resources.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Room / resource</label>
+              <select value={form.resourceId} onChange={e => f("resourceId", e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                <option value="">— None —</option>
+                {resources.filter(r => r.active).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-gray-400">If set, the slot is blocked whenever this resource is already in use.</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
@@ -278,6 +294,7 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
 export default function ServicesPage() {
   const [services, setServices]     = useState<Service[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [resources, setResources]   = useState<Resource[]>([]);
   const [loading, setLoading]       = useState(true);
   const [collapsed, setCollapsed]   = useState<Record<string, boolean>>({});
 
@@ -285,6 +302,8 @@ export default function ServicesPage() {
   const [editSvc, setEditSvc]     = useState<Service | null>(null);
   const [catModal, setCatModal]   = useState(false);
   const [editCat, setEditCat]     = useState<ServiceCategory | null>(null);
+  const [resourceName, setResourceName] = useState("");
+  const [showResources, setShowResources] = useState(false);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -293,12 +312,14 @@ export default function ServicesPage() {
     if (!bizId) return;
     setLoading(true);
     try {
-      const [svcs, cats] = await Promise.all([
+      const [svcs, cats, res] = await Promise.all([
         api.services.listAll(bizId),
         api.serviceCategories.listAll(bizId),
+        api.resources.list(bizId).catch(() => [] as Resource[]),
       ]);
       setServices(svcs);
       setCategories(cats);
+      setResources(res);
     } catch { toast.error("Failed to load services"); }
     finally { setLoading(false); }
   }, [bizId]);
@@ -309,6 +330,19 @@ export default function ServicesPage() {
     if (!bizId) return;
     try { await api.services.update(bizId, svc.id, { active: !svc.active }); load(); }
     catch { toast.error("Failed to update"); }
+  }
+
+  async function addResource() {
+    const n = resourceName.trim();
+    if (!n || !bizId) return;
+    try { await api.resources.create(bizId, { name: n }); setResourceName(""); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+  }
+  async function removeResource(r: Resource) {
+    if (!bizId) return;
+    if (!confirm(`Delete "${r.name}"? Services using it will be unset.`)) return;
+    try { await api.resources.remove(bizId, r.id); load(); }
+    catch { toast.error("Failed to delete"); }
   }
 
   async function deleteCategory(cat: ServiceCategory) {
@@ -346,6 +380,35 @@ export default function ServicesPage() {
               <Plus className="w-4 h-4" /> New service
             </Button>
           </div>
+        </div>
+
+        {/* Rooms & resources */}
+        <div className="mb-5 rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <button onClick={() => setShowResources((s) => !s)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left">
+            <span className="text-sm font-semibold text-gray-900">Rooms &amp; resources {resources.length > 0 && <span className="text-gray-400 font-normal">({resources.length})</span>}</span>
+            <span className="text-xs text-violet-600 font-medium">{showResources ? "Hide" : "Manage"}</span>
+          </button>
+          {showResources && (
+            <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-2">
+              <p className="text-xs text-gray-400">Shared rooms or equipment. Assign one to a service and that slot is blocked whenever the resource is in use.</p>
+              <div className="flex flex-wrap gap-2">
+                {resources.map((r) => (
+                  <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 border border-gray-200 px-3 py-1 text-sm text-gray-700">
+                    {r.name}
+                    <button onClick={() => removeResource(r)} className="text-gray-400 hover:text-red-600" aria-label={`Delete ${r.name}`}>×</button>
+                  </span>
+                ))}
+                {resources.length === 0 && <span className="text-xs text-gray-400">No resources yet.</span>}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Input placeholder="e.g. Room 1 · Chair 2 · Laser" value={resourceName}
+                  onChange={(e) => setResourceName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addResource(); } }} />
+                <Button size="sm" onClick={addResource} disabled={!resourceName.trim()}>Add</Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {loading ? <SkeletonList rows={6} /> : services.length === 0 && categories.length === 0 ? (
@@ -441,6 +504,7 @@ export default function ServicesPage() {
           bizId={bizId}
           editing={editSvc}
           categories={categories.filter(c => c.active)}
+          resources={resources}
           onClose={() => setSvcModal(false)}
           onSaved={() => { setSvcModal(false); load(); }}
         />

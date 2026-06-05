@@ -76,6 +76,28 @@ export class AvailabilityService {
       }),
     ]);
 
+    // If this service occupies a shared resource (room/equipment), that resource
+    // being used by ANOTHER staff member's appointment also blocks the slot. (Same
+    // staff is already covered by `appointments`.) Treat those like time off.
+    let effectiveTimeOffs = timeOffs;
+    if (service.resourceId) {
+      const resourceBusy = await this.prisma.appointment.findMany({
+        where: {
+          businessId: service.businessId,
+          staffId: { not: staffId },
+          status: { in: ['CONFIRMED', 'PENDING'] },
+          startsAt: { lt: rangeEnd },
+          endsAt: { gt: rangeStart },
+          service: { resourceId: service.resourceId },
+        },
+        select: { startsAt: true, endsAt: true },
+      });
+      effectiveTimeOffs = [
+        ...timeOffs,
+        ...resourceBusy.map((a) => ({ id: 'resource', staffId, reason: null, createdAt: a.startsAt, startsAt: a.startsAt, endsAt: a.endsAt } as TimeOff)),
+      ];
+    }
+
     // Honest default: a staff with NO configured availability rules is treated as
     // open during standard hours (every day, 9–5) so an owner can book right away
     // before they've set up a schedule — instead of "no availability" on a brand
@@ -104,7 +126,7 @@ export class AvailabilityService {
           rule,
           service,
           appointments,
-          timeOffs,
+          effectiveTimeOffs,
           businessTimezone,
           timezone,
         );

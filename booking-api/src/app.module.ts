@@ -11,6 +11,7 @@ import { StaffModule } from './staff/staff.module';
 import { TasksModule } from './tasks/tasks.module';
 import { ServiceDueModule } from './service-due/service-due.module';
 import { ServicesModule } from './services/services.module';
+import { ResourcesModule } from './resources/resources.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { ClientsModule } from './clients/clients.module';
@@ -66,6 +67,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     TasksModule,
     ServiceDueModule,
     ServicesModule,
+    ResourcesModule,
     AvailabilityModule,
     BookingsModule,
     ClientsModule,

@@ -205,6 +205,25 @@ export class BookingsService {
             if (sameInstance.length >= capacity) {
               throw new ConflictException('This class is full');
             }
+
+            // Shared resource (room/equipment): no other appointment may use it at
+            // the same time. The same class instance (same service + start) shares
+            // one room, so it's allowed.
+            if (primaryService.resourceId) {
+              const resourceConflict = await tx.appointment.findFirst({
+                where: {
+                  businessId,
+                  status: { in: ['CONFIRMED', 'PENDING'] },
+                  startsAt: { lt: endsAt },
+                  endsAt: { gt: startsAt },
+                  service: { resourceId: primaryService.resourceId },
+                  NOT: { serviceId: dto.serviceId, startsAt },
+                },
+              });
+              if (resourceConflict) {
+                throw new ConflictException('The room or resource for this service is already booked at this time');
+              }
+            }
           }
 
           return tx.appointment.create({

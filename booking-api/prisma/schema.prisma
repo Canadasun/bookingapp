@@ -134,6 +134,7 @@ model Business {
   googleCalendar     GoogleCalendarConnection?
   staff              Staff[]
   services           Service[]
+  resources          Resource[]
   serviceCategories  ServiceCategory[]
   appointments       Appointment[]
   clients            Client[]
@@ -545,14 +546,33 @@ model Service {
   updatedAt       DateTime @updatedAt
 
   categoryId      String?
+  resourceId      String?          // optional shared room/equipment this service occupies
   business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   category        ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  resource        Resource?        @relation(fields: [resourceId], references: [id], onDelete: SetNull)
   staffServices   StaffService[]
   appointments    Appointment[]
   serviceDues     ServiceDue[]
 
   @@index([businessId])
   @@index([categoryId])
+  @@index([resourceId])
+}
+
+// A shared bookable asset (treatment room, chair, equipment). A service can
+// require one; the same resource can't host two overlapping appointments.
+model Resource {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  services Service[]
+
+  @@index([businessId])
 }
 
 model ServiceCategory {

@@ -8,6 +8,7 @@ export const CreateServiceSchema = z.object({
   bufferBeforeMin: z.number().int().nonnegative().default(0),
   bufferAfterMin: z.number().int().nonnegative().default(0),
   capacity: z.number().int().min(1).max(100).default(1),
+  resourceId: z.string().nullable().optional(),
   color: z.string().default('#E9A23C'),
   sortOrder: z.number().int().nonnegative().default(0),
   active: z.boolean().default(true),

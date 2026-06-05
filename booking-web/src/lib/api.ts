@@ -93,10 +93,12 @@ export interface ServiceCategory {
   services?: Service[];
 }
 
+export interface Resource { id: string; businessId: string; name: string; active: boolean; createdAt: string; updatedAt: string }
+
 export interface Service {
   id: string; name: string; description?: string;
   durationMinutes: number; priceCents: number;
-  capacity?: number;
+  capacity?: number; resourceId?: string | null;
   bufferBeforeMin: number; bufferAfterMin: number;
   color: string; sortOrder: number; active: boolean;
   businessId: string; categoryId?: string | null;
@@ -482,6 +484,16 @@ export const api = {
       req<Service>(`/businesses/${businessId}/services/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     remove: (businessId: string, id: string) =>
       req<void>(`/businesses/${businessId}/services/${id}`, { method: "DELETE" }),
+  },
+
+  resources: {
+    list: (businessId: string) => req<Resource[]>(`/businesses/${businessId}/resources`),
+    create: (businessId: string, data: { name: string }) =>
+      req<Resource>(`/businesses/${businessId}/resources`, { method: "POST", body: JSON.stringify(data) }),
+    update: (businessId: string, id: string, data: { name?: string; active?: boolean }) =>
+      req<Resource>(`/businesses/${businessId}/resources/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    remove: (businessId: string, id: string) =>
+      req<{ ok: boolean }>(`/businesses/${businessId}/resources/${id}`, { method: "DELETE" }),
   },
 
   serviceCategories: {
