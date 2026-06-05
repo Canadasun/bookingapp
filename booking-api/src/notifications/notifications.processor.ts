@@ -118,7 +118,7 @@ export class NotificationProcessor extends WorkerHost {
     // in the last 2 minutes, so a double-trigger can't fire two emails/texts and
     // burn the business's quota. Auth/transactional types that legitimately repeat
     // (OTP, verify, reset, security) are never suppressed.
-    const ALWAYS_SEND = new Set(['otp', 'verify-email', 'password-reset', 'security-alert']);
+    const ALWAYS_SEND = new Set(['otp', 'verify-email', 'password-reset', 'security-alert', 'plan-changed']);
     const isDuplicate = async (channel: 'EMAIL' | 'SMS', recipient: string): Promise<boolean> => {
       const type = this.currentType || 'unknown';
       if (ALWAYS_SEND.has(type)) return false;
