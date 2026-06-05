@@ -332,6 +332,18 @@ export default function ServicesPage() {
     catch { toast.error("Failed to update"); }
   }
 
+  async function deleteService(svc: Service) {
+    if (!bizId) return;
+    if (!confirm(`Delete "${svc.name}"? This cannot be undone.`)) return;
+    try {
+      await api.services.remove(bizId, svc.id);
+      toast.success("Service deleted");
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
+  }
+
   async function addResource() {
     const n = resourceName.trim();
     if (!n || !bizId) return;
@@ -451,7 +463,8 @@ export default function ServicesPage() {
                       {svcs.map(svc => (
                         <ServiceRow key={svc.id} svc={svc}
                           onEdit={() => { setEditSvc(svc); setSvcModal(true); }}
-                          onToggle={() => toggleActive(svc)} />
+                          onToggle={() => toggleActive(svc)}
+                          onDelete={() => deleteService(svc)} />
                       ))}
                     </div>
                   )}
@@ -471,7 +484,8 @@ export default function ServicesPage() {
                   {uncategorised.map(svc => (
                     <ServiceRow key={svc.id} svc={svc}
                       onEdit={() => { setEditSvc(svc); setSvcModal(true); }}
-                      onToggle={() => toggleActive(svc)} />
+                      onToggle={() => toggleActive(svc)}
+                      onDelete={() => deleteService(svc)} />
                   ))}
                 </div>
               </div>
@@ -522,8 +536,8 @@ export default function ServicesPage() {
 }
 
 // ── Service row ───────────────────────────────────────────────────────────────
-function ServiceRow({ svc, onEdit, onToggle }: {
-  svc: Service; onEdit: () => void; onToggle: () => void;
+function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
+  svc: Service; onEdit: () => void; onToggle: () => void; onDelete: () => void;
 }) {
   return (
     <div className={cn("flex items-center gap-4 px-4 py-3", !svc.active && "opacity-50")}>
@@ -550,6 +564,11 @@ function ServiceRow({ svc, onEdit, onToggle }: {
         <button onClick={onEdit}
           className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors">
           <Pencil className="w-4 h-4" />
+        </button>
+        <button onClick={onDelete}
+          className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+          aria-label={`Delete ${svc.name}`}>
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>
