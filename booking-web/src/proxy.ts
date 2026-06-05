@@ -68,9 +68,14 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Already signed in and hitting an auth page → send to the logged-in home.
+  // Already signed in and hitting an auth page → send to the right workspace.
   if (AUTH_ONLY.includes(pathname) && authed) {
-    return NextResponse.redirect(new URL("/", req.url));
+    const home = user?.role === "ADMIN"
+      ? "/admin/verifications"
+      : user?.role === "CLIENT"
+        ? "/my/dashboard"
+        : "/dashboard";
+    return NextResponse.redirect(new URL(home, req.url));
   }
 
   if (CLIENT_AUTH_ONLY.includes(pathname) && authed) {

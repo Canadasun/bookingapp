@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
-import { Calendar, Bell, CreditCard, Clock, Star, Shield, ArrowRight, Sparkles } from "lucide-react";
+import { redirect } from "next/navigation";
+import { Calendar, Bell, CreditCard, Clock, Star, Shield, Sparkles } from "lucide-react";
 import { LandingAuthCta, LandingResources, LandingSolutions, LandingHeroCta, LandingBottomCta, LandingFooterLinks } from "@/components/LandingClient";
-import { LoggedInHome } from "@/components/LoggedInHome";
 
 // Decode the role from the (non-HttpOnly) booking_user cookie, server-side, so a
 // signed-in user gets their dedicated home with no flash of the marketing page.
@@ -35,11 +34,12 @@ const stats = [
 ];
 
 export default async function LandingPage() {
-  // Signed-in owners/staff/admins get a dedicated home, not the marketing page.
-  // If a session exists but the role cookie was dropped (mobile), still show the
-  // logged-in home rather than flashing the marketing page.
+  // Signed-in users should land in their working area. Keep "/" as marketing only
+  // so owners/staff are never routed through a separate logged-in home page.
   const { role, authed } = await sessionInfo();
-  if ((role && role !== "CLIENT") || (authed && !role)) return <LoggedInHome />;
+  if (role === "ADMIN") redirect("/admin/verifications");
+  if (role === "CLIENT") redirect("/my/dashboard");
+  if ((role && role !== "CLIENT") || (authed && !role)) redirect("/dashboard");
 
   return (
     <div className="flex flex-col min-h-screen brand-shell">

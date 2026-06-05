@@ -22,7 +22,7 @@ interface NavItem {
 }
 
 const OWNER_NAV: NavItem[] = [
-  { href: "/dashboard",              label: "Overview",     icon: LayoutDashboard },
+  { href: "/dashboard",              label: "Home",         icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
   { href: "/dashboard/checkout",     label: "New booking",  icon: CalendarPlus },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
@@ -218,11 +218,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* ── Main ──────────────────────────────────────────────────── */}
-      <div className="flex-1 md:ml-60 flex flex-col min-h-screen">
+      <div className="flex-1 md:ml-60 flex flex-col min-h-screen min-w-0">
 
         {/* Top bar */}
-        <header className="h-16 bg-white/82 backdrop-blur-xl border-b border-[#E9DDCB] flex items-center justify-between px-6 sticky top-0 z-20">
-          <div className="flex items-center gap-3">
+        <header className="h-16 bg-white/82 backdrop-blur-xl border-b border-[#E9DDCB] flex items-center justify-between gap-3 px-3 sm:px-6 sticky top-0 z-20">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Hamburger — 3 lines */}
             <button
               className="md:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
@@ -232,11 +232,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 ? <X className="w-5 h-5 text-gray-600" />
                 : <MenuIcon className="w-5 h-5 text-gray-600" />}
             </button>
-            <h1 className="text-sm font-semibold text-ink">{currentLabel}</h1>
+            <h1 className="truncate text-sm font-semibold text-ink">{currentLabel}</h1>
             {verified && <VerifiedBadge />}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link href="/dashboard/notifications"
               className="relative p-2 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors text-amber-700"
               aria-label="Notifications">
@@ -266,7 +266,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
       </div>
     </div>
   );

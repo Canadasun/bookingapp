@@ -40,8 +40,7 @@ function LoginForm() {
 
   function go() {
     const role = getUser()?.role;
-    // Owners/staff land on the logged-in home; admins on the admin area.
-    const home = role === "ADMIN" ? "/admin/verifications" : role === "CLIENT" ? "/my/dashboard" : "/";
+    const home = role === "ADMIN" ? "/admin/verifications" : role === "CLIENT" ? "/my/dashboard" : "/dashboard";
     // Honour an explicit deep-link (?next) to a real page; otherwise the home.
     if (next && next !== "/dashboard" && next !== "/") { router.push(safeNextPath(next, home)); return; }
     router.push(home);

@@ -167,7 +167,7 @@ export function LandingAuthCta() {
   useEffect(() => { setUser(getUser()); }, []);
 
   if (user) {
-    const home = user.role === "CLIENT" ? "/my/dashboard" : "/dashboard";
+    const home = homeFor(user) ?? "/dashboard";
     return (
       <div className="flex items-center gap-3">
         <span className="hidden sm:inline text-sm text-slate-600">Hi, {user.name.split(" ")[0]}</span>
