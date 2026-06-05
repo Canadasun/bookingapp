@@ -176,4 +176,74 @@ export class ClientsService {
       return { ok: true, deletedAppointments: appointments.count };
     });
   }
+
+  // Find likely-duplicate clients (same person under a different email/phone).
+  // Clients are linked when they share a normalized phone or an identical name;
+  // connected groups of 2+ are returned for the owner to review and merge.
+  async findDuplicates(businessId: string) {
+    const clients = await this.prisma.client.findMany({
+      where: { businessId },
+      select: { id: true, name: true, email: true, phone: true, createdAt: true },
+    });
+    const parent = new Map<string, string>();
+    const find = (x: string): string => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x)!)!); x = parent.get(x)!; } return x; };
+    const union = (a: string, b: string) => { parent.set(find(a), find(b)); };
+    for (const c of clients) parent.set(c.id, c.id);
+
+    const byPhone = new Map<string, string>();
+    const byName = new Map<string, string>();
+    for (const c of clients) {
+      const p = normalizePhone(c.phone);
+      if (p) { const seen = byPhone.get(p); if (seen) union(seen, c.id); else byPhone.set(p, c.id); }
+      const n = c.name.trim().toLowerCase();
+      if (n) { const seen = byName.get(n); if (seen) union(seen, c.id); else byName.set(n, c.id); }
+    }
+    const groups = new Map<string, typeof clients>();
+    for (const c of clients) {
+      const root = find(c.id);
+      const g = groups.get(root) ?? [];
+      g.push(c); groups.set(root, g);
+    }
+    const result: Array<{ clients: Array<typeof clients[number] & { appointments: number }> }> = [];
+    for (const g of groups.values()) {
+      if (g.length < 2) continue;
+      const counts = await this.prisma.appointment.groupBy({
+        by: ['clientId'], where: { clientId: { in: g.map((c) => c.id) } }, _count: { _all: true },
+      });
+      const cmap = new Map(counts.map((c) => [c.clientId, c._count._all]));
+      result.push({ clients: g.map((c) => ({ ...c, appointments: cmap.get(c.id) ?? 0 })) });
+    }
+    return result;
+  }
+
+  // Merge duplicates into the primary: all bookings/messages/payments/packages/
+  // follow-ups move over, the duplicates are deleted, and the owner-chosen
+  // name/email/phone are applied to the survivor.
+  async merge(businessId: string, primaryId: string, dupeIds: string[], canonical: { name?: string; email?: string; phone?: string | null }) {
+    const ids = [...new Set([primaryId, ...dupeIds])];
+    const found = await this.prisma.client.findMany({ where: { id: { in: ids }, businessId }, select: { id: true } });
+    if (found.length !== ids.length) throw new NotFoundException('One or more clients not found in this business');
+    const dupes = ids.filter((id) => id !== primaryId);
+    if (!dupes.length) return { ok: true, merged: 0 };
+
+    return this.prisma.$transaction(async (tx) => {
+      const where = { clientId: { in: dupes } };
+      const to = { clientId: primaryId };
+      await tx.appointment.updateMany({ where, data: to });
+      await tx.message.updateMany({ where, data: to });
+      await tx.payment.updateMany({ where, data: to });
+      await tx.clientPackage.updateMany({ where, data: to });
+      await tx.serviceDue.updateMany({ where, data: to });
+      await tx.client.deleteMany({ where: { id: { in: dupes }, businessId } });
+      await tx.client.update({
+        where: { id: primaryId },
+        data: {
+          ...(canonical.name ? { name: canonical.name.trim() } : {}),
+          ...(canonical.email ? { email: canonical.email.trim().toLowerCase() } : {}),
+          ...(canonical.phone !== undefined ? { phone: canonical.phone ? normalizePhone(canonical.phone) : null } : {}),
+        },
+      });
+      return { ok: true, merged: dupes.length };
+    });
+  }
 }

@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientsService } from './clients.service';
-import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto } from './dto/client.dto';
+import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto } from './dto/client.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -35,6 +35,31 @@ export class ClientsController {
   // dropped: it disclosed a person's name, phone and booking history to anyone
   // who knew their email/phone. Clients now manage bookings only via the signed
   // link in their confirmation email, or by signing into the portal.
+
+  // Declared before @Get(':id') so "duplicates" isn't swallowed as a client id.
+  @Get('duplicates')
+  @UseGuards(JwtAuthGuard)
+  duplicates(@Param('businessId') businessId: string, @CurrentUser() user: { role: string; businessId: string | null }) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.clientService.findDuplicates(businessId);
+  }
+
+  @Post('merge')
+  @UseGuards(JwtAuthGuard)
+  merge(
+    @Param('businessId') businessId: string,
+    @Body(new ZodValidationPipe(MergeClientsSchema)) dto: MergeClientsDto,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.clientService.merge(businessId, dto.primaryId, dto.dupeIds, {
+      name: dto.name, email: dto.email, phone: dto.phone,
+    });
+  }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)

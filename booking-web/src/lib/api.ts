@@ -563,6 +563,10 @@ export const api = {
       req<Client>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    duplicates: (businessId: string) =>
+      req<Array<{ clients: Array<{ id: string; name: string; email: string; phone?: string | null; createdAt: string; appointments: number }> }>>(`/businesses/${businessId}/clients/duplicates`),
+    merge: (businessId: string, data: { primaryId: string; dupeIds: string[]; name?: string; email?: string; phone?: string | null }) =>
+      req<{ ok: boolean; merged: number }>(`/businesses/${businessId}/clients/merge`, { method: "POST", body: JSON.stringify(data) }),
     delete: (businessId: string, id: string) =>
       req<{ ok: boolean; deletedAppointments: number }>(`/businesses/${businessId}/clients/${id}`, { method: "DELETE" }),
   },

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus } from "lucide-react";
+import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonList, SkeletonCard } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ClientMergeModal } from "@/components/ClientMergeModal";
 import { formatPrice, cn } from "@/lib/utils";
 
 export default function ClientsPage() {
@@ -26,6 +27,7 @@ export default function ClientsPage() {
   const [selected, setSelected] = useState<(ClientWithStats & { appointments?: unknown[]; payments?: Payment[]; packages?: ClientPackage[]; messages?: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }> }) | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [showMerge, setShowMerge] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [deletingClient, setDeletingClient] = useState(false);
@@ -181,7 +183,10 @@ export default function ClientsPage() {
           <h2 className="text-xl font-bold text-gray-900">Clients</h2>
           <p className="text-sm text-gray-500">{total} client{total !== 1 ? "s" : ""}</p>
         </div>
-        <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />Merge duplicates</Button>
+          <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
+        </div>
       </div>
 
       <div className="relative mb-4">
@@ -406,6 +411,10 @@ export default function ClientsPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {showMerge && bizId && (
+        <ClientMergeModal bizId={bizId} onClose={() => setShowMerge(false)} onMerged={() => load(search, 1)} />
       )}
     </div>
   );

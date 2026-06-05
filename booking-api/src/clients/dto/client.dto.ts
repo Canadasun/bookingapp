@@ -34,5 +34,15 @@ export const CreateClientSchema = z.object({
 
 export const UpdateClientSchema = CreateClientSchema.partial();
 
+// Merge duplicates into one primary; the owner picks the canonical name/email/phone.
+export const MergeClientsSchema = z.object({
+  primaryId: z.string().min(1),
+  dupeIds: z.array(z.string().min(1)).min(1).max(20),
+  name: z.string().trim().min(1).optional(),
+  email: z.string().trim().toLowerCase().email().optional(),
+  phone: z.string().trim().optional().nullable(),
+});
+
 export type CreateClientDto = z.infer<typeof CreateClientSchema>;
 export type UpdateClientDto = z.infer<typeof UpdateClientSchema>;
+export type MergeClientsDto = z.infer<typeof MergeClientsSchema>;
