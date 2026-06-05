@@ -97,7 +97,7 @@ export class StaffService {
     return { staff: await this.findOne(staff.id), tempPassword };
   }
 
-  async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean }, businessId?: string) {
+  async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[] }, businessId?: string) {
     const staff = await this.findOne(id, businessId);
     return this.prisma.staff.update({
       where: { id: staff.id },
@@ -105,6 +105,7 @@ export class StaffService {
         ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
         ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
         ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.permissions !== undefined ? { permissions: dto.permissions } : {}),
       },
       include: {
         user: { select: { name: true, email: true, role: true } },

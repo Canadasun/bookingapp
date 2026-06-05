@@ -6,10 +6,13 @@ export const CreateStaffSchema = z.object({
   avatarUrl: z.string().url().optional(),
 });
 
+export const STAFF_PERMISSIONS = ['VIEW_MONEY', 'MANAGE_SERVICES', 'MANAGE_STAFF'] as const;
+
 export const UpdateStaffSchema = z.object({
   bio: z.string().optional(),
   avatarUrl: z.string().url().optional(),
   active: z.boolean().optional(),
+  permissions: z.array(z.enum(STAFF_PERMISSIONS)).max(10).optional(),
 });
 export type UpdateStaffDto = z.infer<typeof UpdateStaffSchema>;
 

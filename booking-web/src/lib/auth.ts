@@ -5,6 +5,7 @@ export interface SessionUser {
   role: "ADMIN" | "OWNER" | "STAFF" | "CLIENT";
   businessId: string | null;
   staffId: string | null;
+  permissions?: string[];
   twoFactorEnabled?: boolean;
   twoFactorMethod?: "EMAIL" | "SMS";
 }

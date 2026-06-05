@@ -114,7 +114,7 @@ export interface AvailabilityRule {
 
 export interface StaffMember {
   id: string; userId: string; businessId: string;
-  bio?: string; avatarUrl?: string; active: boolean;
+  bio?: string; avatarUrl?: string; active: boolean; permissions?: string[];
   createdAt: string; updatedAt: string;
   user: { name: string; email?: string; phone?: string; role?: string };
   staffServices: StaffService[];
@@ -507,7 +507,7 @@ export const api = {
     // Owner-only: creates the staff login + returns a one-time temp password.
     invite: (businessId: string, data: { name: string; email: string; bio?: string; serviceIds?: string[] }) =>
       req<{ staff: StaffMember; tempPassword: string }>(`/businesses/${businessId}/staff/invite`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean }) =>
+    update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[] }) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     // force=true moves the provider's bookings to the owner, then deletes them.
     remove: (businessId: string, id: string, force?: boolean) =>

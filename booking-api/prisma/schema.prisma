@@ -467,6 +467,7 @@ model Staff {
   bio        String?
   avatarUrl  String?
   active     Boolean  @default(true)
+  permissions String[] @default([]) // extra access for staff: VIEW_MONEY, MANAGE_SERVICES, MANAGE_STAFF
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

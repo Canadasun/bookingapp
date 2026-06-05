@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
+  DollarSign, BarChart3,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -134,7 +135,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => setUnread(0));
   }, [pathname]);
 
-  const nav = user?.role === "STAFF" ? STAFF_NAV : OWNER_NAV;
+  // Staff get the base nav plus anything their granted permissions unlock.
+  const staffNav: NavItem[] = [
+    ...STAFF_NAV,
+    ...((user?.permissions ?? []).includes("VIEW_MONEY")
+      ? [
+          { href: "/dashboard/transactions", label: "Transactions", icon: DollarSign },
+          { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },
+        ]
+      : []),
+  ];
+  const nav = user?.role === "STAFF" ? staffNav : OWNER_NAV;
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});

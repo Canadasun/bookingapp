@@ -28,7 +28,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", bio: "", avatarUrl: "" });
+  const [form, setForm] = useState<{ name: string; email: string; bio: string; avatarUrl: string; permissions: string[] }>({ name: "", email: "", bio: "", avatarUrl: "", permissions: [] });
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   // One-time temp password to surface to the owner after inviting a staff member.
@@ -52,10 +52,10 @@ export default function StaffPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"" }); setSelectedServiceIds([]); setShowModal(true); }
+  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"", permissions:[] }); setSelectedServiceIds([]); setShowModal(true); }
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "" });
+    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "", permissions: s.permissions ?? [] });
     setSelectedServiceIds(s.staffServices.map((ss) => ss.serviceId));
     setShowModal(true);
   }
@@ -70,14 +70,14 @@ export default function StaffPage() {
         const res = await api.staff.invite(bizId, {
           name: form.name, email: form.email, bio: form.bio || undefined, serviceIds: selectedServiceIds,
         });
-        // Invite can't carry an avatar — set it right after on the new staff record.
-        if (form.avatarUrl && res.staff?.id) {
-          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl }).catch(() => {});
+        // Invite can't carry an avatar/permissions — set them right after on the new staff record.
+        if ((form.avatarUrl || form.permissions.length) && res.staff?.id) {
+          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions }).catch(() => {});
         }
         setInvited({ email: form.email, password: res.tempPassword });
         toast.success("Staff invited — copy the temporary password now");
       } else {
-        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "" });
+        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "", permissions: form.permissions });
         await api.staff.assignServices(bizId, editing.id, selectedServiceIds);
         toast.success("Staff updated");
       }
@@ -225,6 +225,33 @@ export default function StaffPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Photo (optional)</label>
                 <ImageUpload value={form.avatarUrl || null} kind="AVATAR" shape="circle"
                   onChange={(url) => setForm((p) => ({ ...p, avatarUrl: url ?? "" }))} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+                <p className="text-xs text-gray-400 -mt-1 mb-2">Owners have full access. Grant this staff member extra access below.</p>
+                <div className="space-y-1.5">
+                  {([
+                    { key: "VIEW_MONEY", label: "View money", desc: "See the payments ledger & reports" },
+                    { key: "MANAGE_SERVICES", label: "Manage services", desc: "Add and edit services" },
+                    { key: "MANAGE_STAFF", label: "Manage staff", desc: "Invite and edit team members" },
+                  ] as const).map((p) => {
+                    const on = form.permissions.includes(p.key);
+                    return (
+                      <button key={p.key} type="button"
+                        onClick={() => setForm((f) => ({ ...f, permissions: on ? f.permissions.filter((x) => x !== p.key) : [...f.permissions, p.key] }))}
+                        className={cn("flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition-colors",
+                          on ? "border-violet-200 bg-violet-50" : "border-gray-200 hover:bg-gray-50")}>
+                        <span>
+                          <span className={cn("block text-sm font-medium", on ? "text-violet-700" : "text-gray-700")}>{p.label}</span>
+                          <span className="block text-xs text-gray-400">{p.desc}</span>
+                        </span>
+                        <span className={cn("relative w-9 h-5 rounded-full transition-colors shrink-0", on ? "bg-violet-600" : "bg-gray-200")}>
+                          <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform", on ? "translate-x-4" : "translate-x-0.5")} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Services offered</label>

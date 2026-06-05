@@ -449,9 +449,11 @@ export class AuthService {
     await this.prisma.refreshSession.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
 
     let staffId: string | null = null;
+    let permissions: string[] = [];
     if (user.role === 'STAFF') {
       const staff = await this.prisma.staff.findUnique({ where: { userId: user.id } });
       staffId = staff?.id ?? null;
+      permissions = staff?.permissions ?? [];
     }
 
     return {
@@ -464,6 +466,7 @@ export class AuthService {
         role: user.role,
         businessId: user.businessId,
         staffId,
+        permissions,
         mustResetPassword: user.mustResetPassword,
         twoFactorEnabled: user.twoFactorEnabled,
         twoFactorMethod: user.twoFactorMethod,

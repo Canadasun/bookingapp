@@ -8,7 +8,9 @@ import { z } from 'zod';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -91,11 +93,12 @@ export class PaymentsController {
     return this.paymentService.createCustomCharge(user.businessId, parsed.data);
   }
 
-  // Owner — the business payment ledger (deposits, fees, in-person charges + refunds).
+  // The business payment ledger (deposits, fees, in-person charges + refunds).
+  // Owner/admin always; staff need the VIEW_MONEY permission.
   @Get()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('VIEW_MONEY')
   list(@CurrentUser() user: { role: string; businessId: string | null }) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.paymentService.listPayments(user.businessId);
