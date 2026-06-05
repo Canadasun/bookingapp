@@ -50,14 +50,14 @@ export async function POST(req: NextRequest) {
     res.cookies.set("booking_token", refreshed.accessToken, {
       httpOnly: true,
       secure,
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/",
       maxAge: 60 * 15,
     });
     res.cookies.set("booking_refresh", refreshed.refreshToken, {
       httpOnly: true,
       secure,
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
       httpOnly: false,
       secure,
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set("booking_td", "", {
       httpOnly: true,
       secure,
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/",
       maxAge: 0,
     });

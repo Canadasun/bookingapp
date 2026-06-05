@@ -18,19 +18,23 @@ function userFromCookie(req: NextRequest): { role?: string; mustResetPassword?: 
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const token = req.cookies.get("booking_token")?.value;
+  // A session exists as long as the long-lived refresh cookie (7d) is present —
+  // the 15-minute access cookie may have lapsed, but the app silently refreshes
+  // it on the next API call. Gating on the access cookie alone bounced people to
+  // login every 15 minutes; gate on either so navigation stays smooth.
+  const authed = !!(req.cookies.get("booking_token")?.value || req.cookies.get("booking_refresh")?.value);
   const user = userFromCookie(req);
 
   // Forced first-login password reset: until the flag clears, keep the user on
   // /change-password and out of the dashboard area.
   if (
-    token && user?.mustResetPassword && pathname !== "/change-password" &&
+    authed && user?.mustResetPassword && pathname !== "/change-password" &&
     pathname.startsWith("/dashboard")
   ) {
     return NextResponse.redirect(new URL("/change-password", req.url));
   }
   // /change-password itself requires a login.
-  if (pathname === "/change-password" && !token) {
+  if (pathname === "/change-password" && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
@@ -39,36 +43,37 @@ export function proxy(req: NextRequest) {
 
   // Platform admin area — must be logged in AND Role.ADMIN.
   if (pathname.startsWith("/admin")) {
-    if (!token) {
+    if (!authed) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     }
     if (user?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      return NextResponse.redirect(new URL("/", req.url));
     }
   }
 
-  if (STAFF_PROTECTED.some((p) => pathname.startsWith(p)) && !token) {
+  if (STAFF_PROTECTED.some((p) => pathname.startsWith(p)) && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (CLIENT_PROTECTED.some((p) => pathname.startsWith(p)) && !token) {
+  if (CLIENT_PROTECTED.some((p) => pathname.startsWith(p)) && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = "/my/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (AUTH_ONLY.includes(pathname) && token) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  // Already signed in and hitting an auth page → send to the logged-in home.
+  if (AUTH_ONLY.includes(pathname) && authed) {
+    return NextResponse.redirect(new URL("/", req.url));
   }
 
-  if (CLIENT_AUTH_ONLY.includes(pathname) && token) {
+  if (CLIENT_AUTH_ONLY.includes(pathname) && authed) {
     return NextResponse.redirect(new URL("/my/dashboard", req.url));
   }
 

@@ -68,7 +68,7 @@ export default function RegisterPage() {
       });
       if (!loginRes.ok) { toast.error("Registered but login failed — please log in manually"); router.push("/login"); return; }
       toast.success("Account created! Welcome.");
-      router.push("/dashboard");
+      router.push("/");
     } catch {
       toast.error("Something went wrong, please try again");
     } finally {

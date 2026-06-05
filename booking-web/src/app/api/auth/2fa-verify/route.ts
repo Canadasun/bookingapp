@@ -62,27 +62,27 @@ export async function POST(req: NextRequest) {
   // next sign-in on this device skips the 2FA prompt.
   if (data.trustedDeviceToken) {
     res.cookies.set("booking_td", data.trustedDeviceToken, {
-      httpOnly: true, secure, sameSite: "strict", path: "/", maxAge: 60 * 60 * 24 * 30,
+      httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
     });
   }
   res.cookies.set("booking_token", data.accessToken, {
     httpOnly: true,
     secure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true,
     secure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
   res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
     httpOnly: false,
     secure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });

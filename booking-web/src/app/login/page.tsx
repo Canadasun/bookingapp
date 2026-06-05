@@ -24,7 +24,7 @@ async function readJson<T>(res: Response): Promise<T | null> {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = searchParams.get("next") ?? "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,11 +39,12 @@ function LoginForm() {
   const [rememberDevice, setRememberDevice] = useState(true); // skip 2FA on this device next time
 
   function go() {
-    // Honour an explicit ?next, otherwise route by role: admins to the platform
-    // admin area, clients to their portal, owners/staff to the dashboard.
-    if (next && next !== "/dashboard") { router.push(safeNextPath(next, "/dashboard")); return; }
     const role = getUser()?.role;
-    router.push(role === "ADMIN" ? "/admin/verifications" : role === "CLIENT" ? "/my/dashboard" : "/dashboard");
+    // Owners/staff land on the logged-in home; admins on the admin area.
+    const home = role === "ADMIN" ? "/admin/verifications" : role === "CLIENT" ? "/my/dashboard" : "/";
+    // Honour an explicit deep-link (?next) to a real page; otherwise the home.
+    if (next && next !== "/dashboard" && next !== "/") { router.push(safeNextPath(next, home)); return; }
+    router.push(home);
   }
 
   async function handleSubmit(e: React.FormEvent) {

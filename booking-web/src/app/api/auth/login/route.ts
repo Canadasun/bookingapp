@@ -75,14 +75,14 @@ export async function POST(req: NextRequest) {
     // the API reads it from the cookie — client JS never touches it (XSS-safe).
     httpOnly: true,
     secure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true,
     secure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
     httpOnly: false,
     secure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
