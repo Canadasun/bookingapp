@@ -6,7 +6,7 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   isSameMonth, addMonths, subMonths,
 } from "date-fns";
-import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
+import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, Appointment } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -287,6 +287,125 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect }: {
   );
 }
 
+// Block off personal/unbookable time for a provider. Backed by the existing
+// TimeOff model, which the availability engine already excludes from open slots.
+function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
+  bizId: string;
+  staffList: { id: string; user: { name: string } }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [staffId, setStaffId] = useState(staffList[0]?.id ?? "");
+  const today = format(new Date(), "yyyy-MM-dd");
+  const [date, setDate] = useState(today);
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("17:00");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [blocks, setBlocks] = useState<{ id: string; startsAt: string; endsAt: string; reason?: string | null }[]>([]);
+
+  const loadBlocks = useCallback(async (sid: string) => {
+    if (!bizId || !sid) return;
+    try { setBlocks(await api.staff.getTimeOffs(bizId, sid)); } catch { setBlocks([]); }
+  }, [bizId]);
+  useEffect(() => { if (staffId) loadBlocks(staffId); }, [staffId, loadBlocks]);
+
+  async function save() {
+    if (!staffId) { toast.error("Choose a provider"); return; }
+    const startsAt = new Date(`${date}T${start}`);
+    const endsAt = new Date(`${date}T${end}`);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) { toast.error("Enter a valid date and time"); return; }
+    if (endsAt <= startsAt) { toast.error("End time must be after the start time"); return; }
+    setBusy(true);
+    try {
+      await api.staff.addTimeOff(bizId, staffId, { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), reason: reason.trim() || undefined });
+      toast.success("Time blocked — those hours are now unbookable");
+      setReason("");
+      loadBlocks(staffId);
+      onSaved();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to block time"); }
+    finally { setBusy(false); }
+  }
+
+  async function remove(id: string) {
+    try {
+      await api.staff.deleteTimeOff(bizId, staffId, id);
+      setBlocks((p) => p.filter((b) => b.id !== id));
+      onSaved();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to remove"); }
+  }
+
+  const upcoming = blocks
+    .filter((b) => new Date(b.endsAt) >= new Date())
+    .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <CalendarOff className="w-4 h-4 text-violet-600" />
+            <p className="text-sm font-semibold text-gray-900">Block time</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          {staffList.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+              <select value={staffId} onChange={(e) => setStaffId(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
+                {staffList.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <Input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+            <Input placeholder="Lunch, holiday, personal…" value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+          <Button className="w-full" loading={busy} onClick={save}>Block this time</Button>
+
+          {upcoming.length > 0 && (
+            <div className="pt-2">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Upcoming blocks</p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {upcoming.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-700 truncate">
+                        {format(new Date(b.startsAt), "EEE, MMM d · HH:mm")}–{format(new Date(b.endsAt), "HH:mm")}
+                      </p>
+                      {b.reason && <p className="text-[11px] text-gray-400 truncate">{b.reason}</p>}
+                    </div>
+                    <button onClick={() => remove(b.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0" aria-label="Remove block">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AppointmentsPage() {
   const user = getUser();
   const isStaff = user?.role === "STAFF";
@@ -302,6 +421,13 @@ export default function AppointmentsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [calMonth, setCalMonth] = useState<Date>(() => new Date());
   const [selected, setSelected] = useState<Appointment | null>(null);
+  const [showBlock, setShowBlock] = useState(false);
+  const [staffList, setStaffList] = useState<{ id: string; user: { name: string } }[]>([]);
+
+  useEffect(() => {
+    if (!bizId) return;
+    api.staff.listAll(bizId).then((all) => setStaffList(all.filter((s) => s.active))).catch(() => {});
+  }, [bizId]);
 
   const load = useCallback(async () => {
     if (!bizId) {
@@ -415,10 +541,21 @@ export default function AppointmentsPage() {
           <h2 className="text-xl font-bold text-gray-900">Appointments</h2>
           <p className="text-sm text-gray-500">{appointments.length} total</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={load} loading={loading}>
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isStaff && (
+            <Button variant="outline" size="sm" onClick={() => setShowBlock(true)} className="gap-1.5">
+              <CalendarOff className="w-4 h-4" /> Block time
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={load} loading={loading}>
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </Button>
+        </div>
       </div>
+
+      {showBlock && (
+        <BlockTimeModal bizId={bizId} staffList={staffList} onClose={() => setShowBlock(false)} onSaved={load} />
+      )}
 
       {/* Tabs + filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
