@@ -249,11 +249,13 @@ const STATUS_DOT: Record<string, string> = {
 
 // Month grid view — appointments laid out on a real calendar. Click an entry to
 // open the same detail drawer used by the list/board views.
-function MonthView({ month, appts, onPrev, onNext, onToday, onSelect }: {
+function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedule }: {
   month: Date; appts: Appointment[];
   onPrev: () => void; onNext: () => void; onToday: () => void;
   onSelect: (a: Appointment) => void;
+  onReschedule: (id: string, dayKey: string) => void;
 }) {
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 0 }),
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 0 }),
@@ -284,7 +286,11 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect }: {
           const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
           const inMonth = isSameMonth(day, month);
           return (
-            <div key={k} className={cn("min-h-[96px] border-b border-r border-gray-50 p-1.5", !inMonth && "bg-gray-50/40")}>
+            <div key={k}
+              onDragOver={(e) => { e.preventDefault(); setDragOverKey(k); }}
+              onDragLeave={() => setDragOverKey((cur) => cur === k ? null : cur)}
+              onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); setDragOverKey(null); if (id) onReschedule(id, k); }}
+              className={cn("min-h-[96px] border-b border-r border-gray-50 p-1.5 transition-colors", !inMonth && "bg-gray-50/40", dragOverKey === k && "bg-violet-50 ring-1 ring-inset ring-violet-300")}>
               <div className={cn("text-xs mb-1 inline-flex items-center justify-center w-6 h-6 rounded-full",
                 isToday(day) ? "bg-violet-600 text-white font-bold" : inMonth ? "text-gray-700" : "text-gray-300")}>
                 {format(day, "d")}
@@ -292,7 +298,9 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect }: {
               <div className="space-y-0.5">
                 {list.slice(0, 3).map((a) => (
                   <button key={a.id} onClick={() => onSelect(a)}
-                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100">
+                    draggable
+                    onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
+                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100 cursor-grab active:cursor-grabbing">
                     <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
                     <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "HH:mm")} {a.client.name}</span>
                   </button>
@@ -427,11 +435,13 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
 }
 
 // Week view — seven day columns with each day's appointments in time order.
-function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect }: {
+function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect, onReschedule }: {
   weekStart: Date; appts: Appointment[];
   onPrev: () => void; onNext: () => void; onToday: () => void;
   onSelect: (a: Appointment) => void;
+  onReschedule: (id: string, dayKey: string) => void;
 }) {
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const byDay = new Map<string, Appointment[]>();
   for (const a of appts) {
@@ -455,7 +465,11 @@ function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect }: {
           const k = format(day, "yyyy-MM-dd");
           const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
           return (
-            <div key={k} className="min-h-[180px]">
+            <div key={k}
+              onDragOver={(e) => { e.preventDefault(); setDragOverKey(k); }}
+              onDragLeave={() => setDragOverKey((cur) => cur === k ? null : cur)}
+              onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); setDragOverKey(null); if (id) onReschedule(id, k); }}
+              className={cn("min-h-[180px] transition-colors", dragOverKey === k && "bg-violet-50 ring-1 ring-inset ring-violet-300")}>
               <div className={cn("px-2 py-2 text-center border-b border-gray-50", isSameDay(day, new Date()) && "bg-violet-50")}>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase">{format(day, "EEE")}</p>
                 <p className={cn("text-sm font-bold", isSameDay(day, new Date()) ? "text-violet-700" : "text-gray-700")}>{format(day, "d")}</p>
@@ -463,7 +477,9 @@ function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect }: {
               <div className="p-1.5 space-y-1">
                 {list.map((a) => (
                   <button key={a.id} onClick={() => onSelect(a)}
-                    className="block w-full text-left rounded-lg border border-gray-100 px-2 py-1.5 hover:bg-gray-50">
+                    draggable
+                    onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
+                    className="block w-full text-left rounded-lg border border-gray-100 px-2 py-1.5 hover:bg-gray-50 cursor-grab active:cursor-grabbing">
                     <span className="flex items-center gap-1">
                       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
                       <span className="text-[11px] font-semibold text-gray-700">{format(new Date(a.startsAt), "HH:mm")}</span>
@@ -601,6 +617,25 @@ export default function AppointmentsPage() {
     return list;
   }, [appointments, staffFilter, statusFilter, search]);
 
+  // Drag-and-drop reschedule: move an appointment to another day, keeping its time.
+  async function rescheduleToDay(appointmentId: string, dayKey: string) {
+    if (!bizId) return;
+    const apt = appointments.find((a) => a.id === appointmentId);
+    if (!apt) return;
+    const orig = new Date(apt.startsAt);
+    const [y, m, d] = dayKey.split("-").map(Number);
+    const next = new Date(orig);
+    next.setFullYear(y, m - 1, d);
+    if (next.getTime() === orig.getTime()) return; // dropped on the same day
+    try {
+      await api.appointments.reschedule(bizId, appointmentId, next.toISOString());
+      toast.success(`Moved ${apt.client.name} to ${format(next, "EEE, MMM d")}`);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not reschedule — that time may be unavailable");
+    }
+  }
+
   const staffGroups = useMemo(() => {
     const groups = new Map<string, Appointment[]>();
     for (const apt of filtered) {
@@ -691,6 +726,7 @@ export default function AppointmentsPage() {
           onNext={() => setCalMonth((m) => addMonths(m, 1))}
           onToday={() => setCalMonth(new Date())}
           onSelect={setSelected}
+          onReschedule={rescheduleToDay}
         />
       ) : viewMode === "week" ? (
         <WeekView
@@ -700,6 +736,7 @@ export default function AppointmentsPage() {
           onNext={() => setWeekStart((w) => addWeeks(w, 1))}
           onToday={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }))}
           onSelect={setSelected}
+          onReschedule={rescheduleToDay}
         />
       ) : filtered.length === 0 ? (
         <EmptyState title="No appointments" description="Try adjusting your filters." />

@@ -656,6 +656,9 @@ export const api = {
       req<{ groupId: string; created: { id: string; startsAt: string }[]; skipped: string[] }>(`/businesses/${businessId}/bookings/recurring`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),
+    // Owner reschedule (e.g. drag-and-drop on the calendar).
+    reschedule: (businessId: string, id: string, startsAt: string) =>
+      req<Appointment>(`/businesses/${businessId}/bookings/${id}/reschedule`, { method: "PATCH", body: JSON.stringify({ startsAt }) }),
     updateStatus: (businessId: string, id: string, status: string, cancelReason?: string, chargeCancellationFee?: boolean) =>
       req<Appointment & { cancelFee?: { charged: boolean; feeCents: number; reason?: string } }>(`/businesses/${businessId}/bookings/${id}/status`, {
         method: "PATCH",
