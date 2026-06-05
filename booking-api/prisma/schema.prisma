@@ -145,6 +145,7 @@ model Business {
   payments           Payment[]
   refunds            Refund[]
   uploads            UploadedFile[]
+  staffTasks         StaffTask[]
   subscription       Subscription?
   privacyConsents    PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
@@ -470,8 +471,30 @@ model Staff {
   availabilityRules AvailabilityRule[]
   timeOffs          TimeOff[]
   appointments      Appointment[]
+  tasks             StaffTask[]
 
   @@index([businessId])
+}
+
+// Owner-assigned tasks for staff (least-privilege: a staff member only ever sees
+// their own tasks). Staff are not part of the booking flow — this is how an owner
+// delegates work to them.
+model StaffTask {
+  id          String    @id @default(cuid())
+  businessId  String
+  staffId     String?
+  title       String
+  notes       String?
+  dueAt       DateTime?
+  status      String    @default("OPEN") // OPEN | DONE
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff    Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
+  @@index([staffId])
 }
 
 model Service {

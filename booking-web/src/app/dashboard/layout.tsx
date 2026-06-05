@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
-  MessageSquare, Menu as MenuIcon, CalendarPlus, Bell,
+  MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -31,6 +31,7 @@ const OWNER_NAV: NavItem[] = [
     children: [
       { href: "/dashboard/services",     label: "Services" },
       { href: "/dashboard/staff",        label: "Staff" },
+      { href: "/dashboard/tasks",        label: "Tasks" },
       { href: "/dashboard/offers",       label: "Offers" },
       { href: "/dashboard/waitlist",     label: "Waitlist" },
       { href: "/dashboard/reviews",      label: "Reviews" },
@@ -47,6 +48,7 @@ const OWNER_NAV: NavItem[] = [
 
 const STAFF_NAV: NavItem[] = [
   { href: "/dashboard/appointments", label: "My Appointments", icon: Calendar },
+  { href: "/dashboard/tasks",        label: "My Tasks",        icon: CheckSquare },
   { href: "/dashboard/messages",     label: "Messages",        icon: MessageSquare },
 ];
 

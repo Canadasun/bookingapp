@@ -215,6 +215,13 @@ export interface DeviceToken {
   id: string; platform: string; enabled: boolean; createdAt: string; updatedAt: string;
 }
 
+export interface TaskItem {
+  id: string; title: string; notes?: string | null; dueAt?: string | null;
+  status: "OPEN" | "DONE"; staffId?: string | null;
+  staff?: { user: { name: string } } | null;
+  createdAt: string; completedAt?: string | null;
+}
+
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -509,6 +516,16 @@ export const api = {
       if (enforceNotice === false) q.set("enforceNotice", "false");
       return req<Slot[]>(`/availability/slots?${q.toString()}`);
     },
+  },
+
+  tasks: {
+    list: (businessId: string) => req<TaskItem[]>(`/businesses/${businessId}/tasks`),
+    create: (businessId: string, data: { title: string; staffId?: string | null; notes?: string; dueAt?: string }) =>
+      req<TaskItem>(`/businesses/${businessId}/tasks`, { method: "POST", body: JSON.stringify(data) }),
+    update: (businessId: string, id: string, data: { title?: string; staffId?: string | null; notes?: string; dueAt?: string | null; status?: "OPEN" | "DONE" }) =>
+      req<TaskItem>(`/businesses/${businessId}/tasks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    remove: (businessId: string, id: string) =>
+      req<{ ok: boolean }>(`/businesses/${businessId}/tasks/${id}`, { method: "DELETE" }),
   },
 
   clients: {
