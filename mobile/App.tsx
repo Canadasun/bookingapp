@@ -1467,6 +1467,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [campaigns, setCampaigns] = useState<any[] | null>(null);
   const [giftcards, setGiftcards] = useState<any[] | null>(null);
   const [packages, setPackages] = useState<any[] | null>(null);
+  const [issuedPackages, setIssuedPackages] = useState<any[] | null>(null);
   const [tasks, setTasks]       = useState<TaskItem[] | null>(null);
   const [followups, setFollowups] = useState<ServiceDueItem[] | null>(null);
   const [appts, setAppts]       = useState<Appointment[] | null>(null); // for Reports
@@ -1475,6 +1476,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
   const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean }|null>(null);
+  const [offerEditor, setOfferEditor] = useState<{ id?:string; title:string; description:string; discount:string; expiresAt:string }|null>(null);
+  const [giftMode, setGiftMode] = useState<null|'issue'|'redeem'>(null);
+  const [giftIssue, setGiftIssue] = useState({ amount:'50', recipientName:'', recipientEmail:'', message:'' });
+  const [giftRedeem, setGiftRedeem] = useState({ code:'', amount:'' });
+  const [packageTab, setPackageTab] = useState<'products'|'issued'>('products');
+  const [packageEditor, setPackageEditor] = useState<{ name:string; serviceId:string; credits:string; price:string }|null>(null);
   const [taskEditor, setTaskEditor] = useState<{ title:string; staffId:string; dueAt:string; notes:string }|null>(null);
   const [settingsEditor, setSettingsEditor] = useState<{ name:string; email:string; phone:string; address:string; minNoticeMinutes:string; maxAdvanceDays:string; cancellationWindowHours:string; requireDeposit:boolean; depositPercent:string }|null>(null);
   const [timeOffEditor, setTimeOffEditor] = useState<{ staffId:string; name:string; startsAt:string; endsAt:string; reason:string }|null>(null);
@@ -1559,6 +1566,190 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     } catch(e) {
       Alert.alert('Could not save service', e instanceof Error ? e.message : 'Please try again.');
     }
+  }
+
+  function openOfferEditor(of?: any) {
+    setOfferEditor(of ? {
+      id: of.id,
+      title: of.title ?? '',
+      description: of.description ?? '',
+      discount: of.discount ?? '',
+      expiresAt: of.expiresAt ? String(of.expiresAt).slice(0, 16).replace('T', ' ') : '',
+    } : { title:'', description:'', discount:'', expiresAt:'' });
+  }
+
+  async function saveOffer() {
+    if (!offerEditor?.title.trim() || !offerEditor.description.trim()) {
+      Alert.alert('Check offer', 'Title and description are required.');
+      return;
+    }
+    try {
+      const payload: Record<string, unknown> = {
+        title: offerEditor.title.trim(),
+        description: offerEditor.description.trim(),
+        discount: offerEditor.discount.trim() || undefined,
+        active: true,
+      };
+      if (offerEditor.expiresAt.trim()) {
+        payload.expiresAt = new Date(offerEditor.expiresAt.trim().replace(' ', 'T')).toISOString();
+      }
+      if (offerEditor.id) {
+        await api(`/businesses/${bizId()}/offers/${offerEditor.id}`, { method:'PATCH', body: JSON.stringify(payload) });
+      } else {
+        await api(`/businesses/${bizId()}/offers`, { method:'POST', body: JSON.stringify(payload) });
+      }
+      setOfferEditor(null);
+      setOffers(await api<any[]>(`/businesses/${bizId()}/offers`));
+    } catch(e) {
+      Alert.alert('Could not save offer', e instanceof Error ? e.message : 'Use a valid expiry date like 2026-06-05 14:00.');
+    }
+  }
+
+  async function removeOffer(of: any) {
+    Alert.alert('Delete offer', `Remove "${of.title}"?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/offers/${of.id}`, { method:'DELETE' });
+          setOffers(await api<any[]>(`/businesses/${bizId()}/offers`));
+        } catch(e) {
+          Alert.alert('Could not delete offer', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  async function issueGiftCard() {
+    const dollars = Number.parseFloat(giftIssue.amount);
+    if (!Number.isFinite(dollars) || dollars < 1) { Alert.alert('Check amount', 'Enter at least $1.'); return; }
+    try {
+      const card = await api<any>(`/businesses/${bizId()}/gift-cards`, {
+        method:'POST',
+        body: JSON.stringify({
+          amountCents: Math.round(dollars * 100),
+          recipientName: giftIssue.recipientName.trim() || undefined,
+          recipientEmail: giftIssue.recipientEmail.trim() || undefined,
+          message: giftIssue.message.trim() || undefined,
+        }),
+      });
+      setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`));
+      setGiftMode(null);
+      setGiftIssue({ amount:'50', recipientName:'', recipientEmail:'', message:'' });
+      Alert.alert('Gift card issued', card?.code ? `Code: ${card.code}` : 'Gift card was created.');
+    } catch(e) {
+      Alert.alert('Could not issue gift card', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function redeemGiftCard() {
+    const dollars = Number.parseFloat(giftRedeem.amount);
+    if (!giftRedeem.code.trim()) { Alert.alert('Code required', 'Enter a gift card code.'); return; }
+    if (!Number.isFinite(dollars) || dollars <= 0) { Alert.alert('Check amount', 'Enter an amount to redeem.'); return; }
+    try {
+      const r = await api<any>(`/businesses/${bizId()}/gift-cards/redeem`, {
+        method:'POST',
+        body: JSON.stringify({ code: giftRedeem.code.trim(), amountCents: Math.round(dollars * 100) }),
+      });
+      setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`));
+      setGiftMode(null);
+      setGiftRedeem({ code:'', amount:'' });
+      Alert.alert('Gift card redeemed', `$${((r?.redeemedCents ?? 0)/100).toFixed(2)} used. $${((r?.balanceCents ?? 0)/100).toFixed(2)} left.`);
+    } catch(e) {
+      Alert.alert('Could not redeem gift card', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function voidGiftCard(g: any) {
+    Alert.alert('Void gift card', `Void ${g.code}? Remaining balance can no longer be used.`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Void', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/gift-cards/${g.id}/void`, { method:'POST' });
+          setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`));
+        } catch(e) {
+          Alert.alert('Could not void gift card', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  async function loadPackages() {
+    const [productRows, issuedRows, serviceRows] = await Promise.all([
+      api<any[]>(`/businesses/${bizId()}/packages`),
+      api<any[]>(`/businesses/${bizId()}/packages/issued/list`),
+      api<Service[]>(`/businesses/${bizId()}/services`).catch(() => services ?? []),
+    ]);
+    setPackages(productRows);
+    setIssuedPackages(issuedRows);
+    setServices(serviceRows);
+  }
+
+  function packageServiceName(serviceId?: string | null) {
+    return (services ?? []).find(sv => sv.id === serviceId)?.name ?? 'Any service';
+  }
+
+  async function savePackageProduct() {
+    if (!packageEditor?.name.trim()) { Alert.alert('Package name required', 'Name the package.'); return; }
+    const credits = Number.parseInt(packageEditor.credits, 10);
+    const priceCents = Math.round(Number.parseFloat(packageEditor.price || '0') * 100);
+    if (!Number.isInteger(credits) || credits < 1) { Alert.alert('Check credits', 'Credits must be at least 1.'); return; }
+    if (!Number.isFinite(priceCents) || priceCents < 0) { Alert.alert('Check price', 'Enter a valid price.'); return; }
+    try {
+      await api(`/businesses/${bizId()}/packages`, {
+        method:'POST',
+        body: JSON.stringify({
+          name: packageEditor.name.trim(),
+          serviceId: packageEditor.serviceId || undefined,
+          credits,
+          priceCents,
+        }),
+      });
+      setPackageEditor(null);
+      await loadPackages();
+    } catch(e) {
+      Alert.alert('Could not create package', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function removePackageProduct(p: any) {
+    Alert.alert('Delete package', `Delete "${p.name}"? Already-issued packages are kept.`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/packages/${p.id}`, { method:'DELETE' });
+          await loadPackages();
+        } catch(e) {
+          Alert.alert('Could not delete package', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  async function redeemIssuedPackage(cp: any) {
+    try {
+      const r = await api<any>(`/businesses/${bizId()}/packages/issued/${cp.id}/redeem`, {
+        method:'POST',
+        body: JSON.stringify({}),
+      });
+      await loadPackages();
+      Alert.alert('Credit used', `${r?.creditsRemaining ?? 0} credit${(r?.creditsRemaining ?? 0) === 1 ? '' : 's'} left.`);
+    } catch(e) {
+      Alert.alert('Could not redeem credit', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function voidIssuedPackage(cp: any) {
+    Alert.alert('Void package', `Void ${cp.client?.name ?? 'client'}'s "${cp.name}"?`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Void', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/packages/issued/${cp.id}/void`, { method:'POST' });
+          await loadPackages();
+        } catch(e) {
+          Alert.alert('Could not void package', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
   }
 
   async function loadTasks() {
@@ -1835,7 +2026,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${bizId()}/reviews`)); }
       else if (v === 'marketing' && !campaigns){ setLoading(true); setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`)); }
       else if (v === 'giftcards' && !giftcards){ setLoading(true); setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`)); }
-      else if (v === 'packages' && !packages){ setLoading(true); setPackages(await api<any[]>(`/businesses/${bizId()}/packages`)); }
+      else if (v === 'packages' && (!packages || !issuedPackages)){ setLoading(true); await loadPackages(); }
       else if (v === 'tasks' && !tasks){ setLoading(true); await loadTasks(); }
       else if (v === 'followups' && !followups){ setLoading(true); await loadFollowups(); }
       else if ((v === 'settings' || v === 'booking' || v === 'subscriptions' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
@@ -2083,14 +2274,26 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'offers') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Offers"/>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <Text style={s.headerTitle}>Offers</Text>
+        <TouchableOpacity onPress={()=>openOfferEditor()}>
+          <Ionicons name="add" size={24} color={BRAND}/>
+        </TouchableOpacity>
+      </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(offers ?? []).map(of => (
             <View key={of.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor:'#10B981' }]}>
               <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-                <Text style={ms.rowTitle}>{of.title}</Text>
-                {!!of.discount && <View style={[ms.dealChip]}><Text style={ms.dealChipText}>{of.discount}</Text></View>}
+                <View style={{ flex:1, paddingRight:10 }}>
+                  <Text style={ms.rowTitle}>{of.title}</Text>
+                  {!!of.discount && <View style={[ms.dealChip,{ alignSelf:'flex-start', marginTop:5 }]}><Text style={ms.dealChipText}>{of.discount}</Text></View>}
+                </View>
+                <View style={{ flexDirection:'row', gap:8 }}>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>openOfferEditor(of)}><Ionicons name="create-outline" size={16} color={BRAND}/></TouchableOpacity>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>removeOffer(of)}><Ionicons name="trash-outline" size={16} color="#DC2626"/></TouchableOpacity>
+                </View>
               </View>
               {!!of.description && <Text style={ms.rowMeta}>{of.description}</Text>}
               {!!of.expiresAt && <Text style={[ms.rowMeta,{ color:GRAY_400 }]}>Expires {new Date(of.expiresAt).toLocaleDateString()}</Text>}
@@ -2099,6 +2302,27 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           {offers && offers.length===0 && <Text style={ms.empty}>No active offers.</Text>}
         </ScrollView>
       )}
+      <Modal visible={!!offerEditor} animationType="slide" onRequestClose={()=>setOfferEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setOfferEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>{offerEditor?.id ? 'Edit offer' : 'New offer'}</Text>
+          </View>
+          {offerEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.fieldLabel}>Title</Text>
+              <TextInput style={s.input} value={offerEditor.title} placeholder="Summer special" placeholderTextColor={GRAY_400} onChangeText={title=>setOfferEditor({...offerEditor,title})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Description</Text>
+              <TextInput style={[s.input,{ minHeight:86, textAlignVertical:'top' }]} multiline value={offerEditor.description} placeholder="What's included?" placeholderTextColor={GRAY_400} onChangeText={description=>setOfferEditor({...offerEditor,description})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Discount label</Text>
+              <TextInput style={s.input} value={offerEditor.discount} placeholder="20% off" placeholderTextColor={GRAY_400} onChangeText={discount=>setOfferEditor({...offerEditor,discount})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Expires</Text>
+              <TextInput style={s.input} value={offerEditor.expiresAt} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400} onChangeText={expiresAt=>setOfferEditor({...offerEditor,expiresAt})}/>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveOffer}><Text style={s.btnPrimaryText}>Save offer</Text></TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
@@ -2194,7 +2418,14 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'giftcards') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Gift cards"/>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <Text style={s.headerTitle}>Gift cards</Text>
+        <View style={{ flexDirection:'row', gap:12 }}>
+          <TouchableOpacity onPress={()=>setGiftMode('redeem')}><Ionicons name="ticket-outline" size={23} color={BRAND}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>setGiftMode('issue')}><Ionicons name="add" size={24} color={BRAND}/></TouchableOpacity>
+        </View>
+      </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(giftcards ?? []).map(g => (
@@ -2212,32 +2443,150 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>
                 {g.recipientName ? `For ${g.recipientName} · ` : ''}of ${(g.initialCents/100).toFixed(2)} issued
               </Text>
+              {g.status === 'ACTIVE' && (
+                <TouchableOpacity style={[ms.smallAction,{ alignSelf:'flex-start', marginTop:10 }]} onPress={()=>voidGiftCard(g)}>
+                  <Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Void</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))}
           {giftcards && giftcards.length===0 && <Text style={ms.empty}>No gift cards issued yet.</Text>}
         </ScrollView>
       )}
+      <Modal visible={giftMode === 'issue'} animationType="slide" onRequestClose={()=>setGiftMode(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setGiftMode(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Issue gift card</Text>
+          </View>
+          <ScrollView contentContainerStyle={s.listContent}>
+            <Text style={s.fieldLabel}>Amount</Text>
+            <TextInput style={s.input} value={giftIssue.amount} keyboardType="decimal-pad" onChangeText={amount=>setGiftIssue({...giftIssue,amount})}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>Recipient name</Text>
+            <TextInput style={s.input} value={giftIssue.recipientName} placeholder="Optional" placeholderTextColor={GRAY_400} onChangeText={recipientName=>setGiftIssue({...giftIssue,recipientName})}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>Recipient email</Text>
+            <TextInput style={s.input} value={giftIssue.recipientEmail} keyboardType="email-address" autoCapitalize="none" placeholder="Optional" placeholderTextColor={GRAY_400} onChangeText={recipientEmail=>setGiftIssue({...giftIssue,recipientEmail})}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>Message</Text>
+            <TextInput style={[s.input,{ minHeight:86, textAlignVertical:'top' }]} multiline value={giftIssue.message} placeholder="Optional" placeholderTextColor={GRAY_400} onChangeText={message=>setGiftIssue({...giftIssue,message})}/>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={issueGiftCard}><Text style={s.btnPrimaryText}>Issue gift card</Text></TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+      <Modal visible={giftMode === 'redeem'} animationType="slide" onRequestClose={()=>setGiftMode(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setGiftMode(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Redeem gift card</Text>
+          </View>
+          <ScrollView contentContainerStyle={s.listContent}>
+            <Text style={s.fieldLabel}>Code</Text>
+            <TextInput style={s.input} value={giftRedeem.code} autoCapitalize="characters" placeholder="GIFT-XXXX" placeholderTextColor={GRAY_400} onChangeText={code=>setGiftRedeem({...giftRedeem,code:code.toUpperCase()})}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>Amount</Text>
+            <TextInput style={s.input} value={giftRedeem.amount} keyboardType="decimal-pad" onChangeText={amount=>setGiftRedeem({...giftRedeem,amount})}/>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={redeemGiftCard}><Text style={s.btnPrimaryText}>Redeem</Text></TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
   if (view === 'packages') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Packages"/>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <Text style={s.headerTitle}>Packages</Text>
+        {packageTab === 'products' ? (
+          <TouchableOpacity onPress={()=>setPackageEditor({ name:'', serviceId:'', credits:'5', price:'' })}>
+            <Ionicons name="add" size={24} color={BRAND}/>
+          </TouchableOpacity>
+        ) : <View style={{ width:24 }}/>}
+      </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
-          {(packages ?? []).map(p => (
-            <View key={p.id} style={ms.row}>
-              <View style={[ms.dot,{ backgroundColor: p.active ? BRAND : GRAY_200 }]}/>
-              <View style={{ flex:1 }}>
-                <Text style={ms.rowTitle}>{p.name}</Text>
-                <Text style={ms.rowMeta}>{p.credits} credit{p.credits===1?'':'s'}{p.active ? '' : ' · inactive'}</Text>
-              </View>
-              <PriceTag cents={p.priceCents}/>
-            </View>
-          ))}
-          {packages && packages.length===0 && <Text style={ms.empty}>No packages yet. Create one on the web dashboard.</Text>}
+          <View style={[ms.card,{ flexDirection:'row', gap:8 }]}>
+            {(['products','issued'] as const).map(tab => (
+              <TouchableOpacity key={tab} style={[ms.methodChip, packageTab === tab && ms.methodChipOn]} onPress={()=>setPackageTab(tab)}>
+                <Text style={[ms.methodChipText, packageTab === tab && { color:BRAND }]}>{tab === 'products' ? 'Products' : 'Issued'}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {packageTab === 'products' ? (
+            <>
+              {(packages ?? []).map(p => (
+                <View key={p.id} style={ms.row}>
+                  <View style={[ms.dot,{ backgroundColor: p.active ? BRAND : GRAY_200 }]}/>
+                  <View style={{ flex:1 }}>
+                    <Text style={ms.rowTitle}>{p.name}</Text>
+                    <Text style={ms.rowMeta}>{p.credits} credit{p.credits===1?'':'s'} · {packageServiceName(p.serviceId)}{p.active ? '' : ' · inactive'}</Text>
+                  </View>
+                  <View style={{ alignItems:'flex-end' }}>
+                    <PriceTag cents={p.priceCents}/>
+                    <TouchableOpacity style={{ marginTop:6 }} onPress={()=>removePackageProduct(p)}>
+                      <Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              {packages && packages.length===0 && <Text style={ms.empty}>No packages yet.</Text>}
+            </>
+          ) : (
+            <>
+              {(issuedPackages ?? []).map(cp => (
+                <View key={cp.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor: cp.status === 'ACTIVE' ? '#10B981' : GRAY_200 }]}>
+                  <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+                    <View style={{ flex:1 }}>
+                      <Text style={ms.rowTitle}>{cp.client?.name ?? 'Client'}</Text>
+                      <Text style={ms.rowMeta}>{cp.name} · {packageServiceName(cp.serviceId)}</Text>
+                      <Text style={[ms.rowMeta,{ color:GRAY_400 }]}>{cp.status} · {cp.creditsRemaining}/{cp.creditsTotal} credits left</Text>
+                    </View>
+                    <Text style={{ fontSize:22, fontWeight:'800', color:GRAY_900 }}>{cp.creditsRemaining}</Text>
+                  </View>
+                  {cp.status === 'ACTIVE' && (
+                    <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
+                      <TouchableOpacity style={ms.smallAction} onPress={()=>redeemIssuedPackage(cp)}><Text style={ms.smallActionText}>Use credit</Text></TouchableOpacity>
+                      <TouchableOpacity style={ms.smallAction} onPress={()=>voidIssuedPackage(cp)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Void</Text></TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              ))}
+              {issuedPackages && issuedPackages.length===0 && <Text style={ms.empty}>No issued packages yet.</Text>}
+            </>
+          )}
         </ScrollView>
       )}
+      <Modal visible={!!packageEditor} animationType="slide" onRequestClose={()=>setPackageEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setPackageEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>New package</Text>
+          </View>
+          {packageEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.fieldLabel}>Name</Text>
+              <TextInput style={s.input} value={packageEditor.name} placeholder="5x Haircut" placeholderTextColor={GRAY_400} onChangeText={name=>setPackageEditor({...packageEditor,name})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Credits</Text>
+              <TextInput style={s.input} value={packageEditor.credits} keyboardType="number-pad" onChangeText={credits=>setPackageEditor({...packageEditor,credits})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Price</Text>
+              <TextInput style={s.input} value={packageEditor.price} keyboardType="decimal-pad" placeholder="200.00" placeholderTextColor={GRAY_400} onChangeText={price=>setPackageEditor({...packageEditor,price})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Service</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:8 }}>
+                <TouchableOpacity style={[dst.chip, !packageEditor.serviceId && dst.chipOn, { marginRight:8 }]} onPress={()=>setPackageEditor({...packageEditor,serviceId:''})}>
+                  <Text style={[dst.chipDow, !packageEditor.serviceId && dst.chipTextOn]}>Any</Text>
+                </TouchableOpacity>
+                {(services ?? []).map(sv => {
+                  const selected = packageEditor.serviceId === sv.id;
+                  return (
+                    <TouchableOpacity key={sv.id} style={[dst.chip, selected && dst.chipOn, { marginRight:8 }]} onPress={()=>setPackageEditor({...packageEditor,serviceId:sv.id})}>
+                      <Text style={[dst.chipDow, selected && dst.chipTextOn]}>{sv.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={savePackageProduct}><Text style={s.btnPrimaryText}>Create package</Text></TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 
