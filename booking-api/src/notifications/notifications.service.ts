@@ -45,6 +45,15 @@ export class NotificationsService implements OnModuleInit {
     }
   }
 
+  // Confirm a subscription plan change (upgrade/downgrade/cancel) to the owner(s).
+  async sendPlanChanged(businessId: string, plan: string) {
+    await this.queue.add('plan-changed', { businessId, plan }, {
+      jobId: `plan-${businessId}-${Date.now()}`,
+      removeOnComplete: true,
+      attempts: 1,
+    });
+  }
+
   // Invite a lapsed/due client to book their next visit (reuses the win-back email).
   async sendRebookNudge(clientId: string) {
     await this.queue.add('rebook-reminder', { clientId }, {

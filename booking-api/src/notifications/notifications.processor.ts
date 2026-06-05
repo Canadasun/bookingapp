@@ -212,6 +212,40 @@ export class NotificationProcessor extends WorkerHost {
     }
   }
 
+  // Email + in-app confirmation when a business's subscription plan changes.
+  private async sendPlanChangedEmail(businessId: string, plan: string) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'plan-changed';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    if (!owners.length) return;
+    const perks: Record<string, string> = {
+      BASIC: 'Deposits, card-on-file, client messaging replies, win-back emails and recurring follow-ups are now unlocked.',
+      PRO: 'Everything in Basic, plus automatic no-show & late-cancellation charging, SMS reminders, and 2-way texting with your booked clients.',
+      FREE: 'Your subscription was cancelled — your account is back on the Free plan. You can re-subscribe any time.',
+    };
+    const title = plan === 'FREE' ? 'Your plan was cancelled' : `You're now on the ${plan} plan 🎉`;
+    const body = perks[plan] ?? `Your plan is now ${plan}.`;
+    for (const o of owners) {
+      await this.email.send({
+        to: o.email,
+        subject: title,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Open your dashboard →</a>
+`),
+      }).catch(() => {});
+    }
+    await this.notifyOwners(businessId, {
+      kind: 'SYSTEM',
+      title,
+      body,
+      linkUrl: '/dashboard/settings',
+    }).catch(() => {});
+  }
+
   // In-app inbox notification to a business's owner(s). Best-effort.
   private async notifyOwners(
     businessId: string,
@@ -313,7 +347,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string }>) {
+  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
@@ -535,6 +569,12 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     // Daily service-due scan → flips due trackers to DUE + prompts the owner.
     if (job.name === 'service-due-scan') {
       await this.runServiceDueScan();
+      return;
+    }
+
+    // Subscription plan changed → email + in-app confirmation to the owner.
+    if (job.name === 'plan-changed') {
+      await this.sendPlanChangedEmail(String(job.data.businessId ?? ''), String(job.data.plan ?? 'FREE'));
       return;
     }
 

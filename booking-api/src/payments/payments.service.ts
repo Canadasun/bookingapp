@@ -407,8 +407,13 @@ export class PaymentsService {
       currentPeriodEnd: periodEnd,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
     };
+    // Notify the owner when their plan actually changes (upgrade/downgrade/cancel).
+    const prev = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
     await this.prisma.subscription.upsert({ where: { businessId }, create: { businessId, ...data }, update: data });
     await this.prisma.business.update({ where: { id: businessId }, data: { plan: effectivePlan, planExpiresAt: periodEnd } });
+    if (prev && prev.plan !== effectivePlan) {
+      await this.notifications.sendPlanChanged(businessId, effectivePlan).catch(() => {});
+    }
   }
 
   private async ensureBusinessCustomer(business: { id: string; name: string; email: string }): Promise<string> {
@@ -436,13 +441,32 @@ export class PaymentsService {
     // Already subscribed? Switch the plan IN PLACE with proration instead of a new
     // checkout — Stripe credits the unused time on the old plan and immediately
     // invoices only the difference (e.g. Basic→Pro mid-cycle ≈ +$10, not $20).
+    // We look up the live subscription from our DB first, then fall back to Stripe
+    // directly (in case our DB is stale, e.g. a missed webhook) so we NEVER create
+    // a second active subscription on the same customer.
     const existing = await this.prisma.subscription.findUnique({ where: { businessId } });
-    if (existing?.stripeSubscriptionId && ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(existing.status ?? '')) {
+    let activeSubId: string | null =
+      existing?.stripeSubscriptionId && ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(existing.status ?? '')
+        ? existing.stripeSubscriptionId
+        : null;
+    if (!activeSubId) {
       try {
-        const sub = await this.getStripe().subscriptions.retrieve(existing.stripeSubscriptionId);
+        const subs = await this.getStripe().subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+        activeSubId = subs.data[0]?.id ?? null;
+      } catch { /* ignore */ }
+    }
+    if (activeSubId) {
+      try {
+        const sub = await this.getStripe().subscriptions.retrieve(activeSubId);
         const itemId = sub.items.data[0]?.id;
-        if (sub.status !== 'canceled' && itemId && sub.items.data[0]?.price?.id !== priceId) {
-          const updated = await this.getStripe().subscriptions.update(existing.stripeSubscriptionId, {
+        const currentPrice = sub.items.data[0]?.price?.id;
+        if (sub.status !== 'canceled' && itemId) {
+          if (currentPrice === priceId) {
+            // Already on this plan — just reconcile our records.
+            await this.applySubscription(businessId, sub);
+            return { updated: true as const, plan };
+          }
+          const updated = await this.getStripe().subscriptions.update(activeSubId, {
             items: [{ id: itemId, price: priceId }],
             proration_behavior: 'always_invoice', // charge/credit the difference now
             metadata: { businessId, plan },
