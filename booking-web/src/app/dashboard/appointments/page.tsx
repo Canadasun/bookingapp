@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { format, isToday, isThisWeek } from "date-fns";
-import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign } from "lucide-react";
+import {
+  format, isToday, isThisWeek,
+  startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
+  isSameMonth, addMonths, subMonths,
+} from "date-fns";
+import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { api, Appointment } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -15,7 +19,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatPrice, cn } from "@/lib/utils";
 
 type Tab = "today" | "week" | "all";
-type ViewMode = "list" | "staff";
+type ViewMode = "list" | "staff" | "calendar";
 
 // Turn the API's cancellation-fee reason code into something an owner can read.
 function feeReasonText(reason: string): string {
@@ -218,6 +222,71 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
   );
 }
 
+const STATUS_DOT: Record<string, string> = {
+  PENDING: "bg-amber-400", CONFIRMED: "bg-emerald-500", COMPLETED: "bg-violet-500",
+  CANCELLED: "bg-gray-300", NO_SHOW: "bg-red-400",
+};
+
+// Month grid view — appointments laid out on a real calendar. Click an entry to
+// open the same detail drawer used by the list/board views.
+function MonthView({ month, appts, onPrev, onNext, onToday, onSelect }: {
+  month: Date; appts: Appointment[];
+  onPrev: () => void; onNext: () => void; onToday: () => void;
+  onSelect: (a: Appointment) => void;
+}) {
+  const days = eachDayOfInterval({
+    start: startOfWeek(startOfMonth(month), { weekStartsOn: 0 }),
+    end: endOfWeek(endOfMonth(month), { weekStartsOn: 0 }),
+  });
+  const byDay = new Map<string, Appointment[]>();
+  for (const a of appts) {
+    const k = format(new Date(a.startsAt), "yyyy-MM-dd");
+    (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(a);
+  }
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <p className="text-sm font-semibold text-gray-900">{format(month, "MMMM yyyy")}</p>
+        <div className="flex items-center gap-1">
+          <button onClick={onToday} className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">Today</button>
+          <button onClick={onPrev} aria-label="Previous month" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={onNext} aria-label="Next month" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-100">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-400">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {days.map((day) => {
+          const k = format(day, "yyyy-MM-dd");
+          const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+          const inMonth = isSameMonth(day, month);
+          return (
+            <div key={k} className={cn("min-h-[96px] border-b border-r border-gray-50 p-1.5", !inMonth && "bg-gray-50/40")}>
+              <div className={cn("text-xs mb-1 inline-flex items-center justify-center w-6 h-6 rounded-full",
+                isToday(day) ? "bg-violet-600 text-white font-bold" : inMonth ? "text-gray-700" : "text-gray-300")}>
+                {format(day, "d")}
+              </div>
+              <div className="space-y-0.5">
+                {list.slice(0, 3).map((a) => (
+                  <button key={a.id} onClick={() => onSelect(a)}
+                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100">
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
+                    <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "HH:mm")} {a.client.name}</span>
+                  </button>
+                ))}
+                {list.length > 3 && <p className="px-1 text-[10px] text-gray-400">+{list.length - 3} more</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function AppointmentsPage() {
   const user = getUser();
   const isStaff = user?.role === "STAFF";
@@ -231,6 +300,7 @@ export default function AppointmentsPage() {
   const [staffFilter, setStaffFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [calMonth, setCalMonth] = useState<Date>(() => new Date());
   const [selected, setSelected] = useState<Appointment | null>(null);
 
   const load = useCallback(async () => {
@@ -312,6 +382,23 @@ export default function AppointmentsPage() {
     return [...list].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   }, [appointments, tab, staffFilter, statusFilter, search]);
 
+  // The month grid spans whole weeks, so it ignores the today/week tab and only
+  // honours the staff / status / search filters.
+  const calendarAppts = useMemo(() => {
+    let list = appointments;
+    if (staffFilter) list = list.filter((a) => a.staff.user.name === staffFilter);
+    if (statusFilter) list = list.filter((a) => a.status === statusFilter);
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((a) =>
+        a.client.name.toLowerCase().includes(q) ||
+        a.client.email.toLowerCase().includes(q) ||
+        (a.client.phone ?? "").includes(q)
+      );
+    }
+    return list;
+  }, [appointments, staffFilter, statusFilter, search]);
+
   const staffGroups = useMemo(() => {
     const groups = new Map<string, Appointment[]>();
     for (const apt of filtered) {
@@ -366,11 +453,11 @@ export default function AppointmentsPage() {
         </select>
 
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-          {(["list","staff"] as ViewMode[]).map((v) => (
+          {(["list","staff","calendar"] as ViewMode[]).map((v) => (
             <button key={v} onClick={() => setViewMode(v)}
               className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                 viewMode === v ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}>
-              {v === "list" ? "List" : "Staff board"}
+              {v === "list" ? "List" : v === "staff" ? "Staff board" : "Month"}
             </button>
           ))}
         </div>
@@ -383,7 +470,16 @@ export default function AppointmentsPage() {
         </div>
       )}
 
-      {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
+      {loading ? <LoadingSpinner /> : viewMode === "calendar" ? (
+        <MonthView
+          month={calMonth}
+          appts={calendarAppts}
+          onPrev={() => setCalMonth((m) => subMonths(m, 1))}
+          onNext={() => setCalMonth((m) => addMonths(m, 1))}
+          onToday={() => setCalMonth(new Date())}
+          onSelect={setSelected}
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState title="No appointments" description="Try adjusting your filters." />
       ) : viewMode === "staff" ? (
         <div className="grid gap-4 lg:grid-cols-3">
