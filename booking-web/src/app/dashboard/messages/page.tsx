@@ -65,11 +65,14 @@ export default function MessagesPage() {
     }
     setSending(true);
     try {
-      await api.messages.reply(bizId, selected.clientId, reply.trim());
+      const res = await api.messages.reply(bizId, selected.clientId, reply.trim());
       setReply("");
       const data = await api.messages.thread(bizId, selected.clientId);
       setMsgs(data);
       setTimeout(() => scrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 50);
+      // Surface how the reply was delivered (in-app always; SMS for Basic+ when eligible).
+      if (res?.sms?.sent) toast.success("Sent — also texted to the client");
+      else if (res?.sms?.reason === "client_must_text_first") toast.success("Sent in-app — they'll get a text once they message you first");
     } catch { toast.error("Failed to send"); }
     finally { setSending(false); }
   }

@@ -628,7 +628,7 @@ export const api = {
       return req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`, { method: "POST", body: JSON.stringify({ content }) }, token === undefined ? undefined : null);
     },
     reply: (businessId: string, clientId: string, content: string) =>
-      req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages/reply`, { method: "POST", body: JSON.stringify({ content }) }),
+      req<{ id: string; sms?: { sent: boolean; reason?: string } }>(`/businesses/${businessId}/clients/${clientId}/messages/reply`, { method: "POST", body: JSON.stringify({ content }) }),
     markRead: (businessId: string, clientId: string) =>
       req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages/read`, { method: "PATCH" }),
   },

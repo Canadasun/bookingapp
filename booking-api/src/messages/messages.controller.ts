@@ -1,5 +1,8 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, Headers, HttpCode, Header } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const twilio = require('twilio') as typeof import('twilio');
 import { z } from 'zod';
 import { MessagesService } from './messages.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -88,13 +91,17 @@ export class MessagesController {
       throw new ForbiddenException('You do not have access to this business');
     }
 
-    // Check plan — only PAID can reply (unlocked for all during testing).
+    // Free: receive only (no replies). Basic/Pro can reply in-app, and — for
+    // clients who texted first (Basic) or who have a booking (Pro) — by SMS too.
     const biz = await this.svc.getBusiness(businessId);
-    if (effectivePlan(biz?.plan) === 'FREE') {
-      throw new ForbiddenException('Messaging is a paid-plan feature. Please upgrade to BASIC or PRO.');
+    const tier = effectivePlan(biz?.plan);
+    if (tier === 'FREE') {
+      throw new ForbiddenException('Replying to clients is a paid-plan feature. Please upgrade to Basic or Pro.');
     }
 
-    return this.svc.send(businessId, clientId, dto.content, false);
+    const msg = await this.svc.send(businessId, clientId, dto.content, false);
+    const sms = await this.svc.maybeSendReplySms(businessId, clientId, dto.content, tier as 'BASIC' | 'PRO');
+    return { ...msg, sms };
   }
 
   // Protected — mark messages as read
@@ -131,5 +138,34 @@ export class BusinessMessagesController {
       throw new ForbiddenException('You do not have access to this business');
     }
     return this.svc.getBusinessThreads(businessId, unread === 'true');
+  }
+}
+
+// ── Public Twilio inbound-SMS webhook ────────────────────────────────────────
+// Configure this URL on your Twilio number's "A message comes in" webhook:
+//   https://<api-domain>/api/messages/sms/inbound  (HTTP POST)
+@ApiTags('messages')
+@Controller('messages/sms')
+export class SmsWebhookController {
+  constructor(private svc: MessagesService) {}
+
+  @Post('inbound')
+  @HttpCode(200)
+  @Header('Content-Type', 'text/xml')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  async inbound(@Headers('x-twilio-signature') sig: string, @Body() body: Record<string, string>) {
+    const authToken = process.env.TWILIO_AUTH_TOKEN ?? process.env.TWILIO_API_CLIENT_SECRET;
+    // Verify the request really came from Twilio (skipped only in stub/dev where
+    // no real token is set). The URL must match the configured webhook exactly.
+    if (authToken && !authToken.startsWith('AC_placeholder')) {
+      const base = (process.env.API_PUBLIC_URL ?? 'https://bookingapp-production-32f8.up.railway.app').replace(/\/+$/, '').replace(/\/api$/, '');
+      const url = `${base}/api/messages/sms/inbound`;
+      if (!twilio.validateRequest(authToken, sig ?? '', url, body ?? {})) {
+        throw new ForbiddenException('Invalid Twilio signature');
+      }
+    }
+    await this.svc.handleInboundSms(String(body?.From ?? ''), String(body?.Body ?? ''));
+    // Empty TwiML — we handle the reply in-app, so Twilio shouldn't auto-respond.
+    return '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
   }
 }
