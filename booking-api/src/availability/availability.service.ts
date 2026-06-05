@@ -143,12 +143,13 @@ export class AvailabilityService {
   private generateDaySlots(
     localDay: Date,
     rule: AvailabilityRule,
-    service: { durationMinutes: number; bufferBeforeMin: number; bufferAfterMin: number },
+    service: { id: string; durationMinutes: number; bufferBeforeMin: number; bufferAfterMin: number; capacity?: number },
     appointments: Appointment[],
     timeOffs: TimeOff[],
     businessTimezone: string,
     displayTimezone: string,
   ): TimeSlot[] {
+    const capacity = Math.max(1, service.capacity ?? 1);
     const dateStr = format(localDay, 'yyyy-MM-dd');
 
     // Build window in UTC from the local times
@@ -173,9 +174,16 @@ export class AvailabilityService {
         break;
       }
 
-      const blockedByAppointment = appointments.some(
+      // Group/class services: clients join the same instance (same service + exact
+      // start) until capacity is full. Overlaps with anything else still block.
+      const overlapping = appointments.filter(
         (apt) => occupiedStart < apt.endsAt && occupiedEnd > apt.startsAt,
       );
+      const sameInstance = overlapping.filter(
+        (apt) => apt.serviceId === service.id && +apt.startsAt === +candidateStart,
+      );
+      const otherOverlap = overlapping.length > sameInstance.length;
+      const blockedByAppointment = otherOverlap || sameInstance.length >= capacity;
 
       const blockedByTimeOff = timeOffs.some(
         (to) => occupiedStart < to.endsAt && occupiedEnd > to.startsAt,

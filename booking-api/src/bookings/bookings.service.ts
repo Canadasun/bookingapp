@@ -181,9 +181,11 @@ export class BookingsService {
             FOR UPDATE
           `);
 
-          // Re-check availability inside the transaction
+          // Re-check availability inside the transaction. Group/class services
+          // (capacity > 1) allow multiple clients on the same instance (same
+          // service + exact start) until full; any other overlap still conflicts.
           if (!opts.overrideConflicts) {
-            const conflict = await tx.appointment.findFirst({
+            const overlapping = await tx.appointment.findMany({
               where: {
                 businessId,
                 staffId: dto.staffId,
@@ -191,10 +193,17 @@ export class BookingsService {
                 startsAt: { lt: endsAt },
                 endsAt: { gt: startsAt },
               },
+              select: { serviceId: true, startsAt: true },
             });
-
-            if (conflict) {
+            const capacity = Math.max(1, primaryService.capacity ?? 1);
+            const sameInstance = overlapping.filter(
+              (a) => a.serviceId === dto.serviceId && +a.startsAt === +startsAt,
+            );
+            if (overlapping.length > sameInstance.length) {
               throw new ConflictException('This time slot is no longer available');
+            }
+            if (sameInstance.length >= capacity) {
+              throw new ConflictException('This class is full');
             }
           }
 

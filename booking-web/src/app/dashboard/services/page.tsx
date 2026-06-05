@@ -41,11 +41,12 @@ function fmtDurationLong(mins: number) {
 interface ServiceFormState {
   name: string; description: string; durationMinutes: string;
   priceCents: string; bufferBeforeMin: string; bufferAfterMin: string;
+  capacity: string;
   color: string; active: boolean; categoryId: string;
 }
 const EMPTY_SVC: ServiceFormState = {
   name: "", description: "", durationMinutes: "60", priceCents: "",
-  bufferBeforeMin: "0", bufferAfterMin: "0", color: "#E9A23C", active: true, categoryId: "",
+  bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", color: "#E9A23C", active: true, categoryId: "",
 };
 
 interface ServiceModalProps {
@@ -63,6 +64,7 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
       priceCents: String(editing.priceCents / 100),
       bufferBeforeMin: String(editing.bufferBeforeMin),
       bufferAfterMin: String(editing.bufferAfterMin),
+      capacity: String(editing.capacity ?? 1),
       color: editing.color, active: editing.active,
       categoryId: editing.categoryId ?? "",
     } : EMPTY_SVC
@@ -82,6 +84,7 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
         priceCents: Math.round(Number(form.priceCents) * 100),
         bufferBeforeMin: Number(form.bufferBeforeMin),
         bufferAfterMin: Number(form.bufferAfterMin),
+        capacity: Math.max(1, Number(form.capacity) || 1),
         color: form.color, active: form.active,
         sortOrder: editing?.sortOrder ?? 0,
         categoryId: form.categoryId || null,
@@ -163,6 +166,18 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
                 min={0} step={step} />
             </div>
           ))}
+
+          {/* Group / class capacity */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Group capacity</label>
+            <Input type="number" min={1} step={1} value={form.capacity}
+              onChange={e => f("capacity", e.target.value)} placeholder="1" />
+            <p className="mt-1 text-xs text-gray-400">
+              {Number(form.capacity) > 1
+                ? `Up to ${Number(form.capacity)} clients can book the same time slot (group class).`
+                : "1 = standard one-on-one booking. Increase for group classes."}
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>

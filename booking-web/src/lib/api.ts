@@ -96,6 +96,7 @@ export interface ServiceCategory {
 export interface Service {
   id: string; name: string; description?: string;
   durationMinutes: number; priceCents: number;
+  capacity?: number;
   bufferBeforeMin: number; bufferAfterMin: number;
   color: string; sortOrder: number; active: boolean;
   businessId: string; categoryId?: string | null;

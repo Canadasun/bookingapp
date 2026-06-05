@@ -54,6 +54,8 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
   const txMock = {
     $queryRaw: jest.fn().mockResolvedValue([]),
     appointment: {
+      // A different-instance overlap (serviceId !== the booked service) signals a real conflict.
+      findMany: jest.fn().mockResolvedValue(options.conflictExists ? [{ serviceId: 'other', startsAt: new Date(0) }] : []),
       findFirst: jest.fn().mockResolvedValue(options.conflictExists ? { id: 'conflict' } : null),
       create: jest.fn().mockResolvedValue(makeAppointment()),
       update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
@@ -219,14 +221,16 @@ describe('BookingsService', () => {
       const txMock = {
         $queryRaw: jest.fn().mockResolvedValue([]),
         appointment: {
-          findFirst: jest.fn().mockImplementation(() => {
-            // Simulate the real race: first caller gets null, all subsequent get a conflict
+          // Simulate the real race: first caller sees no overlap, all subsequent
+          // see a different-instance overlap (= conflict).
+          findMany: jest.fn().mockImplementation(() => {
             if (!booked) {
               booked = true;
-              return Promise.resolve(null);
+              return Promise.resolve([]);
             }
-            return Promise.resolve({ id: 'existing' });
+            return Promise.resolve([{ serviceId: 'other', startsAt: new Date(0) }]);
           }),
+          findFirst: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue(makeAppointment()),
         },
       };
