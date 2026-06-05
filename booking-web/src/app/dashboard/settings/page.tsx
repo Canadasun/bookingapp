@@ -857,6 +857,7 @@ export default function SettingsPage() {
                     {
                       id: "BASIC", name: "Basic", price: "$10", period: "/mo",
                       desc: "Great for growing salons",
+                      recommended: true,
                       features: ["Everything in Free","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
@@ -870,9 +871,16 @@ export default function SettingsPage() {
                   ].map((plan) => (
                     <div key={plan.id} className={cn(
                       "rounded-2xl border-2 p-5 relative",
-                      plan.highlight ? "border-violet-500 bg-violet-50" : "border-gray-100 bg-white",
+                      plan.recommended ? "border-emerald-500 bg-emerald-50/50"
+                        : plan.highlight ? "border-violet-500 bg-violet-50"
+                        : "border-gray-100 bg-white",
                     )}>
-                      {plan.highlight && (
+                      {plan.recommended && (
+                        <span className="absolute -top-2.5 left-5 text-xs font-bold text-white bg-emerald-600 px-3 py-0.5 rounded-full">
+                          ★ Recommended
+                        </span>
+                      )}
+                      {plan.highlight && !plan.recommended && (
                         <span className="absolute -top-2.5 left-5 text-xs font-bold text-white bg-violet-600 px-3 py-0.5 rounded-full">
                           Most popular
                         </span>
@@ -898,6 +906,8 @@ export default function SettingsPage() {
                                 "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
                                 isCurrent
                                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  : plan.recommended
+                                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
                                   : plan.highlight
                                   ? "bg-violet-600 text-white hover:bg-violet-700"
                                   : "border border-violet-300 text-violet-600 hover:bg-violet-50",
@@ -911,7 +921,7 @@ export default function SettingsPage() {
                       <ul className="mt-4 space-y-1.5">
                         {plan.features.map((f) => (
                           <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                            <CheckCircle2 className={cn("w-3.5 h-3.5 shrink-0", plan.highlight ? "text-violet-500" : "text-emerald-500")} />
+                            <CheckCircle2 className={cn("w-3.5 h-3.5 shrink-0", plan.highlight && !plan.recommended ? "text-violet-500" : "text-emerald-500")} />
                             {f}
                           </li>
                         ))}

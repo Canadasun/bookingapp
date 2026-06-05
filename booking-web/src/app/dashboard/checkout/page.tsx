@@ -37,7 +37,7 @@ export default function CheckoutPage() {
   const [clientResults, setClientResults] = useState<Client[]>([]);
   const [searching, setSearching]         = useState(false);
   const [newClientMode, setNewClientMode] = useState(false);
-  const [newClient, setNewClient]         = useState({ name: "", email: "", phone: "" });
+  const [newClient, setNewClient]         = useState({ firstName: "", lastName: "", email: "", phone: "" });
 
   const [selectedClient, setSelectedClient]   = useState<Client | null>(null);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -133,12 +133,13 @@ export default function CheckoutPage() {
   async function createOrGetClient(): Promise<Client | null> {
     if (!bizId) return null;
     if (selectedClient) return selectedClient;
-    if (!newClient.name.trim() || !newClient.email.trim()) {
-      toast.error("Name and email are required"); return null;
+    if (!newClientValid) {
+      toast.error("Enter a valid first name, last name, email and phone"); return null;
     }
+    const name = `${newClient.firstName.trim()} ${newClient.lastName.trim()}`.trim();
     try {
       return await api.clients.create(bizId, {
-        name: newClient.name, email: newClient.email, phone: newClient.phone || undefined,
+        name, email: newClient.email.trim(), phone: newClient.phone.trim() || undefined,
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create client"); return null;
@@ -195,8 +196,17 @@ export default function CheckoutPage() {
     setSelectedStaff(null); setSelectedDate(undefined); setSelectedSlot(null);
     setCustomDate(""); setCustomTime(""); setCustomStaffId(""); setOverrideCalendar(false);
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
-    setNewClientMode(false); setNewClient({ name: "", email: "", phone: "" });
+    setNewClientMode(false); setNewClient({ firstName: "", lastName: "", email: "", phone: "" });
   }
+
+  // New-client field validation — block "Continue" on bad email / phone / missing names.
+  const ncEmailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newClient.email.trim());
+  const ncPhoneDigits = newClient.phone.replace(/\D/g, "");
+  const ncPhoneOk = ncPhoneDigits.length >= 10 && ncPhoneDigits.length <= 15;
+  const ncFirstOk = newClient.firstName.trim().length >= 1;
+  const ncLastOk = newClient.lastName.trim().length >= 1;
+  const newClientValid = ncFirstOk && ncLastOk && ncEmailOk && ncPhoneOk;
+  const newClientName = `${newClient.firstName.trim()} ${newClient.lastName.trim()}`.trim();
 
   const today = startOfDay(new Date());
   const totalMins  = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
@@ -223,7 +233,7 @@ export default function CheckoutPage() {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking confirmed!</h2>
         <p className="text-gray-500 mb-1">
-          {selectedClient?.name ?? newClient.name} — {selectedServices.map(s => s.name).join(" + ")}
+          {selectedClient?.name ?? newClientName} — {selectedServices.map(s => s.name).join(" + ")}
         </p>
         <p className="text-xs text-gray-400 font-mono mb-6">#{booked.id.slice(-8).toUpperCase()}</p>
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
@@ -327,29 +337,45 @@ export default function CheckoutPage() {
                   ← Back to search
                 </button>
                 <div className="space-y-3">
-                  {[
-                    { k: "name",  label: "Full name *",   type: "text" },
-                    { k: "email", label: "Email *",        type: "email" },
-                    { k: "phone", label: "Phone (optional)", type: "tel" },
-                  ].map(({ k, label, type }) => (
-                    <div key={k}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-                      {k === "phone" ? (
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 select-none pointer-events-none z-10">+1</span>
-                          <Input type={type} className="pl-9" placeholder="555 123 4567"
-                            value={newClient.phone}
-                            onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))} />
-                        </div>
-                      ) : (
-                        <Input type={type}
-                          value={newClient[k as keyof typeof newClient]}
-                          onChange={(e) => setNewClient((p) => ({ ...p, [k]: e.target.value }))} />
-                      )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">First name *</label>
+                      <Input type="text" placeholder="Jane"
+                        value={newClient.firstName}
+                        onChange={(e) => setNewClient((p) => ({ ...p, firstName: e.target.value }))} />
                     </div>
-                  ))}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Last name *</label>
+                      <Input type="text" placeholder="Doe"
+                        value={newClient.lastName}
+                        onChange={(e) => setNewClient((p) => ({ ...p, lastName: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
+                    <Input type="email" placeholder="jane@example.com"
+                      className={newClient.email.trim() && !ncEmailOk ? "border-red-300 focus-visible:ring-red-200" : ""}
+                      value={newClient.email}
+                      onChange={(e) => setNewClient((p) => ({ ...p, email: e.target.value }))} />
+                    {newClient.email.trim() && !ncEmailOk && (
+                      <p className="mt-1 text-xs text-red-600">Enter a valid email address.</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 select-none pointer-events-none z-10">+1</span>
+                      <Input type="tel" placeholder="555 123 4567"
+                        className={newClient.phone.trim() && !ncPhoneOk ? "pl-9 border-red-300 focus-visible:ring-red-200" : "pl-9"}
+                        value={newClient.phone}
+                        onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))} />
+                    </div>
+                    {newClient.phone.trim() && !ncPhoneOk && (
+                      <p className="mt-1 text-xs text-red-600">Enter a valid phone number (10–15 digits).</p>
+                    )}
+                  </div>
                   <Button className="w-full"
-                    disabled={!newClient.name.trim() || !newClient.email.trim()}
+                    disabled={!newClientValid}
                     onClick={() => setStep("services")}>
                     Continue
                   </Button>
@@ -366,7 +392,7 @@ export default function CheckoutPage() {
               ← Back
             </button>
             <h3 className="text-base font-semibold text-gray-900 mb-4">
-              Choose services for <span className="text-violet-700">{selectedClient?.name ?? newClient.name}</span>
+              Choose services for <span className="text-violet-700">{selectedClient?.name ?? newClientName}</span>
             </h3>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {allServices.map((svc) => {
@@ -577,7 +603,7 @@ export default function CheckoutPage() {
 
             <div className="space-y-3 text-sm mb-6">
               {[
-                { label: "Client", value: selectedClient?.name ?? newClient.name, icon: User },
+                { label: "Client", value: selectedClient?.name ?? newClientName, icon: User },
                 { label: "Services", value: selectedServices.map(s => s.name).join(", "), icon: Check },
                 { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
                 { label: "Provider", value: providerText(customStartsAt ? customStaff?.user.name : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName), icon: Check },

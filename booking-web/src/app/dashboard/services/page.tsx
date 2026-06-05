@@ -28,7 +28,8 @@ function fmtDuration(mins: number) {
 }
 
 // Scrollable duration picker options (minutes) + a readable hours:minutes label.
-const DURATION_OPTIONS = [10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240];
+const HOUR_OPTS = Array.from({ length: 13 }, (_, i) => i); // 0–12 hours
+const MIN_OPTS = Array.from({ length: 60 }, (_, i) => i);  // 0–59 minutes
 function fmtDurationLong(mins: number) {
   const h = Math.floor(mins / 60), m = mins % 60;
   const hLabel = h > 0 ? `${h} hr${h > 1 ? "s" : ""}` : "";
@@ -71,6 +72,7 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
 
   async function save() {
     if (!form.name || !form.priceCents) { toast.error("Name and price are required"); return; }
+    if (Number(form.durationMinutes) < 1) { toast.error("Set how long the service takes"); return; }
     if (!bizId) return;
     setSaving(true);
     try {
@@ -123,17 +125,30 @@ function ServiceModal({ bizId, editing, categories, onClose, onSaved }: ServiceM
             </div>
           ))}
 
-          {/* Duration — scrollable picker (hours:minutes), not a raw minutes box */}
+          {/* Duration — pick hours and minutes separately (e.g. 1:15, 2:08) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">How long does it take?</label>
-            <select
-              value={form.durationMinutes}
-              onChange={e => f("durationMinutes", e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-              {(DURATION_OPTIONS.includes(Number(form.durationMinutes)) ? DURATION_OPTIONS : [Number(form.durationMinutes), ...DURATION_OPTIONS])
-                .filter((m) => m > 0)
-                .map((m) => <option key={m} value={String(m)}>{fmtDurationLong(m)}</option>)}
-            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <select
+                  value={Math.floor(Number(form.durationMinutes || 0) / 60)}
+                  onChange={e => f("durationMinutes", String(Number(e.target.value) * 60 + (Number(form.durationMinutes || 0) % 60)))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  {HOUR_OPTS.map(h => <option key={h} value={h}>{h} hour{h === 1 ? "" : "s"}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">Hours</p>
+              </div>
+              <div>
+                <select
+                  value={Number(form.durationMinutes || 0) % 60}
+                  onChange={e => f("durationMinutes", String(Math.floor(Number(form.durationMinutes || 0) / 60) * 60 + Number(e.target.value)))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  {MIN_OPTS.map(m => <option key={m} value={m}>{String(m).padStart(2, "0")} min</option>)}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">Minutes</p>
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-violet-600 font-medium">Total: {fmtDurationLong(Number(form.durationMinutes || 0))}</p>
           </div>
 
           {[
