@@ -18,8 +18,11 @@ const BookingIntentSchema = z.object({
 });
 
 const CustomChargeSchema = z.object({
-  // $0.50 min (Stripe) up to $100,000 per charge.
+  // $0.50 min (Stripe) up to $100,000 per charge. amountCents is the full total
+  // (subtotal + tax + tip); tip/tax are the breakdown for the receipt.
   amountCents: z.number().int().min(50).max(10_000_000),
+  tipCents: z.number().int().min(0).max(10_000_000).optional(),
+  taxCents: z.number().int().min(0).max(10_000_000).optional(),
   description: z.string().max(200).optional(),
   clientId: z.string().optional(),
   idempotencyKey: z.string().trim().min(8).max(120).optional(),

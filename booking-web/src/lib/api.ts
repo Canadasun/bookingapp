@@ -79,6 +79,7 @@ export interface Business {
   planExpiresAt?: string;
   verificationStatus?: VerificationStatus;
   intakeQuestions?: IntakeQuestion[];
+  taxRatePercent?: number;
   createdAt: string; updatedAt: string;
 }
 
@@ -196,7 +197,7 @@ export interface RefundRow {
   id: string; amountCents: number; reason?: string | null; status: string; createdAt: string;
 }
 export interface Payment {
-  id: string; businessId: string; amountCents: number; currency: string;
+  id: string; businessId: string; amountCents: number; tipCents?: number; taxCents?: number; currency: string;
   kind: PaymentKind; status: PaymentStatus; refundedCents: number;
   description?: string | null; stripePaymentIntentId?: string | null; receiptUrl?: string | null; createdAt: string;
   client?: { id: string; name: string; email: string } | null;

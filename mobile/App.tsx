@@ -696,11 +696,14 @@ function CheckoutScreen() {
   const [phase, setPhase]     = useState<Phase>('amount');
   const [digits, setDigits]   = useState('');   // raw cents, e.g. "1234" = $12.34
   const [note, setNote]       = useState('');
+  const [tipPct, setTipPct]   = useState(0);     // 0/15/18/20% of the entered amount
   const [loading, setLoading] = useState(false);
   const [receipt, setReceipt] = useState<{ amountCents:number; ref:string; at:Date }|null>(null);
 
-  const cents   = parseInt(digits || '0', 10);
-  const display = (cents/100).toFixed(2);
+  const cents     = parseInt(digits || '0', 10);
+  const tipCents  = Math.round(cents * tipPct / 100);
+  const totalCents = cents + tipCents;
+  const display   = (cents/100).toFixed(2);
 
   // Hardware back steps the flow back instead of leaving the app.
   useEffect(() => {
@@ -720,7 +723,7 @@ function CheckoutScreen() {
     setLoading(true);
     try {
       const r = await api<{ paymentIntentId:string; amountCents:number }>(`/payments/charge`, {
-        method:'POST', body: JSON.stringify({ amountCents: cents, description: note.trim() || undefined }),
+        method:'POST', body: JSON.stringify({ amountCents: totalCents, tipCents: tipCents || undefined, description: note.trim() || undefined }),
       });
       setReceipt({ amountCents: r.amountCents, ref: r.paymentIntentId, at: new Date() });
       setPhase('tap');
@@ -733,7 +736,7 @@ function CheckoutScreen() {
   // entitlement is granted that hook is stubbed, so this advances to the receipt.
   function completeTap(){ setPhase('done'); }
 
-  function reset(){ setPhase('amount'); setDigits(''); setNote(''); setReceipt(null); }
+  function reset(){ setPhase('amount'); setDigits(''); setNote(''); setTipPct(0); setReceipt(null); }
 
   // ── Tap to Pay on iPhone (full-screen prompt) ──
   if (phase === 'tap') {
@@ -823,6 +826,22 @@ function CheckoutScreen() {
         })}
       </View>
 
+      {/* Tip presets — added on top of the entered amount */}
+      {cents >= 50 && (
+        <View style={co.tipRow}>
+          <Text style={co.tipLabel}>Tip</Text>
+          {[0,15,18,20].map(p => (
+            <TouchableOpacity key={p} onPress={()=>setTipPct(p)}
+              style={[co.tipChip, tipPct===p && co.tipChipOn]}>
+              <Text style={[co.tipChipText, tipPct===p && { color:'#fff' }]}>{p===0?'None':`${p}%`}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {tipPct>0 && cents>=50 && (
+        <Text style={co.tipSummary}>Tip ${(tipCents/100).toFixed(2)} · Total ${(totalCents/100).toFixed(2)}</Text>
+      )}
+
       <TouchableOpacity
         style={[co.chargeBtn, (cents<50||loading) && { opacity:0.4 }]}
         disabled={cents<50||loading}
@@ -830,7 +849,7 @@ function CheckoutScreen() {
         activeOpacity={0.85}>
         {loading
           ? <ActivityIndicator color="#fff"/>
-          : <Text style={co.chargeBtnText}>Charge ${display}</Text>}
+          : <Text style={co.chargeBtnText}>Charge ${(totalCents/100).toFixed(2)}</Text>}
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -3484,6 +3503,12 @@ const co = StyleSheet.create({
   keyText:      { fontSize:26, fontWeight:'600', color:GRAY_900 },
   chargeBtn:    { backgroundColor:BRAND, margin:20, marginTop:12, borderRadius:16, paddingVertical:18, alignItems:'center' },
   chargeBtnText:{ color:'#fff', fontSize:17, fontWeight:'700' },
+  tipRow:       { flexDirection:'row', alignItems:'center', gap:8, paddingHorizontal:20, marginTop:4 },
+  tipLabel:     { fontSize:13, fontWeight:'700', color:GRAY_500, marginRight:2 },
+  tipChip:      { paddingHorizontal:14, paddingVertical:8, borderRadius:12, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff' },
+  tipChipOn:    { backgroundColor:BRAND, borderColor:BRAND },
+  tipChipText:  { fontSize:13, fontWeight:'700', color:GRAY_700 },
+  tipSummary:   { textAlign:'center', color:GRAY_500, fontSize:13, marginTop:8 },
   // Tap to Pay full-screen
   tapWrap:      { flex:1, alignItems:'center', justifyContent:'center', paddingHorizontal:32 },
   tapAmount:    { color:'#fff', fontSize:40, fontWeight:'800', marginBottom:28 },

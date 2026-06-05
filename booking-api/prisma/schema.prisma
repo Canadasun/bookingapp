@@ -90,6 +90,7 @@ model Business {
   // Owner-defined intake/consultation questions shown at booking. Array of
   // { id, label, required }. Answers are stored per appointment (intakeAnswers).
   intakeQuestions Json @default("[]")
+  taxRatePercent  Float @default(0) // sales tax applied to totals/receipts (e.g. 13 = 13%)
 
   // Booking policies
   minNoticeMinutes      Int     @default(120)
@@ -896,6 +897,8 @@ model Payment {
   clientId              String?
   stripePaymentIntentId String?       @unique
   amountCents           Int
+  tipCents              Int           @default(0)
+  taxCents              Int           @default(0)
   currency              String        @default("usd")
   kind                  PaymentKind   @default(OTHER)
   status                PaymentStatus @default(PENDING)

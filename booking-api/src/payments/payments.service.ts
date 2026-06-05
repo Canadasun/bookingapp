@@ -56,6 +56,8 @@ export class PaymentsService {
     clientId?: string | null;
     stripePaymentIntentId?: string | null;
     amountCents: number;
+    tipCents?: number;
+    taxCents?: number;
     kind: PaymentKind;
     status: PaymentStatus;
     description?: string;
@@ -163,7 +165,7 @@ export class PaymentsService {
    */
   async createCustomCharge(
     businessId: string,
-    input: { amountCents: number; description?: string; clientId?: string; idempotencyKey?: string },
+    input: { amountCents: number; tipCents?: number; taxCents?: number; description?: string; clientId?: string; idempotencyKey?: string },
   ) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     if (!isPaidPlan(business.plan)) {
@@ -199,6 +201,7 @@ export class PaymentsService {
     await this.recordPayment({
       businessId, clientId: input.clientId ?? null,
       stripePaymentIntentId: intent.id, amountCents: input.amountCents,
+      tipCents: input.tipCents ?? 0, taxCents: input.taxCents ?? 0,
       kind: 'IN_PERSON', status: 'PENDING',
       description: input.description?.trim() || `In-person charge`,
     });

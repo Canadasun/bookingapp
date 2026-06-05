@@ -270,6 +270,7 @@ export default function SettingsPage() {
         cancellationWindowHours: Number(form.cancellationWindowHours ?? 24),
         requireDeposit: !!form.requireDeposit,
         depositPercent: Math.max(1, Number(form.depositPercent ?? 25)),
+        taxRatePercent: Math.max(0, Math.min(100, Number(form.taxRatePercent ?? 0))),
         noShowFeeCents: Math.max(0, Number(form.noShowFeeCents ?? 0)),
         cancellationFeeCents: Math.max(0, Number(form.cancellationFeeCents ?? 0)),
         collectCardOnFile: !!form.collectCardOnFile,
@@ -489,6 +490,22 @@ export default function SettingsPage() {
                 </div>
 
                 {bizId && <IntakeFormEditor bizId={bizId} initial={(biz?.intakeQuestions as IntakeQuestion[] | undefined) ?? []} />}
+
+                <div className="rounded-xl border border-gray-100 bg-white p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-violet-600" />
+                    <p className="text-sm font-semibold text-gray-800">Sales tax</p>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-3">Shown on booking totals and receipts. Set to 0 to hide tax.</p>
+                  <div className="flex items-center gap-2 max-w-[180px]">
+                    <Input type="number" min={0} max={100} step={0.01}
+                      value={(form.taxRatePercent as number) ?? 0}
+                      onChange={(e) => f("taxRatePercent", Number(e.target.value))}
+                      className="bg-white text-base font-semibold" />
+                    <span className="text-sm font-medium text-gray-500">% tax</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-2">Saved with the section below.</p>
+                </div>
               </div>
             )}
 

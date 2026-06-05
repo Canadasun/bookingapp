@@ -510,8 +510,19 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 </div>
               ))}
               <hr className="border-gray-200" />
+              {(biz?.taxRatePercent ?? 0) > 0 && (
+                <>
+                  <div className="flex justify-between text-gray-500 text-xs">
+                    <span>Subtotal</span><span>{fmtPrice(totalCents)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500 text-xs">
+                    <span>Tax ({biz!.taxRatePercent}%)</span><span>{fmtPrice(Math.round(totalCents * (biz!.taxRatePercent! / 100)))}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between font-semibold">
-                <span>Total</span><span className="text-violet-700">{fmtPrice(totalCents)}</span>
+                <span>Total</span>
+                <span className="text-violet-700">{fmtPrice(totalCents + Math.round(totalCents * ((biz?.taxRatePercent ?? 0) / 100)))}</span>
               </div>
               <div className="flex justify-between text-gray-500 text-xs pt-1">
                 <span>Duration</span><span>{fmtDuration(totalMins)}</span>

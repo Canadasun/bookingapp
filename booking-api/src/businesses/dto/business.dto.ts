@@ -34,6 +34,7 @@ export const CreateBusinessSchema = z.object({
     label: z.string().min(1).max(200),
     required: z.boolean().optional(),
   })).max(20).optional(),
+  taxRatePercent: z.number().min(0).max(100).optional(),
   minNoticeMinutes: z.number().int().nonnegative().default(120),
   maxAdvanceDays: z.number().int().positive().default(60),
   cancellationWindowHours: z.number().int().nonnegative().default(24),
