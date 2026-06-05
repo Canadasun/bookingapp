@@ -6,7 +6,7 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   isSameMonth, addMonths, subMonths, addDays, addWeeks, subWeeks, isSameDay,
 } from "date-fns";
-import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2 } from "lucide-react";
+import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api, Appointment } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -198,6 +198,10 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
         {/* Actions */}
         {!showCancelForm && !showEditForm && (
           <div className="px-6 py-4 border-t border-gray-100 space-y-2">
+            <a href={`/dashboard/receipt/${apt.id}`} target="_blank" rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <FileText className="w-4 h-4" /> View receipt
+            </a>
             <Button className="w-full gap-2" variant="secondary" onClick={() => setShowEditForm(true)}>
               Edit appointment
             </Button>
