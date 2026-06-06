@@ -70,6 +70,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [twoFAMethod, setTwoFAMethod] = useState<'EMAIL'|'SMS'>(getAuth().user?.twoFactorMethod ?? 'EMAIL');
   const [twoFASaving, setTwoFASaving] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]|null>(null); // shown once on enable
+  const [acctBusy, setAcctBusy] = useState(false);
 
   async function saveTwoFA(enabled: boolean, method: 'EMAIL'|'SMS') {
     setTwoFASaving(true);
@@ -89,6 +90,39 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
       Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.');
     } finally { setTwoFASaving(false); }
+  }
+
+  // Account lifecycle (owner): pause/reactivate (reversible) + permanent delete.
+  async function toggleActive() {
+    if (!biz) return;
+    setAcctBusy(true);
+    try {
+      const path = biz.suspended ? 'reactivate' : 'deactivate';
+      const updated = await api<any>(`/businesses/${bizId()}/${path}`, { method:'POST' });
+      setBiz(updated);
+      Alert.alert(
+        updated.suspended ? 'Business paused' : 'Business reactivated',
+        updated.suspended ? 'Your booking page is hidden — reactivate any time.' : 'Your business is live again.',
+      );
+    } catch (e) { Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.'); }
+    finally { setAcctBusy(false); }
+  }
+  function confirmDelete() {
+    if (!biz) return;
+    Alert.alert(
+      'Delete this business?',
+      `This permanently erases ${biz.name} and ALL its data — clients, bookings, staff, services, payments and your login. This cannot be undone.`,
+      [
+        { text:'Cancel', style:'cancel' },
+        { text:'Delete forever', style:'destructive', onPress: async () => {
+          setAcctBusy(true);
+          try {
+            await api(`/businesses/${bizId()}`, { method:'DELETE', body: JSON.stringify({ confirmation: biz.name }) });
+            onLogout();
+          } catch (e) { setAcctBusy(false); Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.'); }
+        }},
+      ],
+    );
   }
 
   function refundPayment(p: any) {
@@ -1858,6 +1892,31 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 </TouchableOpacity>
               </View>
             </View>
+          )}
+
+          {user?.role === 'OWNER' && (
+            <>
+              <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>ACCOUNT</Text>
+              <View style={ms.card}>
+                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                  <View style={{ flex:1, paddingRight:12 }}>
+                    <Text style={ms.cardValue}>{(biz as any)?.suspended ? 'Business paused' : 'Pause business'}</Text>
+                    <Text style={[ms.rowMeta,{ marginTop:2 }]}>
+                      {(biz as any)?.suspended
+                        ? 'Your booking page is hidden — reactivate any time.'
+                        : 'Hide your booking page and stop new online bookings. Nothing is deleted.'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity disabled={acctBusy} onPress={toggleActive}
+                    style={[ms.methodChip, { flex:0, paddingHorizontal:16 }, (biz as any)?.suspended && ms.methodChipOn]}>
+                    <Text style={[ms.methodChipText, (biz as any)?.suspended && { color:BRAND }]}>{(biz as any)?.suspended ? 'Reactivate' : 'Pause'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity disabled={acctBusy} onPress={confirmDelete} style={{ paddingVertical:12, alignItems:'center' }}>
+                <Text style={{ fontSize:13, color:'#DC2626', fontWeight:'600' }}>Delete business permanently</Text>
+              </TouchableOpacity>
+            </>
           )}
 
           <Text style={[ms.empty,{ marginTop:8 }]}>Advanced business settings, billing, and delivery-log controls are available on the web dashboard.</Text>
