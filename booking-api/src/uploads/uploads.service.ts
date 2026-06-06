@@ -1,13 +1,15 @@
 import { Injectable, BadRequestException, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadKind } from '@prisma/client';
-import { sniffImageMime } from './sniff';
+import { sniffDocumentMime, sniffImageMime } from './sniff';
 import { objectStorageEnabled, putObject, getObjectBytes, newStorageKey, publicUrlFor } from './object-storage';
 
 // Allow common raster web image types only. SVG is intentionally excluded
 // because it can embed script-like content.
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const ALLOWED_DOCUMENT_MIME = new Set(['application/pdf']);
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export interface IncomingFile {
   buffer: Buffer;
@@ -21,17 +23,28 @@ export class UploadsService {
 
   async create(businessId: string, file: IncomingFile | undefined, kind: UploadKind) {
     if (!file || !file.buffer?.length) throw new BadRequestException('No file uploaded');
-    if (!ALLOWED_MIME.has(file.mimetype)) {
-      throw new BadRequestException('Only PNG, JPEG, WebP, or GIF images are allowed');
+    const allowsDocument = kind === 'OTHER';
+    const allowedMime = allowsDocument
+      ? new Set([...ALLOWED_MIME, ...ALLOWED_DOCUMENT_MIME])
+      : ALLOWED_MIME;
+    if (!allowedMime.has(file.mimetype)) {
+      throw new BadRequestException(allowsDocument
+        ? 'Only PNG, JPEG, WebP, GIF, or PDF files are allowed'
+        : 'Only PNG, JPEG, WebP, or GIF images are allowed');
     }
-    if (file.size > MAX_BYTES) throw new PayloadTooLargeException('Image must be 2 MB or smaller');
+    const maxBytes = allowsDocument ? MAX_DOCUMENT_BYTES : MAX_BYTES;
+    if (file.size > maxBytes) {
+      throw new PayloadTooLargeException(allowsDocument ? 'File must be 5 MB or smaller' : 'Image must be 2 MB or smaller');
+    }
 
-    // Content sniffing: the real bytes must be one of the allowed image types,
+    // Content sniffing: the real bytes must be one of the allowed file types,
     // regardless of the client-declared Content-Type. The sniffed type is stored
     // as the authoritative MIME.
-    const sniffed = sniffImageMime(file.buffer);
-    if (!sniffed || !ALLOWED_MIME.has(sniffed)) {
-      throw new BadRequestException('File content is not a valid PNG, JPEG, WebP, or GIF image');
+    const sniffed = sniffImageMime(file.buffer) ?? (allowsDocument ? sniffDocumentMime(file.buffer) : null);
+    if (!sniffed || !allowedMime.has(sniffed)) {
+      throw new BadRequestException(allowsDocument
+        ? 'File content is not a valid PNG, JPEG, WebP, GIF, or PDF file'
+        : 'File content is not a valid PNG, JPEG, WebP, or GIF image');
     }
 
     // Object storage when configured; otherwise the bytes live in the DB. Either

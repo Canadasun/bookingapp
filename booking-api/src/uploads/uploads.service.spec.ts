@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 // A minimal valid PNG header so content-sniffing passes for the happy paths.
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PDF_MAGIC = Buffer.from('%PDF-1.7\n');
 
 function file(over: Partial<{ buffer: Buffer; mimetype: string; size: number }> = {}) {
   const buffer = over.buffer ?? PNG_MAGIC;
@@ -38,7 +39,16 @@ describe('UploadsService.create', () => {
       .rejects.toThrow(BadRequestException);
   });
 
-  it('rejects a non-image MIME type', async () => {
+  it('accepts a PDF for generic document uploads', async () => {
+    const { svc, prisma } = await build();
+    const res = await svc.create('biz1', file({ buffer: PDF_MAGIC, mimetype: 'application/pdf' }), 'OTHER');
+    expect(res).toEqual({ id: 'f1', url: '/uploads/f1', kind: 'OTHER' });
+    expect(prisma.uploadedFile.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ mimeType: 'application/pdf' }),
+    }));
+  });
+
+  it('rejects a PDF for image-only upload kinds', async () => {
     const { svc } = await build();
     await expect(svc.create('biz1', file({ mimetype: 'application/pdf' }), 'LOGO')).rejects.toThrow(BadRequestException);
   });

@@ -39,6 +39,8 @@ export class UploadsController {
     const r = await this.uploads.resolve(id);
     if (r.redirectUrl) return res.redirect(302, r.redirectUrl);
     res.setHeader('Content-Type', r.contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.send(r.buffer);
   }

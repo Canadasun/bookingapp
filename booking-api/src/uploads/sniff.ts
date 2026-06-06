@@ -9,3 +9,10 @@ export function sniffImageMime(buf: Buffer): string | null {
     && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp'; // RIFF....WEBP
   return null;
 }
+
+// PDF is the only non-image document type accepted for uploads. Office formats
+// can carry macros/active content and are intentionally excluded.
+export function sniffDocumentMime(buf: Buffer): string | null {
+  if (buf.length >= 5 && buf.subarray(0, 5).toString('ascii') === '%PDF-') return 'application/pdf';
+  return null;
+}

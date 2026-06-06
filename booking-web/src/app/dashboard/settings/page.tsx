@@ -426,7 +426,7 @@ export default function SettingsPage() {
                               </button>
                               <div>
                                 <p className="text-xs font-medium text-violet-700 mb-1.5">Optional: attach a registration document</p>
-                                <ImageUpload value={null} onChange={(url) => { if (url) submitVerification(url); }} />
+                                <ImageUpload value={null} documents onChange={(url) => { if (url) submitVerification(url); }} />
                               </div>
                             </div>
                           </>

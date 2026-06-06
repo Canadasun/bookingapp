@@ -31,7 +31,8 @@ function s3(): S3Client {
 }
 
 export function newStorageKey(businessId: string): string {
-  return `uploads/${businessId}/${randomBytes(16).toString('hex')}`;
+  const prefix = (process.env.S3_UPLOAD_PREFIX || 'Uploads').replace(/^\/+|\/+$/g, '') || 'Uploads';
+  return `${prefix}/${businessId}/${randomBytes(16).toString('hex')}`;
 }
 
 export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {

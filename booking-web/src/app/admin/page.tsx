@@ -313,6 +313,28 @@ export default function AdminPage() {
                             </button>
                           </div>
                         </div>
+                        {b.verificationDocUrl && (
+                          <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                            <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 py-2">
+                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+                                <FileText className="h-3.5 w-3.5" /> Submitted document
+                              </span>
+                              <a
+                                href={b.verificationDocUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:underline"
+                              >
+                                Open full size <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                            <iframe
+                              src={b.verificationDocUrl}
+                              title={`${b.name} verification document`}
+                              className="h-80 w-full bg-white"
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}

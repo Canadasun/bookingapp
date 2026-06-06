@@ -6,11 +6,12 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
-export function ImageUpload({ value, kind, onChange, shape = "square" }: {
+export function ImageUpload({ value, kind, onChange, shape = "square", documents = false }: {
   value?: string | null;
   kind?: "LOGO" | "AVATAR" | "COVER";
   onChange: (url: string | null) => void;
   shape?: "square" | "circle";
+  documents?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,8 @@ export function ImageUpload({ value, kind, onChange, shape = "square" }: {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-selecting the same file
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error("Image must be 2 MB or smaller"); return; }
+    const maxBytes = documents ? 5 * 1024 * 1024 : 2 * 1024 * 1024;
+    if (file.size > maxBytes) { toast.error(documents ? "File must be 5 MB or smaller" : "Image must be 2 MB or smaller"); return; }
     setBusy(true);
     try {
       const { url } = await api.uploads.upload(file, kind);
@@ -35,13 +37,13 @@ export function ImageUpload({ value, kind, onChange, shape = "square" }: {
   return (
     <div className="flex items-center gap-4">
       <div className={`w-16 h-16 ${radius} border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0`}>
-        {value
+        {value && !documents
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={value} alt="" className="w-full h-full object-cover" />
           : <Upload className="w-5 h-5 text-gray-300" />}
       </div>
       <div className="flex items-center gap-2">
-        <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={pick} />
+        <input ref={inputRef} type="file" accept={documents ? "image/png,image/jpeg,image/webp,image/gif,application/pdf" : "image/png,image/jpeg,image/webp,image/gif"} className="hidden" onChange={pick} />
         <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => inputRef.current?.click()}>
           {value ? "Replace" : "Upload"}
         </Button>
@@ -52,7 +54,7 @@ export function ImageUpload({ value, kind, onChange, shape = "square" }: {
           </button>
         )}
       </div>
-      <p className="text-xs text-gray-400">PNG, JPG, WebP or GIF · up to 2 MB</p>
+      <p className="text-xs text-gray-400">{documents ? "PDF, PNG, JPG, WebP or GIF · up to 5 MB" : "PNG, JPG, WebP or GIF · up to 2 MB"}</p>
     </div>
   );
 }
