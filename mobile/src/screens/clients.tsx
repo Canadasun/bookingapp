@@ -108,7 +108,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
               <TouchableOpacity style={s.btnPrimary} onPress={()=>{ const c=profile; setProfile(null); onMessage(c); nav.navigate('Messages'); }}>
                 <Text style={s.btnPrimaryText}>Message</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.btnSecondary} onPress={()=>{ setProfile(null); nav.navigate('Book'); }}>
+              <TouchableOpacity style={s.btnSecondary} onPress={()=>{ setProfile(null); nav.navigate('Calendar', { screen: 'Book' }); }}>
                 <Text style={s.btnSecondaryText}>Book appointment</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.btnGhost} onPress={()=>setProfile(null)}><Text style={s.btnGhostText}>Close</Text></TouchableOpacity>

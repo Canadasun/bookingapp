@@ -18,6 +18,7 @@ import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
 function BookScreen() {
+  const nav = useNavigation<any>();
   type Step = 'service'|'staff'|'date'|'time'|'details'|'done';
   const [step, setStep]               = useState<Step>('service');
   const [services, setServices]       = useState<Service[]>([]);
@@ -153,7 +154,12 @@ function BookScreen() {
 
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>Book appointment</Text></View>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{marginRight:6}} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+          <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Book appointment</Text>
+      </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'}>
         <ScrollView contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
@@ -360,6 +366,9 @@ function BookScreen() {
               <Text style={s.doneRef}>Ref #{bookedId.slice(-8).toUpperCase()}</Text>
               <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={reset}>
                 <Text style={s.btnPrimaryText}>Book another</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.btnGhost,{marginTop:4}]} onPress={()=>nav.goBack()}>
+                <Text style={s.btnGhostText}>Back to calendar</Text>
               </TouchableOpacity>
             </View>
           )}

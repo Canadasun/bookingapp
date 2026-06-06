@@ -28,12 +28,26 @@ import { MenuScreen } from './src/screens/menu';
 import { LoginScreen, ForgotPasswordScreen, RegisterScreen, ChangePasswordScreen, ClientPortalScreen } from './src/screens/auth';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 
 // ── Tab navigator ────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
+const CalStack = createNativeStackNavigator();
+
+// The Calendar tab is a native stack so "+ New appointment" pushes the Book
+// screen with a real header + swipe-back, instead of opening a hidden tab that
+// had no way back. Headers stay hidden — each screen renders its own.
+function CalendarStack() {
+  return (
+    <CalStack.Navigator screenOptions={{ headerShown: false }}>
+      <CalStack.Screen name="CalendarHome" component={CalendarScreen}/>
+      <CalStack.Screen name="Book" component={BookScreen}/>
+    </CalStack.Navigator>
+  );
+}
 
 // The tab bar lives inside the SafeAreaProvider so it can read the bottom inset.
 // Without this the bar sat flush at height:64 and its targets overlapped the home
@@ -72,7 +86,7 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
         },
       })}
     >
-      <Tab.Screen name="Calendar" component={CalendarScreen}/>
+      <Tab.Screen name="Calendar" component={CalendarStack}/>
       <Tab.Screen name="Checkout" component={CheckoutScreen}/>
       <Tab.Screen name="Customers">
         {()=><ClientsScreen onMessage={c=>setMsgClient(c)}/>}
@@ -84,8 +98,6 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
       <Tab.Screen name="Menu">
         {()=><MenuScreen onLogout={onLogout}/>}
       </Tab.Screen>
-      {/* Hidden route — opened from the Calendar "+" to add an appointment. */}
-      <Tab.Screen name="Book" component={BookScreen} options={{ tabBarButton: () => null }}/>
     </Tab.Navigator>
   );
 }

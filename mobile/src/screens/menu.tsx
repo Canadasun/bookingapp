@@ -1041,7 +1041,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 {!!w.phone && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`tel:${w.phone}`)}><Text style={ms.smallActionText}>Call</Text></TouchableOpacity>}
                 {!!w.email && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}`)}><Text style={ms.smallActionText}>Email</Text></TouchableOpacity>}
                 <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}?subject=${encodeURIComponent('A spot is available')}`)}><Text style={ms.smallActionText}>Notify</Text></TouchableOpacity>
-                <TouchableOpacity style={ms.smallAction} onPress={()=>{ setView('menu'); nav.navigate('Book'); }}><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
+                <TouchableOpacity style={ms.smallAction} onPress={()=>{ setView('menu'); nav.navigate('Calendar', { screen: 'Book' }); }}><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
                 <TouchableOpacity style={ms.smallAction} onPress={()=>removeWaitlistEntry(w.id)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Remove</Text></TouchableOpacity>
               </View>
             </View>
