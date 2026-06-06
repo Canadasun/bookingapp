@@ -40,12 +40,12 @@ function fmtDurationLong(mins: number) {
 // ── Service form modal ────────────────────────────────────────────────────────
 interface ServiceFormState {
   name: string; description: string; durationMinutes: string;
-  priceCents: string; bufferBeforeMin: string; bufferAfterMin: string;
+  priceCents: string; priceType: "FLAT" | "PER_HOUR" | "STARTING_AT"; bufferBeforeMin: string; bufferAfterMin: string;
   capacity: string; resourceId: string;
   color: string; active: boolean; categoryId: string;
 }
 const EMPTY_SVC: ServiceFormState = {
-  name: "", description: "", durationMinutes: "60", priceCents: "",
+  name: "", description: "", durationMinutes: "60", priceCents: "", priceType: "FLAT",
   bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", resourceId: "", color: "#E9A23C", active: true, categoryId: "",
 };
 
@@ -63,6 +63,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       name: editing.name, description: editing.description ?? "",
       durationMinutes: String(editing.durationMinutes),
       priceCents: String(editing.priceCents / 100),
+      priceType: editing.priceType ?? "FLAT",
       bufferBeforeMin: String(editing.bufferBeforeMin),
       bufferAfterMin: String(editing.bufferAfterMin),
       capacity: String(editing.capacity ?? 1),
@@ -84,6 +85,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
         name: form.name, description: form.description || undefined,
         durationMinutes: Number(form.durationMinutes),
         priceCents: Math.round(Number(form.priceCents) * 100),
+        priceType: form.priceType,
         bufferBeforeMin: Number(form.bufferBeforeMin),
         bufferAfterMin: Number(form.bufferAfterMin),
         capacity: Math.max(1, Number(form.capacity) || 1),
@@ -157,30 +159,44 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
             <p className="mt-1.5 text-xs text-violet-600 font-medium">Total: {fmtDurationLong(Number(form.durationMinutes || 0))}</p>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
+            <Input type="number" placeholder="45.00" value={form.priceCents}
+              onChange={e => f("priceCents", e.target.value)}
+              min={0} step="0.01" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Pricing style</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "FLAT" as const, label: "Flat rate" },
+                { value: "PER_HOUR" as const, label: "Per hour" },
+                { value: "STARTING_AT" as const, label: "Starting at" },
+              ].map((opt) => (
+                <button key={opt.value} type="button" onClick={() => f("priceType", opt.value)}
+                  className={cn("rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
+                    form.priceType === opt.value ? "border-violet-300 bg-violet-50 text-violet-700" : "border-gray-200 text-gray-500 hover:bg-gray-50")}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-gray-400">
+              Use starting at when the final amount may change after seeing the client, pet, or job.
+            </p>
+          </div>
+
           {[
-            { k: "priceCents",      label: "Price *",             type: "number", ph: "45.00", step: "0.01" },
             { k: "bufferBeforeMin", label: "Buffer before (min)", type: "number", ph: "0" },
             { k: "bufferAfterMin",  label: "Buffer after (min)",  type: "number", ph: "0" },
-          ].map(({ k, label, type, ph, step }) => (
+          ].map(({ k, label, type, ph }) => (
             <div key={k}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
               <Input type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
                 onChange={e => f(k as keyof ServiceFormState, e.target.value)}
-                min={0} step={step} />
+                min={0} />
             </div>
           ))}
-
-          {/* Group / class capacity */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Group capacity</label>
-            <Input type="number" min={1} step={1} value={form.capacity}
-              onChange={e => f("capacity", e.target.value)} placeholder="1" />
-            <p className="mt-1 text-xs text-gray-400">
-              {Number(form.capacity) > 1
-                ? `Up to ${Number(form.capacity)} clients can book the same time slot (group class).`
-                : "1 = standard one-on-one booking. Increase for group classes."}
-            </p>
-          </div>
 
           {/* Room / resource this service occupies */}
           {resources.length > 0 && (
@@ -539,6 +555,11 @@ export default function ServicesPage() {
 function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
   svc: Service; onEdit: () => void; onToggle: () => void; onDelete: () => void;
 }) {
+  const priceLabel = svc.priceType === "STARTING_AT"
+    ? `Starting at ${formatPrice(svc.priceCents)}`
+    : svc.priceType === "PER_HOUR"
+      ? `${formatPrice(svc.priceCents)} / hr`
+      : formatPrice(svc.priceCents);
   return (
     <div className={cn("flex items-center gap-4 px-4 py-3", !svc.active && "opacity-50")}>
       <div className="w-2.5 h-8 rounded-full shrink-0" style={{ background: svc.color }} />
@@ -550,7 +571,7 @@ function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
         {svc.description && <p className="text-xs text-gray-500 truncate mt-0.5">{svc.description}</p>}
         <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(svc.durationMinutes)}</span>
-          <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatPrice(svc.priceCents)}</span>
+          <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{priceLabel}</span>
           {(svc.bufferBeforeMin > 0 || svc.bufferAfterMin > 0) && (
             <span>+{svc.bufferBeforeMin}/{svc.bufferAfterMin}m buffer</span>
           )}

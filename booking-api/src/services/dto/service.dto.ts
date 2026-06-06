@@ -5,6 +5,7 @@ export const CreateServiceSchema = z.object({
   description: z.string().optional(),
   durationMinutes: z.number().int().positive(),
   priceCents: z.number().int().nonnegative(),
+  priceType: z.enum(['FLAT', 'PER_HOUR', 'STARTING_AT']).default('FLAT'),
   bufferBeforeMin: z.number().int().nonnegative().default(0),
   bufferAfterMin: z.number().int().nonnegative().default(0),
   capacity: z.number().int().min(1).max(100).default(1),

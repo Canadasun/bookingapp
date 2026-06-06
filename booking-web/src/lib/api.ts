@@ -120,6 +120,7 @@ export interface Invoice {
 export interface Service {
   id: string; name: string; description?: string;
   durationMinutes: number; priceCents: number;
+  priceType?: "FLAT" | "PER_HOUR" | "STARTING_AT";
   capacity?: number; resourceId?: string | null;
   bufferBeforeMin: number; bufferAfterMin: number;
   color: string; sortOrder: number; active: boolean;

@@ -545,6 +545,7 @@ model Service {
   description     String?
   durationMinutes Int
   priceCents      Int
+  priceType       String   @default("FLAT") // FLAT, PER_HOUR, STARTING_AT
   bufferBeforeMin Int      @default(0)
   bufferAfterMin  Int      @default(0)
   capacity        Int      @default(1) // > 1 = group/class: that many clients can book the same slot

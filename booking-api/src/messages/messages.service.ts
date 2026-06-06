@@ -59,10 +59,35 @@ export class MessagesService {
     return false;
   }
 
-  send(businessId: string, clientId: string, content: string, fromClient: boolean, channel: 'IN_APP' | 'SMS' = 'IN_APP') {
-    return this.prisma.message.create({
+  async send(businessId: string, clientId: string, content: string, fromClient: boolean, channel: 'IN_APP' | 'SMS' = 'IN_APP') {
+    const message = await this.prisma.message.create({
       data: { businessId, clientId, content, fromClient, channel },
     });
+    if (fromClient) {
+      await this.notifyBusinessUsersOfClientMessage(businessId, clientId, content, channel);
+    }
+    return message;
+  }
+
+  private async notifyBusinessUsersOfClientMessage(businessId: string, clientId: string, content: string, channel: 'IN_APP' | 'SMS') {
+    const [users, client] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { businessId, role: { in: ['OWNER', 'STAFF'] } },
+        select: { id: true },
+      }),
+      this.prisma.client.findUnique({ where: { id: clientId }, select: { name: true } }),
+    ]);
+    if (!users.length) return;
+    const source = channel === 'SMS' ? 'text' : 'message';
+    await this.prisma.notification.createMany({
+      data: users.map((u) => ({
+        userId: u.id,
+        kind: 'SYSTEM' as const,
+        title: `New ${source} from ${client?.name ?? 'a client'}`,
+        body: content.slice(0, 140),
+        linkUrl: '/dashboard/messages',
+      })),
+    }).catch(() => {});
   }
 
   // Tiered SMS delivery of an owner reply. Basic: only to clients who texted the
@@ -111,17 +136,7 @@ export class MessagesService {
       target = clients.find((c) => c.id === pick) ?? target;
     }
 
-    await this.prisma.message.create({
-      data: { businessId: target.businessId, clientId: target.id, content: body.slice(0, 2000), fromClient: true, channel: 'SMS' },
-    });
-    // Surface it to the owner(s) in-app.
-    const owners = await this.prisma.user.findMany({ where: { businessId: target.businessId, role: 'OWNER' }, select: { id: true } });
-    if (owners.length) {
-      const client = await this.prisma.client.findUnique({ where: { id: target.id }, select: { name: true } });
-      await this.prisma.notification.createMany({
-        data: owners.map((o) => ({ userId: o.id, kind: 'SYSTEM' as const, title: `New text from ${client?.name ?? 'a client'}`, body: body.slice(0, 140), linkUrl: '/dashboard/messages' })),
-      }).catch(() => {});
-    }
+    await this.send(target.businessId, target.id, body.slice(0, 2000), true, 'SMS');
   }
 
   markRead(businessId: string, clientId: string) {
