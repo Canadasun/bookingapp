@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
-  DollarSign, BarChart3, FileText,
+  DollarSign, BarChart3, FileText, Search,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -18,7 +18,13 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
-  children?: { href: string; label: string }[];
+  children?: NavChild[];
+}
+
+interface NavChild {
+  href?: string;
+  label?: string;
+  group?: string;
 }
 
 const OWNER_NAV: NavItem[] = [
@@ -31,18 +37,22 @@ const OWNER_NAV: NavItem[] = [
   {
     href: "/dashboard/more",         label: "More",         icon: MenuIcon,
     children: [
+      { group: "Operations" },
       { href: "/dashboard/staff",        label: "Staff" },
       { href: "/dashboard/tasks",        label: "Tasks" },
       { href: "/dashboard/followups",    label: "Follow-ups" },
-      { href: "/dashboard/offers",       label: "Offers" },
       { href: "/dashboard/waitlist",     label: "Waitlist" },
+      { group: "Growth" },
+      { href: "/dashboard/offers",       label: "Offers" },
       { href: "/dashboard/reviews",      label: "Reviews" },
       { href: "/dashboard/marketing",    label: "Marketing" },
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
       { href: "/dashboard/packages",     label: "Packages" },
+      { group: "Financials" },
       { href: "/dashboard/transactions", label: "Transactions" },
       { href: "/dashboard/invoices",     label: "Invoices" },
       { href: "/dashboard/reports",      label: "Reports" },
+      { group: "Admin" },
       { href: "/dashboard/notifications",label: "Notifications" },
       { href: "/dashboard/account",      label: "Account" },
       { href: "/dashboard/settings",     label: "Settings" },
@@ -58,7 +68,7 @@ const STAFF_NAV: NavItem[] = [
 
 function NavLink({ item, onClose }: { item: NavItem; onClose: () => void }) {
   const pathname = usePathname();
-  const childActive = item.children?.some((c) => pathname.startsWith(c.href.split("?")[0])) ?? false;
+  const childActive = item.children?.some((c) => c.href && pathname.startsWith(c.href.split("?")[0])) ?? false;
   const [open, setOpen] = useState(childActive);
   const active = item.href === "/dashboard"
     ? pathname === item.href
@@ -80,17 +90,23 @@ function NavLink({ item, onClose }: { item: NavItem; onClose: () => void }) {
         </button>
         {open && (
           <div className="ml-7 mt-0.5 space-y-0.5">
-            {item.children.map((c) => (
-              <Link key={c.href} href={c.href} onClick={onClose}
-                className={cn(
-                  "block px-3 py-2 rounded-lg text-sm transition-colors",
-                  pathname === c.href.split("?")[0]
-                    ? "text-violet-700 font-medium bg-violet-50"
-                    : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
-                )}>
-                {c.label}
-              </Link>
-            ))}
+            {item.children.map((c, index) => {
+              if (c.group) {
+                return <p key={`${c.group}-${index}`} className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400 first:pt-1">{c.group}</p>;
+              }
+              if (!c.href || !c.label) return null;
+              return (
+                <Link key={c.href} href={c.href} onClick={onClose}
+                  className={cn(
+                    "block px-3 py-2 rounded-lg text-sm transition-colors",
+                    pathname === c.href.split("?")[0]
+                      ? "text-violet-700 font-medium bg-violet-50"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
+                  )}>
+                  {c.label}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
@@ -110,6 +126,69 @@ function NavLink({ item, onClose }: { item: NavItem; onClose: () => void }) {
   );
 }
 
+function commandItems(nav: NavItem[]) {
+  return nav.flatMap((item) => {
+    const parent = item.children
+      ? []
+      : [{ href: item.href, label: item.label }];
+    const children = (item.children ?? [])
+      .filter((child): child is Required<Pick<NavChild, "href" | "label">> => !!child.href && !!child.label)
+      .map((child) => ({ href: child.href, label: child.label }));
+    return [...parent, ...children];
+  });
+}
+
+function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[]; onClose: () => void }) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (open) setQuery("");
+  }, [open]);
+
+  if (!open) return null;
+
+  const q = query.trim().toLowerCase();
+  const items = commandItems(nav).filter((item) =>
+    !q || item.label.toLowerCase().includes(q) || item.href.toLowerCase().includes(q)
+  );
+
+  function go(href: string) {
+    onClose();
+    router.push(href);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/25 p-3 sm:p-8" onClick={onClose}>
+      <div className="mx-auto mt-16 w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
+          <Search className="h-4 w-4 text-gray-400" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+            placeholder="Jump to a page..."
+            className="h-8 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-gray-400"
+          />
+          <kbd className="hidden rounded-md border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 sm:inline">Esc</kbd>
+        </div>
+        <div className="max-h-80 overflow-y-auto p-2">
+          {items.length === 0 ? (
+            <p className="px-3 py-8 text-center text-sm text-gray-400">No matching pages</p>
+          ) : items.map((item) => (
+            <button key={item.href} onClick={() => go(item.href)}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700">
+              <span>{item.label}</span>
+              <span className="text-xs text-gray-300">{item.href.replace("/dashboard", "") || "/"}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -118,6 +197,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatar, setAvatar] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [commandOpen, setCommandOpen] = useState(false);
 
   // Re-read the (display) session and refresh the avatar on every navigation, so
   // edits made on the account page show up in the header/sidebar without a reload.
@@ -152,6 +232,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
   const nav = user?.role === "STAFF" ? staffNav : OWNER_NAV;
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     clearSession();
@@ -159,12 +250,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const currentLabel =
-    nav.flatMap((n) => [n, ...(n.children ?? []).map((c) => ({ ...c, icon: n.icon }))]).find((n) =>
-      n.href === "/dashboard" ? pathname === n.href : pathname.startsWith(n.href.split("?")[0])
+    nav.flatMap((n) => [n, ...(n.children ?? []).filter((c) => c.href).map((c) => ({ ...c, icon: n.icon }))]).find((n) =>
+      n.href === "/dashboard" ? pathname === n.href : n.href && pathname.startsWith(n.href.split("?")[0])
     )?.label ?? "Dashboard";
 
   return (
     <div className="flex min-h-screen brand-shell">
+      <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} />
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside className={cn(
@@ -237,6 +329,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <button type="button" onClick={() => setCommandOpen(true)}
+              className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 lg:inline-flex">
+              <Search className="h-4 w-4" />
+              <span>Search</span>
+              <kbd className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400">⌘K</kbd>
+            </button>
             <Link href="/dashboard/notifications"
               className="relative p-2 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors text-amber-700"
               aria-label="Notifications">
