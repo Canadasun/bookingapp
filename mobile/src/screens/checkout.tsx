@@ -17,6 +17,10 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
+// Square sandbox test nonce — a placeholder card token until the native Square
+// In-App Payments / Tap-to-Pay SDK is wired (config plugin + EAS dev build).
+const SQUARE_SOURCE_ID = 'cnon:card-nonce-ok';
+
 function CheckoutScreen() {
   type Phase = 'amount'|'tap'|'done';
   const [phase, setPhase]     = useState<Phase>('amount');
@@ -44,23 +48,28 @@ function CheckoutScreen() {
   function pressDigit(d:string){ setDigits(p => (p + d).replace(/^0+/, '').slice(0, 7)); } // up to $99,999.99
   function back(){ setDigits(p => p.slice(0, -1)); }
 
-  async function charge() {
+  function charge() {
     if (cents < 50) { Alert.alert('Amount too low', 'Enter at least $0.50.'); return; }
+    setPhase('tap');
+  }
+
+  // Square inverts the flow: the card is tokenized on-device (Tap to Pay / card
+  // entry via the Square In-App Payments SDK) → the API charges that token on the
+  // business's Square account. Until the native SDK is added (config plugin + EAS
+  // dev build) we send Square's sandbox test nonce, which charges a real payment
+  // end-to-end against the sandbox. Replace SQUARE_SOURCE_ID with the SDK token.
+  async function completeTap() {
     setLoading(true);
     try {
-      const r = await api<{ paymentIntentId:string; amountCents:number }>(`/payments/charge`, {
-        method:'POST', body: JSON.stringify({ amountCents: totalCents, tipCents: tipCents || undefined, description: note.trim() || undefined }),
+      const r = await api<{ squarePaymentId:string; amountCents:number; status:string }>(`/payments/charge`, {
+        method:'POST',
+        body: JSON.stringify({ amountCents: totalCents, sourceId: SQUARE_SOURCE_ID, tipCents: tipCents || undefined, description: note.trim() || undefined }),
       });
-      setReceipt({ amountCents: r.amountCents, ref: r.paymentIntentId, at: new Date() });
-      setPhase('tap');
+      setReceipt({ amountCents: r.amountCents, ref: r.squarePaymentId, at: new Date() });
+      setPhase('done');
     } catch(e){ Alert.alert('Checkout failed', e instanceof Error ? e.message : 'Please try again'); }
     finally { setLoading(false); }
   }
-
-  // The Stripe Terminal "Tap to Pay on iPhone" SDK confirms the PaymentIntent here
-  // (collectPaymentMethod → confirmPaymentIntent). Until the Apple proximity-reader
-  // entitlement is granted that hook is stubbed, so this advances to the receipt.
-  function completeTap(){ setPhase('done'); }
 
   function reset(){ setPhase('amount'); setDigits(''); setNote(''); setTipPct(0); setReceipt(null); }
 
@@ -69,7 +78,7 @@ function CheckoutScreen() {
     return (
       <SafeAreaView style={[s.screen, { backgroundColor:'#111827' }]}>
         <View style={co.tapWrap}>
-          <Text style={co.tapAmount}>${(receipt!.amountCents/100).toFixed(2)}</Text>
+          <Text style={co.tapAmount}>${(totalCents/100).toFixed(2)}</Text>
           <View style={co.tapNfc}>
             <Ionicons name="wifi" size={44} color="#fff" style={{ transform:[{ rotate:'90deg' }] }}/>
           </View>
@@ -77,8 +86,8 @@ function CheckoutScreen() {
           <Text style={co.tapSub}>Hold the customer&apos;s card, phone, or watch near the top of your iPhone.</Text>
           <ActivityIndicator color="#fff" style={{ marginTop:24 }}/>
 
-          <TouchableOpacity style={co.tapDone} onPress={completeTap} activeOpacity={0.85}>
-            <Text style={co.tapDoneText}>Complete payment</Text>
+          <TouchableOpacity style={co.tapDone} onPress={completeTap} disabled={loading} activeOpacity={0.85}>
+            <Text style={co.tapDoneText}>{loading ? 'Charging…' : 'Complete payment'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ marginTop:16 }} onPress={()=>setPhase('amount')}>
             <Text style={co.tapCancel}>Cancel</Text>

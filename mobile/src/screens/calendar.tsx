@@ -162,7 +162,7 @@ function CalendarScreen() {
     } finally { setActing(false); }
   }
   // No-show protection: marks NO_SHOW and charges the client's saved card off-session
-  // for the business's no-show fee (Stripe). If no card is on file the backend just
+  // for the business's no-show fee (Square). If no card is on file the backend just
   // marks NO_SHOW and tells us to collect manually.
   function noShow(id:string) {
     Alert.alert('Mark as no-show?','This marks the appointment NO_SHOW and charges the no-show fee to the card on file, if any.',[
