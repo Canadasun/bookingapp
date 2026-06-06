@@ -47,7 +47,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [deliveries, setDeliveries] = useState<NotificationDelivery[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
-  const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean; capacity:string }|null>(null);
+  const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean; capacity:string; priceType:'FLAT'|'PER_HOUR'|'STARTING_AT' }|null>(null);
   const [offerEditor, setOfferEditor] = useState<{ id?:string; title:string; description:string; discount:string; expiresAt:string }|null>(null);
   const [giftMode, setGiftMode] = useState<null|'issue'|'redeem'>(null);
   const [giftIssue, setGiftIssue] = useState({ amount:'50', recipientName:'', recipientEmail:'', message:'' });
@@ -157,6 +157,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         color: BRAND,
         active: serviceEditor.active,
         capacity: Math.max(1, Number.parseInt(serviceEditor.capacity || '1', 10) || 1),
+        priceType: serviceEditor.priceType,
       };
       if (serviceEditor.id) await api(`/businesses/${bizId()}/services/${serviceEditor.id}`, { method:'PATCH', body: JSON.stringify(payload) });
       else await api(`/businesses/${bizId()}/services`, { method:'POST', body: JSON.stringify(payload) });
@@ -804,7 +805,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <View style={s.header}>
         <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Services</Text>
-        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1' })}>
+        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1', priceType:'FLAT' })}>
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -818,13 +819,18 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               price: (sv.priceCents / 100).toFixed(2),
               active: sv.active,
               capacity: String(sv.capacity ?? 1),
+              priceType: (sv.priceType as any) ?? 'FLAT',
             })}>
               <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{sv.name}</Text>
                 <Text style={ms.rowMeta}>{sv.durationMinutes} min{(sv.capacity ?? 1) > 1 ? ` · group of ${sv.capacity}` : ''}{sv.active ? '' : ' · inactive'}</Text>
               </View>
-              <PriceTag cents={sv.priceCents}/>
+              <View style={{ alignItems:'flex-end' }}>
+                <PriceTag cents={sv.priceCents}/>
+                {sv.priceType==='PER_HOUR' && <Text style={{ fontSize:10, color:GRAY_400, marginTop:1 }}>/hr</Text>}
+                {sv.priceType==='STARTING_AT' && <Text style={{ fontSize:10, color:GRAY_400, marginTop:1 }}>starting</Text>}
+              </View>
             </TouchableOpacity>
           ))}
           {services && services.length===0 && <Text style={ms.empty}>No services yet.</Text>}
@@ -856,7 +862,19 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 </View>
               </View>
               <Text style={[ms.rowMeta,{ color:BRAND, marginTop:6 }]}>Total: {fmtDur(Number(serviceEditor.durationMinutes)||0)}</Text>
-              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Price</Text>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Pricing</Text>
+              <View style={{ flexDirection:'row', gap:8, marginBottom:10 }}>
+                {([['FLAT','Flat rate'],['PER_HOUR','Per hour'],['STARTING_AT','Starting at']] as const).map(([val,label])=>{
+                  const on = serviceEditor.priceType===val;
+                  return (
+                    <TouchableOpacity key={val} onPress={()=>setServiceEditor({...serviceEditor, priceType:val})}
+                      style={[s.slotBtn, on && s.slotBtnActive, { flex:1, alignItems:'center' }]}>
+                      <Text style={[s.slotText, on && s.slotTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={s.fieldLabel}>{serviceEditor.priceType==='PER_HOUR'?'Hourly rate':serviceEditor.priceType==='STARTING_AT'?'Starting price':'Price'}</Text>
               <TextInput style={s.input} value={serviceEditor.price} keyboardType="decimal-pad" onChangeText={price=>setServiceEditor({...serviceEditor,price})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Group capacity</Text>
               <TextInput style={s.input} value={serviceEditor.capacity} keyboardType="number-pad"
