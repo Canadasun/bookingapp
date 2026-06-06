@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { cn } from "@/lib/utils";
+import { useEvents } from "@/lib/hooks";
 
 interface NavItem {
   href: string;
@@ -66,7 +67,7 @@ const STAFF_NAV: NavItem[] = [
   { href: "/dashboard/messages",     label: "Messages",        icon: MessageSquare },
 ];
 
-function NavLink({ item, onClose }: { item: NavItem; onClose: () => void }) {
+function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
   const pathname = usePathname();
   const childActive = item.children?.some((c) => c.href && pathname.startsWith(c.href.split("?")[0])) ?? false;
   const [open, setOpen] = useState(childActive);
@@ -121,6 +122,11 @@ function NavLink({ item, onClose }: { item: NavItem; onClose: () => void }) {
       )}>
       <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-600" : "text-gray-400 group-hover:text-gray-600")} />
       <span className="flex-1">{item.label}</span>
+      {item.href === "/dashboard/messages" && unreadMessages > 0 && (
+        <span className="min-w-5 h-5 rounded-full bg-red-600 px-1 text-[10px] leading-5 text-white text-center font-bold">
+          {unreadMessages > 99 ? "99+" : unreadMessages}
+        </span>
+      )}
       {active && <ChevronRight className="w-3 h-3 text-violet-400" />}
     </Link>
   );
@@ -197,6 +203,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatar, setAvatar] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [commandOpen, setCommandOpen] = useState(false);
 
   // Re-read the (display) session and refresh the avatar on every navigation, so
@@ -215,6 +222,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .then((r) => setUnread(r.count))
       .catch(() => setUnread(0));
   }, [pathname]);
+
+  const refreshUnreadMessages = useCallback(() => {
+    const current = getUser();
+    if (!current?.businessId) return;
+    api.messages.unreadCount(current.businessId)
+      .then((result) => setUnreadMessages(result.unreadMessages))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshUnreadMessages();
+    const interval = window.setInterval(refreshUnreadMessages, 15_000);
+    const onVisibility = () => { if (document.visibilityState === "visible") refreshUnreadMessages(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [pathname, refreshUnreadMessages]);
+
+  useEvents(useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]));
 
   // Staff get the base nav plus anything their granted permissions unlock.
   const perms = user?.permissions ?? [];
@@ -276,7 +304,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {nav.map((item) => (
-            <NavLink key={item.href} item={item} onClose={() => setOpen(false)} />
+            <NavLink key={item.href} item={item} onClose={() => setOpen(false)} unreadMessages={unreadMessages} />
           ))}
         </nav>
 
@@ -347,8 +375,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Link>
             {/* Messages quick-link */}
             <Link href="/dashboard/messages"
-              className="p-2 rounded-xl bg-violet-50 hover:bg-violet-100 transition-colors text-violet-700">
+              className="relative p-2 rounded-xl bg-violet-50 hover:bg-violet-100 transition-colors text-violet-700"
+              aria-label={unreadMessages > 0 ? `${unreadMessages} unread client messages` : "Messages"}>
               <MessageSquare className="w-4.5 h-4.5" />
+              {unreadMessages > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 min-w-5 h-5 rounded-full bg-red-600 px-1 text-[10px] leading-5 text-white text-center font-bold ring-2 ring-white">
+                  {unreadMessages > 99 ? "99+" : unreadMessages}
+                </span>
+              )}
             </Link>
             {user && (
               <Link href="/dashboard/account" className="flex items-center gap-2 rounded-full hover:bg-gray-100 pr-2 transition-colors" title="Your account">

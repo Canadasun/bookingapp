@@ -214,6 +214,14 @@ export class NotificationsService implements OnModuleInit {
     );
   }
 
+  async sendPriorityMessageAlert(messageId: string) {
+    await this.queue.add(
+      'priority-message-alert',
+      { messageId },
+      { jobId: `priority-message-alert-${messageId}`, removeOnComplete: true, attempts: 2 },
+    );
+  }
+
   async sendAdminBookingAlert(appointmentId: string) {
     const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
     if (!adminEmail) {

@@ -17,8 +17,9 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
-function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client|null; onClearClient:()=>void }) {
-  const [threads, setThreads]   = useState<Array<{clientId:string;client:{name:string;email:string};lastMessage:string;fromClient:boolean;read:boolean;createdAt:string}>>([]);
+function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { initialClient:Client|null; onClearClient:()=>void; onUnreadChanged:(count:number)=>void }) {
+  const navigation = useNavigation<any>();
+  const [threads, setThreads]   = useState<Array<{clientId:string;client:{name:string;email:string};lastMessage:string;fromClient:boolean;read:boolean;unreadCount:number;createdAt:string}>>([]);
   const [selected, setSelected] = useState<Client|null>(null);
   const [msgs, setMsgs]         = useState<Message[]>([]);
   const [reply, setReply]       = useState('');
@@ -29,17 +30,24 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
 
   const loadThreads = useCallback(async () => {
     try {
-      const [threadData, bizData] = await Promise.all([
+      const [threadData, bizData, unread] = await Promise.all([
         api<any[]>(`/businesses/${bizId()}/messages`),
-        api<any>(`/businesses/${bizId()}`).catch(() => ({ plan: 'FREE' }))
+        api<any>(`/businesses/${bizId()}`).catch(() => ({ plan: 'FREE' })),
+        api<{unreadMessages:number}>(`/businesses/${bizId()}/messages/unread-count`).catch(() => ({ unreadMessages:0 })),
       ]);
       setThreads(threadData);
+      onUnreadChanged(unread.unreadMessages);
       setPlan(bizData.plan);
     }
     catch {}
     finally { setLoading(false); }
-  }, []);
+  }, [onUnreadChanged]);
   useEffect(()=>{ loadThreads(); },[loadThreads]);
+  useEffect(() => navigation.addListener('focus', loadThreads), [navigation, loadThreads]);
+  useEffect(() => {
+    const interval = setInterval(loadThreads, 10_000);
+    return () => clearInterval(interval);
+  }, [loadThreads]);
 
   useEffect(()=>{
     if (initialClient) { openThread(initialClient); onClearClient(); }
@@ -50,7 +58,9 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
     try {
       const data = await api<Message[]>(`/businesses/${bizId()}/clients/${c.id}/messages`);
       setMsgs(data);
-      await api(`/businesses/${bizId()}/clients/${c.id}/messages/read`,{method:'PATCH'});
+      const unread = await api<{unreadMessages:number}>(`/businesses/${bizId()}/clients/${c.id}/messages/read`,{method:'PATCH'});
+      onUnreadChanged(unread.unreadMessages);
+      setThreads((prev) => prev.map((thread) => thread.clientId === c.id ? { ...thread, read:true, unreadCount:0 } : thread));
     } catch {}
     setTimeout(()=>scrollRef.current?.scrollToEnd({animated:false}),100);
   }
@@ -125,13 +135,18 @@ function MessagesScreen({ initialClient, onClearClient }: { initialClient:Client
           ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No messages yet</Text></View>}
           showsVerticalScrollIndicator={false}
           renderItem={({item:t})=>(
-            <TouchableOpacity style={s.card} activeOpacity={0.7}
+            <TouchableOpacity style={[s.card, t.unreadCount>0 && { borderColor:'#FCA5A5', backgroundColor:'#FEF2F2' }]} activeOpacity={0.7}
               onPress={()=>openThread({id:t.clientId,...t.client})}>
               <View style={s.avatar}><Text style={s.avatarText}>{t.client.name.slice(0,2).toUpperCase()}</Text></View>
               <View style={{flex:1}}>
                 <View style={s.row}>
-                  <Text style={s.clientName}>{t.client.name}</Text>
-                  {t.fromClient&&!t.read&&<View style={s.unreadDot}/>}
+                  <Text style={[s.clientName, t.unreadCount>0 && { color:'#991B1B', fontWeight:'800' }]}>{t.client.name}</Text>
+                  {t.unreadCount>0&&(
+                    <View style={{ flexDirection:'row', alignItems:'center', gap:5 }}>
+                      <Text style={{ color:'#DC2626', fontSize:10, fontWeight:'800' }}>{t.unreadCount} UNREAD</Text>
+                      <View style={[s.unreadDot,{ backgroundColor:'#DC2626' }]}/>
+                    </View>
+                  )}
                 </View>
                 <Text style={s.sub} numberOfLines={1}>{t.lastMessage}</Text>
               </View>

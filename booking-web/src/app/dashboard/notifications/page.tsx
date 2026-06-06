@@ -196,18 +196,20 @@ export default function NotificationsPage() {
           <div className="space-y-2">
             {visible.map((n) => {
               const Icon = iconFor(n.kind);
+              const urgentMessage = n.title.startsWith("Urgent:");
               return (
                 <button key={n.id} onClick={() => open(n)}
                   className={cn("w-full text-left rounded-xl border p-4 transition-colors",
+                    urgentMessage && !n.read ? "border-red-200 bg-red-50 shadow-sm hover:bg-red-100/60" :
                     n.read ? "border-gray-100 bg-white hover:bg-gray-50" : "border-violet-200 bg-white shadow-sm hover:bg-violet-50/40")}>
                   <div className="flex items-start gap-3">
-                    <div className={cn("w-9 h-9 rounded-lg border flex items-center justify-center shrink-0", colorFor(n.kind, n.read))}>
+                    <div className={cn("w-9 h-9 rounded-lg border flex items-center justify-center shrink-0", urgentMessage && !n.read ? "border-red-200 bg-red-100 text-red-700" : colorFor(n.kind, n.read))}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className={cn("text-sm truncate", n.read ? "font-medium text-gray-700" : "font-semibold text-gray-900")}>{n.title}</p>
-                        {!n.read && <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />}
+                        <p className={cn("text-sm truncate", urgentMessage && !n.read ? "font-bold text-red-900" : n.read ? "font-medium text-gray-700" : "font-semibold text-gray-900")}>{n.title}</p>
+                        {!n.read && <span className={cn("w-2 h-2 rounded-full shrink-0", urgentMessage ? "bg-red-600" : "bg-violet-500")} />}
                       </div>
                       {n.body && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{n.body}</p>}
                       <p className="text-xs text-gray-400 mt-1.5">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>

@@ -101,21 +101,25 @@ function NotificationsScreen() {
         contentContainerStyle={[s.listContent, visible.length===0 && { flexGrow:1, justifyContent:'center' }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}
         ListEmptyComponent={<Text style={s.emptyText}>No alerts to show.</Text>}
-        renderItem={({item})=>(
-          <TouchableOpacity style={[s.card, !item.read && { borderColor:BRAND_LT, backgroundColor:'#FFFBF6' }]} onPress={()=>open(item)}>
-            <View style={{ width:36, height:36, borderRadius:12, backgroundColor:item.read?GRAY_100:BRAND_LT, alignItems:'center', justifyContent:'center' }}>
-              <Ionicons name={iconFor(item.kind) as any} size={18} color={item.read?GRAY_500:BRAND}/>
+        renderItem={({item})=>{
+          const urgentMessage = item.title.startsWith('Urgent:');
+          return (
+          <TouchableOpacity style={[s.card, !item.read && { borderColor:urgentMessage?'#FCA5A5':BRAND_LT, backgroundColor:urgentMessage?'#FEF2F2':'#FFFBF6' }]} onPress={()=>open(item)}>
+            <View style={{ width:36, height:36, borderRadius:12, backgroundColor:item.read?GRAY_100:urgentMessage?'#FEE2E2':BRAND_LT, alignItems:'center', justifyContent:'center' }}>
+              <Ionicons name={urgentMessage?'chatbubble-ellipses':iconFor(item.kind) as any} size={18} color={item.read?GRAY_500:urgentMessage?'#DC2626':BRAND}/>
             </View>
             <View style={s.cardBody}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:6 }}>
-                <Text style={[s.clientName, { flex:1 }]} numberOfLines={1}>{item.title}</Text>
-                {!item.read && <View style={{ width:8, height:8, borderRadius:4, backgroundColor:BRAND }}/>}
+                <Text style={[s.clientName, { flex:1 }, urgentMessage&&!item.read&&{ color:'#991B1B', fontWeight:'800' }]} numberOfLines={1}>{item.title}</Text>
+                {!item.read && (
+                  <View style={{ width:8, height:8, borderRadius:4, backgroundColor:urgentMessage?'#DC2626':BRAND }}/>
+                )}
               </View>
               {!!item.body && <Text style={s.sub} numberOfLines={2}>{item.body}</Text>}
               <Text style={s.dateText}>{new Date(item.createdAt).toLocaleDateString([], { month:'short', day:'numeric' })} {fmtTime(item.createdAt)}</Text>
             </View>
           </TouchableOpacity>
-        )}
+        )}}
       />
     </SafeAreaView>
   );

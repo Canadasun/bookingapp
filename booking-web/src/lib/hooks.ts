@@ -47,6 +47,9 @@ export function useEvents(onUpdate: (data: unknown) => void) {
         socket.on("bookingUpdated", (data: unknown) => {
           onUpdate(data);
         });
+        socket.on("messageUpdated", (data: unknown) => {
+          onUpdate(data);
+        });
       })
       .catch(() => {
         // Not authenticated / ticket unavailable — skip realtime; the UI still

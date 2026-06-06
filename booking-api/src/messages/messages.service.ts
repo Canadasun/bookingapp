@@ -2,13 +2,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizePhone } from '../common/util/phone';
 import { TwilioSmsProvider } from '../notifications/providers/sms.provider';
+import { EventsGateway } from '../events/events.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
   private readonly sms = new TwilioSmsProvider();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private events: EventsGateway,
+    private notifications: NotificationsService,
+  ) {}
 
   getThread(businessId: string, clientId: string) {
     return this.prisma.message.findMany({
@@ -65,6 +71,9 @@ export class MessagesService {
     });
     if (fromClient) {
       await this.notifyBusinessUsersOfClientMessage(businessId, clientId, content, channel);
+      const unread = await this.getUnreadCount(businessId);
+      this.events.emitMessageUpdate(businessId, { clientId, ...unread });
+      await this.notifications.sendPriorityMessageAlert(message.id).catch(() => {});
     }
     return message;
   }
@@ -83,7 +92,7 @@ export class MessagesService {
       data: users.map((u) => ({
         userId: u.id,
         kind: 'SYSTEM' as const,
-        title: `New ${source} from ${client?.name ?? 'a client'}`,
+        title: `Urgent: new ${source} from ${client?.name ?? 'a client'}`,
         body: content.slice(0, 140),
         linkUrl: '/dashboard/messages',
       })),
@@ -139,23 +148,45 @@ export class MessagesService {
     await this.send(target.businessId, target.id, body.slice(0, 2000), true, 'SMS');
   }
 
-  markRead(businessId: string, clientId: string) {
-    return this.prisma.message.updateMany({
+  async markRead(businessId: string, clientId: string) {
+    const result = await this.prisma.message.updateMany({
       where: { businessId, clientId, fromClient: true, read: false },
       data: { read: true },
     });
+    const unread = await this.getUnreadCount(businessId);
+    this.events.emitMessageUpdate(businessId, { clientId, ...unread });
+    return { ...result, ...unread };
+  }
+
+  async getUnreadCount(businessId: string) {
+    const [unreadMessages, unreadGroups] = await Promise.all([
+      this.prisma.message.count({ where: { businessId, fromClient: true, read: false } }),
+      this.prisma.message.groupBy({
+        by: ['clientId'],
+        where: { businessId, fromClient: true, read: false },
+      }),
+    ]);
+    return { unreadMessages, unreadThreads: unreadGroups.length };
   }
 
   async getBusinessThreads(businessId: string, unreadOnly = false) {
-    const messages = await this.prisma.message.findMany({
-      where: {
-        businessId,
-        ...(unreadOnly ? { fromClient: true, read: false } : {}),
-      },
-      include: { client: { select: { id: true, name: true, email: true, phone: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 2000, // bound: newest messages are enough to surface active threads
-    });
+    const [messages, unreadGroups] = await Promise.all([
+      this.prisma.message.findMany({
+        where: {
+          businessId,
+          ...(unreadOnly ? { fromClient: true, read: false } : {}),
+        },
+        include: { client: { select: { id: true, name: true, email: true, phone: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 2000, // bound: newest messages are enough to surface active threads
+      }),
+      this.prisma.message.groupBy({
+        by: ['clientId'],
+        where: { businessId, fromClient: true, read: false },
+        _count: { _all: true },
+      }),
+    ]);
+    const unreadByClient = new Map(unreadGroups.map((row) => [row.clientId, row._count._all]));
 
     // Group by clientId — return latest message per thread
     const threads = new Map<string, typeof messages[0]>();
@@ -168,7 +199,8 @@ export class MessagesService {
       client: m.client,
       lastMessage: m.content,
       fromClient: m.fromClient,
-      read: m.read,
+      read: (unreadByClient.get(m.clientId) ?? 0) === 0,
+      unreadCount: unreadByClient.get(m.clientId) ?? 0,
       createdAt: m.createdAt,
     }));
   }

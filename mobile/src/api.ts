@@ -36,6 +36,24 @@ export async function registerPushNotifications() {
     // before dependencies are installed. EAS installs expo-notifications from package.json.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('client-messages', {
+        name: 'Urgent client messages',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 150, 250],
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+      });
+    }
     const current = await Notifications.getPermissionsAsync();
     const finalStatus = current.status === 'granted'
       ? current.status

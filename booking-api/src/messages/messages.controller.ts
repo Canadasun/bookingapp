@@ -139,6 +139,17 @@ export class BusinessMessagesController {
     }
     return this.svc.getBusinessThreads(businessId, unread === 'true');
   }
+
+  @Get('unread-count')
+  unreadCount(
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.svc.getUnreadCount(businessId);
+  }
 }
 
 // ── Public Twilio inbound-SMS webhook ────────────────────────────────────────

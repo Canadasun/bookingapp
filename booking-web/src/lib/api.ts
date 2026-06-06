@@ -743,7 +743,7 @@ export const api = {
 
   messages: {
     threads: (businessId: string) =>
-      req<Array<{ clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; createdAt: string }>>(`/businesses/${businessId}/messages`),
+      req<Array<{ clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; createdAt: string }>>(`/businesses/${businessId}/messages`),
     thread: (businessId: string, clientId: string, appointmentId?: string, token?: string) => {
       const q = new URLSearchParams();
       if (appointmentId) q.set("appointmentId", appointmentId);
@@ -762,6 +762,8 @@ export const api = {
       req<{ id: string; sms?: { sent: boolean; reason?: string } }>(`/businesses/${businessId}/clients/${clientId}/messages/reply`, { method: "POST", body: JSON.stringify({ content }) }),
     markRead: (businessId: string, clientId: string) =>
       req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages/read`, { method: "PATCH" }),
+    unreadCount: (businessId: string) =>
+      req<{ unreadMessages: number; unreadThreads: number }>(`/businesses/${businessId}/messages/unread-count`),
   },
 
   offers: {

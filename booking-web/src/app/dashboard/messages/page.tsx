@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
+import { useEvents } from "@/lib/hooks";
 
-interface Thread { clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; createdAt: string }
+interface Thread { clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; createdAt: string }
 interface Message { id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }
 
 export default function MessagesPage() {
@@ -45,6 +46,13 @@ export default function MessagesPage() {
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
+  useEvents(useCallback(() => {
+    loadThreads();
+    if (selected && bizId) {
+      api.messages.thread(bizId, selected.clientId).then(setMsgs).catch(() => {});
+    }
+  }, [bizId, loadThreads, selected]));
+
   async function openThread(t: Thread) {
     if (!bizId) return;
     setSelected(t);
@@ -52,6 +60,7 @@ export default function MessagesPage() {
       const data = await api.messages.thread(bizId, t.clientId);
       setMsgs(data);
       await api.messages.markRead(bizId, t.clientId);
+      setThreads((prev) => prev.map((thread) => thread.clientId === t.clientId ? { ...thread, read:true, unreadCount:0 } : thread));
       loadThreads();
     } catch { toast.error("Failed to load thread"); }
     setTimeout(() => scrollRef.current?.scrollTo({ top: 9999 }), 80);
@@ -104,8 +113,9 @@ export default function MessagesPage() {
           ) : threads.map((t) => (
             <button key={t.clientId} onClick={() => openThread(t)}
               className={cn(
-                "w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors",
-                selected?.clientId === t.clientId && "bg-violet-50",
+                "w-full px-4 py-3 text-left transition-colors",
+                t.unreadCount > 0 ? "bg-red-50 hover:bg-red-100/70" : "hover:bg-gray-50",
+                selected?.clientId === t.clientId && "ring-1 ring-inset ring-violet-200",
               )}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -113,11 +123,14 @@ export default function MessagesPage() {
                     {t.client.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{t.client.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={cn("text-sm truncate", t.unreadCount > 0 ? "font-bold text-red-900" : "font-semibold text-gray-800")}>{t.client.name}</p>
+                      {t.unreadCount > 0 && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">{t.unreadCount} unread</span>}
+                    </div>
                     <p className="text-xs text-gray-400 truncate">{t.lastMessage}</p>
                   </div>
                 </div>
-                {t.fromClient && !t.read && <div className="w-2 h-2 rounded-full bg-violet-600 shrink-0" />}
+                {t.unreadCount > 0 && <div className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 shadow-sm shadow-red-300" />}
               </div>
             </button>
           ))}

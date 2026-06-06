@@ -7,6 +7,7 @@ import {
   View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, SectionList,
   StyleSheet, ActivityIndicator, Alert, SafeAreaView, Platform, Modal,
   StatusBar, KeyboardAvoidingView, RefreshControl, BackHandler, Linking, Switch, Share,
+  AppState,
 } from 'react-native';
 
 // ── Shared modules (extracted from this file into src/) ─────────────────────
@@ -73,6 +74,25 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
 }) {
   const insets = useSafeAreaInsets();
   const barHeight = 60 + Math.max(insets.bottom, 8);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const refreshUnreadMessages = useCallback(async () => {
+    const businessId = bizId();
+    if (!businessId) return;
+    try {
+      const result = await api<{ unreadMessages:number }>(`/businesses/${businessId}/messages/unread-count`);
+      setUnreadMessages(result.unreadMessages);
+    } catch { /* foreground polling is best-effort */ }
+  }, []);
+
+  useEffect(() => {
+    refreshUnreadMessages();
+    const interval = setInterval(refreshUnreadMessages, 10_000);
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshUnreadMessages();
+    });
+    return () => { clearInterval(interval); appState.remove(); };
+  }, [refreshUnreadMessages]);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -104,8 +124,11 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
       <Tab.Screen name="Customers">
         {()=><ClientsScreen onMessage={c=>setMsgClient(c)}/>}
       </Tab.Screen>
-      <Tab.Screen name="Messages">
-        {()=><MessagesScreen initialClient={msgClient} onClearClient={()=>setMsgClient(null)}/>}
+      <Tab.Screen name="Messages" options={{
+        tabBarBadge: unreadMessages > 0 ? (unreadMessages > 99 ? '99+' : unreadMessages) : undefined,
+        tabBarBadgeStyle: { backgroundColor:'#DC2626', color:'#fff', fontSize:10, fontWeight:'800' },
+      }}>
+        {()=><MessagesScreen initialClient={msgClient} onClearClient={()=>setMsgClient(null)} onUnreadChanged={setUnreadMessages}/>}
       </Tab.Screen>
       <Tab.Screen name="Alerts" component={NotificationsScreen}/>
       <Tab.Screen name="Menu">
@@ -189,4 +212,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-

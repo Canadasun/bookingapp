@@ -376,6 +376,8 @@ export class NotificationProcessor extends WorkerHost {
               sound: 'default',
               title: data.title,
               body: data.body ?? data.title,
+              priority: this.currentType === 'priority-message-alert' ? 'high' : 'default',
+              ...(this.currentType === 'priority-message-alert' ? { channelId: 'client-messages' } : {}),
               data: { businessId: data.businessId },
             }),
           });
@@ -407,7 +409,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
@@ -416,6 +418,25 @@ export class NotificationProcessor extends WorkerHost {
     this.currentType = job.name; // label for the delivery log
     this.currentBusinessId = null;
     this.currentUserId = job.data.userId ?? null;
+
+    if (job.name === 'priority-message-alert') {
+      const message = await this.prisma.message.findUnique({
+        where: { id: job.data.messageId! },
+        include: { client: { select: { name: true } } },
+      });
+      if (!message || !message.fromClient) return;
+      this.currentBusinessId = message.businessId;
+      const users = await this.prisma.user.findMany({
+        where: { businessId: message.businessId, role: { in: ['OWNER', 'STAFF'] } },
+        select: { id: true },
+      });
+      await this.sendPushToUsers(users.map((user) => user.id), {
+        businessId: message.businessId,
+        title: `Urgent message from ${message.client.name}`,
+        body: message.content.slice(0, 160),
+      });
+      return;
+    }
 
     // 2FA one-time code (email, or SMS if the method is SMS and a phone exists).
     if (job.name === 'otp') {
