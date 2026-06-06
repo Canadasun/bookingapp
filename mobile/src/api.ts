@@ -1,0 +1,51 @@
+// Authenticated fetch wrapper with transparent token-refresh-on-401, plus
+// best-effort Expo push-token registration.
+import { Platform } from 'react-native';
+import { API_BASE } from './config';
+import { getAuth, refreshSession } from './auth';
+
+export async function api<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
+  const { token } = getAuth();
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  // Access token expired mid-session → refresh once and retry transparently.
+  if (res.status === 401 && !_retried && getAuth().refresh) {
+    if (await refreshSession()) return api<T>(path, init, true);
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as Record<string,unknown>;
+    throw new Error(typeof body.message === 'string' ? body.message : `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function registerPushNotifications() {
+  const { token, user } = getAuth();
+  if (!token || !user) return;
+  try {
+    // Optional at runtime so local type-checks do not require the native module
+    // before dependencies are installed. EAS installs expo-notifications from package.json.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Notifications = require('expo-notifications');
+    const current = await Notifications.getPermissionsAsync();
+    const finalStatus = current.status === 'granted'
+      ? current.status
+      : (await Notifications.requestPermissionsAsync()).status;
+    if (finalStatus !== 'granted') return;
+    const result = await Notifications.getExpoPushTokenAsync();
+    const pushToken = result?.data;
+    if (!pushToken) return;
+    await api('/users/me/device-token', {
+      method:'POST',
+      body: JSON.stringify({ token: pushToken, platform: Platform.OS.toUpperCase() }),
+    }).catch(() => {});
+  } catch {
+    // Push is best-effort; never block login or app launch.
+  }
+}
