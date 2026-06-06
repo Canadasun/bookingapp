@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { ServiceDueService } from './service-due.service';
@@ -14,12 +14,24 @@ type AuthUser = { role: string; businessId: string | null };
 const SetSchema = z.object({
   clientId: z.string().min(1),
   serviceId: z.string().optional().nullable(),
+  policyId: z.string().optional().nullable(),
   cadenceDays: z.number().int().positive().max(366).optional().nullable(),
   dueAt: z.string().datetime(),
+  messageSubject: z.string().max(200).optional().nullable(),
+  messageBody: z.string().max(2000).optional().nullable(),
 });
 const RescheduleSchema = z.object({
   cadenceDays: z.number().int().positive().max(366).optional().nullable(),
   dueAt: z.string().datetime().optional(),
+});
+const PolicySchema = z.object({
+  serviceId: z.string().optional().nullable(),
+  name: z.string().min(1).max(100),
+  trigger: z.enum(['COMPLETED', 'MANUAL']).default('COMPLETED'),
+  delayDays: z.number().int().min(0).max(3660),
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(2000),
+  enabled: z.boolean().optional(),
 });
 
 @ApiTags('service-due')
@@ -40,6 +52,24 @@ export class ServiceDueController {
   list(@Param('businessId') businessId: string, @CurrentUser() user: AuthUser) {
     this.assert(user, businessId);
     return this.svc.list(businessId);
+  }
+
+  @Get('policies')
+  policies(@Param('businessId') businessId: string, @CurrentUser() user: AuthUser) {
+    this.assert(user, businessId);
+    return this.svc.listPolicies(businessId);
+  }
+
+  @Post('policies')
+  createPolicy(@Param('businessId') businessId: string, @Body(new ZodValidationPipe(PolicySchema)) dto: z.infer<typeof PolicySchema>, @CurrentUser() user: AuthUser) {
+    this.assert(user, businessId);
+    return this.svc.createPolicy(businessId, dto);
+  }
+
+  @Patch('policies/:id')
+  updatePolicy(@Param('businessId') businessId: string, @Param('id') id: string, @Body(new ZodValidationPipe(PolicySchema.partial())) dto: Partial<z.infer<typeof PolicySchema>>, @CurrentUser() user: AuthUser) {
+    this.assert(user, businessId);
+    return this.svc.updatePolicy(businessId, id, dto);
   }
 
   @Post()

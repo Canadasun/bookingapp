@@ -1,7 +1,7 @@
 // Small formatting helpers shared across screens.
 
 export const fmtTime = (value: string | Date) =>
-  new Date(value).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:false });
+  new Date(value).toLocaleTimeString([], { hour:'numeric', minute:'2-digit', hour12:true });
 
 // Human duration, e.g. 75 → "1h 15m". Shared across the calendar and the service editor.
 export function fmtDur(min:number){ const h=Math.floor(min/60), r=min%60; if(h&&r) return `${h}h ${r}m`; return h?`${h}h`:`${min}m`; }

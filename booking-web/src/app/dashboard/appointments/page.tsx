@@ -47,7 +47,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
   const feeEligible = apt.business?.plan === "PRO" && (apt.business?.cancellationFeeCents ?? 0) > 0;
   const [edit, setEdit] = useState({
     clientName: apt.client.name,
-    clientEmail: apt.client.email,
+    clientEmail: apt.client.email ?? "",
     clientPhone: apt.client.phone ?? "",
     startsAt: format(new Date(apt.startsAt), "yyyy-MM-dd'T'HH:mm"),
     notes: apt.notes ?? "",
@@ -85,7 +85,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
               {format(new Date(apt.startsAt), "EEEE, MMMM d, yyyy")}
             </p>
             <p className="text-sm text-violet-600 mt-0.5">
-              {format(new Date(apt.startsAt), "HH:mm")} - {format(new Date(apt.endsAt), "HH:mm")}
+              {format(new Date(apt.startsAt), "h:mm a")} - {format(new Date(apt.endsAt), "h:mm a")}
             </p>
           </div>
 
@@ -302,7 +302,7 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
                     onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
                     className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100 cursor-grab active:cursor-grabbing">
                     <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
-                    <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "HH:mm")} {a.client.name}</span>
+                    <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "h:mm a")} {a.client.name}</span>
                   </button>
                 ))}
                 {list.length > 3 && <p className="px-1 text-[10px] text-gray-400">+{list.length - 3} more</p>}
@@ -416,7 +416,7 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
                   <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-700 truncate">
-                        {format(new Date(b.startsAt), "EEE, MMM d · HH:mm")}–{format(new Date(b.endsAt), "HH:mm")}
+                        {format(new Date(b.startsAt), "EEE, MMM d · h:mm a")}–{format(new Date(b.endsAt), "h:mm a")}
                       </p>
                       {b.reason && <p className="text-[11px] text-gray-400 truncate">{b.reason}</p>}
                     </div>
@@ -482,7 +482,7 @@ function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect, onResch
                     className="block w-full text-left rounded-lg border border-gray-100 px-2 py-1.5 hover:bg-gray-50 cursor-grab active:cursor-grabbing">
                     <span className="flex items-center gap-1">
                       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
-                      <span className="text-[11px] font-semibold text-gray-700">{format(new Date(a.startsAt), "HH:mm")}</span>
+                      <span className="text-[11px] font-semibold text-gray-700">{format(new Date(a.startsAt), "h:mm a")}</span>
                     </span>
                     <span className="block truncate text-[11px] text-gray-600">{a.client.name}</span>
                   </button>
@@ -593,7 +593,7 @@ export default function AppointmentsPage() {
       const q = search.toLowerCase();
       list = list.filter((a) =>
         a.client.name.toLowerCase().includes(q) ||
-        a.client.email.toLowerCase().includes(q) ||
+        (a.client.email ?? "").toLowerCase().includes(q) ||
         (a.client.phone ?? "").includes(q)
       );
     }
@@ -610,7 +610,7 @@ export default function AppointmentsPage() {
       const q = search.toLowerCase();
       list = list.filter((a) =>
         a.client.name.toLowerCase().includes(q) ||
-        a.client.email.toLowerCase().includes(q) ||
+        (a.client.email ?? "").toLowerCase().includes(q) ||
         (a.client.phone ?? "").includes(q)
       );
     }
@@ -776,7 +776,7 @@ export default function AppointmentsPage() {
                   </div>
                   <p className="text-sm text-gray-500 mt-0.5">{apt.service.name} · {apt.staff.user.name}</p>
                   <p className="text-sm font-medium text-violet-600 mt-0.5">
-                    {format(new Date(apt.startsAt), "EEE, MMM d · HH:mm")} - {format(new Date(apt.endsAt), "HH:mm")}
+                    {format(new Date(apt.startsAt), "EEE, MMM d · h:mm a")} - {format(new Date(apt.endsAt), "h:mm a")}
                   </p>
                 </div>
                 <div className="text-xs text-gray-400 shrink-0">{formatPrice(apt.totalPriceCents || apt.service.priceCents)}</div>

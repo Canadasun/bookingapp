@@ -55,7 +55,7 @@ export class MessagesService {
 
     // Existing client rows may predate account linking. A verified account with
     // the same email can claim only that matching client row, in that business.
-    if (user.emailVerified && client.email.toLowerCase() === user.email.toLowerCase()) {
+    if (user.emailVerified && client.email && client.email.toLowerCase() === user.email.toLowerCase()) {
       await this.prisma.client.update({
         where: { id: clientId },
         data: { userId },
@@ -70,6 +70,10 @@ export class MessagesService {
       data: { businessId, clientId, content, fromClient, channel },
     });
     if (fromClient) {
+      await this.prisma.messageThreadState?.updateMany({
+        where: { businessId, clientId },
+        data: { archivedAt: null },
+      });
       await this.notifyBusinessUsersOfClientMessage(businessId, clientId, content, channel);
       const unread = await this.getUnreadCount(businessId);
       this.events.emitMessageUpdate(businessId, { clientId, ...unread });
@@ -137,6 +141,11 @@ export class MessagesService {
     if (!clients.length) return;
 
     let target = clients[0];
+    const businessIds = new Set(clients.map((client) => client.businessId));
+    if (businessIds.size > 1) {
+      this.logger.warn(`Inbound SMS from ${phone} matched multiple businesses; message was not routed.`);
+      return;
+    }
     if (clients.length > 1) {
       const ids = clients.map((c) => c.id);
       const recentMsg = await this.prisma.message.findFirst({ where: { clientId: { in: ids } }, orderBy: { createdAt: 'desc' }, select: { clientId: true } });
@@ -148,17 +157,48 @@ export class MessagesService {
     await this.send(target.businessId, target.id, body.slice(0, 2000), true, 'SMS');
   }
 
-  async markRead(businessId: string, clientId: string) {
+  async markRead(businessId: string, clientId: string, userId?: string) {
     const result = await this.prisma.message.updateMany({
       where: { businessId, clientId, fromClient: true, read: false },
       data: { read: true },
     });
-    const unread = await this.getUnreadCount(businessId);
+    if (userId) {
+      await this.prisma.messageThreadState.upsert({
+        where: { businessId_clientId_userId: { businessId, clientId, userId } },
+        create: { businessId, clientId, userId, lastReadAt: new Date() },
+        update: { lastReadAt: new Date(), archivedAt: null },
+      });
+    }
+    const unread = await this.getUnreadCount(businessId, userId);
     this.events.emitMessageUpdate(businessId, { clientId, ...unread });
     return { ...result, ...unread };
   }
 
-  async getUnreadCount(businessId: string) {
+  async getUnreadCount(businessId: string, userId?: string) {
+    if (userId) {
+      const [messages, states] = await Promise.all([
+        this.prisma.message.findMany({
+          where: { businessId, fromClient: true },
+          select: { clientId: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 5000,
+        }),
+        this.prisma.messageThreadState.findMany({ where: { businessId, userId } }),
+      ]);
+      const stateByClient = new Map(states.map((state) => [state.clientId, state]));
+      const unreadByClient = new Map<string, number>();
+      for (const message of messages) {
+        const state = stateByClient.get(message.clientId);
+        if (state?.archivedAt) continue;
+        if (!state?.lastReadAt || message.createdAt > state.lastReadAt) {
+          unreadByClient.set(message.clientId, (unreadByClient.get(message.clientId) ?? 0) + 1);
+        }
+      }
+      return {
+        unreadMessages: Array.from(unreadByClient.values()).reduce((sum, count) => sum + count, 0),
+        unreadThreads: unreadByClient.size,
+      };
+    }
     const [unreadMessages, unreadGroups] = await Promise.all([
       this.prisma.message.count({ where: { businessId, fromClient: true, read: false } }),
       this.prisma.message.groupBy({
@@ -169,12 +209,20 @@ export class MessagesService {
     return { unreadMessages, unreadThreads: unreadGroups.length };
   }
 
-  async getBusinessThreads(businessId: string, unreadOnly = false) {
+  async getBusinessThreads(businessId: string, userId?: string, filters: { unreadOnly?: boolean; archived?: boolean; search?: string; channel?: string } = {}) {
+    const states = userId
+      ? await this.prisma.messageThreadState.findMany({ where: { businessId, userId } })
+      : [];
+    const stateByClient = new Map(states.map((state) => [state.clientId, state]));
     const [messages, unreadGroups] = await Promise.all([
       this.prisma.message.findMany({
         where: {
           businessId,
-          ...(unreadOnly ? { fromClient: true, read: false } : {}),
+          ...(filters.channel ? { channel: filters.channel } : {}),
+          ...(filters.search ? { OR: [
+            { content: { contains: filters.search, mode: 'insensitive' } },
+            { client: { name: { contains: filters.search, mode: 'insensitive' } } },
+          ] } : {}),
         },
         include: { client: { select: { id: true, name: true, email: true, phone: true } } },
         orderBy: { createdAt: 'desc' },
@@ -194,14 +242,33 @@ export class MessagesService {
       if (!threads.has(m.clientId)) threads.set(m.clientId, m);
     }
 
-    return Array.from(threads.values()).map((m) => ({
+    return Array.from(threads.values()).map((m) => {
+      const state = stateByClient.get(m.clientId);
+      const unreadCount = userId
+        ? messages.filter((message) => message.clientId === m.clientId && message.fromClient && (!state?.lastReadAt || message.createdAt > state.lastReadAt)).length
+        : unreadByClient.get(m.clientId) ?? 0;
+      return ({
       clientId: m.clientId,
       client: m.client,
       lastMessage: m.content,
       fromClient: m.fromClient,
-      read: (unreadByClient.get(m.clientId) ?? 0) === 0,
-      unreadCount: unreadByClient.get(m.clientId) ?? 0,
+      read: unreadCount === 0,
+      unreadCount,
+      archived: Boolean(state?.archivedAt),
       createdAt: m.createdAt,
-    }));
+    });
+    }).filter((thread) =>
+      (filters.archived ? thread.archived : !thread.archived) &&
+      (!filters.unreadOnly || thread.unreadCount > 0),
+    );
+  }
+
+  async setArchived(businessId: string, clientId: string, userId: string, archived: boolean) {
+    await this.prisma.client.findFirstOrThrow({ where: { id: clientId, businessId }, select: { id: true } });
+    return this.prisma.messageThreadState.upsert({
+      where: { businessId_clientId_userId: { businessId, clientId, userId } },
+      create: { businessId, clientId, userId, archivedAt: archived ? new Date() : null },
+      update: { archivedAt: archived ? new Date() : null },
+    });
   }
 }

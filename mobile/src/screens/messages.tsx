@@ -19,29 +19,27 @@ import { Pill, PriceTag, VerifiedPill } from '../components';
 
 function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { initialClient:Client|null; onClearClient:()=>void; onUnreadChanged:(count:number)=>void }) {
   const navigation = useNavigation<any>();
-  const [threads, setThreads]   = useState<Array<{clientId:string;client:{name:string;email:string};lastMessage:string;fromClient:boolean;read:boolean;unreadCount:number;createdAt:string}>>([]);
+  const [threads, setThreads]   = useState<Array<{clientId:string;client:{name:string;email?:string|null};lastMessage:string;fromClient:boolean;read:boolean;unreadCount:number;archived?:boolean;createdAt:string}>>([]);
   const [selected, setSelected] = useState<Client|null>(null);
   const [msgs, setMsgs]         = useState<Message[]>([]);
   const [reply, setReply]       = useState('');
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
-  const [plan, setPlan]         = useState<string>('FREE');
+  const [filter, setFilter]     = useState<'all'|'unread'|'archived'>('all');
   const scrollRef = useRef<ScrollView>(null);
 
   const loadThreads = useCallback(async () => {
     try {
-      const [threadData, bizData, unread] = await Promise.all([
-        api<any[]>(`/businesses/${bizId()}/messages`),
-        api<any>(`/businesses/${bizId()}`).catch(() => ({ plan: 'FREE' })),
+      const [threadData, unread] = await Promise.all([
+        api<any[]>(`/businesses/${bizId()}/messages${filter==='unread'?'?unread=true':filter==='archived'?'?archived=true':''}`),
         api<{unreadMessages:number}>(`/businesses/${bizId()}/messages/unread-count`).catch(() => ({ unreadMessages:0 })),
       ]);
       setThreads(threadData);
       onUnreadChanged(unread.unreadMessages);
-      setPlan(bizData.plan);
     }
     catch {}
     finally { setLoading(false); }
-  }, [onUnreadChanged]);
+  }, [onUnreadChanged, filter]);
   useEffect(()=>{ loadThreads(); },[loadThreads]);
   useEffect(() => navigation.addListener('focus', loadThreads), [navigation, loadThreads]);
   useEffect(() => {
@@ -67,10 +65,6 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
 
   async function send() {
     if (!reply.trim()||!selected) return;
-    if (plan === 'FREE') {
-      Alert.alert('Upgrade Required', 'Messaging is a paid feature. Please upgrade to BASIC or PRO to reply to clients.');
-      return;
-    }
     setSending(true);
     try {
       await api(`/businesses/${bizId()}/clients/${selected.id}/messages/reply`,{
@@ -91,6 +85,7 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
           <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{selected.name}</Text>
+        <TouchableOpacity onPress={async()=>{await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:true})});setSelected(null);loadThreads();}}><Text style={{color:'#DC2626',fontWeight:'700'}}>Archive</Text></TouchableOpacity>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={Platform.OS==='ios'?88:0}>
         <ScrollView ref={scrollRef} contentContainerStyle={{padding:16}} showsVerticalScrollIndicator={false}>
@@ -103,22 +98,14 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
           ))}
         </ScrollView>
         <View style={s.composeRow}>
-          {plan === 'FREE' ? (
-            <View style={{flex:1, backgroundColor:GRAY_50, borderRadius:12, padding:12, alignItems:'center', borderStyle:'dashed', borderWidth:1, borderColor:GRAY_200}}>
-              <Text style={{fontSize:12, color:GRAY_500, textAlign:'center'}}>
-                🔒 Messaging is a paid feature. Upgrade to BASIC or PRO to reply to clients.
-              </Text>
-            </View>
-          ) : (
-            <>
+          <>
               <TextInput style={s.composeInput} placeholder="Type a message…" placeholderTextColor={GRAY_400}
                 value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={send}/>
               <TouchableOpacity style={[s.sendBtn, (!reply.trim()||sending)&&{opacity:0.4}]}
                 disabled={!reply.trim()||sending} onPress={send}>
                 <Ionicons name="send" size={18} color="#fff"/>
               </TouchableOpacity>
-            </>
-          )}
+          </>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -127,6 +114,9 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}><Text style={s.headerTitle}>Messages</Text></View>
+      <View style={{flexDirection:'row',gap:8,paddingHorizontal:16,paddingBottom:8}}>
+        {(['all','unread','archived'] as const).map(value=><TouchableOpacity key={value} onPress={()=>setFilter(value)} style={[cal.filterChip,filter===value&&cal.filterChipOn]}><Text style={[cal.filterText,filter===value&&cal.filterTextOn]}>{value}</Text></TouchableOpacity>)}
+      </View>
       {loading?<ActivityIndicator color={BRAND} style={{marginTop:40}}/>:(
         <FlatList
           data={threads}

@@ -330,6 +330,11 @@ export default function SettingsPage() {
         timezone: String(form.timezone ?? "America/New_York"),
         address: String(form.address ?? "").trim() || undefined,
         logoUrl: String(form.logoUrl ?? "").trim() || undefined,
+        websiteUrl: String(form.websiteUrl ?? "").trim() || undefined,
+        instagramUrl: String(form.instagramUrl ?? "").trim() || undefined,
+        facebookUrl: String(form.facebookUrl ?? "").trim() || undefined,
+        tiktokUrl: String(form.tiktokUrl ?? "").trim() || undefined,
+        postVisitMessage: String(form.postVisitMessage ?? "").trim() || undefined,
         bookingPageSettings: bookingSettings,
         notificationSettings: (form.notificationSettings ?? {}) as Business["notificationSettings"],
         minNoticeMinutes: Number(form.minNoticeMinutes ?? 120),
@@ -508,6 +513,22 @@ export default function SettingsPage() {
                       <option value="USD">USD — US dollar ($)</option>
                     </select>
                   </Field>
+                </div>
+                <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Post-visit and social links</p>
+                    <p className="text-xs text-gray-400">Shown after an appointment closes. Only secure https:// links are accepted.</p>
+                  </div>
+                  <Field label="Thank-you message">
+                    <Input value={(form.postVisitMessage as string) ?? ""} onChange={(e) => f("postVisitMessage", e.target.value)} placeholder="Thanks for visiting. We hope to see you again soon." />
+                  </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(["websiteUrl", "instagramUrl", "facebookUrl", "tiktokUrl"] as const).map((key) => (
+                      <Field key={key} label={key.replace("Url", "").replace(/^./, (c) => c.toUpperCase())}>
+                        <Input type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder="https://" />
+                      </Field>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

@@ -4,12 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns";
 import { CalendarClock, X, Repeat, Send, RefreshCw, Bell, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, ServiceDueItem } from "@/lib/api";
+import { api, Service, ServiceDueItem } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const CADENCES = [
@@ -34,11 +35,17 @@ export default function FollowupsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [snoozing, setSnoozing] = useState<string | null>(null);
+  const [policies, setPolicies] = useState<Array<{ id:string; name:string; delayDays:number; subject:string; body:string; enabled:boolean; service?:{name:string}|null }>>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [policy, setPolicy] = useState({ name:"", serviceId:"", delayDays:14, subject:"Time for a follow-up", body:"We hope you are doing well. Book your follow-up appointment when you are ready." });
 
   const load = useCallback(async (silent = false) => {
     if (!bizId) { setLoading(false); return; }
     if (silent) setRefreshing(true); else setLoading(true);
-    try { setItems(await api.serviceDue.list(bizId)); }
+    try {
+      const [dueItems, policyItems, serviceItems] = await Promise.all([api.serviceDue.list(bizId), api.serviceDue.policies(bizId), api.services.listAll(bizId)]);
+      setItems(dueItems); setPolicies(policyItems); setServices(serviceItems);
+    }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load follow-ups"); }
     finally { setLoading(false); setRefreshing(false); }
   }, [bizId]);
@@ -62,6 +69,14 @@ export default function FollowupsPage() {
     setBusy(it.id);
     try { await api.serviceDue.cancel(bizId, it.id); toast.success("Follow-up cancelled"); load(true); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(null); }
+  }
+  async function createPolicy() {
+    if (!policy.name.trim() || !policy.subject.trim() || !policy.body.trim()) return toast.error("Complete the follow-up policy fields");
+    try {
+      await api.serviceDue.createPolicy(bizId, { ...policy, serviceId:policy.serviceId || null, name:policy.name.trim(), subject:policy.subject.trim(), body:policy.body.trim(), trigger:"COMPLETED" });
+      setPolicy({ name:"", serviceId:"", delayDays:14, subject:"Time for a follow-up", body:"We hope you are doing well. Book your follow-up appointment when you are ready." });
+      toast.success("Follow-up policy created"); load(true);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not create policy"); }
   }
 
   const due = items.filter((i) => i.status === "DUE");
@@ -92,6 +107,22 @@ export default function FollowupsPage() {
         <Button size="sm" variant="secondary" onClick={() => load(true)} disabled={refreshing} className="gap-1.5 shrink-0">
           <RefreshCw className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} /> Refresh
         </Button>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 space-y-3">
+        <div><p className="text-sm font-semibold text-gray-900">Professional follow-up policy</p><p className="text-xs text-gray-400">Automatically schedules a customized follow-up after a completed appointment.</p></div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Input value={policy.name} onChange={(e)=>setPolicy(p=>({...p,name:e.target.value}))} placeholder="Policy name, e.g. Dental check-in" />
+          <Input type="number" min={0} max={3660} value={policy.delayDays} onChange={(e)=>setPolicy(p=>({...p,delayDays:Number(e.target.value)}))} placeholder="Delay in days" />
+        </div>
+        <select value={policy.serviceId} onChange={(e)=>setPolicy(p=>({...p,serviceId:e.target.value}))} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm">
+          <option value="">All services (business default)</option>
+          {services.filter(service=>service.active).map(service=><option key={service.id} value={service.id}>{service.name}</option>)}
+        </select>
+        <Input value={policy.subject} onChange={(e)=>setPolicy(p=>({...p,subject:e.target.value}))} placeholder="Message subject" />
+        <textarea className="min-h-20 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" maxLength={2000} value={policy.body} onChange={(e)=>setPolicy(p=>({...p,body:e.target.value}))} />
+        <Button size="sm" onClick={createPolicy}>Add policy</Button>
+        {policies.length > 0 && <div className="flex flex-wrap gap-2 pt-1">{policies.map(p=><span key={p.id} className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">{p.name} · {p.delayDays} days</span>)}</div>}
       </div>
 
       {/* Summary */}

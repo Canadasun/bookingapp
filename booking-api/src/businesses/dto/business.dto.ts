@@ -20,6 +20,11 @@ const optionalString = (max?: number) => z.preprocess(
   (max ? z.string().max(max) : z.string()).optional(),
 );
 
+const optionalHttpsUrl = z.preprocess(
+  (v) => v === '' || v === null ? undefined : v,
+  z.string().url().max(2048).refine((v) => new URL(v).protocol === 'https:', 'Use an https:// URL').optional(),
+);
+
 export const CreateBusinessSchema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
@@ -28,6 +33,11 @@ export const CreateBusinessSchema = z.object({
   timezone: z.string().default('America/New_York'),
   address: optionalString(),
   logoUrl: optionalString(2048),
+  websiteUrl: optionalHttpsUrl,
+  instagramUrl: optionalHttpsUrl,
+  facebookUrl: optionalHttpsUrl,
+  tiktokUrl: optionalHttpsUrl,
+  postVisitMessage: optionalString(500),
   bookingPageSettings: z.record(z.unknown()).optional(),
   notificationSettings: z.record(z.unknown()).optional(),
   intakeQuestions: z.array(z.object({

@@ -33,6 +33,10 @@ export class ClientsService {
             select: { startsAt: true, totalPriceCents: true, service: { select: { priceCents: true } } },
             orderBy: { startsAt: 'desc' },
           },
+          payments: {
+            where: { status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+            select: { amountCents: true, refundedCents: true },
+          },
         },
         orderBy: { name: 'asc' },
         skip,
@@ -53,7 +57,7 @@ export class ClientsService {
         updatedAt: c.updatedAt,
         totalVisits: c._count.appointments,
         lastVisit: c.appointments[0]?.startsAt ?? null,
-        totalSpentCents: c.appointments.reduce((sum, a) => sum + (a.totalPriceCents || a.service.priceCents), 0),
+        totalSpentCents: c.payments.reduce((sum, payment) => sum + payment.amountCents - payment.refundedCents, 0),
       })),
       total,
       page,
@@ -73,13 +77,18 @@ export class ClientsService {
           include: { service: true, staff: { include: { user: true } } },
           orderBy: { startsAt: 'desc' },
         },
+        payments: {
+          where: { status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+          select: { amountCents: true, refundedCents: true },
+        },
       },
     });
     if (!client) throw new NotFoundException('Client not found');
 
-    const totalSpentCents = client.appointments
-      .filter((a) => a.status === 'COMPLETED')
-      .reduce((sum, a) => sum + (a.totalPriceCents || a.service.priceCents), 0);
+    const totalSpentCents = client.payments.reduce(
+      (sum, payment) => sum + payment.amountCents - payment.refundedCents,
+      0,
+    );
 
     return { ...client, totalSpentCents };
   }
@@ -133,7 +142,7 @@ export class ClientsService {
       where: {
         businessId,
         OR: [
-          { email: { equals: dto.email, mode: 'insensitive' as const } },
+          ...(dto.email ? [{ email: { equals: dto.email, mode: 'insensitive' as const } }] : []),
           ...(dto.phone ? [{ phone: dto.phone }] : []),
         ],
       },
@@ -147,6 +156,7 @@ export class ClientsService {
         where: { id: existing.id },
         data: {
           name: dto.name,
+          ...(!existing.email && dto.email ? { email: dto.email } : {}),
           ...(dto.phone && dto.phone !== existing.phone ? { phone: dto.phone } : {}),
           ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
         },

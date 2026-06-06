@@ -33,14 +33,19 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   if (loading) return <LoadingSpinner />;
   if (!apt) return <p className="text-center text-gray-400 py-12">Receipt not found.</p>;
 
+  const successfulPayments = payments.filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED" || p.status === "REFUNDED");
+  if (successfulPayments.length === 0) {
+    return <p className="text-center text-gray-500 py-12">No receipt is available because no payment was collected for this appointment.</p>;
+  }
+
   const currency = (biz?.currency ?? "CAD") as "CAD" | "USD";
   const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(c / 100);
   const rate = biz?.taxRatePercent ?? 0;
   const subtotal = apt.totalPriceCents || apt.service.priceCents;
   const taxCents = Math.round(subtotal * (rate / 100));
   const total = subtotal + taxCents;
-  const tipsCollected = payments.reduce((s, p) => s + (p.status === "SUCCEEDED" ? (p.tipCents ?? 0) : 0), 0);
-  const paid = payments.filter((p) => p.status === "SUCCEEDED").reduce((s, p) => s + (p.amountCents - (p.refundedCents ?? 0)), 0);
+  const tipsCollected = successfulPayments.reduce((s, p) => s + (p.tipCents ?? 0), 0);
+  const paid = successfulPayments.reduce((s, p) => s + (p.amountCents - (p.refundedCents ?? 0)), 0);
   const alsoIncludes = (apt.notes ?? "").includes("Also includes:")
     ? (apt.notes ?? "").split("Also includes:")[1]?.split("|")[0]?.trim()
     : "";
@@ -86,7 +91,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Appointment</p>
-            <p className="text-gray-700">{format(new Date(apt.startsAt), "EEE, MMM d · HH:mm")}</p>
+            <p className="text-gray-700">{format(new Date(apt.startsAt), "EEE, MMM d · h:mm a")}</p>
             <p className="text-xs text-gray-500">with {apt.staff.user.name}</p>
           </div>
         </div>

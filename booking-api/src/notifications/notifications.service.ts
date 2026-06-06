@@ -11,7 +11,7 @@ export interface AppointmentWithRelations {
   id: string;
   startsAt: Date;
   endsAt: Date;
-  client: { name: string; email: string; phone?: string | null };
+  client: { name: string; email: string | null; phone?: string | null };
   service: { name: string };
   business?: { plan: 'FREE' | 'BASIC' | 'PRO'; notificationSettings?: unknown };
 }
@@ -73,6 +73,15 @@ export class NotificationsService implements OnModuleInit {
       jobId: `rebook-${clientId}-${Date.now()}`,
       removeOnComplete: true,
       attempts: 1,
+    });
+  }
+
+  async sendCustomFollowUp(dueId: string) {
+    await this.queue.add('custom-follow-up', { dueId }, {
+      jobId: `follow-up-${dueId}`,
+      removeOnComplete: true,
+      attempts: 2,
+      backoff: { type: 'exponential', delay: 3000 },
     });
   }
 

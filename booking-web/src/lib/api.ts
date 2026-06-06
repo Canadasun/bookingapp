@@ -69,6 +69,7 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
 export interface Business {
   id: string; name: string; slug: string; timezone: string;
   email: string; phone?: string; address?: string; logoUrl?: string;
+  websiteUrl?: string; instagramUrl?: string; facebookUrl?: string; tiktokUrl?: string; postVisitMessage?: string;
   bookingPageSettings: Record<string, unknown>;
   notificationSettings?: NotificationSettings;
   minNoticeMinutes: number; maxAdvanceDays: number; maxAdvanceMinutes?: number;
@@ -152,7 +153,7 @@ export interface Slot {
 }
 
 export interface Client {
-  id: string; name: string; email: string; phone?: string; notes?: string; tags?: string[]; birthday?: string;
+  id: string; name: string; email?: string | null; phone?: string; notes?: string; tags?: string[]; birthday?: string;
   businessId: string; createdAt: string; updatedAt: string;
 }
 
@@ -651,6 +652,10 @@ export const api = {
       req<ServiceDueItem>(`/businesses/${businessId}/service-due/${id}/reschedule`, { method: "POST", body: JSON.stringify(data) }),
     cancel: (businessId: string, id: string) =>
       req<ServiceDueItem>(`/businesses/${businessId}/service-due/${id}/cancel`, { method: "POST" }),
+    policies: (businessId: string) =>
+      req<Array<{ id: string; name: string; serviceId?: string | null; trigger: string; delayDays: number; subject: string; body: string; enabled: boolean; service?: { name: string } | null }>>(`/businesses/${businessId}/service-due/policies`),
+    createPolicy: (businessId: string, data: { name: string; serviceId?: string | null; trigger: "COMPLETED" | "MANUAL"; delayDays: number; subject: string; body: string; enabled?: boolean }) =>
+      req<unknown>(`/businesses/${businessId}/service-due/policies`, { method: "POST", body: JSON.stringify(data) }),
   },
 
   tasks: {
@@ -677,7 +682,7 @@ export const api = {
       req<Client & { appointments: Appointment[]; totalSpentCents: number }>(`/businesses/${businessId}/clients/${id}`),
     // `matched: true` means the booking synced to an existing client (deduped on
     // email/phone) rather than creating a new profile.
-    create: (businessId: string, data: { name: string; email: string; phone?: string; notes?: string; birthday?: string }) =>
+    create: (businessId: string, data: { name: string; email?: string; phone?: string; notes?: string; birthday?: string }) =>
       req<Client & { matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[]; birthday?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -706,7 +711,7 @@ export const api = {
       req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
     // Owner-initiated recurring series. Returns the created occurrences + any
     // dates skipped due to conflicts.
-    createRecurring: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "MONTHLY"; count: number }) =>
+    createRecurring: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "THREE_WEEKS" | "EIGHT_WEEKS" | "MONTHLY"; count: number }) =>
       req<{ groupId: string; created: { id: string; startsAt: string }[]; skipped: string[] }>(`/businesses/${businessId}/bookings/recurring`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),
@@ -742,8 +747,14 @@ export const api = {
   },
 
   messages: {
-    threads: (businessId: string) =>
-      req<Array<{ clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; createdAt: string }>>(`/businesses/${businessId}/messages`),
+    threads: (businessId: string, filters?: { unread?: boolean; archived?: boolean; search?: string; channel?: string }) => {
+      const q = new URLSearchParams();
+      if (filters?.unread) q.set("unread", "true");
+      if (filters?.archived) q.set("archived", "true");
+      if (filters?.search) q.set("search", filters.search);
+      if (filters?.channel) q.set("channel", filters.channel);
+      return req<Array<{ clientId: string; client: { id: string; name: string; email?: string | null }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; archived: boolean; createdAt: string }>>(`/businesses/${businessId}/messages?${q.toString()}`);
+    },
     thread: (businessId: string, clientId: string, appointmentId?: string, token?: string) => {
       const q = new URLSearchParams();
       if (appointmentId) q.set("appointmentId", appointmentId);
@@ -764,6 +775,8 @@ export const api = {
       req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages/read`, { method: "PATCH" }),
     unreadCount: (businessId: string) =>
       req<{ unreadMessages: number; unreadThreads: number }>(`/businesses/${businessId}/messages/unread-count`),
+    archive: (businessId: string, clientId: string, archived = true) =>
+      req<unknown>(`/businesses/${businessId}/messages/${clientId}/archive`, { method: "PATCH", body: JSON.stringify({ archived }) }),
   },
 
   offers: {

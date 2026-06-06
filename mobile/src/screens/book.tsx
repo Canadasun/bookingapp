@@ -30,7 +30,7 @@ function BookScreen() {
   const [slot, setSlot]               = useState<BookingSlot|null>(null);
   const [showStaffStep, setShowStaffStep] = useState(false);
   const [customStartsAt, setCustomStartsAt] = useState('');
-  const [repeat, setRepeat] = useState<{ frequency:'WEEKLY'|'BIWEEKLY'|'MONTHLY'; count:number }|null>(null);
+  const [repeat, setRepeat] = useState<{ frequency:'WEEKLY'|'BIWEEKLY'|'THREE_WEEKS'|'EIGHT_WEEKS'|'MONTHLY'; count:number }|null>(null);
   const [overrideCalendar, setOverrideCalendar] = useState(false);
   const [form, setForm]               = useState({name:'',email:'',phone:''});
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -105,7 +105,8 @@ function BookScreen() {
 
   async function book() {
     if (form.name.trim().length < 2){ Alert.alert('Name required','Enter the client’s full name.'); return; }
-    if (!form.email.trim()){ Alert.alert('Email required','Enter the client’s email.'); return; }
+    if (!form.email.trim() && !form.phone.trim()){ Alert.alert('Contact required','Enter an email address or phone number.'); return; }
+    if (form.email.trim() && !/\S+@\S+\.\S+/.test(form.email.trim())) { Alert.alert('Check email','Enter a valid email address or leave it blank.'); return; }
     // Phone is optional, but if given it must be a complete number so SMS can send.
     let normalizedPhone: string | undefined;
     if (form.phone.trim()) {
@@ -125,7 +126,7 @@ function BookScreen() {
       if (!staffId){ Alert.alert('Provider required','Choose a provider before booking.'); return; }
       if (!startsAt){ Alert.alert('Time required','Choose an available time or enter a custom owner time.'); return; }
       const client = await api<{id:string; matched?:boolean}>(`/businesses/${bizId()}/clients`, {
-        method:'POST', body: JSON.stringify({name:form.name.trim(),email:form.email.trim(),phone:normalizedPhone}),
+        method:'POST', body: JSON.stringify({name:form.name.trim(),email:form.email.trim() || undefined,phone:normalizedPhone}),
       });
       // Owner/staff booking from the app → confirmed immediately (the /manual
       // endpoint skips approval and sends the client their confirmation).
@@ -343,8 +344,8 @@ function BookScreen() {
             </View>
             {[
               {k:'name',   label:'Full name *',    type:'default' as const,       ph:'Jane Doe'},
-              {k:'email',  label:'Email *',         type:'email-address' as const, ph:'you@example.com'},
-              {k:'phone',  label:'Phone (optional)',type:'phone-pad' as const,     ph:'+1 555 123 4567'},
+              {k:'email',  label:'Email',            type:'email-address' as const, ph:'you@example.com'},
+              {k:'phone',  label:'Phone',            type:'phone-pad' as const,     ph:'+1 555 123 4567'},
             ].map(({k,label,type,ph})=>(
               <View key={k} style={{marginBottom:12}}>
                 <Text style={s.fieldLabel}>{label}</Text>
@@ -353,13 +354,13 @@ function BookScreen() {
                   value={form[k as keyof typeof form]}
                   onChangeText={v=>setForm(p=>({...p,[k]:v}))}
                   onBlur={k==='phone'?()=>{ const np=normalizePhoneClient(form.phone); if(np) setForm(p=>({...p,phone:np})); }:undefined}/>
-                {k==='phone' && <Text style={s.fieldHint}>Used for SMS reminders. Leave blank if none.</Text>}
+                {k==='phone' && <Text style={s.fieldHint}>Enter an email address, a phone number, or both.</Text>}
               </View>
             ))}
             {/* Repeat (recurring series) */}
             <Text style={s.fieldLabel}>Repeat</Text>
             <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom: repeat?8:14 }}>
-              {([['Once',null],['Weekly','WEEKLY'],['Biweekly','BIWEEKLY'],['Monthly','MONTHLY']] as const).map(([label,freq])=>{
+              {([['Once',null],['Weekly','WEEKLY'],['2 weeks','BIWEEKLY'],['3 weeks','THREE_WEEKS'],['8 weeks','EIGHT_WEEKS'],['Monthly','MONTHLY']] as const).map(([label,freq])=>{
                 const on = (freq===null && !repeat) || (repeat?.frequency===freq);
                 return (
                   <TouchableOpacity key={label} onPress={()=>setRepeat(freq===null ? null : { frequency:freq, count: repeat?.count ?? 4 })}
@@ -372,9 +373,9 @@ function BookScreen() {
             {repeat && (
               <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginBottom:14 }}>
                 <Text style={[s.fieldLabel,{ marginBottom:0 }]}>Times</Text>
-                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.max(2,r.count-1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>−</Text></TouchableOpacity>
+                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.max(1,r.count-1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>−</Text></TouchableOpacity>
                 <Text style={{ fontSize:18, fontWeight:'800', color:GRAY_900, minWidth:28, textAlign:'center' }}>{repeat.count}</Text>
-                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.min(26,r.count+1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>+</Text></TouchableOpacity>
+                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.min(12,r.count+1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>+</Text></TouchableOpacity>
               </View>
             )}
             {/* Cancellation policy */}
@@ -398,7 +399,7 @@ function BookScreen() {
             <View style={s.doneBox}>
               <View style={s.doneIcon}><Ionicons name="checkmark" size={36} color="#fff"/></View>
               <Text style={s.doneTitle}>You're booked!</Text>
-              <Text style={s.doneSub}>Confirmation sent to {form.email}</Text>
+              <Text style={s.doneSub}>Confirmation sent to {form.email || form.phone}</Text>
               <Text style={s.doneRef}>Ref #{bookedId.slice(-8).toUpperCase()}</Text>
               <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={reset}>
                 <Text style={s.btnPrimaryText}>Book another</Text>

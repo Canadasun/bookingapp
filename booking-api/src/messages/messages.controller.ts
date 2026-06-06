@@ -7,7 +7,6 @@ import { z } from 'zod';
 import { MessagesService } from './messages.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { effectivePlan } from '../common/util/plan';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { verifyAppointmentToken } from '../common/util/appointment-token';
 
@@ -85,22 +84,14 @@ export class MessagesController {
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
     @Body(new ZodValidationPipe(SendSchema)) dto: SendDto,
-    @CurrentUser() user: { role: string; businessId: string | null },
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
 
-    // Free: receive only (no replies). Basic/Pro can reply in-app, and — for
-    // clients who texted first (Basic) or who have a booking (Pro) — by SMS too.
-    const biz = await this.svc.getBusiness(businessId);
-    const tier = effectivePlan(biz?.plan);
-    if (tier === 'FREE') {
-      throw new ForbiddenException('Replying to clients is a paid-plan feature. Please upgrade to Basic or Pro.');
-    }
-
     const msg = await this.svc.send(businessId, clientId, dto.content, false);
-    const sms = await this.svc.maybeSendReplySms(businessId, clientId, dto.content, tier as 'BASIC' | 'PRO');
+    const sms = await this.svc.maybeSendReplySms(businessId, clientId, dto.content, 'PRO');
     return { ...msg, sms };
   }
 
@@ -111,12 +102,12 @@ export class MessagesController {
   markRead(
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.markRead(businessId, clientId);
+    return this.svc.markRead(businessId, clientId, user.id);
   }
 }
 
@@ -131,24 +122,38 @@ export class BusinessMessagesController {
   @Get()
   threads(
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
     @Query('unread') unread?: string,
+    @Query('archived') archived?: string,
+    @Query('search') search?: string,
+    @Query('channel') channel?: string,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.getBusinessThreads(businessId, unread === 'true');
+    return this.svc.getBusinessThreads(businessId, user.id, { unreadOnly: unread === 'true', archived: archived === 'true', search, channel });
   }
 
   @Get('unread-count')
   unreadCount(
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.getUnreadCount(businessId);
+    return this.svc.getUnreadCount(businessId, user.id);
+  }
+
+  @Patch(':clientId/archive')
+  archive(
+    @Param('businessId') businessId: string,
+    @Param('clientId') clientId: string,
+    @Body() body: { archived?: boolean },
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) throw new ForbiddenException('You do not have access to this business');
+    return this.svc.setArchived(businessId, clientId, user.id, body.archived !== false);
   }
 }
 

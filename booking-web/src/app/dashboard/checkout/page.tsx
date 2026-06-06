@@ -48,7 +48,7 @@ export default function CheckoutPage() {
   const [customTime, setCustomTime]           = useState("");
   const [customStaffId, setCustomStaffId]     = useState("");
   const [overrideCalendar, setOverrideCalendar] = useState(false);
-  const [recurring, setRecurring] = useState<{ enabled: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "MONTHLY"; count: number }>({ enabled: false, frequency: "WEEKLY", count: 4 });
+  const [recurring, setRecurring] = useState<{ enabled: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "THREE_WEEKS" | "EIGHT_WEEKS" | "MONTHLY"; count: number }>({ enabled: false, frequency: "WEEKLY", count: 4 });
 
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting]     = useState(false);
@@ -250,7 +250,7 @@ export default function CheckoutPage() {
         <p className="text-xs text-gray-400 font-mono mb-6">#{booked.id.slice(-8).toUpperCase()}</p>
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
           {(selectedDate || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Date: </span>{format(customStartsAt ? new Date(customStartsAt) : selectedDate!, "EEE, MMM d, yyyy")}</p>}
-          {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "HH:mm") : format(parseISO(selectedSlot!.startsAtLocal), "HH:mm")}</p>}
+          {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-400">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "h:mm a") : format(parseISO(selectedSlot!.startsAtLocal), "h:mm a")}</p>}
           <p className="text-gray-700"><span className="text-gray-400">Provider: </span>{providerText(customStartsAt ? customStaff?.user.name : selectedSlot?.staffName)}</p>
           <p className="text-gray-700"><span className="text-gray-400">Duration: </span>{fmtDuration(totalMins)}</p>
           <p className="font-semibold text-violet-700"><span className="text-gray-400">Total: </span>{fmtPrice(totalCents)}</p>
@@ -533,8 +533,7 @@ export default function CheckoutPage() {
                           selectedSlot?.startsAt === sl.startsAt
                             ? "bg-violet-600 text-white border-violet-600"
                             : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50")}>
-                        {format(parseISO(sl.startsAtLocal), "HH:mm")}
-                        <span className="text-[10px] block">{format(parseISO(sl.startsAtLocal), "a")}</span>
+                        {format(parseISO(sl.startsAtLocal), "h:mm a")}
                         {selectedStaff === "any" && sl.staffName && <span className="text-[10px] block truncate px-1 opacity-70">{sl.staffName}</span>}
                       </button>
                     ))}
@@ -544,7 +543,7 @@ export default function CheckoutPage() {
             )}
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-amber-900">Custom owner time</p>
-              <p className="mt-1 text-xs text-amber-700">Book any date and HH:mm time directly. This overrides availability and double-book conflicts, then syncs like other confirmed bookings.</p>
+              <p className="mt-1 text-xs text-amber-700">Book any date and time directly. This overrides availability and double-book conflicts, then syncs like other confirmed bookings.</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 {selectedStaff === "any" && (
                   <div className="sm:col-span-3">
@@ -590,7 +589,7 @@ export default function CheckoutPage() {
                           customTime === t ? "border-violet-500 bg-violet-600 text-white" : "border-amber-200 bg-white text-amber-900 hover:border-violet-300",
                         )}
                       >
-                        {t}
+                        {format(parseISO(`2000-01-01T${t}:00`), "h:mm a")}
                       </button>
                     ))}
                   </div>
@@ -598,7 +597,7 @@ export default function CheckoutPage() {
               </div>
               {customStartsAt && (
                 <Button type="button" variant="secondary" className="mt-3 w-full sm:w-auto" onClick={() => setStep("confirm")}>
-                  Use {format(new Date(customStartsAt), "MMM d")} at {format(new Date(customStartsAt), "HH:mm")}
+                  Use {format(new Date(customStartsAt), "MMM d")} at {format(new Date(customStartsAt), "h:mm a")}
                 </Button>
               )}
             </div>
@@ -620,7 +619,7 @@ export default function CheckoutPage() {
                 { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
                 { label: "Provider", value: providerText(customStartsAt ? customStaff?.user.name : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName), icon: Check },
                 { label: "Date", value: customStartsAt ? format(new Date(customStartsAt), "EEE, MMM d, yyyy") : selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
-                { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "HH:mm") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "HH:mm") : "—", icon: Check },
+                { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "h:mm a") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "h:mm a") : "—", icon: Check },
                 { label: "Calendar", value: customStartsAt || overrideCalendar ? "Owner override" : "Available slot", icon: Check },
                 { label: "Total", value: fmtPrice(totalCents), icon: Check },
               ].map(({ label, value }) => (
@@ -650,6 +649,8 @@ export default function CheckoutPage() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
                       <option value="WEEKLY">Weekly</option>
                       <option value="BIWEEKLY">Every 2 weeks</option>
+                      <option value="THREE_WEEKS">Every 3 weeks</option>
+                      <option value="EIGHT_WEEKS">Every 8 weeks</option>
                       <option value="MONTHLY">Monthly</option>
                     </select>
                   </div>
@@ -658,7 +659,7 @@ export default function CheckoutPage() {
                     <select value={recurring.count}
                       onChange={(e) => setRecurring((p) => ({ ...p, count: Number(e.target.value) }))}
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
-                      {[2, 3, 4, 5, 6, 8, 10, 12].map((n) => <option key={n} value={n}>{n} times</option>)}
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} {n === 1 ? "time" : "times"}</option>)}
                     </select>
                   </div>
                   <p className="col-span-2 text-xs text-gray-400">Creates {recurring.count} confirmed bookings; any that conflict are skipped.</p>

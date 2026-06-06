@@ -345,9 +345,10 @@ export class BookingsService {
     const skipped: string[] = [];
 
     for (let i = 0; i < count; i++) {
-      const occStart =
-        frequency === 'MONTHLY' ? addMonths(baseStart, i)
-        : addWeeks(baseStart, i * (frequency === 'BIWEEKLY' ? 2 : 1));
+      const weekInterval = frequency === 'BIWEEKLY' ? 2 : frequency === 'THREE_WEEKS' ? 3 : frequency === 'EIGHT_WEEKS' ? 8 : 1;
+      const occStart = frequency === 'MONTHLY'
+        ? addMonths(baseStart, i)
+        : addWeeks(baseStart, i * weekInterval);
       try {
         const apt = await this.create(
           businessId,
@@ -618,6 +619,31 @@ export class BookingsService {
       // Post-visit review request.
       const full = await this.findOne(id, businessId);
       await this.notifications.sendReviewRequest(full);
+      const matchingPolicies = await this.prisma.followUpPolicy.findMany({
+        where: {
+          businessId: updated.businessId,
+          enabled: true,
+          trigger: 'COMPLETED',
+          OR: [{ serviceId: updated.serviceId }, { serviceId: null }],
+        },
+      });
+      const servicePolicies = matchingPolicies.filter((policy) => policy.serviceId === updated.serviceId);
+      const policies = servicePolicies.length > 0
+        ? servicePolicies
+        : matchingPolicies.filter((policy) => policy.serviceId === null);
+      for (const policy of policies) {
+        await this.prisma.serviceDue.create({
+          data: {
+            businessId: updated.businessId,
+            clientId: updated.clientId,
+            serviceId: updated.serviceId,
+            policyId: policy.id,
+            dueAt: new Date(Date.now() + policy.delayDays * 86_400_000),
+            messageSubject: policy.subject,
+            messageBody: policy.body,
+          },
+        });
+      }
     }
 
     // Policy due: a no-show was just recorded and a fee is configured but wasn't

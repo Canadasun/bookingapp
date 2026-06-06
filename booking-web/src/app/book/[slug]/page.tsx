@@ -197,8 +197,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     api.appointments.get(rescheduleId, rescheduleToken).then((apt) => {
       const svc = allServices.find((s) => s.id === apt.service.id);
       if (svc) setSelectedServices([svc]);
-      setForm((p) => ({ ...p, name: apt.client.name, email: apt.client.email, phone: apt.client.phone ?? "" }));
-      setWl({ name: apt.client.name, email: apt.client.email });
+      setForm((p) => ({ ...p, name: apt.client.name, email: apt.client.email ?? "", phone: apt.client.phone ?? "" }));
+      setWl({ name: apt.client.name, email: apt.client.email ?? "" });
       setStep(2);
       toast.success("Select a new date and time");
     }).catch(() => {});
@@ -238,7 +238,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   function validate() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Required";
-    if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.email.trim() && !form.phone.trim()) e.email = "Enter an email address or phone number";
+    else if (form.email && !/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email or leave it blank";
     if (form.phone && !/^\+?[\d\s\-()+]{7,}$/.test(form.phone)) e.phone = "Invalid phone";
     for (const q of biz?.intakeQuestions ?? []) {
       if (q.required && !(intake[q.id] ?? "").trim()) e[`intake_${q.id}`] = "Required";
@@ -265,7 +266,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       }
 
       const client = await api.clients.create(bizId, {
-        name: form.name, email: form.email, phone: form.phone || undefined, notes: form.notes || undefined,
+        name: form.name, email: form.email || undefined, phone: form.phone || undefined, notes: form.notes || undefined,
       });
       setClientMatched(!!client.matched);
 
@@ -498,7 +499,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               <Check className="w-8 h-8 text-emerald-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re booked!</h2>
-            <p className="text-gray-500 mb-1">Confirmation sent to <span className="font-medium text-gray-800">{form.email}</span></p>
+            <p className="text-gray-500 mb-1">Confirmation sent to <span className="font-medium text-gray-800">{[form.email, form.phone].filter(Boolean).join(" and ")}</span></p>
             <p className="text-xs text-gray-400 font-mono mb-3">#{booking.id.slice(-8).toUpperCase()}</p>
             {clientMatched && (
               <p className="mb-6 inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-100 px-3 py-1 text-xs font-medium text-violet-700">
@@ -534,7 +535,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               </div>
               <div className="flex justify-between text-gray-500 text-xs">
                 <span>When</span>
-                <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal), "HH:mm")}</span>
+                <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}</span>
               </div>
             </div>
 
@@ -815,7 +816,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                                       ? "bg-violet-600 text-white border-violet-600"
                                       : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50",
                                   )}>
-                                  {format(parseISO(sl.startsAtLocal), "HH:mm")}
+                                  {format(parseISO(sl.startsAtLocal), "h:mm a")}
                                   {selectedStaff === "any" && sl.staffName && <span className="block truncate px-1 text-[10px] font-medium opacity-70">{sl.staffName}</span>}
                                 </button>
                               ))}
@@ -846,7 +847,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       </p>
                       <p className="text-violet-600 mt-0.5">
                         {selectedDate && format(selectedDate, "EEE, MMM d")}
-                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal), "HH:mm")}`}
+                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}`}
                         {` · ${providerText(chosenStaffName)}`}
                       </p>
                     </div>
@@ -860,7 +861,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 <div className="space-y-4">
                   {([
                     { k: "name",  label: "Full name *",  type: "text",  ph: "Jane Smith" },
-                    { k: "email", label: "Email *",       type: "email", ph: "jane@example.com" },
+                    { k: "email", label: "Email",         type: "email", ph: "jane@example.com" },
                     { k: "phone", label: "Phone",         type: "tel",   ph: "555 000 0000" },
                     { k: "notes", label: "Notes (optional)", type: "text", ph: "Anything we should know?" },
                   ] as const).map(({ k, label, type, ph }) => {

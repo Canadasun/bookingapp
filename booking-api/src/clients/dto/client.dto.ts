@@ -25,9 +25,9 @@ const phoneSchema = z
     return normalized;
   });
 
-export const CreateClientSchema = z.object({
+const ClientFieldsSchema = z.object({
   name: nameSchema,
-  email: z.string().trim().toLowerCase().email(),
+  email: z.preprocess((v) => v === '' || v === null ? undefined : v, z.string().trim().toLowerCase().email().optional()),
   phone: phoneSchema,
   notes: z.string().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
@@ -38,7 +38,15 @@ export const CreateClientSchema = z.object({
   ),
 });
 
-export const UpdateClientSchema = CreateClientSchema.partial();
+export const CreateClientSchema = ClientFieldsSchema.refine((v) => Boolean(v.email || v.phone), {
+  message: 'Enter an email address or phone number',
+  path: ['email'],
+});
+
+export const UpdateClientSchema = ClientFieldsSchema.partial().refine(
+  (v) => v.email !== undefined || v.phone !== undefined || Object.keys(v).length > 0,
+  { message: 'Provide at least one field to update' },
+);
 
 // Merge duplicates into one primary; the owner picks the canonical name/email/phone.
 export const MergeClientsSchema = z.object({

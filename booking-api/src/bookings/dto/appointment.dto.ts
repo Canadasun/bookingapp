@@ -18,8 +18,8 @@ export const CreateAppointmentSchema = z.object({
 // Owner-initiated recurring series: the base booking + how it repeats. Each
 // occurrence is created CONFIRMED; conflicting occurrences are skipped.
 export const CreateRecurringSchema = CreateAppointmentSchema.extend({
-  frequency: z.enum(['WEEKLY', 'BIWEEKLY', 'MONTHLY']),
-  count: z.number().int().min(2).max(26),
+  frequency: z.enum(['WEEKLY', 'BIWEEKLY', 'THREE_WEEKS', 'EIGHT_WEEKS', 'MONTHLY']),
+  count: z.number().int().min(1).max(12),
 });
 
 export const RescheduleSchema = z.object({

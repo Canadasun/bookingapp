@@ -47,20 +47,20 @@ export default function ReportsPage() {
     const completed = appts.filter((a) => a.status === "COMPLETED");
     const cancelled = appts.filter((a) => a.status === "CANCELLED");
     const noShow = appts.filter((a) => a.status === "NO_SHOW");
-    const bookedRevenue = completed.reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
+    const serviceValue = completed.reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
     const collected = payments
-      .filter((p) => p.status === "SUCCEEDED")
+      .filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED")
       .reduce((s, p) => s + (p.amountCents - (p.refundedCents ?? 0)), 0);
     const thirtyAgo = subMonths(new Date(), 1);
     const newClients = clients.filter((c) => isAfter(new Date(c.createdAt), thirtyAgo)).length;
 
-    // Revenue by month (last 6 months) from completed appointments.
+    // Actual collected revenue by month, net of successful refunds.
     const months = Array.from({ length: 6 }, (_, i) => startOfMonth(subMonths(new Date(), 5 - i)));
     const byMonth = months.map((m) => {
       const key = format(m, "yyyy-MM");
-      const cents = completed
-        .filter((a) => format(new Date(a.startsAt), "yyyy-MM") === key)
-        .reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
+      const cents = payments
+        .filter((p) => (p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED") && format(new Date(p.createdAt), "yyyy-MM") === key)
+        .reduce((s, p) => s + p.amountCents - (p.refundedCents ?? 0), 0);
       return { label: format(m, "MMM"), cents };
     });
     const maxMonth = Math.max(1, ...byMonth.map((m) => m.cents));
@@ -86,7 +86,7 @@ export default function ReportsPage() {
     const topClients = [...clients].sort((a, b) => b.totalSpentCents - a.totalSpentCents).slice(0, 5).filter((c) => c.totalSpentCents > 0);
 
     return { total: appts.length, completed: completed.length, cancelled: cancelled.length, noShow: noShow.length,
-      bookedRevenue, collected, newClients, byMonth, maxMonth, topServices, topStaff, topClients };
+      serviceValue, collected, newClients, byMonth, maxMonth, topServices, topStaff, topClients };
   }, [appts, clients, payments]);
 
   if (loading) return <LoadingSpinner />;
@@ -104,8 +104,8 @@ export default function ReportsPage() {
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {[
-          { label: "Revenue (completed)", value: money(r.bookedRevenue), icon: TrendingUp, tone: "emerald" },
-          { label: "Collected payments", value: money(r.collected), icon: TrendingUp, tone: "violet" },
+          { label: "Collected revenue", value: money(r.collected), icon: TrendingUp, tone: "emerald" },
+          { label: "Completed service value", value: money(r.serviceValue), icon: TrendingUp, tone: "violet" },
           { label: "Completed", value: `${r.completed}`, sub: `${pct(r.completed, r.total)}% of ${r.total}`, icon: CalendarCheck, tone: "violet" },
           { label: "New clients (30d)", value: `${r.newClients}`, icon: Users, tone: "amber" },
         ].map((k) => {
@@ -125,7 +125,7 @@ export default function ReportsPage() {
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Revenue by month */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <p className="text-sm font-semibold text-gray-900 mb-4">Revenue · last 6 months</p>
+          <p className="text-sm font-semibold text-gray-900 mb-4">Collected revenue · last 6 months</p>
           <div className="flex items-end justify-between gap-2 h-40">
             {r.byMonth.map((m) => (
               <div key={m.label} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full">

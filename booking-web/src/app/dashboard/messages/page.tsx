@@ -11,7 +11,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
 
-interface Thread { clientId: string; client: { id: string; name: string; email: string }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; createdAt: string }
+interface Thread { clientId: string; client: { id: string; name: string; email?: string | null }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; archived?: boolean; createdAt: string }
 interface Message { id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }
 
 export default function MessagesPage() {
@@ -21,7 +21,8 @@ export default function MessagesPage() {
   const [reply, setReply]       = useState("");
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
-  const [plan, setPlan]         = useState<string>("FREE");
+  const [filter, setFilter]     = useState<"all" | "unread" | "archived">("all");
+  const [search, setSearch]     = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const user = getUser();
@@ -33,16 +34,12 @@ export default function MessagesPage() {
       return;
     }
     try {
-      const [threadData, bizData] = await Promise.all([
-        api.messages.threads(bizId),
-        api.business.get(bizId).catch(() => ({ plan: "FREE" }))
-      ]);
+      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: search.trim() || undefined });
       setThreads(threadData);
-      setPlan(bizData.plan);
     }
     catch { toast.error("Failed to load messages"); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, filter, search]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
@@ -68,10 +65,6 @@ export default function MessagesPage() {
 
   async function send() {
     if (!reply.trim() || !selected || !bizId) return;
-    if (plan === "FREE") {
-      toast.error("Messaging is a paid feature. Please upgrade to reply.");
-      return;
-    }
     setSending(true);
     try {
       const res = await api.messages.reply(bizId, selected.clientId, reply.trim());
@@ -88,6 +81,13 @@ export default function MessagesPage() {
 
   const unread = threads.filter((t) => t.fromClient && !t.read).length;
 
+  async function archiveSelected() {
+    if (!selected || !bizId) return;
+    await api.messages.archive(bizId, selected.clientId, true);
+    setSelected(null); setMsgs([]); loadThreads();
+    toast.success("Conversation archived");
+  }
+
   return (
     <div className="max-w-5xl mx-auto h-[calc(100vh-130px)] flex gap-4">
 
@@ -101,6 +101,12 @@ export default function MessagesPage() {
           {unread > 0 && (
             <span className="text-xs font-bold text-white bg-violet-600 rounded-full px-2 py-0.5">{unread}</span>
           )}
+        </div>
+        <div className="p-3 border-b border-gray-100 space-y-2">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search messages" />
+          <div className="flex gap-1">
+            {(["all", "unread", "archived"] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", filter === value ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-500")}>{value}</button>)}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
           {loading ? <LoadingSpinner className="py-8" /> :
@@ -161,11 +167,12 @@ export default function MessagesPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-gray-900 truncate">{selected.client.name}</p>
-                <p className="text-xs text-gray-400 truncate">{selected.client.email}</p>
+                <p className="text-xs text-gray-400 truncate">{selected.client.email || "Phone contact"}</p>
               </div>
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-2 py-1 shrink-0">
-                <Mail className="w-3 h-3" /> In-app{plan !== "FREE" && <> · <Smartphone className="w-3 h-3" /> SMS</>}
+                <Mail className="w-3 h-3" /> In-app · <Smartphone className="w-3 h-3" /> SMS
               </span>
+              <button onClick={archiveSelected} className="text-xs font-semibold text-gray-500 hover:text-red-600">Archive</button>
             </div>
 
             {/* Messages */}
@@ -183,7 +190,7 @@ export default function MessagesPage() {
                   )}>
                     <p>{m.content}</p>
                     <p className={cn("text-xs mt-1", m.fromClient ? "text-gray-400" : "text-violet-200")}>
-                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
+                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                     </p>
                   </div>
                 </div>
@@ -192,14 +199,7 @@ export default function MessagesPage() {
 
             {/* Compose */}
             <div className="px-4 py-3 border-t border-gray-100 flex items-end gap-2">
-              {plan === "FREE" ? (
-                <div className="flex-1 bg-gray-50 border border-dashed border-gray-200 rounded-xl px-4 py-3 text-center">
-                  <p className="text-sm text-gray-500">
-                    🔒 Messaging is a paid-plan feature. Upgrade to <span className="font-semibold">Basic</span> or <span className="font-semibold">Pro</span> to reply to clients.
-                  </p>
-                </div>
-              ) : (
-                <>
+              <>
                   <Input
                     placeholder="Type a reply…"
                     value={reply}
@@ -210,8 +210,7 @@ export default function MessagesPage() {
                   <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()}>
                     <Send className="w-4 h-4" />
                   </Button>
-                </>
-              )}
+              </>
             </div>
           </>
         )}

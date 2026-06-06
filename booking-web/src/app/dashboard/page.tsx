@@ -5,7 +5,7 @@ import Link from "next/link";
 import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
 import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { api, Appointment, ClientWithStats, NotificationDelivery } from "@/lib/api";
+import { api, Appointment, ClientWithStats, NotificationDelivery, Payment } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
@@ -35,8 +35,7 @@ function TimelineSlot({ apt }: { apt: Appointment }) {
   return (
     <div className={`flex items-start gap-3 py-3 border-b border-gray-50 last:border-0 ${past ? "opacity-50" : ""}`}>
       <div className="w-14 shrink-0 text-right pt-0.5">
-        <span className="text-xs font-semibold text-gray-500">{format(start, "HH:mm")}</span>
-        <span className="text-xs text-gray-400">{format(start, "a")}</span>
+        <span className="text-xs font-semibold text-gray-500">{format(start, "h:mm a")}</span>
       </div>
       <div className="flex flex-col items-center pt-1.5 gap-1">
         <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
@@ -63,6 +62,7 @@ export default function OverviewPage() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [failedPayments, setFailedPayments] = useState(0);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
   const [verifStatus, setVerifStatus] = useState<string | null>(null);
@@ -105,6 +105,7 @@ export default function OverviewPage() {
       setUnreadNotifications(notifRes.count);
       setUnreadMessages(threadsRes.filter((t) => t.fromClient && !t.read).length);
       setFailedPayments(paymentsRes.filter((p) => p.status === "FAILED").length);
+      setPayments(paymentsRes);
       setWaitlistCount(waitlistRes.length);
       setFailedDeliveries(deliveryRes);
     } catch (e) {
@@ -148,7 +149,9 @@ export default function OverviewPage() {
     .slice(0, 5);
   const weekCompleted = appointments
     .filter((a) => a.status === "COMPLETED" && isThisWeek(new Date(a.startsAt)));
-  const weekRevenue  = weekCompleted.reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
+  const weekRevenue = payments
+    .filter((p) => (p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED") && isThisWeek(new Date(p.createdAt)))
+    .reduce((sum, payment) => sum + payment.amountCents - (payment.refundedCents ?? 0), 0);
   const newThisMonth = clients.filter((c) => isThisMonth(new Date(c.createdAt))).length;
   const greeting = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
   const pendingBookings = appointments.filter((a) => a.status === "PENDING").length;

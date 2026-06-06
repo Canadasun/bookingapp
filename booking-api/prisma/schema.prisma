@@ -86,6 +86,11 @@ model Business {
   timezone             String  @default("America/New_York")
   address              String?
   logoUrl              String?
+  websiteUrl           String?
+  instagramUrl         String?
+  facebookUrl          String?
+  tiktokUrl            String?
+  postVisitMessage     String?
   bookingPageSettings  Json    @default("{}")
   notificationSettings Json    @default("{}")
   // Owner-defined intake/consultation questions shown at booking. Array of
@@ -163,6 +168,8 @@ model Business {
   uploads             UploadedFile[]
   staffTasks          StaffTask[]
   serviceDues         ServiceDue[]
+  followUpPolicies    FollowUpPolicy[]
+  messageThreadStates MessageThreadState[]
   subscription        Subscription?
   privacyConsents     PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
@@ -370,6 +377,7 @@ model User {
   privacyConsents     PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
   refreshSessions     RefreshSession[]
+  messageThreadStates MessageThreadState[]
 
   @@index([email])
   @@index([businessId])
@@ -527,20 +535,47 @@ model ServiceDue {
   businessId     String
   clientId       String
   serviceId      String?
+  policyId       String?
   cadenceDays    Int? // null = one-off custom date (no auto-advance)
   dueAt          DateTime
   status         String    @default("SCHEDULED") // SCHEDULED | DUE | CANCELLED
+  messageSubject String?
+  messageBody    String?
   lastNotifiedAt DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service  Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  policy   FollowUpPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([clientId])
   @@index([status, dueAt])
+}
+
+// Reusable business/service-specific follow-up rules. ServiceDue snapshots the
+// rendered subject/body so editing a policy never rewrites an existing follow-up.
+model FollowUpPolicy {
+  id         String   @id @default(cuid())
+  businessId String
+  serviceId  String?
+  name       String
+  trigger    String   @default("COMPLETED") // COMPLETED | MANUAL
+  delayDays  Int
+  subject    String
+  body       String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  service  Service?     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  dues     ServiceDue[]
+
+  @@index([businessId, enabled])
+  @@index([serviceId])
 }
 
 model Service {
@@ -560,14 +595,15 @@ model Service {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  categoryId    String?
-  resourceId    String? // optional shared room/equipment this service occupies
-  business      Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category      ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  resource      Resource?        @relation(fields: [resourceId], references: [id], onDelete: SetNull)
-  staffServices StaffService[]
-  appointments  Appointment[]
-  serviceDues   ServiceDue[]
+  categoryId       String?
+  resourceId       String? // optional shared room/equipment this service occupies
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category         ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  resource         Resource?        @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  staffServices    StaffService[]
+  appointments     Appointment[]
+  serviceDues      ServiceDue[]
+  followUpPolicies FollowUpPolicy[]
 
   @@index([businessId])
   @@index([categoryId])
@@ -693,7 +729,7 @@ model Client {
   id               String   @id @default(cuid())
   businessId       String
   name             String
-  email            String
+  email            String?
   phone            String?
   notes            String?
   tags             String[] @default([]) // owner labels, e.g. "VIP", "New", "Sensitive skin"
@@ -708,13 +744,14 @@ model Client {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-  messages     Message[]
-  packages     ClientPackage[]
-  payments     Payment[]
-  serviceDues  ServiceDue[]
-  invoices     Invoice[]
+  business            Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments        Appointment[]
+  messages            Message[]
+  packages            ClientPackage[]
+  payments            Payment[]
+  serviceDues         ServiceDue[]
+  messageThreadStates MessageThreadState[]
+  invoices            Invoice[]
 
   @@unique([businessId, email])
   @@index([businessId])
@@ -794,6 +831,26 @@ model Message {
 
   @@index([businessId, clientId])
   @@index([createdAt])
+}
+
+// Per-user inbox state prevents one staff member from clearing another staff
+// member's unread indicator. Legacy Message.read remains during migration.
+model MessageThreadState {
+  id         String    @id @default(cuid())
+  businessId String
+  clientId   String
+  userId     String
+  lastReadAt DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, clientId, userId])
+  @@index([businessId, userId, archivedAt])
 }
 
 model Offer {
@@ -915,6 +972,7 @@ model NotificationDelivery {
   channel    DeliveryChannel
   recipient  String
   type       String
+  dedupeKey  String?            @unique
   status     NotificationStatus
   error      String?
   createdAt  DateTime           @default(now())

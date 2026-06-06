@@ -57,7 +57,7 @@ function aptDetails(apt: {
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Service</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.service.name)} (${apt.service.durationMinutes} min)</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.staff.user.name)}</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'EEEE, MMMM d, yyyy')}</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'HH:mm')} - ${formatInTimeZone(apt.endsAt, tz, 'HH:mm')}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'h:mm a')} - ${formatInTimeZone(apt.endsAt, tz, 'h:mm a')}</td></tr>
     </table>
   </td></tr>
 </table>`;
@@ -104,6 +104,7 @@ export class NotificationProcessor extends WorkerHost {
   private currentType = '';
   private currentBusinessId: string | null = null;
   private currentUserId: string | null = null;
+  private currentDedupeScope: string | null = null;
 
   constructor(
     private prisma: PrismaService,
@@ -117,20 +118,28 @@ export class NotificationProcessor extends WorkerHost {
   // (sent or failed) with zero changes at the ~14 call sites. Best-effort: a
   // logging failure never affects the actual send.
   private installDeliveryLogging() {
-    const log = (channel: 'EMAIL' | 'SMS', recipient: string, status: 'SENT' | 'FAILED', error?: string) =>
-      this.prisma.notificationDelivery
-        .create({
-          data: {
-            channel,
-            recipient,
-            type: this.currentType || 'unknown',
-            status,
-            error,
-            businessId: this.currentBusinessId ?? undefined,
-            userId: this.currentUserId ?? undefined,
-          },
-        })
+    const log = (channel: 'EMAIL' | 'SMS', recipient: string, status: 'SENT' | 'FAILED', error?: string) => {
+      const dedupeKey = this.currentDedupeScope
+        ? `${this.currentDedupeScope}:${this.currentType || 'unknown'}:${channel}`
+        : null;
+      const data = {
+        channel,
+        recipient,
+        type: this.currentType || 'unknown',
+        status,
+        error,
+        businessId: this.currentBusinessId ?? undefined,
+        userId: this.currentUserId ?? undefined,
+      } as const;
+      return (dedupeKey
+        ? this.prisma.notificationDelivery.upsert({
+            where: { dedupeKey },
+            create: { ...data, dedupeKey },
+            update: data,
+          })
+        : this.prisma.notificationDelivery.create({ data }))
         .catch(() => {});
+    };
     // Anti-bust guard: jobs already run once (attempts:1, no retries). On top of
     // that, suppress an *identical* message (same channel + recipient + type) sent
     // in the last 2 minutes, so a double-trigger can't fire two emails/texts and
@@ -142,7 +151,9 @@ export class NotificationProcessor extends WorkerHost {
       if (ALWAYS_SEND.has(type)) return false;
       try {
         const dup = await this.prisma.notificationDelivery.findFirst({
-          where: { channel, recipient, type, status: 'SENT', createdAt: { gt: new Date(Date.now() - 120_000) } },
+          where: this.currentDedupeScope
+            ? { dedupeKey: `${this.currentDedupeScope}:${type}:${channel}`, status: 'SENT' }
+            : { channel, recipient, type, status: 'SENT', createdAt: { gt: new Date(Date.now() - 120_000) } },
           select: { id: true },
         });
         return !!dup;
@@ -409,7 +420,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
@@ -418,6 +429,30 @@ export class NotificationProcessor extends WorkerHost {
     this.currentType = job.name; // label for the delivery log
     this.currentBusinessId = null;
     this.currentUserId = job.data.userId ?? null;
+    this.currentDedupeScope = job.data.appointmentId
+      ? `appointment:${job.data.appointmentId}`
+      : job.data.messageId
+        ? `message:${job.data.messageId}`
+        : job.data.dueId ? `follow-up:${job.data.dueId}` : null;
+
+    if (job.name === 'custom-follow-up') {
+      const due = await this.prisma.serviceDue.findUnique({
+        where: { id: job.data.dueId! },
+        include: { client: true, business: true },
+      });
+      if (!due || due.status === 'CANCELLED') return;
+      this.currentBusinessId = due.businessId;
+      const bookUrl = `${baseUrl}/book/${due.business.slug}`;
+      const subject = due.messageSubject || `A follow-up from ${due.business.name}`;
+      const body = due.messageBody || `It is time to book your next appointment with ${due.business.name}.`;
+      if (due.client.email) await this.email.send({
+        to: due.client.email,
+        subject,
+        html: emailWrap(`<p style="margin:0 0 18px;color:#374151;font-size:14px;white-space:pre-wrap">${esc(body)}</p><a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book follow-up</a>`),
+      });
+      if (due.client.phone) await this.sms.send({ to: due.client.phone, body: `${due.business.name}: ${body} ${bookUrl}`.slice(0, 1500) });
+      return;
+    }
 
     if (job.name === 'priority-message-alert') {
       const message = await this.prisma.message.findUnique({
@@ -587,7 +622,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 
       if (campaign.channel === 'SMS') {
         if (client.phone) await this.sms.send({ to: client.phone, body: merge(campaign.body) });
-      } else {
+      } else if (client.email) {
         await this.email.send({
           to: client.email,
           subject: merge(campaign.subject ?? `A note from ${campaign.business.name}`),
@@ -625,7 +660,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         where: { id: job.data.clientId! },
         include: { business: true },
       });
-      if (!client) return;
+      if (!client || !client.email) return;
       this.currentBusinessId = client.businessId;
       const bookUrl = `${baseUrl}/book/${client.business.slug}`;
       await this.email.send({
@@ -686,6 +721,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
     switch (job.name) {
 
       case 'review-request': {
+        if (!apt.client.email) break;
         await this.email.send({
           to: apt.client.email,
           subject: `How was your visit to ${apt.business.name}?`,
@@ -699,7 +735,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       }
 
       case 'send-pending': {
-        await this.email.send({
+        if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Booking request received — ${apt.service.name}`,
           html: emailWrap(`
@@ -713,26 +749,23 @@ ${aptDetails(apt)}
         if (apt.client.phone) {
           await this.sms.send({
             to: apt.client.phone,
-            body: `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}. ${manageUrl}`,
+            body: `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
           });
         }
-        await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}. Awaiting approval.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}. Awaiting approval.`);
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_NEW',
           title: `New booking — ${apt.client.name}`,
-          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')} — awaiting your approval.`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')} — awaiting your approval.`,
           linkUrl: '/dashboard/appointments',
         });
-        await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
+        if (apt.client.email) await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
+        if (apt.client.phone) await this.logNotification(apt.id, 'SMS', 'CONFIRMATION', 'SENT');
         break;
       }
 
       case 'send-confirmation': {
-        if (!shouldSend('emailConfirmation')) {
-          await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SKIPPED', 'disabled_by_business');
-          break;
-        }
-        await this.email.send({
+        if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment confirmed — ${apt.service.name}`,
           html: emailWrap(`
@@ -746,17 +779,18 @@ ${aptDetails(apt)}
         if (apt.client.phone) {
           await this.sms.send({
             to: apt.client.phone,
-            body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}. ${manageUrl}`,
+            body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
           });
         }
-        await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking confirmed — ${apt.client.name}`,
-          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}`,
           linkUrl: '/dashboard/appointments',
         });
-        await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
+        if (apt.client.email) await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
+        if (apt.client.phone) await this.logNotification(apt.id, 'SMS', 'CONFIRMATION', 'SENT');
         break;
       }
 
@@ -766,7 +800,7 @@ ${aptDetails(apt)}
           await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SKIPPED', 'disabled_by_business');
           break;
         }
-        await this.email.send({
+        if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Reminder: ${apt.service.name} tomorrow`,
           html: emailWrap(`
@@ -776,7 +810,7 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${aptDate(apt, 'HH:mm')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${aptDate(apt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SENT');
         break;
       }
@@ -790,7 +824,7 @@ ${aptDetails(apt)}
         if (apt.client.phone && smsEnabled) {
           await this.sms.send({
             to: apt.client.phone,
-            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'HH:mm')}. ${manageUrl}`,
+            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
           });
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SENT');
         }
@@ -803,7 +837,7 @@ ${aptDetails(apt)}
           await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SKIPPED', 'disabled_by_business');
           break;
         }
-        await this.email.send({
+        if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment cancelled — ${apt.service.name}`,
           html: emailWrap(`
@@ -818,7 +852,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking cancelled — ${apt.client.name}`,
-          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}`,
           linkUrl: '/dashboard/appointments',
         });
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
@@ -830,7 +864,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
           await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SKIPPED', 'disabled_by_business');
           break;
         }
-        await this.email.send({
+        if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Your appointment was cancelled by ${apt.business.name}`,
           html: emailWrap(`
@@ -851,7 +885,7 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
           await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SKIPPED', 'disabled_by_business');
           break;
         }
-        await this.email.send({
+        if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment rescheduled — ${apt.service.name}`,
           html: emailWrap(`
@@ -861,11 +895,11 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking rescheduled — ${apt.client.name}`,
-          body: `${apt.service.name} moved to ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}`,
+          body: `${apt.service.name} moved to ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}`,
           linkUrl: '/dashboard/appointments',
         });
         await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SENT');
@@ -914,7 +948,7 @@ ${aptDetails(apt)}
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_UPDATE',
           title: `Late cancellation request — ${apt.client.name}`,
-          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')} — client wants to cancel past the window`,
+          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')} — client wants to cancel past the window`,
           linkUrl: '/dashboard/appointments',
         });
         break;

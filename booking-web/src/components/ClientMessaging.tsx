@@ -92,7 +92,7 @@ export function ClientMessaging({ businessId, clientId, businessName, appointmen
               )}>
                 <p>{m.content}</p>
                 <p className={cn("text-[10px] mt-1", m.fromClient ? "text-violet-200" : "text-gray-400")}>
-                  {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
+                  {new Date(m.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                 </p>
               </div>
             </div>

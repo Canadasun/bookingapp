@@ -13,28 +13,59 @@ export class ServiceDueService {
 
   // Owner sets/updates a client's next-due. Replaces any existing active tracker
   // for that client (one active recurring due per client keeps it simple).
-  async setDue(businessId: string, dto: { clientId: string; serviceId?: string | null; cadenceDays?: number | null; dueAt: string }) {
+  async setDue(businessId: string, dto: { clientId: string; serviceId?: string | null; policyId?: string | null; cadenceDays?: number | null; dueAt: string; messageSubject?: string | null; messageBody?: string | null }) {
     const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId }, select: { id: true } });
     if (!client) throw new NotFoundException('Client not found');
     if (dto.serviceId) {
       const svc = await this.prisma.service.findFirst({ where: { id: dto.serviceId, businessId }, select: { id: true } });
       if (!svc) throw new NotFoundException('Service not found');
     }
+    const policy = dto.policyId
+      ? await this.prisma.followUpPolicy.findFirst({ where: { id: dto.policyId, businessId, enabled: true } })
+      : null;
+    if (dto.policyId && !policy) throw new NotFoundException('Follow-up policy not found');
     await this.prisma.serviceDue.updateMany({
-      where: { businessId, clientId: dto.clientId, status: { not: 'CANCELLED' } },
+      where: {
+        businessId,
+        clientId: dto.clientId,
+        serviceId: dto.serviceId || policy?.serviceId || null,
+        policyId: dto.policyId || null,
+        status: { not: 'CANCELLED' },
+      },
       data: { status: 'CANCELLED' },
     });
     return this.prisma.serviceDue.create({
       data: {
         businessId,
         clientId: dto.clientId,
-        serviceId: dto.serviceId || null,
+        serviceId: dto.serviceId || policy?.serviceId || null,
+        policyId: policy?.id || null,
         cadenceDays: dto.cadenceDays ?? null,
         dueAt: new Date(dto.dueAt),
+        messageSubject: dto.messageSubject ?? policy?.subject ?? null,
+        messageBody: dto.messageBody ?? policy?.body ?? null,
         status: 'SCHEDULED',
       },
       include: dueInclude,
     });
+  }
+
+  listPolicies(businessId: string) {
+    return this.prisma.followUpPolicy.findMany({ where: { businessId }, include: { service: true }, orderBy: { name: 'asc' } });
+  }
+
+  async createPolicy(businessId: string, dto: { serviceId?: string | null; name: string; trigger: string; delayDays: number; subject: string; body: string; enabled?: boolean }) {
+    if (dto.serviceId) {
+      const service = await this.prisma.service.findFirst({ where: { id: dto.serviceId, businessId }, select: { id: true } });
+      if (!service) throw new NotFoundException('Service not found');
+    }
+    return this.prisma.followUpPolicy.create({ data: { businessId, ...dto, serviceId: dto.serviceId || null } });
+  }
+
+  async updatePolicy(businessId: string, id: string, dto: Partial<{ serviceId: string | null; name: string; trigger: string; delayDays: number; subject: string; body: string; enabled: boolean }>) {
+    const policy = await this.prisma.followUpPolicy.findFirst({ where: { id, businessId }, select: { id: true } });
+    if (!policy) throw new NotFoundException('Follow-up policy not found');
+    return this.prisma.followUpPolicy.update({ where: { id }, data: dto });
   }
 
   list(businessId: string) {
@@ -50,7 +81,8 @@ export class ServiceDueService {
   async approve(businessId: string, id: string) {
     const d = await this.prisma.serviceDue.findFirst({ where: { id, businessId } });
     if (!d) throw new NotFoundException('Follow-up not found');
-    await this.notifications.sendRebookNudge(d.clientId);
+    if (d.messageSubject || d.messageBody) await this.notifications.sendCustomFollowUp(d.id);
+    else await this.notifications.sendRebookNudge(d.clientId);
     if (d.cadenceDays && d.cadenceDays > 0) {
       const base = d.dueAt > new Date() ? d.dueAt : new Date();
       const next = new Date(base.getTime() + d.cadenceDays * 86_400_000);
