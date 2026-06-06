@@ -49,6 +49,19 @@ function CalendarStack() {
   );
 }
 
+// The Menu tab is a native stack too: MenuHome is the list, MenuDetail renders a
+// drill-in chosen by its `view` route param. Same component, two routes — so every
+// drill-in (and nested ones) pushes with a header back + swipe-back.
+const MenuStk = createNativeStackNavigator();
+function MenuStack({ onLogout }: { onLogout: ()=>void }) {
+  return (
+    <MenuStk.Navigator screenOptions={{ headerShown: false }}>
+      <MenuStk.Screen name="MenuHome">{()=><MenuScreen onLogout={onLogout}/>}</MenuStk.Screen>
+      <MenuStk.Screen name="MenuDetail">{()=><MenuScreen onLogout={onLogout}/>}</MenuStk.Screen>
+    </MenuStk.Navigator>
+  );
+}
+
 // The tab bar lives inside the SafeAreaProvider so it can read the bottom inset.
 // Without this the bar sat flush at height:64 and its targets overlapped the home
 // indicator — "extreme down, hard to reach". We lift it above the inset and give
@@ -96,7 +109,7 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
       </Tab.Screen>
       <Tab.Screen name="Alerts" component={NotificationsScreen}/>
       <Tab.Screen name="Menu">
-        {()=><MenuScreen onLogout={onLogout}/>}
+        {()=><MenuStack onLogout={onLogout}/>}
       </Tab.Screen>
     </Tab.Navigator>
   );

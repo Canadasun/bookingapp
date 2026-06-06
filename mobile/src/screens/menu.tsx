@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
@@ -23,8 +23,12 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const nav = useNavigation<any>();
-  const [view, setView]         = useState<MoreView>('menu');
-  const [soonLabel, setSoonLabel] = useState('');
+  // Which drill-in this screen shows is driven by the navigation route param, so
+  // each one is a real pushed screen (native transition + swipe-back). The tab's
+  // root screen (MenuHome) has no param → the menu list.
+  const route = useRoute<any>();
+  const view: MoreView = route.params?.view ?? 'menu';
+  const soonLabel: string = route.params?.soonLabel ?? '';
   const [services, setServices] = useState<Service[] | null>(null);
   const [staff, setStaff]       = useState<Staff[] | null>(null);
   const [offers, setOffers]     = useState<any[] | null>(null);
@@ -86,16 +90,6 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.');
     } finally { setTwoFASaving(false); }
   }
-
-  // Hardware back (Android) pops a sub-view back to the menu instead of leaving
-  // the app. iOS keeps the on-screen ‹ back button in <Head/>.
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (view !== 'menu') { setView('menu'); return true; }
-      return false;
-    });
-    return () => sub.remove();
-  }, [view]);
 
   function refundPayment(p: any) {
     const remaining = (p.amountCents - p.refundedCents) / 100;
@@ -688,8 +682,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     ]);
   }
 
-  async function open(v: MoreView) {
-    setView(v);
+  // Open a drill-in by pushing a new MenuDetail screen (works from the menu list
+  // AND from nested drill-ins like Add-ons → Gift cards, so back pops one level).
+  function open(v: MoreView) { nav.push('MenuDetail', { view: v }); }
+
+  // Load the data this drill-in needs, once, when its screen mounts.
+  useEffect(() => { if (view !== 'menu') loadView(view); }, []);
+  async function loadView(v: MoreView) {
     try {
       if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${bizId()}/services`)); }
       else if (v === 'staff' && (!staff || !services))  {
@@ -727,7 +726,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const Head = ({ title }: { title:string }) => (
     <View style={[s.header, view!=='menu' && { flexDirection:'row', alignItems:'center' }]}>
       {view !== 'menu' && (
-        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
       )}
       <Text style={s.headerTitle}>{title}</Text>
     </View>
@@ -737,7 +736,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'services') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Services</Text>
         <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true })}>
           <Ionicons name="add" size={24} color={BRAND}/>
@@ -971,7 +970,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'offers') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Offers</Text>
         <TouchableOpacity onPress={()=>openOfferEditor()}>
           <Ionicons name="add" size={24} color={BRAND}/>
@@ -1041,7 +1040,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 {!!w.phone && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`tel:${w.phone}`)}><Text style={ms.smallActionText}>Call</Text></TouchableOpacity>}
                 {!!w.email && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}`)}><Text style={ms.smallActionText}>Email</Text></TouchableOpacity>}
                 <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}?subject=${encodeURIComponent('A spot is available')}`)}><Text style={ms.smallActionText}>Notify</Text></TouchableOpacity>
-                <TouchableOpacity style={ms.smallAction} onPress={()=>{ setView('menu'); nav.navigate('Calendar', { screen: 'Book' }); }}><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
+                <TouchableOpacity style={ms.smallAction} onPress={()=>{ nav.navigate('Calendar', { screen: 'Book' }); }}><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
                 <TouchableOpacity style={ms.smallAction} onPress={()=>removeWaitlistEntry(w.id)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Remove</Text></TouchableOpacity>
               </View>
             </View>
@@ -1088,7 +1087,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'marketing') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Marketing</Text>
         <TouchableOpacity onPress={openCampaignComposer}>
           <Ionicons name="add" size={24} color={BRAND}/>
@@ -1171,7 +1170,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'giftcards') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Gift cards</Text>
         <View style={{ flexDirection:'row', gap:12 }}>
           <TouchableOpacity onPress={()=>setGiftMode('redeem')}><Ionicons name="ticket-outline" size={23} color={BRAND}/></TouchableOpacity>
@@ -1245,7 +1244,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'packages') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Packages</Text>
         {packageTab === 'products' ? (
           <TouchableOpacity onPress={()=>setPackageEditor({ name:'', serviceId:'', credits:'5', price:'' })}>
@@ -1426,7 +1425,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.header}>
-          <TouchableOpacity onPress={()=>setView('menu')} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={s.headerTitle}>Tasks</Text>
           {isOwner && (
             <TouchableOpacity onPress={()=>setTaskEditor({ title:'', staffId:'', dueAt:'', notes:'' })}>
