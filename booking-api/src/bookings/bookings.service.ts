@@ -422,16 +422,27 @@ export class BookingsService {
       where: { id: existing.staffId, businessId: existing.businessId, active: true },
     });
     if (!staff) throw new BadRequestException('This staff member is no longer available');
-    const offersService = await this.prisma.staffService.findFirst({
-      where: { staffId: existing.staffId, serviceId: existing.serviceId },
-    });
-    if (!offersService) throw new BadRequestException('This staff member no longer offers the service');
+    const hasExplicitAssignments = await this.hasExplicitServiceAssignments(existing.staffId);
+    if (hasExplicitAssignments) {
+      const offersService = await this.prisma.staffService.findFirst({
+        where: { staffId: existing.staffId, serviceId: existing.serviceId },
+      });
+      if (!offersService) throw new BadRequestException('This staff member no longer offers the service');
+    }
 
     if (opts.byClient) {
       if (biz && !biz.allowClientReschedule) {
         throw new ForbiddenException('Online rescheduling is disabled — please contact the business.');
       }
       const now = Date.now();
+      const cutoff = biz && this.cancellationCutoff(existing.startsAt, biz);
+      if (cutoff && now >= cutoff.getTime()) {
+        const windowLabel = this.formatPolicyMinutes(this.cancellationWindowMinutes(biz));
+        throw new ForbiddenException({
+          code: 'TOO_LATE_TO_RESCHEDULE',
+          message: `It's past the ${windowLabel} change window. Please contact ${biz.name} to reschedule.`,
+        });
+      }
       const minNoticeMs = (biz?.minNoticeMinutes ?? 0) * 60_000;
       const maxAdvanceMs = this.maxAdvanceMs(biz);
       if (startsAt.getTime() < now + minNoticeMs) throw new BadRequestException('This time is too soon — please pick a later slot.');
@@ -505,14 +516,14 @@ export class BookingsService {
       fromStartsAt: existing.startsAt,
       toStartsAt: startsAt,
       fromStatus: existing.status,
-      status: 'PENDING',
+      status: updated.status,
       byClient: !!opts.byClient,
     }, opts.userId);
 
     this.events.emitBookingUpdate(updated.businessId, {
       type: 'RESCHEDULE',
       appointmentId: id,
-      status: 'PENDING',
+      status: updated.status,
     });
 
     return updated;

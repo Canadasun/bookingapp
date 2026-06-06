@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
@@ -48,6 +49,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
   const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean; capacity:string; priceType:'FLAT'|'PER_HOUR'|'STARTING_AT' }|null>(null);
+  const [preferredPriceType, setPreferredPriceType] = useState<'FLAT'|'PER_HOUR'|'STARTING_AT'>('FLAT');
   const [offerEditor, setOfferEditor] = useState<{ id?:string; title:string; description:string; discount:string; expiresAt:string }|null>(null);
   const [giftMode, setGiftMode] = useState<null|'issue'|'redeem'>(null);
   const [giftIssue, setGiftIssue] = useState({ amount:'50', recipientName:'', recipientEmail:'', message:'' });
@@ -73,6 +75,14 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [twoFASaving, setTwoFASaving] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]|null>(null); // shown once on enable
   const [acctBusy, setAcctBusy] = useState(false);
+
+  useEffect(() => {
+    SecureStore.getItemAsync('bookingapp.preferred-price-type.v1')
+      .then((value) => {
+        if (value === 'FLAT' || value === 'PER_HOUR' || value === 'STARTING_AT') setPreferredPriceType(value);
+      })
+      .catch(() => {});
+  }, []);
 
   async function saveTwoFA(enabled: boolean, method: 'EMAIL'|'SMS') {
     setTwoFASaving(true);
@@ -161,10 +171,29 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       };
       if (serviceEditor.id) await api(`/businesses/${bizId()}/services/${serviceEditor.id}`, { method:'PATCH', body: JSON.stringify(payload) });
       else await api(`/businesses/${bizId()}/services`, { method:'POST', body: JSON.stringify(payload) });
+      setPreferredPriceType(serviceEditor.priceType);
+      await SecureStore.setItemAsync('bookingapp.preferred-price-type.v1', serviceEditor.priceType).catch(() => {});
       setServices(await api<Service[]>(`/businesses/${bizId()}/services`));
       setServiceEditor(null);
     } catch(e) {
       Alert.alert('Could not save service', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
+  async function setNotificationPreference(key: string, enabled: boolean) {
+    if (!biz) return;
+    const previous = biz.notificationSettings ?? {};
+    const notificationSettings = { ...previous, [key]: enabled };
+    setBiz({ ...biz, notificationSettings });
+    try {
+      const updated = await api<any>(`/businesses/${bizId()}`, {
+        method:'PATCH',
+        body: JSON.stringify({ notificationSettings }),
+      });
+      setBiz(updated);
+    } catch (e) {
+      setBiz({ ...biz, notificationSettings: previous });
+      Alert.alert('Could not update notifications', e instanceof Error ? e.message : 'Please try again.');
     }
   }
 
@@ -805,7 +834,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <View style={s.header}>
         <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Services</Text>
-        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1', priceType:'FLAT' })}>
+        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1', priceType:preferredPriceType })}>
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -1660,25 +1689,41 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Head title="Notifications"/>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
-          <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>EMAIL · ALL PLANS</Text>
+          <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>CLIENT NOTIFICATIONS</Text>
           <View style={ms.card}>
-            {['Booking confirmation','24-hour reminder','Cancellation notice','Reschedule notice','Review request'].map((n,i,arr)=>(
-              <View key={n} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]}>
-                <Text style={ms.rowTitle}>{n}</Text>
-                <View style={ms.statusOn}><View style={ms.statusDot}/><Text style={ms.statusOnText}>Active</Text></View>
+            {([
+              ['emailConfirmation','Booking confirmation'],
+              ['emailReminder24h','24-hour reminder'],
+              ['emailCancellation','Cancellation notice'],
+              ['emailReschedule','Reschedule notice'],
+              ['emailStaffCancellation','Business cancellation notice'],
+            ] as const).map(([key,label],i,arr)=>(
+              <View key={key} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]}>
+                <Text style={ms.rowTitle}>{label}</Text>
+                <Switch
+                  value={biz?.notificationSettings?.[key] !== false}
+                  onValueChange={(enabled)=>setNotificationPreference(key, enabled)}
+                  trackColor={{ false:GRAY_200, true:BRAND_LT }}
+                  thumbColor={biz?.notificationSettings?.[key] !== false ? BRAND : GRAY_400}
+                />
               </View>
             ))}
           </View>
-          <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>SMS · PAID PLANS</Text>
+          <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>SMS</Text>
           <View style={ms.card}>
             <View style={ms.notifRow}>
-              <Text style={ms.rowTitle}>2-hour reminder &amp; alerts</Text>
-              {biz && biz.plan !== 'FREE'
-                ? <View style={ms.statusOn}><View style={ms.statusDot}/><Text style={ms.statusOnText}>Active</Text></View>
-                : <Text style={[ms.rowMeta,{ color:BRAND, fontWeight:'700' }]}>Upgrade</Text>}
+              <View style={{ flex:1, paddingRight:12 }}>
+                <Text style={ms.rowTitle}>2-hour reminder</Text>
+                <Text style={ms.rowMeta}>Booking confirmation texts are always sent when a client provides a phone number.</Text>
+              </View>
+              <Switch
+                value={biz?.notificationSettings?.smsReminder2h !== false}
+                onValueChange={(enabled)=>setNotificationPreference('smsReminder2h', enabled)}
+                trackColor={{ false:GRAY_200, true:BRAND_LT }}
+                thumbColor={biz?.notificationSettings?.smsReminder2h !== false ? BRAND : GRAY_400}
+              />
             </View>
           </View>
-          <Text style={[ms.empty,{ marginTop:10 }]}>Client texts are a paid-plan feature. Free-tier salons don&apos;t send client SMS.</Text>
           <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>RECENT DELIVERY LOGS</Text>
           <View style={ms.card}>
             {(deliveries ?? []).slice(0, 12).map((d,i,arr)=>(

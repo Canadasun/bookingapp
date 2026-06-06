@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Bell, CalendarClock, CheckCheck, CreditCard, Mail, MessageSquare, Search, ShieldCheck, Smartphone, FileText } from "lucide-react";
+import { AlertTriangle, Bell, CalendarClock, CheckCheck, CreditCard, Mail, MessageSquare, Search, ShieldCheck, Smartphone, FileText, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { api, DeviceToken, NotificationDelivery, NotificationItem, NotificationKind } from "@/lib/api";
@@ -125,6 +125,17 @@ export default function NotificationsPage() {
     try { await api.notifications.markAllRead(); } catch { /* optimistic */ }
   }
 
+  async function clearHistory() {
+    if (!confirm("Clear your notification history? This cannot be undone.")) return;
+    try {
+      await api.notifications.clear();
+      setItems([]);
+      toast.success("Notification history cleared");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not clear notification history");
+    }
+  }
+
   const unread = items.filter((i) => !i.read).length;
   const failedDeliveries = deliveries.filter((d) => d.status === "FAILED").length;
   const visible = items.filter((n) => {
@@ -142,7 +153,10 @@ export default function NotificationsPage() {
             {unread > 0 ? `${unread} unread` : "Inbox is clear"} · {failedDeliveries} failed delivery{failedDeliveries === 1 ? "" : "ies"}
           </p>
         </div>
-        {unread > 0 && <Button variant="outline" size="sm" onClick={markAll}><CheckCheck className="w-4 h-4 mr-1.5" /> Mark all read</Button>}
+        <div className="flex gap-2">
+          {unread > 0 && <Button variant="outline" size="sm" onClick={markAll}><CheckCheck className="w-4 h-4 mr-1.5" /> Mark all read</Button>}
+          {items.length > 0 && <Button variant="outline" size="sm" onClick={clearHistory}><Trash2 className="w-4 h-4 mr-1.5" /> Clear history</Button>}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

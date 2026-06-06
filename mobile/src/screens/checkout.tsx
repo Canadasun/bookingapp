@@ -17,9 +17,8 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
-// Square sandbox test nonce — a placeholder card token until the native Square
-// In-App Payments / Tap-to-Pay SDK is wired (config plugin + EAS dev build).
-const SQUARE_SOURCE_ID = 'cnon:card-nonce-ok';
+const SQUARE_SANDBOX_DEMO = process.env.EXPO_PUBLIC_SQUARE_SANDBOX_DEMO === 'true';
+const SQUARE_SANDBOX_SOURCE_ID = 'cnon:card-nonce-ok';
 
 function CheckoutScreen() {
   type Phase = 'amount'|'tap'|'done';
@@ -50,20 +49,28 @@ function CheckoutScreen() {
 
   function charge() {
     if (cents < 50) { Alert.alert('Amount too low', 'Enter at least $0.50.'); return; }
+    if (!SQUARE_SANDBOX_DEMO) {
+      Alert.alert(
+        'Mobile card reader not configured',
+        'This build does not include Square Mobile Payments SDK. Use the secure web checkout until a native EAS build with Square seller linking and Tap to Pay entitlement is installed.',
+        [
+          { text:'Cancel', style:'cancel' },
+          { text:'Open web checkout', onPress:()=>Linking.openURL(`${WEB_URL}/dashboard/checkout`) },
+        ],
+      );
+      return;
+    }
     setPhase('tap');
   }
 
-  // Square inverts the flow: the card is tokenized on-device (Tap to Pay / card
-  // entry via the Square In-App Payments SDK) → the API charges that token on the
-  // business's Square account. Until the native SDK is added (config plugin + EAS
-  // dev build) we send Square's sandbox test nonce, which charges a real payment
-  // end-to-end against the sandbox. Replace SQUARE_SOURCE_ID with the SDK token.
+  // Development-only end-to-end sandbox check. Production must receive a real
+  // one-time token from Square's native SDK and must never send a test nonce.
   async function completeTap() {
     setLoading(true);
     try {
       const r = await api<{ squarePaymentId:string; amountCents:number; status:string }>(`/payments/charge`, {
         method:'POST',
-        body: JSON.stringify({ amountCents: totalCents, sourceId: SQUARE_SOURCE_ID, tipCents: tipCents || undefined, description: note.trim() || undefined }),
+        body: JSON.stringify({ amountCents: totalCents, sourceId: SQUARE_SANDBOX_SOURCE_ID, tipCents: tipCents || undefined, description: note.trim() || undefined }),
       });
       setReceipt({ amountCents: r.amountCents, ref: r.squarePaymentId, at: new Date() });
       setPhase('done');
@@ -82,12 +89,12 @@ function CheckoutScreen() {
           <View style={co.tapNfc}>
             <Ionicons name="wifi" size={44} color="#fff" style={{ transform:[{ rotate:'90deg' }] }}/>
           </View>
-          <Text style={co.tapTitle}>Tap to Pay on iPhone</Text>
-          <Text style={co.tapSub}>Hold the customer&apos;s card, phone, or watch near the top of your iPhone.</Text>
+          <Text style={co.tapTitle}>Square sandbox payment</Text>
+          <Text style={co.tapSub}>Development mode uses Square&apos;s test nonce. No physical card is read or charged.</Text>
           <ActivityIndicator color="#fff" style={{ marginTop:24 }}/>
 
           <TouchableOpacity style={co.tapDone} onPress={completeTap} disabled={loading} activeOpacity={0.85}>
-            <Text style={co.tapDoneText}>{loading ? 'Charging…' : 'Complete payment'}</Text>
+            <Text style={co.tapDoneText}>{loading ? 'Charging…' : 'Run sandbox payment'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={{ marginTop:16 }} onPress={()=>setPhase('amount')}>
             <Text style={co.tapCancel}>Cancel</Text>
@@ -108,7 +115,7 @@ function CheckoutScreen() {
 
           <View style={co.receiptCard}>
             {[
-              { l:'Method', v:'Tap to Pay' },
+              { l:'Method', v:SQUARE_SANDBOX_DEMO ? 'Square sandbox' : 'Card' },
               { l:'Date',   v: receipt.at.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) },
               { l:'Time',   v: fmtTime(receipt.at) },
               { l:'Reference', v: receipt.ref.slice(-10).toUpperCase() },

@@ -71,46 +71,46 @@ enum DataErasureStatus {
 }
 
 enum VerificationStatus {
-  UNVERIFIED  // not submitted
-  PENDING     // document uploaded, awaiting admin review
-  VERIFIED    // approved by admin
-  REJECTED    // admin declined (see verificationNote)
+  UNVERIFIED // not submitted
+  PENDING // document uploaded, awaiting admin review
+  VERIFIED // approved by admin
+  REJECTED // admin declined (see verificationNote)
 }
 
 model Business {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  email       String
-  phone       String?
-  timezone    String   @default("America/New_York")
-  address     String?
-  logoUrl     String?
-  bookingPageSettings Json @default("{}")
-  notificationSettings Json @default("{}")
+  id                   String  @id @default(cuid())
+  name                 String
+  slug                 String  @unique
+  email                String
+  phone                String?
+  timezone             String  @default("America/New_York")
+  address              String?
+  logoUrl              String?
+  bookingPageSettings  Json    @default("{}")
+  notificationSettings Json    @default("{}")
   // Owner-defined intake/consultation questions shown at booking. Array of
   // { id, label, required }. Answers are stored per appointment (intakeAnswers).
-  intakeQuestions Json @default("[]")
-  taxRatePercent  Float @default(0) // sales tax applied to totals/receipts (e.g. 13 = 13%)
-  invoiceSeq      Int   @default(0) // per-business invoice number counter
+  intakeQuestions      Json    @default("[]")
+  taxRatePercent       Float   @default(0) // sales tax applied to totals/receipts (e.g. 13 = 13%)
+  invoiceSeq           Int     @default(0) // per-business invoice number counter
 
   // Booking policies
-  minNoticeMinutes      Int     @default(120)
-  maxAdvanceDays        Int     @default(60)
-  maxAdvanceMinutes     Int     @default(86400) // 60 days; minute-based for HH:MM policy UI
-  cancellationWindowHours Int   @default(24)
-  cancellationWindowMinutes Int @default(1440)
-  requireDeposit        Boolean @default(false)
-  depositPercent        Int     @default(25)
-  noShowFeeCents        Int     @default(0)
-  cancellationFeeCents  Int     @default(0)
-  collectCardOnFile     Boolean @default(false)
-  allowClientReschedule Boolean @default(true)
+  minNoticeMinutes          Int     @default(120)
+  maxAdvanceDays            Int     @default(60)
+  maxAdvanceMinutes         Int     @default(86400) // 60 days; minute-based for HH:MM policy UI
+  cancellationWindowHours   Int     @default(24)
+  cancellationWindowMinutes Int     @default(1440)
+  requireDeposit            Boolean @default(false)
+  depositPercent            Int     @default(25)
+  noShowFeeCents            Int     @default(0)
+  cancellationFeeCents      Int     @default(0)
+  collectCardOnFile         Boolean @default(false)
+  allowClientReschedule     Boolean @default(true)
 
   // Subscription
-  plan          PlanTier @default(FREE)
+  plan          PlanTier  @default(FREE)
   planExpiresAt DateTime?
-  suspended     Boolean  @default(false)
+  suspended     Boolean   @default(false)
 
   // Cancellation policy text shown to clients before booking
   cancellationPolicy String @default("Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee.")
@@ -123,85 +123,89 @@ model Business {
   referralCode String? @unique
 
   // Business verification (upload a registration doc → admin approves).
-  verificationStatus      VerificationStatus @default(UNVERIFIED)
-  verificationDocUrl      String?
-  verificationNote        String?            // admin's note, e.g. rejection reason
-  verificationSubmittedAt DateTime?
-  verifiedAt              DateTime?
+  verificationStatus          VerificationStatus @default(UNVERIFIED)
+  verificationDocUrl          String?
+  verificationGovernmentIdUrl String?
+  verificationLegalName       String?
+  verificationAddress         String?
+  verificationPhone           String?
+  verificationNote            String? // admin's note, e.g. rejection reason
+  verificationSubmittedAt     DateTime?
+  verifiedAt                  DateTime?
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  users              User[]
-  referralsMade      Referral[] @relation("referrer")
-  referralReceived   Referral?  @relation("referred")
-  googleCalendar     GoogleCalendarConnection?
-  squareConnection   SquareConnection?
-  staff              Staff[]
-  services           Service[]
-  resources          Resource[]
-  invoices           Invoice[]
-  locations          Location[]
-  serviceCategories  ServiceCategory[]
-  appointments       Appointment[]
-  clients            Client[]
-  messages           Message[]
-  offers             Offer[]
-  transactions       Transaction[]
-  waitlist           WaitlistEntry[]
-  reviews            Review[]
-  campaigns          Campaign[]
-  giftCards          GiftCard[]
-  packages           Package[]
-  clientPackages     ClientPackage[]
-  payments           Payment[]
-  refunds            Refund[]
-  uploads            UploadedFile[]
-  staffTasks         StaffTask[]
-  serviceDues        ServiceDue[]
-  subscription       Subscription?
-  privacyConsents    PrivacyConsent[]
+  users               User[]
+  referralsMade       Referral[]                @relation("referrer")
+  referralReceived    Referral?                 @relation("referred")
+  googleCalendar      GoogleCalendarConnection?
+  squareConnection    SquareConnection?
+  staff               Staff[]
+  services            Service[]
+  resources           Resource[]
+  invoices            Invoice[]
+  locations           Location[]
+  serviceCategories   ServiceCategory[]
+  appointments        Appointment[]
+  clients             Client[]
+  messages            Message[]
+  offers              Offer[]
+  transactions        Transaction[]
+  waitlist            WaitlistEntry[]
+  reviews             Review[]
+  campaigns           Campaign[]
+  giftCards           GiftCard[]
+  packages            Package[]
+  clientPackages      ClientPackage[]
+  payments            Payment[]
+  refunds             Refund[]
+  uploads             UploadedFile[]
+  staffTasks          StaffTask[]
+  serviceDues         ServiceDue[]
+  subscription        Subscription?
+  privacyConsents     PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
 }
 
 model Review {
   id            String   @id @default(cuid())
   businessId    String
-  appointmentId String?  @unique  // one review per appointment
+  appointmentId String?  @unique // one review per appointment
   staffId       String?
   clientName    String
-  rating        Int                // 1–5
+  rating        Int // 1–5
   comment       String?
   published     Boolean  @default(true)
   createdAt     DateTime @default(now())
 
-  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, published])
 }
 
 enum GiftCardStatus {
   ACTIVE
-  REDEEMED  // balance fully used
+  REDEEMED // balance fully used
   VOID
 }
 
 model GiftCard {
-  id            String         @id @default(cuid())
-  businessId    String
-  code          String         // human-readable, unique per business
-  initialCents  Int
-  balanceCents  Int
-  recipientName String?
+  id             String         @id @default(cuid())
+  businessId     String
+  code           String // human-readable, unique per business
+  initialCents   Int
+  balanceCents   Int
+  recipientName  String?
   recipientEmail String?
-  purchaserName String?
-  message       String?
-  status        GiftCardStatus @default(ACTIVE)
-  createdAt     DateTime       @default(now())
-  expiresAt     DateTime?
+  purchaserName  String?
+  message        String?
+  status         GiftCardStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  expiresAt      DateTime?
 
-  business      Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  redemptions   GiftCardRedemption[]
+  business    Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  redemptions GiftCardRedemption[]
 
   @@unique([businessId, code])
   @@index([businessId, status])
@@ -214,14 +218,14 @@ model GiftCardRedemption {
   appointmentId String?
   createdAt     DateTime @default(now())
 
-  giftCard      GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+  giftCard GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
 
   @@index([giftCardId])
 }
 
 enum PackageStatus {
   ACTIVE
-  USED     // all credits consumed
+  USED // all credits consumed
   EXPIRED
   VOID
 }
@@ -231,8 +235,8 @@ model Package {
   id         String   @id @default(cuid())
   businessId String
   name       String
-  serviceId  String?  // credits valid for this service; null = any service
-  credits    Int      // number of prepaid sessions
+  serviceId  String? // credits valid for this service; null = any service
+  credits    Int // number of prepaid sessions
   priceCents Int
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
@@ -250,17 +254,17 @@ model ClientPackage {
   businessId       String
   packageId        String?
   clientId         String
-  name             String        // snapshot
-  serviceId        String?       // snapshot
+  name             String // snapshot
+  serviceId        String? // snapshot
   creditsTotal     Int
   creditsRemaining Int
   status           PackageStatus @default(ACTIVE)
   expiresAt        DateTime?
   createdAt        DateTime      @default(now())
 
-  business    Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  package     Package?             @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  client      Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  business    Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  package     Package?            @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  client      Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
   redemptions PackageRedemption[]
 
   @@index([businessId, status])
@@ -284,9 +288,9 @@ enum CampaignChannel {
 }
 
 enum CampaignAudience {
-  ALL      // every client with a contact on file
-  RECENT   // visited in the last 30 days
-  LAPSED   // no visit in the last 60 days — win them back
+  ALL // every client with a contact on file
+  RECENT // visited in the last 30 days
+  LAPSED // no visit in the last 60 days — win them back
 }
 
 enum CampaignStatus {
@@ -301,15 +305,15 @@ model Campaign {
   name           String
   channel        CampaignChannel  @default(EMAIL)
   audience       CampaignAudience @default(ALL)
-  subject        String?          // email only
-  body           String           // supports {name} and {business} merge tags
+  subject        String? // email only
+  body           String // supports {name} and {business} merge tags
   status         CampaignStatus   @default(DRAFT)
   recipientCount Int              @default(0)
   sentCount      Int              @default(0)
   createdAt      DateTime         @default(now())
   sentAt         DateTime?
 
-  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, status])
 }
@@ -327,45 +331,45 @@ model WaitlistEntry {
   name        String
   email       String
   phone       String?
-  serviceId   String?        // preferred service (optional)
-  staffId     String?        // preferred staff (optional)
-  desiredDate DateTime?      // preferred day (optional)
+  serviceId   String? // preferred service (optional)
+  staffId     String? // preferred staff (optional)
+  desiredDate DateTime? // preferred day (optional)
   notes       String?
   status      WaitlistStatus @default(WAITING)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, status])
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  phone        String?
-  role         Role     @default(CLIENT)
-  businessId   String?
-  avatarUrl    String?
-  emailVerified Boolean @default(false)
-  mustResetPassword Boolean @default(false)
-  twoFactorEnabled  Boolean @default(false)
-  twoFactorMethod   String  @default("EMAIL") // EMAIL | SMS
+  id                     String   @id @default(cuid())
+  email                  String   @unique
+  passwordHash           String
+  name                   String
+  phone                  String?
+  role                   Role     @default(CLIENT)
+  businessId             String?
+  avatarUrl              String?
+  emailVerified          Boolean  @default(false)
+  mustResetPassword      Boolean  @default(false)
+  twoFactorEnabled       Boolean  @default(false)
+  twoFactorMethod        String   @default("EMAIL") // EMAIL | SMS
   twoFactorRecoveryCodes String[] @default([]) // sha256 hashes of one-time recovery codes
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
-  staff    Staff?
-  loginEvents LoginEvent[]
-  otpChallenges OtpChallenge[]
-  notifications Notification[]
-  deviceTokens DeviceToken[]
-  privacyConsents PrivacyConsent[]
+  business            Business?            @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  staff               Staff?
+  loginEvents         LoginEvent[]
+  otpChallenges       OtpChallenge[]
+  notifications       Notification[]
+  deviceTokens        DeviceToken[]
+  privacyConsents     PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
-  refreshSessions RefreshSession[]
+  refreshSessions     RefreshSession[]
 
   @@index([email])
   @@index([businessId])
@@ -469,16 +473,16 @@ model OtpChallenge {
 }
 
 model Staff {
-  id         String   @id @default(cuid())
-  userId     String   @unique
-  businessId String
-  bio        String?
-  avatarUrl  String?
-  active     Boolean  @default(true)
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  businessId  String
+  bio         String?
+  avatarUrl   String?
+  active      Boolean  @default(true)
   permissions String[] @default([]) // extra access for staff: VIEW_MONEY, MANAGE_SERVICES, MANAGE_STAFF
-  locationId String?            // which location this provider works at (multi-location)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  locationId  String? // which location this provider works at (multi-location)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   location          Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -523,7 +527,7 @@ model ServiceDue {
   businessId     String
   clientId       String
   serviceId      String?
-  cadenceDays    Int?      // null = one-off custom date (no auto-advance)
+  cadenceDays    Int? // null = one-off custom date (no auto-advance)
   dueAt          DateTime
   status         String    @default("SCHEDULED") // SCHEDULED | DUE | CANCELLED
   lastNotifiedAt DateTime?
@@ -556,14 +560,14 @@ model Service {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  categoryId      String?
-  resourceId      String?          // optional shared room/equipment this service occupies
-  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category        ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  resource        Resource?        @relation(fields: [resourceId], references: [id], onDelete: SetNull)
-  staffServices   StaffService[]
-  appointments    Appointment[]
-  serviceDues     ServiceDue[]
+  categoryId    String?
+  resourceId    String? // optional shared room/equipment this service occupies
+  business      Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category      ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  resource      Resource?        @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  staffServices StaffService[]
+  appointments  Appointment[]
+  serviceDues   ServiceDue[]
 
   @@index([businessId])
   @@index([categoryId])
@@ -609,21 +613,21 @@ model Location {
 // A standalone invoice: arbitrary line items, a per-business sequential number,
 // and a lifecycle status. Tax is captured at issue time from the business rate.
 model Invoice {
-  id            String   @id @default(cuid())
-  businessId    String
-  clientId      String?
-  number        Int      // per-business sequence (from Business.invoiceSeq)
-  status        String   @default("DRAFT") // DRAFT | SENT | PAID | VOID
-  lineItems     Json     @default("[]")    // [{ description, quantity, unitCents, amountCents }]
-  notes         String?
-  currency      String   @default("CAD")
-  subtotalCents Int      @default(0)
-  taxRatePercent Float   @default(0)
-  taxCents      Int      @default(0)
-  totalCents    Int      @default(0)
-  dueAt         DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(cuid())
+  businessId     String
+  clientId       String?
+  number         Int // per-business sequence (from Business.invoiceSeq)
+  status         String    @default("DRAFT") // DRAFT | SENT | PAID | VOID
+  lineItems      Json      @default("[]") // [{ description, quantity, unitCents, amountCents }]
+  notes          String?
+  currency       String    @default("CAD")
+  subtotalCents  Int       @default(0)
+  taxRatePercent Float     @default(0)
+  taxCents       Int       @default(0)
+  totalCents     Int       @default(0)
+  dueAt          DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   client   Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
@@ -644,7 +648,7 @@ model ServiceCategory {
   updatedAt   DateTime @updatedAt
 
   business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  services  Service[]
+  services Service[]
 
   @@index([businessId])
 }
@@ -662,7 +666,7 @@ model StaffService {
 model AvailabilityRule {
   id        String @id @default(cuid())
   staffId   String
-  dayOfWeek Int    // 0 = Sunday, 6 = Saturday
+  dayOfWeek Int // 0 = Sunday, 6 = Saturday
   startTime String // "HH:mm" in business timezone
   endTime   String // "HH:mm" in business timezone
 
@@ -672,11 +676,11 @@ model AvailabilityRule {
 }
 
 model TimeOff {
-  id       String   @id @default(cuid())
-  staffId  String
-  startsAt DateTime
-  endsAt   DateTime
-  reason   String?
+  id        String   @id @default(cuid())
+  staffId   String
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
   createdAt DateTime @default(now())
 
   staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -686,25 +690,25 @@ model TimeOff {
 }
 
 model Client {
-  id         String   @id @default(cuid())
-  businessId String
-  name       String
-  email      String
-  phone      String?
-  notes      String?
-  tags       String[] @default([]) // owner labels, e.g. "VIP", "New", "Sensitive skin"
-  birthday   String?  // "MM-DD" — drives the daily birthday-greeting automation
+  id               String   @id @default(cuid())
+  businessId       String
+  name             String
+  email            String
+  phone            String?
+  notes            String?
+  tags             String[] @default([]) // owner labels, e.g. "VIP", "New", "Sensitive skin"
+  birthday         String? // "MM-DD" — drives the daily birthday-greeting automation
   // Link to User account if client has registered
-  userId     String?
+  userId           String?
   // Stripe Customer for saved cards (deposits / no-show auto-charge)
   stripeCustomerId String?
   // Square (per-merchant) customer + card-on-file for the same purpose
   squareCustomerId String?
   squareCardId     String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   appointments Appointment[]
   messages     Message[]
   packages     ClientPackage[]
@@ -719,38 +723,38 @@ model Client {
 }
 
 model Appointment {
-  id                   String            @id @default(cuid())
-  businessId           String
-  staffId              String
-  serviceId            String
-  clientId             String
-  startsAt             DateTime
-  endsAt               DateTime
-  status               AppointmentStatus @default(PENDING)
-  cancelReason         String?
-  depositCents         Int?
-  totalPriceCents      Int               @default(0) // snapshot of all selected services at booking time
+  id                    String            @id @default(cuid())
+  businessId            String
+  staffId               String
+  serviceId             String
+  clientId              String
+  startsAt              DateTime
+  endsAt                DateTime
+  status                AppointmentStatus @default(PENDING)
+  cancelReason          String?
+  depositCents          Int?
+  totalPriceCents       Int               @default(0) // snapshot of all selected services at booking time
   stripePaymentIntentId String?
   // Saved card used for this booking (for no-show auto-charge, incl. card-on-file)
   stripePaymentMethodId String?
   // Square equivalents (deposit payment id + saved card id on the merchant account)
-  squarePaymentId      String?
-  squareCardId         String?
-  notes                String?
-  googleEventId        String?           // Google Calendar event id (when the business has calendar sync on)
-  recurringGroupId     String?           // shared id linking occurrences of a recurring series
-  intakeAnswers        Json?             // client's answers to the business intake questions, [{ label, answer }]
-  locationId           String?           // which location this appointment is at (multi-location)
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  squarePaymentId       String?
+  squareCardId          String?
+  notes                 String?
+  googleEventId         String? // Google Calendar event id (when the business has calendar sync on)
+  recurringGroupId      String? // shared id linking occurrences of a recurring series
+  intakeAnswers         Json? // client's answers to the business intake questions, [{ label, answer }]
+  locationId            String? // which location this appointment is at (multi-location)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
-  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  location          Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  staff             Staff             @relation(fields: [staffId], references: [id], onDelete: Restrict)
-  service           Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  client            Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  notificationLogs  NotificationLog[]
-  payments          Payment[]
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location         Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  staff            Staff             @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  service          Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  notificationLogs NotificationLog[]
+  payments         Payment[]
 
   @@index([businessId])
   @@index([staffId])
@@ -798,7 +802,7 @@ model Offer {
   title       String
   description String
   imageUrl    String?
-  discount    String?   // e.g. "20% off" or "$10 off"
+  discount    String? // e.g. "20% off" or "$10 off"
   expiresAt   DateTime?
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -811,11 +815,11 @@ model Offer {
 
 model AuditLog {
   id         String   @id @default(cuid())
-  entityType String   // e.g., "APPOINTMENT", "BUSINESS", "USER"
+  entityType String // e.g., "APPOINTMENT", "BUSINESS", "USER"
   entityId   String
-  action     String   // e.g., "CREATE", "UPDATE", "CANCEL"
-  userId     String?  // Who performed the action (if logged in)
-  changes    Json?    // Optional: before/after diff or metadata
+  action     String // e.g., "CREATE", "UPDATE", "CANCEL"
+  userId     String? // Who performed the action (if logged in)
+  changes    Json? // Optional: before/after diff or metadata
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])
@@ -830,17 +834,17 @@ enum TransactionType {
 
 model Transaction {
   id          String          @id @default(cuid())
-  businessId  String?         // null if it's a global platform fee
+  businessId  String? // null if it's a global platform fee
   type        TransactionType
   amountCents Int
   currency    String          @default("USD")
   status      String          @default("COMPLETED") // COMPLETED, PENDING, FAILED
-  provider    String?         // e.g., "STRIPE"
+  provider    String? // e.g., "STRIPE"
   providerId  String?         @unique
   metadata    Json?
   createdAt   DateTime        @default(now())
 
-  business    Business?       @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([createdAt])
@@ -850,21 +854,21 @@ model Transaction {
 // subscription. Business.plan is the denormalized current tier, kept in sync by
 // the Stripe webhook; this row holds the billing details.
 model Subscription {
-  id                   String             @id @default(cuid())
-  businessId           String             @unique
-  stripeCustomerId     String?
-  stripeSubscriptionId String?            @unique
-  stripePriceId        String?
+  id                    String             @id @default(cuid())
+  businessId            String             @unique
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?            @unique
+  stripePriceId         String?
   // Square (platform account) SaaS-billing equivalents
   squareCustomerId      String?
-  squareSubscriptionId  String?           @unique
+  squareSubscriptionId  String?            @unique
   squarePlanVariationId String?
-  plan                 PlanTier           @default(FREE)
-  status               SubscriptionStatus @default(ACTIVE)
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean            @default(false)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  plan                  PlanTier           @default(FREE)
+  status                SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -921,7 +925,7 @@ model NotificationDelivery {
 
 model SystemMetric {
   id        String   @id @default(cuid())
-  name      String   // e.g., "API_LATENCY", "DB_CONNECTIONS"
+  name      String // e.g., "API_LATENCY", "DB_CONNECTIONS"
   value     Float
   timestamp DateTime @default(now())
 
@@ -952,7 +956,7 @@ model UploadedFile {
   storageKey String?
   createdAt  DateTime   @default(now())
 
-  business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
 }
@@ -991,7 +995,7 @@ model Payment {
   appointmentId         String?
   clientId              String?
   stripePaymentIntentId String?       @unique
-  squarePaymentId       String?       @unique  // Square payment id (idempotency + reconciliation)
+  squarePaymentId       String?       @unique // Square payment id (idempotency + reconciliation)
   amountCents           Int
   tipCents              Int           @default(0)
   taxCents              Int           @default(0)
@@ -1000,7 +1004,7 @@ model Payment {
   status                PaymentStatus @default(PENDING)
   refundedCents         Int           @default(0)
   description           String?
-  receiptUrl            String?       // Stripe-hosted receipt, captured on payment_intent.succeeded
+  receiptUrl            String? // Stripe-hosted receipt, captured on payment_intent.succeeded
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
@@ -1034,20 +1038,20 @@ model Refund {
 }
 
 enum ReferralStatus {
-  PENDING   // the referred business signed up / subscribed
-  REWARDED  // the referrer's reward has been granted
+  PENDING // the referred business signed up / subscribed
+  REWARDED // the referrer's reward has been granted
 }
 
 // Tracks a referral: one business (referrer) referred another (referred) who
 // applied their code. One row per referred business (a business is referred once).
 model Referral {
-  id                   String         @id @default(cuid())
-  code                 String         // the referrer's referralCode used
-  referrerBusinessId   String
-  referredBusinessId   String         @unique
-  status               ReferralStatus @default(PENDING)
-  createdAt            DateTime       @default(now())
-  rewardedAt           DateTime?
+  id                 String         @id @default(cuid())
+  code               String // the referrer's referralCode used
+  referrerBusinessId String
+  referredBusinessId String         @unique
+  status             ReferralStatus @default(PENDING)
+  createdAt          DateTime       @default(now())
+  rewardedAt         DateTime?
 
   referrer Business @relation("referrer", fields: [referrerBusinessId], references: [id], onDelete: Cascade)
   referred Business @relation("referred", fields: [referredBusinessId], references: [id], onDelete: Cascade)
@@ -1059,8 +1063,8 @@ model Referral {
 model GoogleCalendarConnection {
   id           String    @id @default(cuid())
   businessId   String    @unique
-  email        String?   // the connected Google account
-  refreshToken String              // long-lived; used to mint access tokens
+  email        String? // the connected Google account
+  refreshToken String // long-lived; used to mint access tokens
   accessToken  String?
   expiresAt    DateTime?
   calendarId   String    @default("primary")
@@ -1077,11 +1081,11 @@ model GoogleCalendarConnection {
 model SquareConnection {
   id           String    @id @default(cuid())
   businessId   String    @unique
-  merchantId   String              // Square merchant id
-  accessToken  String              // OAuth access token (used for API calls on the merchant)
-  refreshToken String              // long-lived; mints new access tokens
-  expiresAt    DateTime?           // access-token expiry
-  locationId   String?             // chosen location for payments
+  merchantId   String // Square merchant id
+  accessToken  String // OAuth access token (used for API calls on the merchant)
+  refreshToken String // long-lived; mints new access tokens
+  expiresAt    DateTime? // access-token expiry
+  locationId   String? // chosen location for payments
   merchantName String?
   scopes       String?
   createdAt    DateTime  @default(now())

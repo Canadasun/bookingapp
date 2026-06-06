@@ -45,6 +45,20 @@ function NotificationsScreen() {
     await api('/notifications/read-all', { method:'POST' }).catch(() => {});
   }
 
+  function clearHistory() {
+    Alert.alert('Clear alert history?', 'This permanently removes all alerts from this account.', [
+      { text:'Cancel', style:'cancel' },
+      { text:'Clear', style:'destructive', onPress:async() => {
+        try {
+          await api('/notifications', { method:'DELETE' });
+          setItems([]);
+        } catch (e) {
+          Alert.alert('Could not clear alerts', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
   const unread = items.filter(n => !n.read).length;
   const visible = filter === 'unread' ? items.filter(n => !n.read) : items;
   const iconFor = (kind: NotificationItem['kind']) =>
@@ -58,11 +72,18 @@ function NotificationsScreen() {
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
         <Text style={s.headerTitle}>Alerts</Text>
-        {unread > 0 && (
-          <TouchableOpacity onPress={markAll}>
-            <Text style={{ color:BRAND, fontSize:12, fontWeight:'700' }}>Mark all read</Text>
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection:'row', gap:12 }}>
+          {unread > 0 && (
+            <TouchableOpacity onPress={markAll}>
+              <Text style={{ color:BRAND, fontSize:12, fontWeight:'700' }}>Mark all read</Text>
+            </TouchableOpacity>
+          )}
+          {items.length > 0 && (
+            <TouchableOpacity onPress={clearHistory}>
+              <Text style={{ color:'#DC2626', fontSize:12, fontWeight:'700' }}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
       <View style={{ flexDirection:'row', gap:8, paddingHorizontal:16, paddingTop:12 }}>
         {(['all','unread'] as const).map(k => (

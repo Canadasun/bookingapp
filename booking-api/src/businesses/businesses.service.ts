@@ -45,7 +45,19 @@ export class BusinessesService {
     // A deactivated business is hidden from the public — its booking page reads
     // as "not found" so no new bookings can come in while it's paused.
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
+    const {
+      email: _email,
+      plan: _plan,
+      planExpiresAt: _planExpiresAt,
+      verificationDocUrl: _verificationDocUrl,
+      verificationGovernmentIdUrl: _verificationGovernmentIdUrl,
+      verificationLegalName: _verificationLegalName,
+      verificationAddress: _verificationAddress,
+      verificationPhone: _verificationPhone,
+      verificationNote: _verificationNote,
+      verificationSubmittedAt: _verificationSubmittedAt,
+      ...pub
+    } = business;
     // Active locations so the booking page can offer a location step (multi-location).
     const locations = await this.prisma.location.findMany({
       where: { businessId: business.id, active: true },
@@ -58,7 +70,19 @@ export class BusinessesService {
   async findPublicById(id: string) {
     const business = await this.findOne(id);
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    const { email: _email, plan: _plan, planExpiresAt: _planExpiresAt, ...pub } = business;
+    const {
+      email: _email,
+      plan: _plan,
+      planExpiresAt: _planExpiresAt,
+      verificationDocUrl: _verificationDocUrl,
+      verificationGovernmentIdUrl: _verificationGovernmentIdUrl,
+      verificationLegalName: _verificationLegalName,
+      verificationAddress: _verificationAddress,
+      verificationPhone: _verificationPhone,
+      verificationNote: _verificationNote,
+      verificationSubmittedAt: _verificationSubmittedAt,
+      ...pub
+    } = business;
     return pub;
   }
 

@@ -225,6 +225,7 @@ function CalendarScreen() {
 
   const monthLabel = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
   const staffOptions = Array.from(new Map(apts.map(a => [a.staff.id, a.staff.user.name])).entries());
+  const multiProvider = staffOptions.length > 1;
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
 
@@ -252,16 +253,18 @@ function CalendarScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
-        <TouchableOpacity onPress={()=>setStaffFilter('ALL')} style={[cal.filterChip, staffFilter==='ALL' && cal.filterChipOn]}>
-          <Text style={[cal.filterText, staffFilter==='ALL' && cal.filterTextOn]}>All staff</Text>
-        </TouchableOpacity>
-        {staffOptions.map(([id,name]) => (
-          <TouchableOpacity key={id} onPress={()=>setStaffFilter(id)} style={[cal.filterChip, staffFilter===id && cal.filterChipOn]}>
-            <Text style={[cal.filterText, staffFilter===id && cal.filterTextOn]}>{name}</Text>
+      {multiProvider && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
+          <TouchableOpacity onPress={()=>setStaffFilter('ALL')} style={[cal.filterChip, staffFilter==='ALL' && cal.filterChipOn]}>
+            <Text style={[cal.filterText, staffFilter==='ALL' && cal.filterTextOn]}>Everyone</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          {staffOptions.map(([id,name]) => (
+            <TouchableOpacity key={id} onPress={()=>setStaffFilter(id)} style={[cal.filterChip, staffFilter===id && cal.filterChipOn]}>
+              <Text style={[cal.filterText, staffFilter===id && cal.filterTextOn]}>{name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Calendar date strip — tap a day to focus it; dot = has appointments */}
       <View style={cal.stripWrap}>
@@ -330,7 +333,7 @@ function CalendarScreen() {
               <Text style={s.aptBlockDate}>
                 {new Date(selected.startsAt).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})} at {fmtTime(selected.startsAt)}
               </Text>
-              <Text style={s.aptBlockSub}>{selected.service.name} · {selected.staff.user.name}</Text>
+              <Text style={s.aptBlockSub}>{selected.service.name}{multiProvider ? ` · ${selected.staff.user.name}` : ''}</Text>
             </View>
 
             {[

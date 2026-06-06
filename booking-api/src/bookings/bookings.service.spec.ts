@@ -359,6 +359,34 @@ describe('BookingsService', () => {
   });
 
   describe('reschedule', () => {
+    it('allows an unassigned owner provider to reschedule services', async () => {
+      const { svc, prisma } = await buildService({
+        staffService: {
+          count: jest.fn().mockResolvedValue(0),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+      });
+
+      await expect(
+        svc.reschedule('apt1', { startsAt: SLOT_START.toISOString() }, undefined, { byClient: true }),
+      ).resolves.toBeDefined();
+      expect(prisma.staffService.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects public client reschedule inside the cancellation window', async () => {
+      const startsAt = new Date(Date.now() + 60 * 60 * 1000);
+      const { svc } = await buildService({
+        appointment: {
+          ...mockPrisma().appointment,
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({ startsAt })),
+        },
+      });
+
+      await expect(
+        svc.reschedule('apt1', { startsAt: SLOT_START.toISOString() }, undefined, { byClient: true }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('rejects public client reschedule when online rescheduling is disabled', async () => {
       const { svc } = await buildService({
         appointment: {

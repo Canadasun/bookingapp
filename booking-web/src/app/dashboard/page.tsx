@@ -66,7 +66,6 @@ export default function OverviewPage() {
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
   const [verifStatus, setVerifStatus] = useState<string | null>(null);
-  const [verifBusy, setVerifBusy] = useState(false);
   const [serviceCount, setServiceCount] = useState<number | null>(null);
   const [biz, setBiz] = useState<{ slug: string; logoUrl?: string } | null>(null);
 
@@ -78,17 +77,6 @@ export default function OverviewPage() {
     if (!bizId || isStaff) return;
     api.verification.status(bizId).then((v) => setVerifStatus(v.verificationStatus)).catch(() => {});
   }, [bizId, isStaff]);
-
-  async function requestVerification() {
-    if (!bizId) return;
-    setVerifBusy(true);
-    try {
-      const r = await api.verification.submit(bizId);
-      setVerifStatus(r.verificationStatus);
-      toast.success("Verification requested — we'll review it shortly");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
-    finally { setVerifBusy(false); }
-  }
 
   const load = useCallback(async () => {
     if (!bizId) {
@@ -238,12 +226,12 @@ export default function OverviewPage() {
           <ShieldCheck className="w-6 h-6 text-violet-600 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-violet-900">Get your business verified</p>
-            <p className="text-xs text-violet-700 mt-0.5">Earn a standout verified badge clients trust — shown on your booking page, emails and their portal. One click to request it.</p>
+            <p className="text-xs text-violet-700 mt-0.5">Earn a verified badge by submitting your legal details and supporting documents.</p>
           </div>
-          <button onClick={requestVerification} disabled={verifBusy}
+          <Link href="/dashboard/settings"
             className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
-            {verifBusy ? "Submitting…" : "Get verified"}
-          </button>
+            Get verified
+          </Link>
         </div>
       )}
       {!isStaff && verifStatus === "PENDING" && (

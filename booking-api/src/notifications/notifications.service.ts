@@ -87,14 +87,14 @@ export class NotificationsService implements OnModuleInit {
     if (delay24h > 0 && isPaidPlan(business?.plan) && this.enabled(business?.notificationSettings, 'emailReminder24h')) {
       await this.queue.add(
         'reminder-24h',
-        { appointmentId: apt.id },
+        { appointmentId: apt.id, expectedStartsAt: apt.startsAt.toISOString() },
         { delay: delay24h, jobId: `reminder-24h-${apt.id}`, removeOnComplete: true },
       );
     }
     if (delay2h > 0 && isProPlan(business?.plan) && this.enabled(business?.notificationSettings, 'smsReminder2h')) {
       await this.queue.add(
         'reminder-2h',
-        { appointmentId: apt.id },
+        { appointmentId: apt.id, expectedStartsAt: apt.startsAt.toISOString() },
         { delay: delay2h, jobId: `reminder-2h-${apt.id}`, removeOnComplete: true },
       );
     }

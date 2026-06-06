@@ -31,6 +31,10 @@ type Pending = {
   email: string;
   slug: string;
   verificationDocUrl: string | null;
+  verificationGovernmentIdUrl: string | null;
+  verificationLegalName: string | null;
+  verificationAddress: string | null;
+  verificationPhone: string | null;
   verificationSubmittedAt: string | null;
 };
 
@@ -278,6 +282,11 @@ export default function AdminPage() {
                                 <VerifiedBadge />
                               </div>
                               <p className="mt-0.5 truncate text-xs text-gray-500">{b.email} · /{b.slug}</p>
+                              <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                <p><span className="font-semibold text-gray-800">Legal name:</span> {b.verificationLegalName || "Missing"}</p>
+                                <p><span className="font-semibold text-gray-800">Address:</span> {b.verificationAddress || "Missing"}</p>
+                                <p><span className="font-semibold text-gray-800">Phone:</span> {b.verificationPhone || "Missing"}</p>
+                              </div>
                               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
                                 {submitted && (
                                   <span title={format(submitted, "PPpp")}>
@@ -286,12 +295,17 @@ export default function AdminPage() {
                                 )}
                                 {b.verificationDocUrl ? (
                                   <a href={b.verificationDocUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-violet-600 hover:underline">
-                                    <FileText className="h-3.5 w-3.5" /> Document <ExternalLink className="h-3 w-3" />
+                                    <FileText className="h-3.5 w-3.5" /> Business registration <ExternalLink className="h-3 w-3" />
                                   </a>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 text-gray-400">
                                     <FileText className="h-3.5 w-3.5" /> No document attached
                                   </span>
+                                )}
+                                {b.verificationGovernmentIdUrl && (
+                                  <a href={b.verificationGovernmentIdUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-violet-600 hover:underline">
+                                    <ShieldCheck className="h-3.5 w-3.5" /> Government ID <ExternalLink className="h-3 w-3" />
+                                  </a>
                                 )}
                               </div>
                             </div>

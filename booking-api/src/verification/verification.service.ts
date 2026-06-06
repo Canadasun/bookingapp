@@ -5,8 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 export class VerificationService {
   constructor(private prisma: PrismaService) {}
 
-  // Owner submits a registration document → status PENDING (awaiting admin).
-  async submit(businessId: string, docUrl?: string) {
+  async submit(businessId: string, input: {
+    legalName: string;
+    address: string;
+    phone: string;
+    governmentIdUrl: string;
+    registrationDocUrl: string;
+  }) {
     const biz = await this.prisma.business.findUnique({
       where: { id: businessId },
       select: { verificationStatus: true },
@@ -19,9 +24,11 @@ export class VerificationService {
       where: { id: businessId },
       data: {
         verificationStatus: 'PENDING',
-        // A document is optional — one click enters the queue; attaching a doc
-        // just helps the admin review faster.
-        ...(docUrl ? { verificationDocUrl: docUrl } : {}),
+        verificationLegalName: input.legalName.trim(),
+        verificationAddress: input.address.trim(),
+        verificationPhone: input.phone.trim(),
+        verificationGovernmentIdUrl: input.governmentIdUrl,
+        verificationDocUrl: input.registrationDocUrl,
         verificationNote: null,
         verificationSubmittedAt: new Date(),
       },
@@ -35,6 +42,10 @@ export class VerificationService {
       select: {
         verificationStatus: true,
         verificationDocUrl: true,
+        verificationGovernmentIdUrl: true,
+        verificationLegalName: true,
+        verificationAddress: true,
+        verificationPhone: true,
         verificationNote: true,
         verificationSubmittedAt: true,
         verifiedAt: true,
@@ -51,7 +62,9 @@ export class VerificationService {
       orderBy: { verificationSubmittedAt: 'asc' },
       select: {
         id: true, name: true, email: true, slug: true,
-        verificationDocUrl: true, verificationSubmittedAt: true,
+        verificationDocUrl: true, verificationGovernmentIdUrl: true,
+        verificationLegalName: true, verificationAddress: true, verificationPhone: true,
+        verificationSubmittedAt: true,
       },
     });
   }

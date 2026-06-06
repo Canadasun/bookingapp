@@ -389,6 +389,7 @@ export const api = {
     },
     markRead: (id: string) => req<{ ok: boolean }>(`/notifications/${id}/read`, { method: "POST" }),
     markAllRead: () => req<{ ok: boolean }>("/notifications/read-all", { method: "POST" }),
+    clear: () => req<{ ok: boolean }>("/notifications", { method: "DELETE" }),
   },
 
   devices: {
@@ -413,10 +414,9 @@ export const api = {
   },
   verification: {
     status: (businessId: string) =>
-      req<{ verificationStatus: VerificationStatus; verificationDocUrl: string | null; verificationNote: string | null; verificationSubmittedAt: string | null; verifiedAt: string | null }>(`/businesses/${businessId}/verification`),
-    // docUrl optional — submit in one click, or attach a document to speed review.
-    submit: (businessId: string, docUrl?: string) =>
-      req<{ verificationStatus: VerificationStatus }>(`/businesses/${businessId}/verification`, { method: "POST", body: JSON.stringify(docUrl ? { docUrl } : {}) }),
+      req<{ verificationStatus: VerificationStatus; verificationDocUrl: string | null; verificationGovernmentIdUrl: string | null; verificationLegalName: string | null; verificationAddress: string | null; verificationPhone: string | null; verificationNote: string | null; verificationSubmittedAt: string | null; verifiedAt: string | null }>(`/businesses/${businessId}/verification`),
+    submit: (businessId: string, data: { legalName: string; address: string; phone: string; governmentIdUrl: string; registrationDocUrl: string }) =>
+      req<{ verificationStatus: VerificationStatus }>(`/businesses/${businessId}/verification`, { method: "POST", body: JSON.stringify(data) }),
   },
   calendarSync: {
     // Returns the Google OAuth consent URL to connect the owner's calendar.
@@ -429,7 +429,7 @@ export const api = {
     overview: () => req<AdminOverview>("/admin/overview"),
   },
   adminVerifications: {
-    list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
+    list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationGovernmentIdUrl: string | null; verificationLegalName: string | null; verificationAddress: string | null; verificationPhone: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
     approve: (id: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/approve`, { method: "POST" }),
     reject: (id: string, note?: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }),
   },

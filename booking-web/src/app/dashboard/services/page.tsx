@@ -49,6 +49,12 @@ const EMPTY_SVC: ServiceFormState = {
   bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", resourceId: "", color: "#E9A23C", active: true, categoryId: "",
 };
 
+function preferredPriceType(): ServiceFormState["priceType"] {
+  if (typeof window === "undefined") return "FLAT";
+  const value = window.localStorage.getItem("pulse.preferred-price-type.v1");
+  return value === "PER_HOUR" || value === "STARTING_AT" ? value : "FLAT";
+}
+
 interface ServiceModalProps {
   bizId: string;
   editing: Service | null;
@@ -70,7 +76,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       resourceId: editing.resourceId ?? "",
       color: editing.color, active: editing.active,
       categoryId: editing.categoryId ?? "",
-    } : EMPTY_SVC
+    } : { ...EMPTY_SVC, priceType: preferredPriceType() }
   );
   const [saving, setSaving] = useState(false);
   const f = (k: keyof ServiceFormState, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
@@ -96,6 +102,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       };
       if (editing) await api.services.update(bizId, editing.id, data);
       else await api.services.create(bizId, data);
+      window.localStorage.setItem("pulse.preferred-price-type.v1", form.priceType);
       toast.success(editing ? "Service updated" : "Service created");
       onSaved();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }

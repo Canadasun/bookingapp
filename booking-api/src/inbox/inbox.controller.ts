@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { InboxService } from './inbox.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -42,6 +42,11 @@ export class InboxController {
   @Post('read-all')
   readAll(@CurrentUser() user: User) {
     return this.inbox.markAllRead(user.id);
+  }
+
+  @Delete()
+  clear(@CurrentUser() user: User) {
+    return this.inbox.clear(user.id);
   }
 
   @Post(':id/read')

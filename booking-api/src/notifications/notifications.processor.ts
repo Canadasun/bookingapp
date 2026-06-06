@@ -407,7 +407,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
@@ -689,6 +689,12 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
           `),
         });
+        if (apt.client.phone) {
+          await this.sms.send({
+            to: apt.client.phone,
+            body: `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}. ${manageUrl}`,
+          });
+        }
         await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}. Awaiting approval.`);
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_NEW',
@@ -716,6 +722,12 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
         });
+        if (apt.client.phone) {
+          await this.sms.send({
+            to: apt.client.phone,
+            body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'HH:mm')}. ${manageUrl}`,
+          });
+        }
         await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'HH:mm')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
@@ -728,7 +740,7 @@ ${aptDetails(apt)}
       }
 
       case 'reminder-24h': {
-        if (apt.status === 'CANCELLED') break;
+        if (apt.status !== 'CONFIRMED' || (job.data.expectedStartsAt && apt.startsAt.toISOString() !== job.data.expectedStartsAt)) break;
         if (!shouldSend('emailReminder24h')) {
           await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SKIPPED', 'disabled_by_business');
           break;
@@ -749,7 +761,7 @@ ${aptDetails(apt)}
       }
 
       case 'reminder-2h': {
-        if (apt.status === 'CANCELLED') break;
+        if (apt.status !== 'CONFIRMED' || (job.data.expectedStartsAt && apt.startsAt.toISOString() !== job.data.expectedStartsAt)) break;
         if (!shouldSend('smsReminder2h')) {
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SKIPPED', 'disabled_by_business');
           break;

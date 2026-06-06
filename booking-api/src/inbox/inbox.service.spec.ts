@@ -9,6 +9,7 @@ function build() {
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(3),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     notificationDelivery: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -35,6 +36,12 @@ describe('InboxService', () => {
     const { svc, prisma } = build();
     await svc.markAllRead('user1');
     expect(prisma.notification.updateMany).toHaveBeenCalledWith({ where: { userId: 'user1', read: false }, data: { read: true } });
+  });
+
+  it('clear deletes only the signed-in user notifications', async () => {
+    const { svc, prisma } = build();
+    await svc.clear('user1');
+    expect(prisma.notification.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user1' } });
   });
 
   it('notifyBusinessOwners fans out one notification per owner', async () => {

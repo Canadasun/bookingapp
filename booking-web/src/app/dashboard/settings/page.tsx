@@ -208,17 +208,33 @@ export default function SettingsPage() {
   // Business verification status.
   const [verif, setVerif] = useState<{ status: VerificationStatus; note: string | null } | null>(null);
   const [verifBusy, setVerifBusy] = useState(false);
+  const [verificationForm, setVerificationForm] = useState({
+    legalName: "", address: "", phone: "", governmentIdUrl: "", registrationDocUrl: "",
+  });
   useEffect(() => {
     if (!bizId) return;
-    api.verification.status(bizId).then((v) => setVerif({ status: v.verificationStatus, note: v.verificationNote })).catch(() => {});
+    api.verification.status(bizId).then((v) => {
+      setVerif({ status: v.verificationStatus, note: v.verificationNote });
+      setVerificationForm({
+        legalName: v.verificationLegalName ?? "",
+        address: v.verificationAddress ?? "",
+        phone: v.verificationPhone ?? "",
+        governmentIdUrl: v.verificationGovernmentIdUrl ?? "",
+        registrationDocUrl: v.verificationDocUrl ?? "",
+      });
+    }).catch(() => {});
   }, [bizId]);
-  async function submitVerification(docUrl?: string) {
+  async function submitVerification() {
     if (!bizId) return;
+    if (!verificationForm.legalName.trim() || !verificationForm.address.trim() || !verificationForm.phone.trim() || !verificationForm.governmentIdUrl || !verificationForm.registrationDocUrl) {
+      toast.error("Complete every verification field and upload both documents");
+      return;
+    }
     setVerifBusy(true);
     try {
-      const r = await api.verification.submit(bizId, docUrl);
+      const r = await api.verification.submit(bizId, verificationForm);
       setVerif({ status: r.verificationStatus, note: null });
-      toast.success(docUrl ? "Document submitted — we'll review it shortly" : "Verification requested — we'll review it shortly");
+      toast.success("Verification details submitted for review");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
     finally { setVerifBusy(false); }
   }
@@ -425,20 +441,27 @@ export default function SettingsPage() {
                         ) : (
                           <>
                             <p className="text-xs text-violet-700 mt-1">
-                              Earn a verified badge that builds trust with clients. Submit in one click — attaching your business registration just helps us review faster.
+                              Provide the legal details and documents the review team needs before requesting verification.
                               {verif.status === "REJECTED" && verif.note ? ` Previous submission declined: ${verif.note}` : ""}
                             </p>
                             <div className={cn("mt-3 space-y-3", verifBusy && "opacity-60 pointer-events-none")}>
+                              <Input placeholder="Legal name" value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
+                              <Input placeholder="Legal business address" value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
+                              <Input placeholder="Phone number" type="tel" value={verificationForm.phone} onChange={(e) => setVerificationForm((p) => ({ ...p, phone:e.target.value }))} />
+                              <div>
+                                <p className="text-xs font-medium text-violet-700 mb-1.5">Government-issued ID</p>
+                                <ImageUpload value={verificationForm.governmentIdUrl || null} documents onChange={(url) => setVerificationForm((p) => ({ ...p, governmentIdUrl:url ?? "" }))} />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-violet-700 mb-1.5">Business registration</p>
+                                <ImageUpload value={verificationForm.registrationDocUrl || null} documents onChange={(url) => setVerificationForm((p) => ({ ...p, registrationDocUrl:url ?? "" }))} />
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => submitVerification()}
                                 className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
                                 <ShieldCheck className="w-4 h-4" /> Submit for verification
                               </button>
-                              <div>
-                                <p className="text-xs font-medium text-violet-700 mb-1.5">Optional: attach a registration document</p>
-                                <ImageUpload value={null} documents onChange={(url) => { if (url) submitVerification(url); }} />
-                              </div>
                             </div>
                           </>
                         )}

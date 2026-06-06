@@ -85,4 +85,9 @@ export class InboxService {
     await this.prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
     return { ok: true };
   }
+
+  async clear(userId: string) {
+    await this.prisma.notification.deleteMany({ where: { userId } });
+    return { ok: true };
+  }
 }

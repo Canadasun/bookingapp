@@ -20,7 +20,10 @@ export async function api<T>(path: string, init?: RequestInit, _retried = false)
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string,unknown>;
-    throw new Error(typeof body.message === 'string' ? body.message : `HTTP ${res.status}`);
+    const nested = body.message && typeof body.message === 'object'
+      ? (body.message as Record<string, unknown>).message
+      : undefined;
+    throw new Error(typeof body.message === 'string' ? body.message : typeof nested === 'string' ? nested : `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }

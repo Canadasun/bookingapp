@@ -1,10 +1,10 @@
 // Feature-gating by plan tier.
 //
-// Optional development override: set UNLOCK_ALL_FEATURES=true to grant PRO-tier
-// functionality locally. Production/default behavior enforces each business plan.
+// Launch mode keeps all product features open. Set UNLOCK_ALL_FEATURES=false
+// when paid-plan enforcement is intentionally enabled after launch.
 
 export function featuresUnlocked(): boolean {
-  return process.env.UNLOCK_ALL_FEATURES === 'true';
+  return process.env.UNLOCK_ALL_FEATURES !== 'false';
 }
 
 // The plan to use when deciding whether a FEATURE is available. Treats everyone

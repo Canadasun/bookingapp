@@ -52,9 +52,8 @@ export default function ManageAppointmentPage() {
     // contact the business, and ping the server so the owner gets notified.
     if (isLate) {
       const biz = appointment.business;
-      const contact = [biz.phone, biz.email].filter(Boolean).join(" · ");
       toast.error(
-        `It's past the ${formatHHMM(windowMinutes)} cancellation window — please contact ${biz.name}${contact ? ` (${contact})` : ""} to cancel. We've let them know.`,
+        `It's past the ${formatHHMM(windowMinutes)} cancellation window — please contact ${biz.name} to cancel. We've let them know.`,
         { duration: 8000 },
       );
       api.appointments.publicLateCancelRequest(id, "Late cancellation requested by client", token).catch(() => {});
@@ -81,9 +80,13 @@ export default function ManageAppointmentPage() {
   const isCancelled = appointment.status === 'CANCELLED';
   // Only live bookings can be managed (cancel/reschedule). Completed, no-show and
   // cancelled bookings are closed — the client must book fresh.
-  const canManage = ['PENDING', 'CONFIRMED'].includes(appointment.status);
+  const appointmentStarted = new Date() >= new Date(appointment.startsAt);
+  const canManage = ['PENDING', 'CONFIRMED'].includes(appointment.status) && !appointmentStarted;
   const isClosed = !canManage;
   const canCancel = canManage;
+  const windowMinutes = appointment.business.cancellationWindowMinutes ?? appointment.business.cancellationWindowHours * 60;
+  const changeCutoff = subMinutes(new Date(appointment.startsAt), windowMinutes);
+  const canReschedule = canManage && isBefore(new Date(), changeCutoff);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -175,7 +178,13 @@ export default function ManageAppointmentPage() {
                 <Button
                   variant="secondary"
                   className="flex-1 py-6 text-lg font-semibold"
-                  onClick={() => router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `&token=${encodeURIComponent(token)}` : ''}`)}
+                  onClick={() => {
+                    if (!canReschedule) {
+                      toast.error(`It's past the ${formatHHMM(windowMinutes)} change window. Please contact ${appointment.business.name} to reschedule.`);
+                      return;
+                    }
+                    router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `&token=${encodeURIComponent(token)}` : ''}`);
+                  }}
                 >
                   Reschedule
                 </Button>
@@ -212,7 +221,7 @@ export default function ManageAppointmentPage() {
 
         <div className="text-center">
           <p className="text-sm text-gray-400">
-            Need help? Contact {appointment.business.name} at {appointment.business.phone || appointment.business.email}
+            Need help? Contact {appointment.business.name}.
           </p>
         </div>
       </div>
