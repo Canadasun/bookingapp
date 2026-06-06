@@ -398,16 +398,14 @@ export const api = {
   },
 
   subscriptions: {
-    // Current plan + billing status.
-    get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),
-    // Owner — start Stripe Checkout for a paid plan; returns a redirect URL.
-    // An optional referral code applies a discount + records the referral.
-    // Returns a checkout URL for new subscribers, or { updated, plan } when an
-    // existing subscriber switches plan in place (prorated — no redirect needed).
-    checkout: (plan: "BASIC" | "PRO", referralCode?: string) =>
-      req<{ url?: string; updated?: boolean; plan?: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
-    // Owner — open the Stripe billing portal; returns a redirect URL.
-    portal: () => req<{ url: string }>("/subscriptions/portal", { method: "POST" }),
+    // Current plan + billing status (+ Square app/location for the card form).
+    get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean; applicationId?: string; locationId?: string }>("/subscriptions"),
+    // Owner — subscribe to (or switch) a paid plan with a Square card token.
+    // Returns { created } for a new sub or { updated } for an in-place plan swap.
+    subscribe: (plan: "BASIC" | "PRO", sourceId: string, referralCode?: string) =>
+      req<{ created?: boolean; updated?: boolean; plan?: string }>("/subscriptions/subscribe", { method: "POST", body: JSON.stringify({ plan, sourceId, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
+    // Owner — cancel the subscription.
+    cancel: () => req<{ canceled: boolean }>("/subscriptions/cancel", { method: "POST" }),
   },
   referrals: {
     // The current business's shareable code + who they've referred.

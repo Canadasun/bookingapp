@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ImageUpload } from "@/components/ImageUpload";
+import { SubscribeCardModal } from "@/components/SubscribeCardModal";
 import { cn } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -194,6 +195,7 @@ export default function SettingsPage() {
   }));
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
+  const [subscribePlan, setSubscribePlan] = useState<"BASIC" | "PRO" | null>(null);
   const [referralInput, setReferralInput] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
   const [refCopied, setRefCopied] = useState(false);
@@ -270,29 +272,20 @@ export default function SettingsPage() {
     if (tab && SECTIONS.some((s) => s.id === tab)) setSection(tab as Section);
   }, []);
 
-  async function upgrade(plan: "BASIC" | "PRO") {
-    setBillingBusy(plan);
-    try {
-      const res = await api.subscriptions.checkout(plan, referralInput);
-      if (res.url) {
-        window.location.assign(res.url); // new subscriber → Stripe Checkout
-      } else if (res.updated) {
-        // Existing subscriber switched plan in place (prorated) — refresh state.
-        toast.success(`Switched to ${plan} — you were only charged the prorated difference`);
-        if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
-        setBillingBusy(null);
-      } else {
-        setBillingBusy(null);
-      }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not start checkout"); setBillingBusy(null); }
+  // Open the Square card modal to subscribe to / switch a plan.
+  function upgrade(plan: "BASIC" | "PRO") {
+    setSubscribePlan(plan);
   }
 
   async function manageBilling() {
-    setBillingBusy("portal");
+    if (!window.confirm("Cancel your subscription? Your plan stays active until the end of the current billing period.")) return;
+    setBillingBusy("cancel");
     try {
-      const { url } = await api.subscriptions.portal();
-      window.location.assign(url);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not open billing portal"); setBillingBusy(null); }
+      await api.subscriptions.cancel();
+      toast.success("Subscription canceled");
+      if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
+      setBillingBusy(null);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not cancel"); setBillingBusy(null); }
   }
 
   async function save(e: React.FormEvent) {
@@ -1136,12 +1129,12 @@ export default function SettingsPage() {
                 {(biz?.plan ?? "FREE") !== "FREE" && (
                   <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Manage billing</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, or cancel in Stripe&apos;s billing portal.</p>
+                      <p className="text-sm font-medium text-gray-700">Cancel subscription</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Your plan stays active until the end of the current billing period.</p>
                     </div>
                     <button type="button" onClick={manageBilling} disabled={billingBusy !== null}
-                      className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-2 hover:bg-violet-50 disabled:opacity-60 transition-colors shrink-0">
-                      {billingBusy === "portal" ? "Opening…" : "Manage"}
+                      className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-60 transition-colors shrink-0">
+                      {billingBusy === "cancel" ? "Canceling…" : "Cancel plan"}
                     </button>
                   </div>
                 )}
@@ -1163,6 +1156,18 @@ export default function SettingsPage() {
         </div>
 
       </div>
+
+      {subscribePlan && (
+        <SubscribeCardModal
+          plan={subscribePlan}
+          referralCode={referralInput}
+          onClose={() => setSubscribePlan(null)}
+          onDone={() => {
+            setSubscribePlan(null);
+            if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
+          }}
+        />
+      )}
     </div>
   );
 }

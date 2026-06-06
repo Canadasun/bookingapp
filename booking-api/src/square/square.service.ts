@@ -135,4 +135,16 @@ export class SquareService {
     const conn = await this.requireConnection(businessId);
     return squareFetch<T>(conn.accessToken, method, path, body);
   }
+
+  // ── Platform account (Pulse's own Square) — used for SaaS subscription billing ──
+  platformLocationId(): string {
+    return this.config.get<string>('SQUARE_LOCATION_ID') ?? '';
+  }
+
+  // Authenticated Square call on the PLATFORM account (businesses pay Pulse here).
+  async platformFetch<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+    const token = this.config.get<string>('SQUARE_ACCESS_TOKEN');
+    if (!token) throw new BadRequestException('Square platform account is not configured (SQUARE_ACCESS_TOKEN).');
+    return squareFetch<T>(token, method, path, body);
+  }
 }

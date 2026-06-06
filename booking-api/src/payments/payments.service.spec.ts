@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -89,57 +89,48 @@ describe('PaymentsService.refundPayment', () => {
   });
 });
 
-describe('PaymentsService.handleWebhook (Stripe — subscriptions)', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-  afterEach(() => { process.env.NODE_ENV = originalNodeEnv; });
-
-  it('fails closed in production when STRIPE_WEBHOOK_SECRET is not configured', async () => {
-    process.env.NODE_ENV = 'production';
-    const { svc } = await build(makePayment());
-    await expect(svc.handleWebhook(Buffer.from('{}'), 'sig_test')).rejects.toThrow(ServiceUnavailableException);
-  });
-
-  it('skips unconfigured webhooks outside production', async () => {
-    process.env.NODE_ENV = 'development';
-    const { svc } = await build(makePayment());
-    await expect(svc.handleWebhook(Buffer.from('{}'), 'sig_test')).resolves.toMatchObject({
-      received: true,
-      skipped: expect.stringContaining('not configured'),
-    });
-  });
-});
-
-describe('PaymentsService subscriptions (Stripe — Phase 2 pending)', () => {
+describe('PaymentsService.subscribeToPlan (Square)', () => {
   async function buildSub(env: Record<string, string | undefined>) {
     const prisma = {
-      business: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'biz1', name: 'Biz', email: 'b@x.com' }) },
+      business: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'biz1', name: 'Biz', email: 'b@x.com' }),
+        findUnique: jest.fn().mockResolvedValue({ plan: 'FREE' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       subscription: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}) },
     };
+    const platformFetch = jest.fn().mockImplementation((_m: string, path: string) => {
+      if (path === '/v2/customers') return Promise.resolve({ customer: { id: 'cust_1' } });
+      if (path === '/v2/cards') return Promise.resolve({ card: { id: 'card_1' } });
+      if (path === '/v2/subscriptions') return Promise.resolve({ subscription: { id: 'sub_1', status: 'ACTIVE', plan_variation_id: env.SQUARE_PLAN_BASIC, customer_id: 'cust_1' } });
+      return Promise.resolve({});
+    });
+    const square = { platformFetch, platformLocationId: jest.fn().mockReturnValue('LOC_PLATFORM'), merchantFetch: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
-        { provide: NotificationsService, useValue: {} },
+        { provide: NotificationsService, useValue: { sendPlanChanged: jest.fn().mockResolvedValue(undefined) } },
         { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
-        { provide: SquareService, useValue: { merchantFetch: jest.fn(), locationId: jest.fn(), status: jest.fn() } },
+        { provide: SquareService, useValue: square },
       ],
     }).compile();
-    const svc = module.get<PaymentsService>(PaymentsService);
-    (svc as unknown as { stripe: unknown }).stripe = {
-      customers: { create: jest.fn().mockResolvedValue({ id: 'cus_1' }) },
-      checkout: { sessions: { create: jest.fn().mockResolvedValue({ url: 'https://stripe.test/checkout' }) } },
-    };
-    return { svc };
+    return { svc: module.get<PaymentsService>(PaymentsService), platformFetch };
   }
 
-  it('rejects checkout when the plan price is not configured', async () => {
+  it('rejects when the plan variation is not configured', async () => {
     const { svc } = await buildSub({});
-    await expect(svc.createSubscriptionCheckout('biz1', 'BASIC')).rejects.toThrow(BadRequestException);
+    await expect(svc.subscribeToPlan('biz1', 'BASIC', 'cnon_token')).rejects.toThrow(BadRequestException);
   });
 
-  it('creates a checkout session when the plan price is configured', async () => {
-    const { svc } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123' });
-    await expect(svc.createSubscriptionCheckout('biz1', 'BASIC')).resolves.toEqual({ url: 'https://stripe.test/checkout' });
+  it('creates a Square subscription when the plan variation is configured', async () => {
+    const { svc, platformFetch } = await buildSub({ SQUARE_PLAN_BASIC: 'planvar_basic' });
+    const res = await svc.subscribeToPlan('biz1', 'BASIC', 'cnon_token');
+    expect(res).toEqual({ created: true, plan: 'BASIC' });
+    expect(platformFetch).toHaveBeenCalledWith(
+      'POST', '/v2/subscriptions',
+      expect.objectContaining({ plan_variation_id: 'planvar_basic', customer_id: 'cust_1', card_id: 'card_1' }),
+    );
   });
 });

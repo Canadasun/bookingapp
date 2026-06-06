@@ -146,16 +146,6 @@ export class PaymentsController {
     return this.paymentService.refundPayment(user.businessId, paymentId, parsed.data);
   }
 
-  // Stripe webhook — retained for SaaS subscription events during the migration.
-  @Post('webhook/stripe')
-  @Throttle({ default: { limit: 120, ttl: 60000 } })
-  stripeWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('stripe-signature') sig: string,
-  ) {
-    return this.paymentService.handleWebhook(req.rawBody!, sig);
-  }
-
   // Square webhook — payment + refund reconciliation. Signature is validated over
   // (notificationUrl + rawBody), so we reconstruct the exact URL Square called.
   @Post('webhook/square')

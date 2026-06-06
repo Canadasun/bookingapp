@@ -9,7 +9,11 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
-const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO']), referralCode: z.string().trim().max(40).optional() });
+const SubscribeSchema = z.object({
+  plan: z.enum(['BASIC', 'PRO']),
+  sourceId: z.string().min(1),                 // Square card token (Web Payments SDK)
+  referralCode: z.string().trim().max(40).optional(),
+});
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -25,25 +29,25 @@ export class SubscriptionsController {
     return this.payments.getSubscription(user.businessId);
   }
 
-  // Owner/Admin — start a Stripe Checkout to subscribe to a paid plan.
-  @Post('checkout')
+  // Owner/Admin — subscribe to (or switch) a paid plan with a Square card token.
+  @Post('subscribe')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  checkout(@Body() body: unknown, @CurrentUser() user: { businessId: string | null }) {
-    const parsed = CheckoutSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException('A valid plan (BASIC or PRO) is required');
+  subscribe(@Body() body: unknown, @CurrentUser() user: { businessId: string | null }) {
+    const parsed = SubscribeSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('A valid plan (BASIC or PRO) and card token are required');
     if (!user.businessId) throw new ForbiddenException('No business on this account');
-    return this.payments.createSubscriptionCheckout(user.businessId, parsed.data.plan, parsed.data.referralCode);
+    return this.payments.subscribeToPlan(user.businessId, parsed.data.plan, parsed.data.sourceId, parsed.data.referralCode);
   }
 
-  // Owner/Admin — open the Stripe billing portal.
-  @Post('portal')
+  // Owner/Admin — cancel the subscription.
+  @Post('cancel')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  portal(@CurrentUser() user: { businessId: string | null }) {
+  cancel(@CurrentUser() user: { businessId: string | null }) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
-    return this.payments.createBillingPortal(user.businessId);
+    return this.payments.cancelSubscription(user.businessId);
   }
 }
