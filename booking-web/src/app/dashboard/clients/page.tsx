@@ -229,8 +229,9 @@ export default function ClientsPage() {
       ) : (
         <div className="space-y-2">
           {clients.map((c) => (
-            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openClient(c)}>
-              <CardContent className="py-3 flex items-center gap-4">
+            <Card key={c.id} className="overflow-hidden">
+              <button type="button" onClick={() => openClient(c)}
+                className="flex w-full items-center gap-4 px-6 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-500">
                 <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm shrink-0">
                   {c.name.slice(0, 2).toUpperCase()}
                 </div>
@@ -250,7 +251,7 @@ export default function ClientsPage() {
                   <div className="flex items-center gap-1"><Calendar className="w-3 h-3" />{c.totalVisits} visits</div>
                   {c.lastVisit && <div className="mt-0.5">Last: {format(new Date(c.lastVisit), "MMM d")}</div>}
                 </div>
-              </CardContent>
+              </button>
             </Card>
           ))}
         </div>
