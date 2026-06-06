@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge } from "lucide-react";
 import { format } from "date-fns";
@@ -68,7 +68,12 @@ export default function ClientsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Debounced search. Skip the first run: the mount load above already fetched
+  // page 1, and firing this on mount too caused a second load that flashed the
+  // list back to skeletons right after it appeared ("static-TV" flicker).
+  const searchReady = useRef(false);
   useEffect(() => {
+    if (!searchReady.current) { searchReady.current = true; return; }
     const t = setTimeout(() => { setPage(1); load(search, 1); }, 300);
     return () => clearTimeout(t);
   }, [search, load]);
