@@ -47,9 +47,12 @@ export class UploadsService {
         : 'File content is not a valid PNG, JPEG, WebP, or GIF image');
     }
 
-    // Object storage when configured; otherwise the bytes live in the DB. Either
-    // way the public URL shape (/uploads/:id) is identical.
-    if (objectStorageEnabled()) {
+    // Media (images: logos/avatars/covers) goes to object storage when configured,
+    // so it can be served from a CDN. Documents (kind OTHER — e.g. verification
+    // PDFs) deliberately stay in the DB regardless. Either way the public URL shape
+    // (/uploads/:id) is identical, and existing DB-stored files keep serving.
+    const useObjectStorage = objectStorageEnabled() && kind !== 'OTHER';
+    if (useObjectStorage) {
       const storageKey = newStorageKey(businessId);
       await putObject(storageKey, file.buffer, sniffed);
       const row = await this.prisma.uploadedFile.create({
