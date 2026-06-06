@@ -438,9 +438,15 @@ export const api = {
 
   payments: {
     // Public — booking wizard asks whether a deposit / card-on-file is required.
+    // Square: returns the merchant's applicationId + locationId for the Web
+    // Payments SDK card form (no client secret — the charge runs server-side).
     bookingIntent: (appointmentId: string, businessId: string) =>
-      req<{ required: boolean; mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string; currency?: "CAD" | "USD" }>(
+      req<{ required: boolean; mode?: "payment" | "setup" | "none"; amountCents?: number; currency?: "CAD" | "USD"; applicationId?: string; locationId?: string; saveCard?: boolean; reason?: string }>(
         "/payments/booking-intent", { method: "POST", body: JSON.stringify({ appointmentId, businessId }) }, null),
+    // Public — complete the booking payment with the Square card token.
+    chargeBooking: (data: { appointmentId: string; businessId: string; sourceId: string; verificationToken?: string; mode: "payment" | "setup" }) =>
+      req<{ confirmed: boolean; charged: boolean; squarePaymentId?: string; status?: string }>(
+        "/payments/charge-booking", { method: "POST", body: JSON.stringify(data) }, null),
     // Owner — charge the configured no-show fee on the saved card.
     chargeNoShow: (appointmentId: string) =>
       req<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${appointmentId}`, { method: "POST" }),
@@ -452,6 +458,13 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ ...(amountCents ? { amountCents } : {}), ...(reason ? { reason } : {}) }),
       }),
+  },
+
+  // Per-business Square connection (OAuth) — accept client payments on their account.
+  square: {
+    status: () => req<{ configured: boolean; connected: boolean; merchantName: string | null; locationId: string | null }>("/square/status"),
+    connect: () => req<{ url: string }>("/square/connect"),
+    disconnect: () => req<{ disconnected: boolean }>("/square/disconnect", { method: "POST" }),
   },
 
   waitlist: {

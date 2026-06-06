@@ -239,6 +239,24 @@ export default function SettingsPage() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect"); }
   }
 
+  // Square payments connection (per-merchant). Required to take client payments.
+  const [sq, setSq] = useState<{ configured: boolean; connected: boolean; merchantName: string | null } | null>(null);
+  function loadSq() { api.square.status().then(setSq).catch(() => {}); }
+  useEffect(() => { loadSq(); }, []);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("square");
+    if (p === "connected") { toast.success("Square account connected"); loadSq(); window.history.replaceState({}, "", "/dashboard/settings"); }
+    else if (p === "error") { toast.error("Could not connect Square"); window.history.replaceState({}, "", "/dashboard/settings"); }
+  }, []);
+  async function connectSquare() {
+    try { const { url } = await api.square.connect(); window.location.assign(url); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Square connect"); }
+  }
+  async function disconnectSquare() {
+    try { await api.square.disconnect(); toast.success("Square disconnected"); loadSq(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect Square"); }
+  }
+
   // Toast the result of a returning Stripe Checkout, then reload the plan.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("billing");
@@ -619,6 +637,29 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Payments &amp; fees</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Deposits and manual charges are Basic+. Automatic saved-card fees are Pro.</p>
                 </div>
+
+                {/* Square account connection — required to take any payment. */}
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Square account</p>
+                      <p className="text-xs text-gray-500 mt-1 max-w-md">
+                        {sq?.connected
+                          ? `Connected${sq.merchantName ? ` — ${sq.merchantName}` : ""}. Client payments settle to your Square account.`
+                          : "Connect your Square account to take deposits, no-show fees, and in-person payments. Money goes straight to you."}
+                      </p>
+                    </div>
+                    {sq?.connected ? (
+                      <Button type="button" variant="outline" size="sm" onClick={disconnectSquare} className="shrink-0">Disconnect</Button>
+                    ) : (
+                      <Button type="button" size="sm" onClick={connectSquare} disabled={sq ? !sq.configured : false} className="shrink-0">Connect Square</Button>
+                    )}
+                  </div>
+                  {sq && !sq.configured && (
+                    <p className="text-xs text-amber-600 mt-2">Square isn&apos;t configured on the server yet — contact support.</p>
+                  )}
+                </div>
+
                 <hr className="border-gray-100" />
                 {!isPaid && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

@@ -16,7 +16,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { getUser, type SessionUser } from "@/lib/auth";
 import "react-day-picker/style.css";
 
-type PayInfo = { mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string; currency?: "CAD" | "USD" };
+type PayInfo = { mode?: "payment" | "setup" | "none"; amountCents?: number; currency?: "CAD" | "USD"; applicationId?: string; locationId?: string; saveCard?: boolean };
 type BookingSlot = Slot & { staffId?: string; staffName?: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         }
         return null;
       });
-      if (intent?.required && intent.clientSecret && intent.publishableKey) {
+      if (intent?.required && intent.applicationId && intent.locationId) {
         setPayInfo(intent);
       } else if (requiresDeposit || intent?.required) {
         toast.error("This booking requires a deposit, but payment is not available. Please contact the business.");
@@ -379,7 +379,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   if (payInfo && booking) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <BookingPayment info={payInfo} onPaid={() => { setPayInfo(null); setStep(4); }} />
+        <BookingPayment info={payInfo} appointmentId={booking.id} businessId={bizId} onPaid={() => { setPayInfo(null); setStep(4); }} />
       </div>
     </div>
   );
