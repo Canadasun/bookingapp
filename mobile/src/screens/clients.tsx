@@ -24,6 +24,30 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
   const [search, setSearch]     = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [profile, setProfile]   = useState<Client|null>(null);
+  const [tagInput, setTagInput] = useState('');
+  const [savingTags, setSavingTags] = useState(false);
+
+  // Persist a client's tag list, then reflect it in the open profile + the list.
+  async function saveTags(client: Client, tags: string[]) {
+    setSavingTags(true);
+    try {
+      const updated = await api<Client>(`/businesses/${bizId()}/clients/${client.id}`, { method:'PATCH', body: JSON.stringify({ tags }) });
+      const next = updated.tags ?? tags;
+      setProfile(p => p && p.id===client.id ? { ...p, tags: next } : p);
+      setClients(cs => cs.map(c => c.id===client.id ? { ...c, tags: next } : c));
+    } catch (e) { Alert.alert('Could not update tags', e instanceof Error ? e.message : 'Please try again.'); }
+    finally { setSavingTags(false); }
+  }
+  function addTag(client: Client) {
+    const t = tagInput.trim();
+    if (!t) return;
+    const existing = client.tags ?? [];
+    if (existing.some(x => x.toLowerCase() === t.toLowerCase())) { setTagInput(''); return; }
+    saveTags(client, [...existing, t]); setTagInput('');
+  }
+  function removeTag(client: Client, tag: string) {
+    saveTags(client, (client.tags ?? []).filter(x => x !== tag));
+  }
 
   const load = useCallback(async (silent=false, q='') => {
     if (!silent) setLoading(true);
@@ -76,6 +100,15 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
               <Text style={s.sub}>{c.email}</Text>
               {c.phone&&<Text style={s.sub}>{c.phone}</Text>}
               {c.totalVisits!==undefined&&<Text style={s.sub}>{c.totalVisits} visit{c.totalVisits!==1?'s':''}</Text>}
+              {c.tags&&c.tags.length>0&&(
+                <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4 }}>
+                  {c.tags.slice(0,3).map(t=>(
+                    <View key={t} style={{ backgroundColor:GRAY_100, borderRadius:6, paddingHorizontal:6, paddingVertical:2 }}>
+                      <Text style={{ fontSize:10, fontWeight:'700', color:GRAY_500 }}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
             <TouchableOpacity style={s.msgBtn} onPress={()=>onMessage(c)}>
               <Ionicons name="chatbubble-outline" size={18} color={BRAND}/>
@@ -104,6 +137,27 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
                 <Text style={s.detailValue}>{v}</Text>
               </View>
             ))}
+            <View style={{ marginTop:10 }}>
+              <Text style={[s.detailLabel,{ marginBottom:6 }]}>Tags</Text>
+              <View style={{ flexDirection:'row', flexWrap:'wrap', gap:6 }}>
+                {(profile.tags ?? []).map(tag=>(
+                  <TouchableOpacity key={tag} disabled={savingTags} onPress={()=>removeTag(profile, tag)}
+                    style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:BRAND_LT, borderRadius:99, paddingHorizontal:10, paddingVertical:5 }}>
+                    <Text style={{ fontSize:12, fontWeight:'700', color:BRAND }}>{tag}</Text>
+                    <Ionicons name="close" size={12} color={BRAND}/>
+                  </TouchableOpacity>
+                ))}
+                {(profile.tags ?? []).length===0 && <Text style={s.sub}>No tags yet</Text>}
+              </View>
+              <View style={{ flexDirection:'row', gap:8, marginTop:8 }}>
+                <TextInput style={[s.input,{ flex:1 }]} placeholder="Add a tag (e.g. VIP)" placeholderTextColor={GRAY_400}
+                  value={tagInput} onChangeText={setTagInput} autoCapitalize="none" returnKeyType="done" onSubmitEditing={()=>addTag(profile)}/>
+                <TouchableOpacity style={[s.btnSecondary,{ paddingHorizontal:18, justifyContent:'center' }]} disabled={savingTags||!tagInput.trim()} onPress={()=>addTag(profile)}>
+                  <Text style={s.btnSecondaryText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={s.sheetActions}>
               <TouchableOpacity style={s.btnPrimary} onPress={()=>{ const c=profile; setProfile(null); onMessage(c); nav.navigate('Messages'); }}>
                 <Text style={s.btnPrimaryText}>Message</Text>
