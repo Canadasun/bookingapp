@@ -5,12 +5,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ReferralsService } from '../referrals/referrals.service';
+import { SquareService } from '../square/square.service';
 
 function makePayment(overrides = {}) {
   return {
     id: 'pay1',
     businessId: 'biz1',
-    stripePaymentIntentId: 'pi_123',
+    squarePaymentId: 'sqpay_123',
     amountCents: 5000,
     refundedCents: 0,
     status: 'SUCCEEDED',
@@ -24,8 +25,17 @@ async function build(paymentRow: unknown) {
       findFirst: jest.fn().mockResolvedValue(paymentRow),
       update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...makePayment(), ...data })),
     },
+    business: { findUniqueOrThrow: jest.fn().mockResolvedValue({ currency: 'CAD' }) },
     refund: { create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'ref1', ...data })) },
     $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
+  };
+  // Square refunds: merchantFetch(POST /v2/refunds) → a completed refund.
+  const merchantFetch = jest.fn().mockResolvedValue({ refund: { id: 'sqr_1', status: 'COMPLETED' } });
+  const square = {
+    merchantFetch,
+    locationId: jest.fn().mockResolvedValue('LOC1'),
+    status: jest.fn().mockResolvedValue({ connected: true }),
+    requireConnection: jest.fn(),
   };
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -34,13 +44,11 @@ async function build(paymentRow: unknown) {
       { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('sk_test_x') } },
       { provide: NotificationsService, useValue: {} },
       { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
+      { provide: SquareService, useValue: square },
     ],
   }).compile();
   const svc = module.get<PaymentsService>(PaymentsService);
-  // Inject a fake Stripe so getStripe() returns it without a real key.
-  const refundsCreate = jest.fn().mockResolvedValue({ id: 're_1', status: 'succeeded' });
-  (svc as unknown as { stripe: unknown }).stripe = { refunds: { create: refundsCreate } };
-  return { svc, prisma, refundsCreate };
+  return { svc, prisma, merchantFetch };
 }
 
 describe('PaymentsService.refundPayment', () => {
@@ -55,11 +63,11 @@ describe('PaymentsService.refundPayment', () => {
   });
 
   it('full refund (no amount) → REFUNDED of the remaining balance', async () => {
-    const { svc, refundsCreate } = await build(makePayment({ refundedCents: 1000 }));
+    const { svc, merchantFetch } = await build(makePayment({ refundedCents: 1000 }));
     const res = await svc.refundPayment('biz1', 'pay1', {});
-    expect(refundsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 4000 }),
-      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^pulse:/) }),
+    expect(merchantFetch).toHaveBeenCalledWith(
+      'biz1', 'POST', '/v2/refunds',
+      expect.objectContaining({ payment_id: 'sqpay_123', amount_money: { amount: 4000, currency: 'CAD' } }),
     ); // 5000 - 1000
     expect(res.status).toBe('REFUNDED');
     expect(res.refundedCents).toBe(5000);
@@ -81,24 +89,19 @@ describe('PaymentsService.refundPayment', () => {
   });
 });
 
-describe('PaymentsService.handleWebhook', () => {
+describe('PaymentsService.handleWebhook (Stripe — subscriptions)', () => {
   const originalNodeEnv = process.env.NODE_ENV;
-
-  afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
-  });
+  afterEach(() => { process.env.NODE_ENV = originalNodeEnv; });
 
   it('fails closed in production when STRIPE_WEBHOOK_SECRET is not configured', async () => {
     process.env.NODE_ENV = 'production';
     const { svc } = await build(makePayment());
-
     await expect(svc.handleWebhook(Buffer.from('{}'), 'sig_test')).rejects.toThrow(ServiceUnavailableException);
   });
 
   it('skips unconfigured webhooks outside production', async () => {
     process.env.NODE_ENV = 'development';
     const { svc } = await build(makePayment());
-
     await expect(svc.handleWebhook(Buffer.from('{}'), 'sig_test')).resolves.toMatchObject({
       received: true,
       skipped: expect.stringContaining('not configured'),
@@ -106,7 +109,7 @@ describe('PaymentsService.handleWebhook', () => {
   });
 });
 
-describe('PaymentsService subscriptions', () => {
+describe('PaymentsService subscriptions (Stripe — Phase 2 pending)', () => {
   async function buildSub(env: Record<string, string | undefined>) {
     const prisma = {
       business: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'biz1', name: 'Biz', email: 'b@x.com' }) },
@@ -118,7 +121,8 @@ describe('PaymentsService subscriptions', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
         { provide: NotificationsService, useValue: {} },
-      { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
+        { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
+        { provide: SquareService, useValue: { merchantFetch: jest.fn(), locationId: jest.fn(), status: jest.fn() } },
       ],
     }).compile();
     const svc = module.get<PaymentsService>(PaymentsService);

@@ -5,11 +5,15 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { createHash } from 'crypto';
 import Stripe from 'stripe';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { isPaidPlan, isProPlan } from '../common/util/plan-features';
 import { ReferralsService } from '../referrals/referrals.service';
+import { SquareService } from '../square/square.service';
 
 @Injectable()
 export class PaymentsService {
+  // Stripe retained only for SaaS subscription billing during the migration
+  // (Phase 2 moves subscriptions to Square; Phase 4 removes Stripe entirely).
   private stripe: Stripe | null = null;
 
   constructor(
@@ -17,6 +21,7 @@ export class PaymentsService {
     private configService: ConfigService,
     private notifications: NotificationsService,
     private referrals: ReferralsService,
+    private square: SquareService,
   ) {}
 
   // Lazily construct Stripe so a missing STRIPE_SECRET_KEY can't crash the app
@@ -37,9 +42,9 @@ export class PaymentsService {
     return this.configService.get<string>('STRIPE_PUBLISHABLE_KEY') ?? '';
   }
 
-  // Stripe currency code (lowercase) for a business; defaults to CAD.
+  // Square currency code (uppercase ISO) for a business; defaults to CAD.
   private currencyOf(b: { currency?: string | null } | null | undefined): string {
-    return (b?.currency ?? 'CAD').toLowerCase();
+    return (b?.currency ?? 'CAD').toUpperCase();
   }
 
   private idempotencyKey(parts: Array<string | number | null | undefined>): string {
@@ -55,12 +60,14 @@ export class PaymentsService {
     appointmentId?: string | null;
     clientId?: string | null;
     stripePaymentIntentId?: string | null;
+    squarePaymentId?: string | null;
     amountCents: number;
     tipCents?: number;
     taxCents?: number;
     kind: PaymentKind;
     status: PaymentStatus;
     description?: string;
+    receiptUrl?: string | null;
   }) {
     try {
       await this.prisma.payment.create({ data });
@@ -69,19 +76,31 @@ export class PaymentsService {
     }
   }
 
-  // Get-or-create a Stripe Customer for a client and persist the id so cards can
-  // be saved and re-charged (deposits / no-show protection).
-  private async ensureCustomer(clientId: string): Promise<string> {
+  // Get-or-create a Square Customer (on the business's merchant account) for a
+  // client, and persist the id so cards can be saved and re-charged later
+  // (deposits / no-show protection).
+  private async ensureSquareCustomer(businessId: string, clientId: string): Promise<string> {
     const client = await this.prisma.client.findUniqueOrThrow({ where: { id: clientId } });
-    if (client.stripeCustomerId) return client.stripeCustomerId;
-    const customer = await this.getStripe().customers.create({
-      name: client.name,
-      email: client.email,
-      phone: client.phone ?? undefined,
-      metadata: { clientId: client.id, businessId: client.businessId },
+    if (client.squareCustomerId) return client.squareCustomerId;
+    const res = await this.square.merchantFetch<{ customer: { id: string } }>(businessId, 'POST', '/v2/customers', {
+      given_name: client.name,
+      email_address: client.email,
+      phone_number: client.phone ?? undefined,
+      reference_id: client.id,
     });
-    await this.prisma.client.update({ where: { id: clientId }, data: { stripeCustomerId: customer.id } });
-    return customer.id;
+    await this.prisma.client.update({ where: { id: clientId }, data: { squareCustomerId: res.customer.id } });
+    return res.customer.id;
+  }
+
+  // Save a tokenized card on file (Square Cards API) for a customer; returns the
+  // stored card id, used for later off-session no-show / late-cancel charges.
+  private async saveCard(businessId: string, customerId: string, sourceId: string): Promise<string> {
+    const res = await this.square.merchantFetch<{ card: { id: string } }>(businessId, 'POST', '/v2/cards', {
+      idempotency_key: this.idempotencyKey(['card', businessId, customerId, sourceId]),
+      source_id: sourceId,
+      card: { customer_id: customerId },
+    });
+    return res.card.id;
   }
 
   /**
@@ -95,7 +114,7 @@ export class PaymentsService {
   async createBookingIntent(appointmentId: string, businessId: string) {
     const apt = await this.prisma.appointment.findFirst({
       where: { id: appointmentId, businessId },
-      include: { service: true, client: true, business: true },
+      include: { service: true, business: true },
     });
     if (!apt) throw new BadRequestException('Appointment not found');
 
@@ -104,46 +123,28 @@ export class PaymentsService {
     // also supports card-on-file protection for later automatic fees.
     if (!isPaidPlan(b.plan)) return { required: false, mode: 'none' as const };
 
-    const customer = await this.ensureCustomer(apt.clientId);
+    // Square must be connected for this merchant to take any payment.
+    const status = await this.square.status(businessId);
+    if (!status.connected) return { required: false, mode: 'none' as const, reason: 'square_not_connected' };
+    const applicationId = this.configService.get<string>('SQUARE_APPLICATION_ID') ?? '';
+    const locationId = await this.square.locationId(businessId);
 
     if (b.requireDeposit) {
       const totalPriceCents = apt.totalPriceCents || apt.service.priceCents;
       const depositCents = Math.max(50, Math.round(totalPriceCents * (b.depositPercent / 100)));
-      const intent = await this.getStripe().paymentIntents.create({
-        amount: depositCents,
-        currency: this.currencyOf(b),
-        customer,
-        receipt_email: apt.client.email, // Stripe emails the official receipt on success
-        ...(isProPlan(b.plan) ? { setup_future_usage: 'off_session' as const } : {}),
-        // Card-only: no redirect-based methods, so the client can confirm without
-        // supplying a return_url.
-        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-        metadata: { appointmentId, businessId, kind: 'deposit' },
-        description: `Deposit — ${apt.service.name} @ ${b.name}`,
-      }, { idempotencyKey: this.idempotencyKey(['deposit', businessId, appointmentId, depositCents]) });
-      await this.prisma.appointment.update({
-        where: { id: appointmentId },
-        data: { stripePaymentIntentId: intent.id, depositCents },
-      });
-      await this.recordPayment({
-        businessId, appointmentId, clientId: apt.clientId,
-        stripePaymentIntentId: intent.id, amountCents: depositCents,
-        kind: 'DEPOSIT', status: 'PENDING',
-        description: `Deposit — ${apt.service.name}`,
-      });
-      return { required: true, mode: 'payment' as const, clientSecret: intent.client_secret, amountCents: depositCents, publishableKey: this.publishableKey(), currency: b.currency };
+      // Square charges server-side from a card token. Return what the Web Payments
+      // SDK needs to render the card form; the actual charge runs in chargeBooking().
+      return {
+        required: true, mode: 'payment' as const, amountCents: depositCents,
+        currency: b.currency, applicationId, locationId,
+        saveCard: isProPlan(b.plan), // Pro keeps the card for no-show charges
+      };
     }
 
     // Card-on-file (no upfront charge): collect a saveable card when the owner
     // turned on "always collect a card", or (Pro) when a no-show fee is set.
     if (b.collectCardOnFile || (isProPlan(b.plan) && b.noShowFeeCents > 0)) {
-      const intent = await this.getStripe().setupIntents.create({
-        customer,
-        usage: 'off_session',
-        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-        metadata: { appointmentId, businessId, kind: 'card_on_file' },
-      }, { idempotencyKey: this.idempotencyKey(['card-on-file', businessId, appointmentId]) });
-      return { required: true, mode: 'setup' as const, clientSecret: intent.client_secret, amountCents: 0, publishableKey: this.publishableKey(), currency: b.currency };
+      return { required: true, mode: 'setup' as const, amountCents: 0, currency: b.currency, applicationId, locationId };
     }
 
     return { required: false, mode: 'none' as const };
@@ -156,63 +157,126 @@ export class PaymentsService {
   }
 
   /**
-   * In-person custom charge (mobile Checkout → Tap to Pay on iPhone).
-   * Creates a PaymentIntent for an arbitrary amount so the transaction is recorded
-   * in Stripe and shows on the dashboard. The contactless capture is performed by
-   * the in-app reader: the Stripe Terminal "Tap to Pay on iPhone" SDK collects the
-   * card and confirms THIS intent (drop-in once the Apple proximity-reader
-   * entitlement is granted). We return the client secret + publishable key so that
-   * hook can confirm without another round-trip.
+   * Complete the booking payment after the client tokenizes their card with the
+   * Square Web Payments SDK. `mode:'payment'` charges the deposit (and, for Pro,
+   * saves the card for no-show protection); `mode:'setup'` only saves the card.
+   * Square is synchronous, so on success we confirm the appointment immediately —
+   * no webhook round-trip needed.
+   */
+  async chargeBooking(
+    appointmentId: string,
+    businessId: string,
+    input: { sourceId: string; verificationToken?: string; mode: 'payment' | 'setup' },
+  ) {
+    const apt = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, businessId },
+      include: { service: true, client: true, business: true },
+    });
+    if (!apt) throw new BadRequestException('Appointment not found');
+    const b = apt.business;
+    if (!input.sourceId) throw new BadRequestException('Missing card token');
+    const customerId = await this.ensureSquareCustomer(businessId, apt.clientId);
+
+    // Card-on-file only (no charge).
+    if (input.mode === 'setup') {
+      const cardId = await this.saveCard(businessId, customerId, input.sourceId);
+      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { squareCardId: cardId } });
+      await this.prisma.client.update({ where: { id: apt.clientId }, data: { squareCardId: cardId } });
+      return { confirmed: true, charged: false, cardSaved: true };
+    }
+
+    // Deposit. For Pro, save the card first so we can charge a no-show fee later,
+    // then charge that saved card; otherwise charge the one-time token directly.
+    const totalPriceCents = apt.totalPriceCents || apt.service.priceCents;
+    const depositCents = Math.max(50, Math.round(totalPriceCents * (b.depositPercent / 100)));
+    let cardId: string | null = null;
+    if (isProPlan(b.plan)) {
+      try { cardId = await this.saveCard(businessId, customerId, input.sourceId); } catch { /* charge token directly */ }
+    }
+    const res = await this.square.merchantFetch<{ payment: any }>(businessId, 'POST', '/v2/payments', {
+      source_id: cardId ?? input.sourceId,
+      idempotency_key: this.idempotencyKey(['deposit', businessId, appointmentId, depositCents]),
+      amount_money: { amount: depositCents, currency: this.currencyOf(b) },
+      location_id: await this.square.locationId(businessId),
+      autocomplete: true,
+      customer_id: customerId,
+      buyer_email_address: apt.client.email,
+      reference_id: appointmentId.slice(0, 40),
+      note: `Deposit — ${apt.service.name} @ ${b.name}`.slice(0, 500),
+      ...(input.verificationToken ? { verification_token: input.verificationToken } : {}),
+    });
+    const pay = res.payment;
+    const ok = pay?.status === 'COMPLETED' || pay?.status === 'APPROVED';
+    await this.prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        squarePaymentId: pay?.id ?? null, depositCents,
+        ...(cardId ? { squareCardId: cardId } : {}),
+        ...(ok ? { status: 'CONFIRMED' } : {}),
+      },
+    });
+    await this.recordPayment({
+      businessId, appointmentId, clientId: apt.clientId,
+      squarePaymentId: pay?.id ?? null, amountCents: depositCents,
+      kind: 'DEPOSIT', status: ok ? 'SUCCEEDED' : 'FAILED',
+      description: `Deposit — ${apt.service.name}`, receiptUrl: pay?.receipt_url ?? null,
+    });
+    if (ok) {
+      const full = await this.prisma.appointment.findUnique({
+        where: { id: appointmentId },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+      });
+      if (full) await this.notifications.scheduleReminders(full);
+    }
+    return { confirmed: ok, charged: ok, squarePaymentId: pay?.id, status: pay?.status };
+  }
+
+  /**
+   * In-person custom charge (mobile Checkout / Tap to Pay). The reader/SDK
+   * tokenizes the card → `sourceId`; we create the Square payment on the
+   * business's merchant account so it settles to them and shows on the dashboard.
    */
   async createCustomCharge(
     businessId: string,
-    input: { amountCents: number; tipCents?: number; taxCents?: number; description?: string; clientId?: string; idempotencyKey?: string },
+    input: { amountCents: number; sourceId: string; verificationToken?: string; tipCents?: number; taxCents?: number; description?: string; clientId?: string; idempotencyKey?: string },
   ) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     if (!isPaidPlan(business.plan)) {
       throw new BadRequestException('Manual charges require Basic or Pro.');
     }
+    if (!input.sourceId) throw new BadRequestException('Missing card token');
     const chargeClient = input.clientId
       ? await this.prisma.client.findUnique({ where: { id: input.clientId }, select: { email: true } })
       : null;
-    const intent = await this.getStripe().paymentIntents.create({
-      amount: input.amountCents,
-      currency: this.currencyOf(business),
-      ...(chargeClient?.email ? { receipt_email: chargeClient.email } : {}),
-      // Card-only, no redirect methods — the reader confirms on-device.
-      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-      metadata: {
-        businessId,
-        kind: 'tap_to_pay',
-        ...(input.clientId ? { clientId: input.clientId } : {}),
-      },
-      description: input.description?.trim() || `In-person charge — ${business.name}`,
-    }, {
-      idempotencyKey: input.idempotencyKey?.trim()
-        ? this.idempotencyKey(['custom', businessId, input.idempotencyKey.trim()])
-        : this.idempotencyKey([
-          'custom',
-          businessId,
-          input.clientId,
-          input.amountCents,
-          input.description?.trim(),
-          Math.floor(Date.now() / 60_000),
-        ]),
+    const idempotencyKey = input.idempotencyKey?.trim()
+      ? this.idempotencyKey(['custom', businessId, input.idempotencyKey.trim()])
+      : this.idempotencyKey(['custom', businessId, input.clientId, input.amountCents, input.description?.trim(), Math.floor(Date.now() / 60_000)]);
+    const res = await this.square.merchantFetch<{ payment: any }>(businessId, 'POST', '/v2/payments', {
+      source_id: input.sourceId,
+      idempotency_key: idempotencyKey,
+      amount_money: { amount: input.amountCents, currency: this.currencyOf(business) },
+      ...(input.tipCents ? { tip_money: { amount: input.tipCents, currency: this.currencyOf(business) } } : {}),
+      location_id: await this.square.locationId(businessId),
+      autocomplete: true,
+      ...(chargeClient?.email ? { buyer_email_address: chargeClient.email } : {}),
+      note: (input.description?.trim() || `In-person charge — ${business.name}`).slice(0, 500),
+      ...(input.verificationToken ? { verification_token: input.verificationToken } : {}),
     });
+    const pay = res.payment;
+    const ok = pay?.status === 'COMPLETED' || pay?.status === 'APPROVED';
     await this.recordPayment({
       businessId, clientId: input.clientId ?? null,
-      stripePaymentIntentId: intent.id, amountCents: input.amountCents,
+      squarePaymentId: pay?.id ?? null, amountCents: input.amountCents,
       tipCents: input.tipCents ?? 0, taxCents: input.taxCents ?? 0,
-      kind: 'IN_PERSON', status: 'PENDING',
-      description: input.description?.trim() || `In-person charge`,
+      kind: 'IN_PERSON', status: ok ? 'SUCCEEDED' : 'FAILED',
+      description: input.description?.trim() || `In-person charge`, receiptUrl: pay?.receipt_url ?? null,
     });
     return {
-      paymentIntentId: intent.id,
-      clientSecret: intent.client_secret,
+      squarePaymentId: pay?.id,
       amountCents: input.amountCents,
       currency: this.currencyOf(business),
-      status: intent.status,
-      publishableKey: this.publishableKey(),
+      status: pay?.status,
+      receiptUrl: pay?.receipt_url ?? null,
     };
   }
 
@@ -575,29 +639,25 @@ export class PaymentsService {
     if (payment.status !== 'SUCCEEDED' && payment.status !== 'PARTIALLY_REFUNDED') {
       throw new BadRequestException('Only a settled payment can be refunded');
     }
-    if (!payment.stripePaymentIntentId) {
-      throw new BadRequestException('This payment has no Stripe charge to refund');
+    if (!payment.squarePaymentId) {
+      throw new BadRequestException('This payment has no Square charge to refund');
     }
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { currency: true } });
     const remaining = payment.amountCents - payment.refundedCents;
     const amount = input.amountCents ?? remaining;
     if (amount <= 0 || amount > remaining) {
       throw new BadRequestException(`Refund amount must be between 1 and ${remaining} cents`);
     }
 
-    const stripeRefund = await this.getStripe().refunds.create({
-      payment_intent: payment.stripePaymentIntentId,
-      amount,
-      ...(input.reason ? { metadata: { reason: input.reason } } : {}),
-    }, {
-      idempotencyKey: this.idempotencyKey([
-        'refund',
-        businessId,
-        payment.id,
-        amount,
-        payment.refundedCents,
-        input.reason?.trim(),
-      ]),
+    const res = await this.square.merchantFetch<{ refund: any }>(businessId, 'POST', '/v2/refunds', {
+      idempotency_key: this.idempotencyKey(['refund', businessId, payment.id, amount, payment.refundedCents, input.reason?.trim()]),
+      payment_id: payment.squarePaymentId,
+      amount_money: { amount, currency: this.currencyOf(business) },
+      ...(input.reason ? { reason: input.reason.slice(0, 192) } : {}),
     });
+    const squareRefund = res.refund;
+    const refundStatus = (s?: string): 'SUCCEEDED' | 'FAILED' | 'PENDING' =>
+      s === 'COMPLETED' ? 'SUCCEEDED' : s === 'FAILED' || s === 'REJECTED' ? 'FAILED' : 'PENDING';
 
     const refundedTotal = payment.refundedCents + amount;
     const newStatus: PaymentStatus = refundedTotal >= payment.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
@@ -605,9 +665,9 @@ export class PaymentsService {
     const [refund] = await this.prisma.$transaction([
       this.prisma.refund.create({
         data: {
-          businessId, paymentId: payment.id, stripeRefundId: stripeRefund.id,
+          businessId, paymentId: payment.id, squareRefundId: squareRefund?.id,
           amountCents: amount, reason: input.reason,
-          status: stripeRefund.status === 'succeeded' ? 'SUCCEEDED' : stripeRefund.status === 'failed' ? 'FAILED' : 'PENDING',
+          status: refundStatus(squareRefund?.status),
         },
       }),
       this.prisma.payment.update({
@@ -652,32 +712,34 @@ export class PaymentsService {
       ? apt.business.noShowFeeCents
       : Math.round((apt.totalPriceCents || apt.service.priceCents) * 0.5); // fallback: 50% of appointment price
 
-    if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
+    if (!apt.client.squareCustomerId || !apt.squareCardId) {
       // No saved card — can't auto-charge; mark NO_SHOW for manual collection.
       await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
       return { charged: false, feeCents, message: 'Marked NO_SHOW. No saved card on file — collect the fee manually.' };
     }
 
-    const intent = await this.getStripe().paymentIntents.create({
-      amount: feeCents,
-      currency: this.currencyOf(apt.business),
-      customer: apt.client.stripeCustomerId,
-      payment_method: apt.stripePaymentMethodId,
-      receipt_email: apt.client.email,
-      off_session: true,
-      confirm: true,
-      metadata: { appointmentId, businessId, kind: 'no_show_fee' },
-      description: `No-show fee — ${apt.service.name} @ ${apt.business.name}`,
-    }, { idempotencyKey: this.idempotencyKey(['no-show', businessId, appointmentId, feeCents]) });
+    const res = await this.square.merchantFetch<{ payment: any }>(businessId, 'POST', '/v2/payments', {
+      source_id: apt.squareCardId, // saved card on file
+      idempotency_key: this.idempotencyKey(['no-show', businessId, appointmentId, feeCents]),
+      amount_money: { amount: feeCents, currency: this.currencyOf(apt.business) },
+      location_id: await this.square.locationId(businessId),
+      autocomplete: true,
+      customer_id: apt.client.squareCustomerId,
+      buyer_email_address: apt.client.email,
+      reference_id: appointmentId.slice(0, 40),
+      note: `No-show fee — ${apt.service.name} @ ${apt.business.name}`.slice(0, 500),
+    });
+    const pay = res.payment;
+    const ok = pay?.status === 'COMPLETED' || pay?.status === 'APPROVED';
 
     await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
     await this.recordPayment({
       businessId, appointmentId, clientId: apt.clientId,
-      stripePaymentIntentId: intent.id, amountCents: feeCents,
-      kind: 'NO_SHOW_FEE', status: intent.status === 'succeeded' ? 'SUCCEEDED' : 'FAILED',
-      description: `No-show fee — ${apt.service.name}`,
+      squarePaymentId: pay?.id ?? null, amountCents: feeCents,
+      kind: 'NO_SHOW_FEE', status: ok ? 'SUCCEEDED' : 'FAILED',
+      description: `No-show fee — ${apt.service.name}`, receiptUrl: pay?.receipt_url ?? null,
     });
-    return { charged: intent.status === 'succeeded', feeCents, paymentIntentId: intent.id, status: intent.status };
+    return { charged: ok, feeCents, squarePaymentId: pay?.id, status: pay?.status };
   }
 
   /**
@@ -695,28 +757,30 @@ export class PaymentsService {
     if (!isProPlan(apt.business.plan)) return { charged: false, feeCents: 0, reason: 'plan_requires_pro' };
     const feeCents = apt.business.cancellationFeeCents;
     if (feeCents <= 0) return { charged: false, feeCents: 0, reason: 'no_fee' };
-    if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
+    if (!apt.client.squareCustomerId || !apt.squareCardId) {
       return { charged: false, feeCents, reason: 'no_card' };
     }
     try {
-      const intent = await this.getStripe().paymentIntents.create({
-        amount: feeCents,
-        currency: this.currencyOf(apt.business),
-        customer: apt.client.stripeCustomerId,
-        payment_method: apt.stripePaymentMethodId,
-        receipt_email: apt.client.email,
-        off_session: true,
-        confirm: true,
-        metadata: { appointmentId, businessId, kind: 'late_cancel_fee' },
-        description: `Late cancellation fee — ${apt.service.name} @ ${apt.business.name}`,
-      }, { idempotencyKey: this.idempotencyKey(['late-cancel', businessId, appointmentId, feeCents]) });
+      const res = await this.square.merchantFetch<{ payment: any }>(businessId, 'POST', '/v2/payments', {
+        source_id: apt.squareCardId,
+        idempotency_key: this.idempotencyKey(['late-cancel', businessId, appointmentId, feeCents]),
+        amount_money: { amount: feeCents, currency: this.currencyOf(apt.business) },
+        location_id: await this.square.locationId(businessId),
+        autocomplete: true,
+        customer_id: apt.client.squareCustomerId,
+        buyer_email_address: apt.client.email,
+        reference_id: appointmentId.slice(0, 40),
+        note: `Late cancellation fee — ${apt.service.name} @ ${apt.business.name}`.slice(0, 500),
+      });
+      const pay = res.payment;
+      const ok = pay?.status === 'COMPLETED' || pay?.status === 'APPROVED';
       await this.recordPayment({
         businessId, appointmentId, clientId: apt.clientId,
-        stripePaymentIntentId: intent.id, amountCents: feeCents,
-        kind: 'LATE_CANCEL_FEE', status: intent.status === 'succeeded' ? 'SUCCEEDED' : 'FAILED',
-        description: `Late cancellation fee — ${apt.service.name}`,
+        squarePaymentId: pay?.id ?? null, amountCents: feeCents,
+        kind: 'LATE_CANCEL_FEE', status: ok ? 'SUCCEEDED' : 'FAILED',
+        description: `Late cancellation fee — ${apt.service.name}`, receiptUrl: pay?.receipt_url ?? null,
       });
-      return { charged: intent.status === 'succeeded', feeCents, reason: intent.status };
+      return { charged: ok, feeCents, reason: pay?.status };
     } catch {
       return { charged: false, feeCents, reason: 'charge_failed' };
     }
@@ -729,30 +793,81 @@ export class PaymentsService {
     const clientIds = clients.map((c) => c.id);
     if (!clientIds.length) return { hasCard: false };
     const count = await this.prisma.appointment.count({
-      where: { clientId: { in: clientIds }, stripePaymentMethodId: { not: null } },
+      where: { clientId: { in: clientIds }, squareCardId: { not: null } },
     });
     return { hasCard: count > 0 };
   }
 
-  // Client-initiated: detach every saved card from Stripe and clear it from their
-  // appointments, so it can no longer be auto-charged (no-show/late-cancel) or
-  // manually charged. Best-effort per card; always clears the stored references.
+  // Client-initiated: disable every saved Square card (on each owning merchant
+  // account) and clear it from their records, so it can no longer be auto-charged
+  // (no-show/late-cancel) or manually charged. Best-effort; always clears the refs.
   async removeClientCards(email: string) {
     const clients = await this.prisma.client.findMany({ where: { email }, select: { id: true } });
     const clientIds = clients.map((c) => c.id);
     if (!clientIds.length) return { removed: 0 };
     const appts = await this.prisma.appointment.findMany({
-      where: { clientId: { in: clientIds }, stripePaymentMethodId: { not: null } },
-      select: { stripePaymentMethodId: true },
+      where: { clientId: { in: clientIds }, squareCardId: { not: null } },
+      select: { squareCardId: true, businessId: true },
     });
-    const pmIds = [...new Set(appts.map((a) => a.stripePaymentMethodId).filter((x): x is string => !!x))];
-    for (const pm of pmIds) {
-      try { await this.getStripe().paymentMethods.detach(pm); } catch { /* already detached/unconfigured */ }
+    const seen = new Set<string>();
+    let removed = 0;
+    for (const a of appts) {
+      if (!a.squareCardId || seen.has(`${a.businessId}:${a.squareCardId}`)) continue;
+      seen.add(`${a.businessId}:${a.squareCardId}`);
+      try { await this.square.merchantFetch(a.businessId, 'POST', `/v2/cards/${a.squareCardId}/disable`); removed++; } catch { /* already disabled / not connected */ }
     }
-    await this.prisma.appointment.updateMany({
-      where: { clientId: { in: clientIds } },
-      data: { stripePaymentMethodId: null },
-    });
-    return { removed: pmIds.length };
+    await this.prisma.appointment.updateMany({ where: { clientId: { in: clientIds } }, data: { squareCardId: null } });
+    await this.prisma.client.updateMany({ where: { id: { in: clientIds } }, data: { squareCardId: null } });
+    return { removed };
+  }
+
+  // ── Square webhook (payment + refund reconciliation) ────────────────────────
+  // Square charges are synchronous, so this mainly reconciles async refunds and
+  // out-of-band changes (e.g. a refund issued from the Square dashboard).
+  async handleSquareWebhook(rawBody: Buffer, signature: string, notificationUrl: string) {
+    const key = this.configService.get<string>('SQUARE_WEBHOOK_SIGNATURE_KEY') ?? '';
+    if (!key) {
+      if (process.env.NODE_ENV === 'production') throw new ServiceUnavailableException('Square webhook signature key not configured');
+      return { received: true, skipped: 'square webhook not configured' };
+    }
+    // Square signs HMAC-SHA256 of (notificationUrl + rawBody), base64.
+    const expected = createHmac('sha256', key).update(notificationUrl + rawBody.toString('utf8')).digest('base64');
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature ?? '');
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new BadRequestException('Invalid Square webhook signature');
+    }
+    let event: any;
+    try { event = JSON.parse(rawBody.toString('utf8')); } catch { throw new BadRequestException('Invalid Square webhook body'); }
+    const type: string = event?.type ?? '';
+
+    if (type === 'refund.created' || type === 'refund.updated') {
+      const refund = event?.data?.object?.refund;
+      const paymentId = refund?.payment_id;
+      if (paymentId) {
+        const payment = await this.prisma.payment.findUnique({ where: { squarePaymentId: paymentId } });
+        if (payment && refund?.id) {
+          const status: 'SUCCEEDED' | 'FAILED' | 'PENDING' = refund.status === 'COMPLETED' ? 'SUCCEEDED' : refund.status === 'FAILED' || refund.status === 'REJECTED' ? 'FAILED' : 'PENDING';
+          await this.prisma.refund.upsert({
+            where: { squareRefundId: refund.id },
+            update: { status },
+            create: { businessId: payment.businessId, paymentId: payment.id, squareRefundId: refund.id, amountCents: refund.amount_money?.amount ?? 0, status },
+          });
+          const refundedCents = (await this.prisma.refund.aggregate({ where: { paymentId: payment.id, status: 'SUCCEEDED' }, _sum: { amountCents: true } }))._sum.amountCents ?? 0;
+          const pStatus: PaymentStatus = refundedCents >= payment.amountCents ? 'REFUNDED' : refundedCents > 0 ? 'PARTIALLY_REFUNDED' : payment.status;
+          await this.prisma.payment.update({ where: { id: payment.id }, data: { refundedCents, status: pStatus } });
+        }
+      }
+    } else if (type === 'payment.updated' || type === 'payment.created') {
+      const sqPay = event?.data?.object?.payment;
+      if (sqPay?.id) {
+        const ok = sqPay.status === 'COMPLETED' || sqPay.status === 'APPROVED';
+        await this.prisma.payment.updateMany({
+          where: { squarePaymentId: sqPay.id, status: { in: ['PENDING', 'FAILED'] } },
+          data: { status: ok ? 'SUCCEEDED' : sqPay.status === 'FAILED' || sqPay.status === 'CANCELED' ? 'FAILED' : 'PENDING', ...(sqPay.receipt_url ? { receiptUrl: sqPay.receipt_url } : {}) },
+        });
+      }
+    }
+    return { received: true, eventId: event?.event_id ?? null };
   }
 }

@@ -19,10 +19,21 @@ const BookingIntentSchema = z.object({
   businessId: z.string().min(1),
 });
 
+// Complete a booking payment with the card token from the Square Web Payments SDK.
+const ChargeBookingSchema = z.object({
+  appointmentId: z.string().min(1),
+  businessId: z.string().min(1),
+  sourceId: z.string().min(1),                 // Square card token (nonce)
+  verificationToken: z.string().optional(),    // SCA / buyer verification token
+  mode: z.enum(['payment', 'setup']),
+});
+
 const CustomChargeSchema = z.object({
-  // $0.50 min (Stripe) up to $100,000 per charge. amountCents is the full total
+  // $0.50 min up to $100,000 per charge. amountCents is the full total
   // (subtotal + tax + tip); tip/tax are the breakdown for the receipt.
   amountCents: z.number().int().min(50).max(10_000_000),
+  sourceId: z.string().min(1),                 // Square card token from the in-app/web SDK
+  verificationToken: z.string().optional(),
   tipCents: z.number().int().min(0).max(10_000_000).optional(),
   taxCents: z.number().int().min(0).max(10_000_000).optional(),
   description: z.string().max(200).optional(),
@@ -49,6 +60,20 @@ export class PaymentsController {
     const parsed = BookingIntentSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('appointmentId and businessId are required');
     return this.paymentService.createBookingIntent(parsed.data.appointmentId, parsed.data.businessId);
+  }
+
+  // Public — complete the booking payment (Square charges the tokenized card
+  // server-side). Scoped to the appointment's business.
+  @Post('charge-booking')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  chargeBooking(@Body() body: unknown) {
+    const parsed = ChargeBookingSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('appointmentId, businessId, sourceId and mode are required');
+    return this.paymentService.chargeBooking(parsed.data.appointmentId, parsed.data.businessId, {
+      sourceId: parsed.data.sourceId,
+      verificationToken: parsed.data.verificationToken,
+      mode: parsed.data.mode,
+    });
   }
 
   // Owner-initiated deposit (dashboard). Scoped to the owner's business.
@@ -121,6 +146,7 @@ export class PaymentsController {
     return this.paymentService.refundPayment(user.businessId, paymentId, parsed.data);
   }
 
+  // Stripe webhook — retained for SaaS subscription events during the migration.
   @Post('webhook/stripe')
   @Throttle({ default: { limit: 120, ttl: 60000 } })
   stripeWebhook(
@@ -128,5 +154,17 @@ export class PaymentsController {
     @Headers('stripe-signature') sig: string,
   ) {
     return this.paymentService.handleWebhook(req.rawBody!, sig);
+  }
+
+  // Square webhook — payment + refund reconciliation. Signature is validated over
+  // (notificationUrl + rawBody), so we reconstruct the exact URL Square called.
+  @Post('webhook/square')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  squareWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('x-square-hmacsha256-signature') sig: string,
+  ) {
+    const base = (process.env.API_PUBLIC_URL ?? 'https://bookingapp-production-32f8.up.railway.app').replace(/\/+$/, '').replace(/\/api$/, '');
+    return this.paymentService.handleSquareWebhook(req.rawBody!, sig, `${base}/api/payments/webhook/square`);
   }
 }
