@@ -17,7 +17,7 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
-type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews'
+type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'soon';
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
@@ -42,10 +42,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [followups, setFollowups] = useState<ServiceDueItem[] | null>(null);
   const [appts, setAppts]       = useState<Appointment[] | null>(null); // for Reports
   const [payments, setPayments] = useState<any[] | null>(null);
+  const [invoices, setInvoices] = useState<any[] | null>(null);
+  const [invoiceEditor, setInvoiceEditor] = useState<{ items:Array<{description:string;quantity:string;unit:string}>; notes:string }|null>(null);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
-  const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean }|null>(null);
+  const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean; capacity:string }|null>(null);
   const [offerEditor, setOfferEditor] = useState<{ id?:string; title:string; description:string; discount:string; expiresAt:string }|null>(null);
   const [giftMode, setGiftMode] = useState<null|'issue'|'redeem'>(null);
   const [giftIssue, setGiftIssue] = useState({ amount:'50', recipientName:'', recipientEmail:'', message:'' });
@@ -154,6 +156,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         priceCents,
         color: BRAND,
         active: serviceEditor.active,
+        capacity: Math.max(1, Number.parseInt(serviceEditor.capacity || '1', 10) || 1),
       };
       if (serviceEditor.id) await api(`/businesses/${bizId()}/services/${serviceEditor.id}`, { method:'PATCH', body: JSON.stringify(payload) });
       else await api(`/businesses/${bizId()}/services`, { method:'POST', body: JSON.stringify(payload) });
@@ -162,6 +165,34 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     } catch(e) {
       Alert.alert('Could not save service', e instanceof Error ? e.message : 'Please try again.');
     }
+  }
+
+  async function saveInvoice() {
+    if (!invoiceEditor) return;
+    const lineItems = invoiceEditor.items
+      .map(it => ({ description: it.description.trim(), quantity: Math.max(1, Number.parseInt(it.quantity || '1', 10) || 1), unitCents: Math.round((Number.parseFloat(it.unit || '0') || 0) * 100) }))
+      .filter(it => it.description && it.unitCents >= 0);
+    if (!lineItems.length) { Alert.alert('Add a line item', 'An invoice needs at least one line with a description and amount.'); return; }
+    try {
+      await api(`/businesses/${bizId()}/invoices`, { method:'POST', body: JSON.stringify({ lineItems, notes: invoiceEditor.notes.trim() || undefined }) });
+      setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`));
+      setInvoiceEditor(null);
+    } catch(e) { Alert.alert('Could not create invoice', e instanceof Error ? e.message : 'Please try again.'); }
+  }
+  async function setInvoiceStatus(id:string, status:string) {
+    try {
+      await api(`/businesses/${bizId()}/invoices/${id}/status`, { method:'PATCH', body: JSON.stringify({ status }) });
+      setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`));
+    } catch(e){ Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.'); }
+  }
+  function deleteInvoice(id:string) {
+    Alert.alert('Delete invoice?', 'This permanently removes the invoice.', [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try { await api(`/businesses/${bizId()}/invoices/${id}`, { method:'DELETE' }); setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`)); }
+        catch(e){ Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.'); }
+      }},
+    ]);
   }
 
   function openOfferEditor(of?: any) {
@@ -754,6 +785,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         setPayments(paymentRows);
       }
       else if (v === 'transactions') { setLoading(true); setPayments(await api<any[]>(`/payments`)); }
+      else if (v === 'invoices' && !invoices) { setLoading(true); setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
 
@@ -772,7 +804,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <View style={s.header}>
         <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Services</Text>
-        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true })}>
+        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1' })}>
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -785,11 +817,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               durationMinutes: String(sv.durationMinutes),
               price: (sv.priceCents / 100).toFixed(2),
               active: sv.active,
+              capacity: String(sv.capacity ?? 1),
             })}>
               <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
               <View style={{ flex:1 }}>
                 <Text style={ms.rowTitle}>{sv.name}</Text>
-                <Text style={ms.rowMeta}>{sv.durationMinutes} min{sv.active ? '' : ' · inactive'}</Text>
+                <Text style={ms.rowMeta}>{sv.durationMinutes} min{(sv.capacity ?? 1) > 1 ? ` · group of ${sv.capacity}` : ''}{sv.active ? '' : ' · inactive'}</Text>
               </View>
               <PriceTag cents={sv.priceCents}/>
             </TouchableOpacity>
@@ -825,6 +858,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[ms.rowMeta,{ color:BRAND, marginTop:6 }]}>Total: {fmtDur(Number(serviceEditor.durationMinutes)||0)}</Text>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Price</Text>
               <TextInput style={s.input} value={serviceEditor.price} keyboardType="decimal-pad" onChangeText={price=>setServiceEditor({...serviceEditor,price})}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Group capacity</Text>
+              <TextInput style={s.input} value={serviceEditor.capacity} keyboardType="number-pad"
+                onChangeText={capacity=>setServiceEditor({...serviceEditor,capacity})}/>
+              <Text style={s.fieldHint}>How many clients can book the same time slot. 1 = one-on-one; higher = a group class.</Text>
               <View style={[ms.card,{ marginTop:14, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
                 <Text style={ms.rowTitle}>Active</Text>
                 <Switch value={serviceEditor.active} onValueChange={active=>setServiceEditor({...serviceEditor,active})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
@@ -1729,6 +1766,86 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     );
   }
 
+  if (view === 'invoices') {
+    const IC: Record<string,string> = { DRAFT:GRAY_500, SENT:'#2563EB', PAID:'#10B981', VOID:'#EF4444' };
+    const subtotal = invoiceEditor ? invoiceEditor.items.reduce((t,it)=>t + (Math.max(1,Number.parseInt(it.quantity||'1',10)||1) * (Number.parseFloat(it.unit||'0')||0)), 0) : 0;
+    return (
+      <SafeAreaView style={s.screen}>
+        <Head title="Invoices"/>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setInvoiceEditor({ items:[{ description:'', quantity:'1', unit:'0.00' }], notes:'' })}>
+              <Text style={s.btnPrimaryText}>New invoice</Text>
+            </TouchableOpacity>
+            {(invoices ?? []).map(inv => {
+              const c = IC[inv.status] ?? GRAY_400;
+              return (
+                <View key={inv.id} style={ms.card}>
+                  <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                    <Text style={ms.rowTitle}>#{inv.number} · ${(inv.totalCents/100).toFixed(2)}</Text>
+                    <View style={[s.pill,{ borderColor:c+'33', backgroundColor:c+'15' }]}><Text style={[s.pillText,{ color:c }]}>{inv.status}</Text></View>
+                  </View>
+                  <Text style={[ms.rowMeta,{ marginTop:2 }]}>{inv.client?.name ?? 'No client'} · {new Date(inv.createdAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' })}</Text>
+                  <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:10 }}>
+                    {inv.status==='DRAFT' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'SENT')}><Text style={ms.smallActionText}>Mark sent</Text></TouchableOpacity>}
+                    {inv.status!=='PAID' && inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'PAID')}><Text style={ms.smallActionText}>Mark paid</Text></TouchableOpacity>}
+                    {inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'VOID')}><Text style={ms.smallActionText}>Void</Text></TouchableOpacity>}
+                    <TouchableOpacity style={ms.smallAction} onPress={()=>deleteInvoice(inv.id)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+            {invoices && invoices.length===0 && <Text style={ms.empty}>No invoices yet.</Text>}
+          </ScrollView>
+        )}
+        <Modal visible={!!invoiceEditor} animationType="slide" onRequestClose={()=>setInvoiceEditor(null)}>
+          <SafeAreaView style={s.screen}>
+            <View style={s.header}>
+              <TouchableOpacity onPress={()=>setInvoiceEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <Text style={s.headerTitle}>New invoice</Text>
+            </View>
+            {invoiceEditor && (
+              <ScrollView contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
+                <Text style={s.fieldLabel}>Line items</Text>
+                {invoiceEditor.items.map((it,idx)=>(
+                  <View key={idx} style={[ms.card,{ gap:8 }]}>
+                    <TextInput style={s.input} placeholder="Description" placeholderTextColor={GRAY_400} value={it.description}
+                      onChangeText={v=>setInvoiceEditor(e=>e?{ ...e, items:e.items.map((x,i)=>i===idx?{ ...x, description:v }:x) }:e)}/>
+                    <View style={{ flexDirection:'row', gap:8, alignItems:'flex-end' }}>
+                      <View style={{ flex:1 }}>
+                        <Text style={s.fieldHint}>Qty</Text>
+                        <TextInput style={s.input} keyboardType="number-pad" value={it.quantity}
+                          onChangeText={v=>setInvoiceEditor(e=>e?{ ...e, items:e.items.map((x,i)=>i===idx?{ ...x, quantity:v }:x) }:e)}/>
+                      </View>
+                      <View style={{ flex:2 }}>
+                        <Text style={s.fieldHint}>Unit price ($)</Text>
+                        <TextInput style={s.input} keyboardType="decimal-pad" value={it.unit}
+                          onChangeText={v=>setInvoiceEditor(e=>e?{ ...e, items:e.items.map((x,i)=>i===idx?{ ...x, unit:v }:x) }:e)}/>
+                      </View>
+                      {invoiceEditor.items.length>1 && (
+                        <TouchableOpacity style={{ padding:10 }} onPress={()=>setInvoiceEditor(e=>e?{ ...e, items:e.items.filter((_,i)=>i!==idx) }:e)}>
+                          <Ionicons name="trash-outline" size={20} color="#DC2626"/>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                ))}
+                <TouchableOpacity style={[ms.smallAction,{ alignSelf:'flex-start', marginBottom:14 }]} onPress={()=>setInvoiceEditor(e=>e?{ ...e, items:[...e.items, { description:'', quantity:'1', unit:'0.00' }] }:e)}>
+                  <Text style={ms.smallActionText}>+ Add line</Text>
+                </TouchableOpacity>
+                <Text style={[ms.rowMeta,{ color:BRAND, marginBottom:14 }]}>Subtotal: ${subtotal.toFixed(2)} (tax added per your settings)</Text>
+                <Text style={s.fieldLabel}>Notes (optional)</Text>
+                <TextInput style={[s.input,{ minHeight:70, textAlignVertical:'top' }]} multiline value={invoiceEditor.notes}
+                  onChangeText={v=>setInvoiceEditor(e=>e?{ ...e, notes:v }:e)}/>
+                <TouchableOpacity style={[s.btnPrimary,{ marginTop:14 }]} onPress={saveInvoice}><Text style={s.btnPrimaryText}>Create invoice</Text></TouchableOpacity>
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
+
   if (view === 'addons') return (
     <SafeAreaView style={s.screen}>
       <Head title="Add-ons"/>
@@ -1971,6 +2088,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Follow-ups',       icon:'repeat-outline',          onPress:()=>open('followups') },
     { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
     { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
+    { label:'Invoices',         icon:'receipt-outline',         onPress:()=>open('invoices') },
     { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
     { label:'Add-ons',          icon:'extension-puzzle-outline',onPress:()=>open('addons') },
     { label:'Subscriptions',    icon:'card-outline',            onPress:()=>open('subscriptions') },

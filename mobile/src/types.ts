@@ -3,7 +3,7 @@
 export interface User { id:string; name:string; email:string; role:string; staffId:string|null; businessId:string|null; mustResetPassword?:boolean; twoFactorEnabled?:boolean; twoFactorMethod?:'EMAIL'|'SMS' }
 export interface Appointment { id:string; startsAt:string; endsAt:string; status:string; notes?:string; cancelReason?:string; service:{id:string;name:string;durationMinutes:number;priceCents:number}; staff:{id:string;user:{name:string}}; client:{id:string;name:string;email:string;phone?:string} }
 export interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
-export interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null }
+export interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null; capacity?:number }
 export interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:number; startTime:string; endTime:string }
 export interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string; avatarUrl?:string }
 export interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }

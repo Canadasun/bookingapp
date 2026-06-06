@@ -30,6 +30,7 @@ function BookScreen() {
   const [slot, setSlot]               = useState<BookingSlot|null>(null);
   const [showStaffStep, setShowStaffStep] = useState(false);
   const [customStartsAt, setCustomStartsAt] = useState('');
+  const [repeat, setRepeat] = useState<{ frequency:'WEEKLY'|'BIWEEKLY'|'MONTHLY'; count:number }|null>(null);
   const [overrideCalendar, setOverrideCalendar] = useState(false);
   const [form, setForm]               = useState({name:'',email:'',phone:''});
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -128,20 +129,34 @@ function BookScreen() {
       });
       // Owner/staff booking from the app → confirmed immediately (the /manual
       // endpoint skips approval and sends the client their confirmation).
-      const apt = await api<{id:string}>(`/businesses/${bizId()}/bookings/manual`, {
-        method:'POST', body: JSON.stringify({
-          staffId,
-          serviceId:selectedSvcs[0].id,
-          additionalServiceIds: selectedSvcs.slice(1).map(s => s.id),
-          clientId:client.id,
-          startsAt,
-          allowOverride: overrideCalendar || !!customStartsAt,
-        }),
-      });
-      if (client.matched) {
-        Alert.alert('Existing client', 'We matched this booking to an existing client profile and synced their details.');
+      const basePayload = {
+        staffId,
+        serviceId:selectedSvcs[0].id,
+        additionalServiceIds: selectedSvcs.slice(1).map(s => s.id),
+        clientId:client.id,
+        startsAt,
+        allowOverride: overrideCalendar || !!customStartsAt,
+      };
+      if (repeat) {
+        // Recurring series: first occurrence must succeed; later conflicts are skipped.
+        const res = await api<{ groupId:string; created:{id:string}[]; skipped:string[] }>(`/businesses/${bizId()}/bookings/recurring`, {
+          method:'POST', body: JSON.stringify({ ...basePayload, frequency: repeat.frequency, count: repeat.count }),
+        });
+        setBookedId(res.created[0]?.id ?? '');
+        setStep('done');
+        Alert.alert(
+          'Series booked',
+          `${res.created.length} appointment${res.created.length===1?'':'s'} booked${res.skipped.length?`; ${res.skipped.length} skipped (conflicts)`:''}.${client.matched?'\nMatched an existing client.':''}`,
+        );
+      } else {
+        const apt = await api<{id:string}>(`/businesses/${bizId()}/bookings/manual`, {
+          method:'POST', body: JSON.stringify(basePayload),
+        });
+        if (client.matched) {
+          Alert.alert('Existing client', 'We matched this booking to an existing client profile and synced their details.');
+        }
+        setBookedId(apt.id); setStep('done');
       }
-      setBookedId(apt.id); setStep('done');
     } catch(e){ Alert.alert('Booking failed', e instanceof Error ? e.message : 'Please try again'); }
     finally { setLoading(false); }
   }
@@ -149,7 +164,7 @@ function BookScreen() {
   function reset() {
     setStep('service'); setSelectedSvcs([]); setStaff(null); setDate(''); setSlot(null);
     setStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
-    setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId('');
+    setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId(''); setRepeat(null);
   }
 
   return (
@@ -341,6 +356,27 @@ function BookScreen() {
                 {k==='phone' && <Text style={s.fieldHint}>Used for SMS reminders. Leave blank if none.</Text>}
               </View>
             ))}
+            {/* Repeat (recurring series) */}
+            <Text style={s.fieldLabel}>Repeat</Text>
+            <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom: repeat?8:14 }}>
+              {([['Once',null],['Weekly','WEEKLY'],['Biweekly','BIWEEKLY'],['Monthly','MONTHLY']] as const).map(([label,freq])=>{
+                const on = (freq===null && !repeat) || (repeat?.frequency===freq);
+                return (
+                  <TouchableOpacity key={label} onPress={()=>setRepeat(freq===null ? null : { frequency:freq, count: repeat?.count ?? 4 })}
+                    style={[s.slotBtn, on && s.slotBtnActive]}>
+                    <Text style={[s.slotText, on && s.slotTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {repeat && (
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginBottom:14 }}>
+                <Text style={[s.fieldLabel,{ marginBottom:0 }]}>Times</Text>
+                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.max(2,r.count-1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>−</Text></TouchableOpacity>
+                <Text style={{ fontSize:18, fontWeight:'800', color:GRAY_900, minWidth:28, textAlign:'center' }}>{repeat.count}</Text>
+                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.min(26,r.count+1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>+</Text></TouchableOpacity>
+              </View>
+            )}
             {/* Cancellation policy */}
             <View style={s.policyBox}>
               <Text style={s.policyTitle}>Cancellation Policy</Text>
@@ -353,7 +389,7 @@ function BookScreen() {
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={[s.btnPrimary,{opacity:loading||!policyAccepted?0.5:1}]} disabled={loading||!policyAccepted} onPress={book}>
-              <Text style={s.btnPrimaryText}>{loading?'Booking…':'Confirm booking'}</Text>
+              <Text style={s.btnPrimaryText}>{loading?'Booking…':(repeat?`Confirm ${repeat.count}-visit series`:'Confirm booking')}</Text>
             </TouchableOpacity>
           </>}
 
