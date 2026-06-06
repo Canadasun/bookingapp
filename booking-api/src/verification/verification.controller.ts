@@ -74,3 +74,17 @@ export class AdminVerificationController {
     return this.svc.reject(id, dto.note);
   }
 }
+
+@ApiTags('admin')
+@ApiBearerAuth()
+@Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
+export class AdminOverviewController {
+  constructor(private svc: VerificationService) {}
+
+  @Get('overview')
+  overview() {
+    return this.svc.adminOverview();
+  }
+}

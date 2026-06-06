@@ -71,7 +71,7 @@ export function proxy(req: NextRequest) {
   // Already signed in and hitting an auth page → send to the right workspace.
   if (AUTH_ONLY.includes(pathname) && authed) {
     const home = user?.role === "ADMIN"
-      ? "/admin/verifications"
+      ? "/admin"
       : user?.role === "CLIENT"
         ? "/my/dashboard"
         : "/dashboard";

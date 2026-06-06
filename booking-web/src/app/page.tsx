@@ -37,7 +37,7 @@ export default async function LandingPage() {
   // Signed-in users should land in their working area. Keep "/" as marketing only
   // so owners/staff are never routed through a separate logged-in home page.
   const { role, authed } = await sessionInfo();
-  if (role === "ADMIN") redirect("/admin/verifications");
+  if (role === "ADMIN") redirect("/admin");
   if (role === "CLIENT") redirect("/my/dashboard");
   if ((role && role !== "CLIENT") || (authed && !role)) redirect("/dashboard");
 

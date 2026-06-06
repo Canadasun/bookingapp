@@ -8,7 +8,7 @@ import { getUser, type SessionUser } from "@/lib/auth";
 
 function homeFor(user: SessionUser | null): string | null {
   if (!user) return null;
-  return user.role === "ADMIN" ? "/admin/verifications" : user.role === "CLIENT" ? "/my/dashboard" : "/dashboard";
+  return user.role === "ADMIN" ? "/admin" : user.role === "CLIENT" ? "/my/dashboard" : "/dashboard";
 }
 
 // Hero CTA: logged-in users see a way into the app instead of sign-in / sign-up.

@@ -141,7 +141,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [navUser, setNavUser]               = useState<SessionUser | null>(null); // logged-in viewer → show a way back
   useEffect(() => { setNavUser(getUser()); }, []);
   const homeHref = navUser
-    ? (navUser.role === "ADMIN" ? "/admin/verifications" : navUser.role === "CLIENT" ? "/my/dashboard" : "/dashboard")
+    ? (navUser.role === "ADMIN" ? "/admin" : navUser.role === "CLIENT" ? "/my/dashboard" : "/dashboard")
     : null;
   const [revStats, setRevStats]             = useState<{ average: number; count: number; reviews: { id: string; clientName: string; rating: number; comment?: string | null }[] } | null>(null);
 

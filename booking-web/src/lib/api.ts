@@ -243,6 +243,40 @@ export interface NotificationDelivery {
   error?: string | null; createdAt: string;
   canRetry?: boolean; retryReason?: string | null;
 }
+
+export interface AdminOverview {
+  generatedAt: string;
+  metrics: {
+    totalBusinesses: number;
+    totalUsers: number;
+    totalClients: number;
+    pendingVerifications: number;
+    activeSubscriptions: number;
+    upcomingAppointments: number;
+    recentAppointments: number;
+    grossRevenueCents: number;
+    refundedCents: number;
+    netRevenueCents: number;
+    successfulPayments: number;
+  };
+  planCounts: Record<"FREE" | "BASIC" | "PRO", number>;
+  verificationCounts: Record<VerificationStatus, number>;
+  recentBusinesses: Array<{
+    id: string;
+    name: string;
+    email: string;
+    slug: string;
+    plan: "FREE" | "BASIC" | "PRO";
+    verificationStatus: VerificationStatus;
+    suspended: boolean;
+    createdAt: string;
+    subscription?: {
+      status: string;
+      currentPeriodEnd?: string | null;
+      cancelAtPeriodEnd: boolean;
+    } | null;
+  }>;
+}
 export interface DeviceToken {
   id: string; platform: string; enabled: boolean; createdAt: string; updatedAt: string;
 }
@@ -392,6 +426,9 @@ export const api = {
     disconnect: () => req<{ ok: boolean }>("/calendar-sync/google/disconnect", { method: "POST" }),
   },
   // Platform admin (Role.ADMIN) — review the business-verification queue.
+  admin: {
+    overview: () => req<AdminOverview>("/admin/overview"),
+  },
   adminVerifications: {
     list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
     approve: (id: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/approve`, { method: "POST" }),
