@@ -35,6 +35,7 @@ import { HealthModule } from './health/health.module';
 import { EventsModule } from './events/events.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { VerificationModule } from './verification/verification.module';
+import { SquareModule } from './square/square.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 
@@ -87,6 +88,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
     EventsModule,
     ReferralsModule,
     VerificationModule,
+    SquareModule,
   ],
 
   providers: [

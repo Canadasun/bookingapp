@@ -136,6 +136,7 @@ model Business {
   referralsMade      Referral[] @relation("referrer")
   referralReceived   Referral?  @relation("referred")
   googleCalendar     GoogleCalendarConnection?
+  squareConnection   SquareConnection?
   staff              Staff[]
   services           Service[]
   resources          Resource[]
@@ -697,6 +698,9 @@ model Client {
   userId     String?
   // Stripe Customer for saved cards (deposits / no-show auto-charge)
   stripeCustomerId String?
+  // Square (per-merchant) customer + card-on-file for the same purpose
+  squareCustomerId String?
+  squareCardId     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -729,6 +733,9 @@ model Appointment {
   stripePaymentIntentId String?
   // Saved card used for this booking (for no-show auto-charge, incl. card-on-file)
   stripePaymentMethodId String?
+  // Square equivalents (deposit payment id + saved card id on the merchant account)
+  squarePaymentId      String?
+  squareCardId         String?
   notes                String?
   googleEventId        String?           // Google Calendar event id (when the business has calendar sync on)
   recurringGroupId     String?           // shared id linking occurrences of a recurring series
@@ -848,6 +855,10 @@ model Subscription {
   stripeCustomerId     String?
   stripeSubscriptionId String?            @unique
   stripePriceId        String?
+  // Square (platform account) SaaS-billing equivalents
+  squareCustomerId      String?
+  squareSubscriptionId  String?           @unique
+  squarePlanVariationId String?
   plan                 PlanTier           @default(FREE)
   status               SubscriptionStatus @default(ACTIVE)
   currentPeriodEnd     DateTime?
@@ -980,6 +991,7 @@ model Payment {
   appointmentId         String?
   clientId              String?
   stripePaymentIntentId String?       @unique
+  squarePaymentId       String?       @unique  // Square payment id (idempotency + reconciliation)
   amountCents           Int
   tipCents              Int           @default(0)
   taxCents              Int           @default(0)
@@ -1007,6 +1019,7 @@ model Refund {
   businessId     String
   paymentId      String
   stripeRefundId String?      @unique
+  squareRefundId String?      @unique
   amountCents    Int
   reason         String?
   status         RefundStatus @default(PENDING)
@@ -1051,6 +1064,26 @@ model GoogleCalendarConnection {
   accessToken  String?
   expiresAt    DateTime?
   calendarId   String    @default("primary")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+// Per-merchant Square connection (OAuth). Each business links their own Square
+// account; client payments run on that account using these tokens + location.
+// Mirrors GoogleCalendarConnection. Access tokens expire (~30d) and are refreshed
+// via the refresh token.
+model SquareConnection {
+  id           String    @id @default(cuid())
+  businessId   String    @unique
+  merchantId   String              // Square merchant id
+  accessToken  String              // OAuth access token (used for API calls on the merchant)
+  refreshToken String              // long-lived; mints new access tokens
+  expiresAt    DateTime?           // access-token expiry
+  locationId   String?             // chosen location for payments
+  merchantName String?
+  scopes       String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
