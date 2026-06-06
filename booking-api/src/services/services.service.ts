@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateServiceDto, UpdateServiceDto,
@@ -58,7 +58,11 @@ export class ServicesService {
 
   async remove(id: string, businessId?: string) {
     const service = await this.findOne(id, businessId);
-    return this.prisma.service.update({ where: { id: service.id }, data: { active: false } });
+    const appointments = await this.prisma.appointment.count({ where: { serviceId: service.id } });
+    if (appointments > 0) {
+      throw new BadRequestException('This service has appointment history and cannot be permanently deleted.');
+    }
+    return this.prisma.service.delete({ where: { id: service.id } });
   }
 
   // ── Categories ───────────────────────────────────────────────────────────────
