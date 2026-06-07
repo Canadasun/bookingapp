@@ -67,6 +67,19 @@ export class AdminVerificationController {
     return this.svc.listPending();
   }
 
+  // Businesses auto-flagged at signup as likely duplicates (same name + phone).
+  @Get('duplicates')
+  duplicates() {
+    return this.svc.listFlaggedDuplicates();
+  }
+
+  // Dismiss a duplicate flag (keep the business, clear it from the queue).
+  @Post(':id/duplicate-reviewed')
+  duplicateReviewed(@Param('id') id: string) {
+    if (!id) throw new BadRequestException('Business id required');
+    return this.svc.resolveDuplicate(id);
+  }
+
   @Post(':id/approve')
   approve(@Param('id') id: string) {
     return this.svc.approve(id);

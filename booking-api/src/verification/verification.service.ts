@@ -69,6 +69,31 @@ export class VerificationService {
     });
   }
 
+  // Businesses flagged at signup as a likely duplicate (same name + phone) and
+  // not yet reviewed — plus the business they appear to duplicate, for context.
+  async listFlaggedDuplicates() {
+    const flagged = await this.prisma.business.findMany({
+      where: { suspectedDuplicateOfId: { not: null }, duplicateReviewedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, name: true, email: true, phone: true, slug: true,
+        createdAt: true, verificationNote: true, suspectedDuplicateOfId: true,
+      },
+    });
+    const targetIds = [...new Set(flagged.map((b) => b.suspectedDuplicateOfId).filter((v): v is string => !!v))];
+    const targets = targetIds.length
+      ? await this.prisma.business.findMany({ where: { id: { in: targetIds } }, select: { id: true, name: true, email: true, phone: true, createdAt: true } })
+      : [];
+    const byId = new Map(targets.map((t) => [t.id, t]));
+    return flagged.map((b) => ({ ...b, duplicateOf: b.suspectedDuplicateOfId ? byId.get(b.suspectedDuplicateOfId) ?? null : null }));
+  }
+
+  // Admin dismisses a duplicate flag (keeps the business; clears it from the queue).
+  async resolveDuplicate(id: string) {
+    await this.prisma.business.update({ where: { id }, data: { duplicateReviewedAt: new Date() } });
+    return { ok: true };
+  }
+
   async adminOverview() {
     const now = new Date();
     const thirtyDaysAgo = new Date(now);
@@ -88,6 +113,7 @@ export class VerificationService {
       businessesByPlan,
       verificationByStatus,
       recentBusinesses,
+      flaggedDuplicates,
     ] = await Promise.all([
       this.prisma.business.count(),
       this.prisma.user.count(),
@@ -120,6 +146,7 @@ export class VerificationService {
           },
         },
       }),
+      this.prisma.business.count({ where: { suspectedDuplicateOfId: { not: null }, duplicateReviewedAt: null } }),
     ]);
 
     const planCounts = { FREE: 0, BASIC: 0, PRO: 0 };
@@ -145,6 +172,7 @@ export class VerificationService {
         refundedCents,
         netRevenueCents: grossRevenueCents - refundedCents,
         successfulPayments: payments._count,
+        flaggedDuplicates,
       },
       planCounts,
       verificationCounts,

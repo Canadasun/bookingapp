@@ -137,6 +137,10 @@ model Business {
   verificationNote            String? // admin's note, e.g. rejection reason
   verificationSubmittedAt     DateTime?
   verifiedAt                  DateTime?
+  // Anti-duplicate: set at signup when another business already has the same
+  // normalized name + phone. Flags (never blocks) the account for admin review.
+  suspectedDuplicateOfId      String?
+  duplicateReviewedAt         DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

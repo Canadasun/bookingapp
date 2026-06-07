@@ -38,13 +38,32 @@ export class AuthService {
         const businessName = dto.businessName?.trim() || `${dto.name}'s Business`;
         const slugSource = (dto.businessName?.trim() || dto.name).toLowerCase();
         const baseSlug = slugSource.replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "business";
+        const phone = normalizePhone(dto.businessPhone) ?? undefined;
+
+        // Anti-duplicate rule: flag (never block) a new business when an existing
+        // one already has the SAME phone AND the same normalized name — a strong
+        // signal of a re-registration. It still registers; an admin reviews it.
+        let suspectedDuplicateOfId: string | undefined;
+        let duplicateNote: string | undefined;
+        if (phone) {
+          const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+          const samePhone = await tx.business.findMany({ where: { phone }, select: { id: true, name: true } });
+          const dup = samePhone.find((b) => norm(b.name) === norm(businessName));
+          if (dup) {
+            suspectedDuplicateOfId = dup.id;
+            duplicateNote = `Possible duplicate of "${dup.name}" (${dup.id}) — same name + phone at signup.`;
+          }
+        }
+
         const business = await tx.business.create({
           data: {
             name: businessName,
             slug: `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`,
             email: dto.email,
-            phone: normalizePhone(dto.businessPhone) ?? undefined,
+            phone,
             timezone: dto.timezone?.trim() || undefined,
+            suspectedDuplicateOfId,
+            verificationNote: duplicateNote,
           },
         });
         businessId = business.id;
