@@ -13,7 +13,7 @@ import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
 import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
-import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from '../auth';
+import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, setBiometricEnabled, biometricCapability, authenticateBiometric } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill, SwipeToDelete } from '../components';
@@ -83,6 +83,30 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [twoFA, setTwoFA]       = useState<boolean>(getAuth().user?.twoFactorEnabled ?? false);
   const [twoFAMethod, setTwoFAMethod] = useState<'EMAIL'|'SMS'>(getAuth().user?.twoFactorMethod ?? 'EMAIL');
   const [twoFASaving, setTwoFASaving] = useState(false);
+  // Biometric app-lock (Face ID / Touch ID) — only surfaced when the device supports it.
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioLabel, setBioLabel] = useState('Face ID');
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [bioSaving, setBioSaving] = useState(false);
+  useEffect(() => { (async () => {
+    const cap = await biometricCapability();
+    setBioAvailable(cap.available); setBioLabel(cap.label);
+    setBioEnabled(await isBiometricEnabled());
+  })(); }, []);
+
+  // Toggle the biometric lock. Turning it on requires passing the prompt once, so
+  // we never enable a lock the user can't actually clear.
+  async function toggleBiometric(next: boolean) {
+    setBioSaving(true);
+    try {
+      if (next) {
+        const ok = await authenticateBiometric(`Enable ${bioLabel} unlock`);
+        if (!ok) { Alert.alert(`${bioLabel} not enabled`, 'Authentication was cancelled or failed.'); return; }
+      }
+      await setBiometricEnabled(next);
+      setBioEnabled(next);
+    } finally { setBioSaving(false); }
+  }
   const [recoveryCodes, setRecoveryCodes] = useState<string[]|null>(null); // shown once on enable
   const [acctBusy, setAcctBusy] = useState(false);
 
@@ -2152,6 +2176,24 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[ms.rowMeta,{ color:'#B45309', marginTop:8 }]}>Add a mobile number to your account — codes fall back to email otherwise.</Text>
             )}
           </View>
+
+          {bioAvailable && (
+            <View style={ms.card}>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                <View style={{ flex:1, paddingRight:12 }}>
+                  <Text style={ms.cardValue}>Unlock with {bioLabel}</Text>
+                  <Text style={[ms.rowMeta,{ marginTop:2 }]}>Require {bioLabel} when reopening the app.</Text>
+                </View>
+                <Switch
+                  value={bioEnabled}
+                  disabled={bioSaving}
+                  onValueChange={toggleBiometric}
+                  trackColor={{ true: BRAND, false: GRAY_200 }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+          )}
 
           {recoveryCodes && (
             <View style={ms.recoveryBox}>

@@ -1,6 +1,7 @@
 // Auth store: in-memory token/refresh/user, persisted to the device keychain
 // via SecureStore. A tiny listener set lets the root re-render on auth changes.
 import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { API_BASE, BIZ_ID } from './config';
 import type { User } from './types';
 
@@ -62,5 +63,48 @@ export async function refreshSession(): Promise<boolean> {
     setAuth(data.accessToken, data.user, data.refreshToken);
     await persistAuth();
     return true;
+  } catch { return false; }
+}
+
+// ── Biometric app-lock (Face ID / Touch ID) ──────────────────────────────────
+// Opt-in: when enabled, the root gates a restored session behind a biometric
+// (or device-passcode) prompt on cold start. The preference lives in the
+// keychain alongside the session.
+const BIOMETRIC_KEY = 'bookingapp.biometric.v1';
+
+export async function isBiometricEnabled(): Promise<boolean> {
+  try { return (await SecureStore.getItemAsync(BIOMETRIC_KEY)) === '1'; }
+  catch { return false; }
+}
+
+export async function setBiometricEnabled(enabled: boolean): Promise<void> {
+  try { await SecureStore.setItemAsync(BIOMETRIC_KEY, enabled ? '1' : '0'); }
+  catch { /* keychain unavailable (web) — preference not persisted */ }
+}
+
+// Whether this device can do biometrics, plus a friendly label for the UI.
+export async function biometricCapability(): Promise<{ available: boolean; label: string }> {
+  try {
+    const [hasHardware, enrolled, types] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+      LocalAuthentication.supportedAuthenticationTypesAsync(),
+    ]);
+    const label = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION) ? 'Face ID'
+      : types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT) ? 'Touch ID'
+      : 'Biometrics';
+    return { available: hasHardware && enrolled, label };
+  } catch { return { available: false, label: 'Biometrics' }; }
+}
+
+// Prompt the OS biometric sheet; falls back to the device passcode. true = passed.
+export async function authenticateBiometric(promptMessage = 'Unlock Pulse'): Promise<boolean> {
+  try {
+    const res = await LocalAuthentication.authenticateAsync({
+      promptMessage,
+      fallbackLabel: 'Use passcode',
+      disableDeviceFallback: false,
+    });
+    return res.success;
   } catch { return false; }
 }

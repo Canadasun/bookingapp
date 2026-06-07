@@ -15,7 +15,7 @@ import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from './src/config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from './src/theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from './src/types';
 import { fmtTime, fmtDur, normalizePhoneClient } from './src/format';
-import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from './src/auth';
+import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, biometricCapability, authenticateBiometric } from './src/auth';
 import { api, registerPushNotifications } from './src/api';
 import { s, cal, co, ms, dst } from './src/styles';
 import { ErrorBoundary, Pill, PriceTag, VerifiedPill } from './src/components';
@@ -140,12 +140,52 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
   );
 }
 
+// Full-screen biometric gate shown over a restored session. Prompts immediately
+// on mount; the user can retry or sign out instead.
+function LockScreen({ onUnlock, onSignOut }: { onUnlock: ()=>void; onSignOut: ()=>void }) {
+  const [label, setLabel] = useState('Face ID');
+  const [busy, setBusy]   = useState(false);
+  const didPrompt = useRef(false);
+
+  const attempt = useCallback(async () => {
+    setBusy(true);
+    const ok = await authenticateBiometric('Unlock Pulse');
+    setBusy(false);
+    if (ok) onUnlock();
+  }, [onUnlock]);
+
+  // Auto-prompt once on mount; a parent re-render must not re-trigger the sheet.
+  useEffect(() => {
+    biometricCapability().then(c => setLabel(c.label));
+    if (!didPrompt.current) { didPrompt.current = true; attempt(); }
+  }, [attempt]);
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <View style={{ flex:1, alignItems:'center', justifyContent:'center', padding:28, gap:18 }}>
+        <View style={{ width:76, height:76, borderRadius:38, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' }}>
+          <Ionicons name="lock-closed" size={34} color={BRAND}/>
+        </View>
+        <Text style={{ fontSize:20, fontWeight:'700', color:GRAY_900 }}>Pulse is locked</Text>
+        <Text style={{ fontSize:14, color:GRAY_500, textAlign:'center' }}>Unlock with {label} to continue.</Text>
+        <TouchableOpacity style={[s.btnPrimary, { alignSelf:'stretch', opacity:busy?0.6:1 }]} disabled={busy} onPress={attempt}>
+          <Text style={s.btnPrimaryText}>{busy ? 'Authenticating…' : `Unlock with ${label}`}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.btnGhost} onPress={onSignOut}>
+          <Text style={s.btnGhostText}>Sign out instead</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
 function AppContent() {
   const [token, setToken]             = useState<string|null>(null);
   const [user, setUser]               = useState<User|null>(null);
   const [msgClient, setMsgClient]     = useState<Client|null>(null);
   const [_, forceRender]              = useState(0);
   const [booting, setBooting]         = useState(true);
+  const [locked, setLocked]           = useState(false);
   const [authView, setAuthView]       = useState<'login'|'register'|'forgot'>('login');
 
   useEffect(()=>{ const unsub=()=>forceRender(n=>n+1); listeners.add(unsub); return ()=>{ listeners.delete(unsub); }; },[]);
@@ -160,6 +200,11 @@ function AppContent() {
       if (!ok) { setAuth(null,null,null); await persistAuth(); }
     }
     const a = getAuth(); setToken(a.token); setUser(a.user);
+    // If a real session was restored and the user opted into biometric lock,
+    // gate the app behind Face ID / Touch ID until they pass (or sign out).
+    if (a.token && await isBiometricEnabled() && (await biometricCapability()).available) {
+      setLocked(true);
+    }
     setBooting(false);
     registerPushNotifications();
   })(); },[]);
@@ -174,6 +219,14 @@ function AppContent() {
           <ActivityIndicator color={BRAND}/>
         </View>
       </SafeAreaView>
+    </ErrorBoundary>
+  );
+
+  // Biometric lock: a restored session is hidden until the user passes Face ID
+  // (or signs out). Only reached when `locked` was set during boot.
+  if (locked) return (
+    <ErrorBoundary>
+      <LockScreen onUnlock={()=>setLocked(false)} onSignOut={()=>{ setLocked(false); handleLogout(); }}/>
     </ErrorBoundary>
   );
 
