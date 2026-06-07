@@ -10,13 +10,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.canadasun.Mobile",
-      "buildNumber": "20",
+      "buildNumber": "22",
       "entitlements": {
         "aps-environment": "production"
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "Pulse"
+        "CFBundleDisplayName": "Pulse",
+        "NSCameraUsageDescription": "Pulse uses the camera to let you scan a payment card when entering card details at checkout."
       }
     },
     "android": {
