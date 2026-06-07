@@ -22,10 +22,13 @@ const STATUS_LABEL: Record<string,string> = {
   COMPLETED:'Completed', CANCELLED:'Cancelled', NO_SHOW:'No-show',
 };
 
+import { io, Socket } from 'socket.io-client';
+
 function CalendarScreen() {
   const { user } = getAuth();
   const nav = useNavigation<any>();
   const [apts, setApts]       = useState<Appointment[]>([]);
+  const [biz, setBiz]         = useState<any|null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected]     = useState<Appointment|null>(null);
@@ -40,17 +43,45 @@ function CalendarScreen() {
   const load = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await api<{data: Appointment[]}>(`/businesses/${bizId()}/bookings`);
+      const bId = bizId();
+      const [res, b] = await Promise.all([
+        api<{data: Appointment[]}>(`/businesses/${bId}/bookings`),
+        api<any>(`/businesses/${bId}`),
+      ]);
       const all = res.data;
       const filtered = user?.role==='STAFF' && user?.staffId
         ? all.filter(a => a.staff.id === user.staffId)
         : all;
       setApts(filtered.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+      setBiz(b);
     } catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed to load'); }
     finally { setLoading(false); setRefreshing(false); }
   }, [user?.staffId, user?.role]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { 
+    load();
+    const interval = setInterval(() => load(true), 60_000); // Poll every 60s as backup
+    return () => clearInterval(interval);
+  }, [load]);
+
+  // Real-time sync via sockets
+  useEffect(() => {
+    const bId = bizId();
+    if (!bId) return;
+
+    let socket: Socket | null = null;
+    const apiUrl = API_BASE.replace(/\/api$/, '');
+
+    api<{ ticket: string }>('/events/ws-ticket').then(({ ticket }) => {
+      socket = io(apiUrl, { transports: ['websocket'], auth: { ticket } });
+      socket.on('connect', () => socket?.emit('joinBusiness', bId));
+      socket.on('bookingUpdated', () => load(true));
+      socket.on('appointmentUpdated', () => load(true));
+      socket.on('messageUpdated', () => {}); // handled elsewhere
+    }).catch(() => {});
+
+    return () => { socket?.disconnect(); };
+  }, [load]);
 
   // Hardware back (Android) closes the open appointment detail instead of leaving
   // the app; the overlay also has an on-screen close for iOS.
@@ -205,8 +236,8 @@ function CalendarScreen() {
   const allDayKeys = Array.from(new Set([TODAY_KEY, ...byDay.keys()]))
     .filter(k => new Date(k).getTime() >= todayMs)
     .sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
-  // A 14-day horizontal strip starting today, so the screen reads as a calendar.
-  const STRIP_DAYS = Array.from({ length: 14 }, (_, i) => {
+  // A 60-day horizontal strip starting today, so the screen reads as a calendar.
+  const STRIP_DAYS = Array.from({ length: 60 }, (_, i) => {
     const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+i);
     const key = d.toDateString();
     return { key, date: d, count: (byDay.get(key) ?? []).length };
@@ -238,8 +269,12 @@ function CalendarScreen() {
     <SafeAreaView style={s.screen}>
       {/* Top bar: ⋯ (left) · Month ▾ (center) · + (right) */}
       <View style={cal.topbar}>
-        <TouchableOpacity style={cal.topBtn} onPress={openMenu} hitSlop={{top:8,bottom:8,left:8,right:8}}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={GRAY_700}/>
+        <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Menu')} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+          {biz?.logoUrl ? (
+            <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={{ width:28, height:28, borderRadius:8 }} contentFit="cover"/>
+          ) : (
+            <Ionicons name="person-circle-outline" size={28} color={GRAY_700}/>
+          )}
         </TouchableOpacity>
         <TouchableOpacity style={cal.monthWrap} activeOpacity={0.7} onPress={()=>{ setRefreshing(true); load(true); }}>
           <Text style={cal.monthText}>{monthLabel}</Text>
@@ -311,12 +346,33 @@ function CalendarScreen() {
           : null}
         renderItem={({item:a})=>{
           const d = new Date(a.startsAt);
+          const color = STATUS_COLOR[a.status] ?? GRAY_200;
           return (
-            <TouchableOpacity style={cal.aptRow} activeOpacity={0.6} onPress={()=>setSelected(a)}>
-              <View style={[cal.aptBar, {backgroundColor: STATUS_COLOR[a.status]??GRAY_200}]}/>
+            <TouchableOpacity 
+              style={[cal.aptRow, { 
+                backgroundColor: '#fff',
+                borderLeftWidth: 4, 
+                borderLeftColor: color,
+                marginHorizontal: 10,
+                marginVertical: 2,
+                borderRadius: 10,
+                shadowColor: '#000',
+                shadowOpacity: 0.04,
+                shadowRadius: 3,
+                shadowOffset: { width: 0, height: 1 },
+                elevation: 1,
+                borderBottomWidth: 0, 
+                paddingVertical: 6, // super compact
+              }]} 
+              activeOpacity={0.6} 
+              onPress={()=>setSelected(a)}
+            >
               <View style={{flex:1}}>
                 <Text style={cal.aptClient}>{a.client.name}</Text>
-                <Text style={cal.aptService}>{a.service.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                  <Text style={cal.aptService}>{a.service.name}</Text>
+                  {a.location && <Ionicons name="location-outline" size={10} color={GRAY_400} />}
+                </View>
               </View>
               <View style={{alignItems:'flex-end'}}>
                 <Text style={cal.aptTime}>{fmtTime(d)}</Text>
@@ -347,10 +403,18 @@ function CalendarScreen() {
               {l:'Phone',  v:selected.client.phone||'—'},
               {l:'Status', v:selected.status},
               {l:'Price',  v:`$${(selected.service.priceCents/100).toFixed(2)}`},
+              {l:'Location', v:selected.location?.name || biz?.address || '—'},
             ].map(({l,v})=>(
               <View key={l} style={s.detailRow}>
                 <Text style={s.detailLabel}>{l}</Text>
-                <Text style={s.detailValue}>{v}</Text>
+                <View style={{flex:1, alignItems:'flex-end'}}>
+                  <Text style={s.detailValue}>{v}</Text>
+                  {l==='Location' && v!=='—' && (
+                    <TouchableOpacity onPress={()=>Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`)}>
+                      <Text style={{fontSize:11, color:BRAND, fontWeight:'600', marginTop:2}}>Open in Maps</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             ))}
             {selected.notes && (

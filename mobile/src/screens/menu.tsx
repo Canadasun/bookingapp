@@ -30,6 +30,8 @@ const PLANS = [
   { id:'PRO',   name:'Pro',   price:'$20', period:'/mo', features:['Everything in Basic','SMS reminders (2h)','Automatic no-show fees','Analytics'] },
 ] as const;
 
+import * as ImagePicker from 'expo-image-picker';
+
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const nav = useNavigation<any>();
@@ -58,6 +60,46 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [deliveries, setDeliveries] = useState<NotificationDelivery[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
   const [loading, setLoading]   = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
+
+  // Pick and upload business logo
+  async function pickLogo() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setLogoBusy(true);
+      try {
+        const uri = result.assets[0].uri;
+        const formData = new FormData();
+        const filename = uri.split('/').pop() || 'logo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+
+        formData.append('file', { uri, name: filename, type } as any);
+
+        const upload = await api<{ url: string }>('/uploads', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const updated = await api<any>(`/businesses/${bizId()}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ logoUrl: upload.url }),
+        });
+        setBiz(updated);
+        Alert.alert('Logo updated', 'Your business logo has been updated.');
+      } catch (e) {
+        Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not upload logo.');
+      } finally {
+        setLogoBusy(false);
+      }
+    }
+  }
   const [serviceEditor, setServiceEditor] = useState<{ id?:string; name:string; durationMinutes:string; price:string; active:boolean; capacity:string; priceType:'FLAT'|'PER_HOUR'|'STARTING_AT' }|null>(null);
   const [preferredPriceType, setPreferredPriceType] = useState<'FLAT'|'PER_HOUR'|'STARTING_AT'>('FLAT');
   const [offerEditor, setOfferEditor] = useState<{ id?:string; title:string; description:string; discount:string; expiresAt:string }|null>(null);
@@ -2064,11 +2106,20 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={ms.card}>
-            <Text style={ms.cardLabel}>Business</Text>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
+              <Text style={ms.cardLabel}>Business</Text>
+              <TouchableOpacity onPress={pickLogo} disabled={logoBusy}>
+                <Text style={{ fontSize:13, color:BRAND, fontWeight:'600' }}>{logoBusy ? 'Uploading...' : 'Change logo'}</Text>
+              </TouchableOpacity>
+            </View>
             <View style={{ flexDirection:'row', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-              {uploadUri((biz as any)?.logoUrl) && (
-                <Image source={{ uri: uploadUri((biz as any).logoUrl)! }} style={s.bizLogoImg} contentFit="cover"/>
-              )}
+              <TouchableOpacity onPress={pickLogo} disabled={logoBusy}>
+                {biz?.logoUrl ? (
+                  <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={s.bizLogoImg} contentFit="cover"/>
+                ) : (
+                  <View style={[s.bizLogoImg, { alignItems:'center', justifyContent:'center' }]}><Ionicons name="image-outline" size={24} color={GRAY_400}/></View>
+                )}
+              </TouchableOpacity>
               <Text style={ms.cardValue}>{biz?.name ?? '—'}</Text>
               {(biz as any)?.verificationStatus === 'VERIFIED' && <VerifiedPill/>}
             </View>
@@ -2315,13 +2366,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <View style={s.header}><Text style={s.headerTitle}>Menu</Text></View>
       <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
         {user&&(
-          <View style={s.profileCard}>
-            <View style={s.avatarLg}><Text style={s.avatarLgText}>{user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+          <TouchableOpacity style={s.profileCard} activeOpacity={0.7} onPress={()=>open('settings')}>
+            {biz?.logoUrl ? (
+              <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={s.avatarLg} contentFit="cover"/>
+            ) : (
+              <View style={s.avatarLg}><Text style={s.avatarLgText}>{user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
+            )}
             <View>
-              <Text style={s.profileName}>{user.name}</Text>
-              <Text style={s.profileRole}>{user.role}</Text>
+              <Text style={s.profileName}>{biz?.name ?? user.name}</Text>
+              <Text style={s.profileRole}>{user.role.toLowerCase()}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
         <View style={s.menuCard}>
           {MENU.map((r,i)=>(

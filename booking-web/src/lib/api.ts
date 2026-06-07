@@ -260,6 +260,7 @@ export interface AdminOverview {
     refundedCents: number;
     netRevenueCents: number;
     successfulPayments: number;
+    flaggedDuplicates: number;
   };
   planCounts: Record<"FREE" | "BASIC" | "PRO", number>;
   verificationCounts: Record<VerificationStatus, number>;
@@ -278,6 +279,17 @@ export interface AdminOverview {
       cancelAtPeriodEnd: boolean;
     } | null;
   }>;
+}
+export interface FlaggedDuplicate {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  slug: string;
+  createdAt: string;
+  verificationNote: string | null;
+  suspectedDuplicateOfId: string | null;
+  duplicateOf: { id: string; name: string; email: string; phone: string | null; createdAt: string } | null;
 }
 export interface DeviceToken {
   id: string; platform: string; enabled: boolean; createdAt: string; updatedAt: string;
@@ -429,6 +441,8 @@ export const api = {
     list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationGovernmentIdUrl: string | null; verificationLegalName: string | null; verificationAddress: string | null; verificationPhone: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
     approve: (id: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/approve`, { method: "POST" }),
     reject: (id: string, note?: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }),
+    duplicates: () => req<FlaggedDuplicate[]>("/admin/verifications/duplicates"),
+    dismissDuplicate: (id: string) => req<{ ok: boolean }>(`/admin/verifications/${id}/duplicate-reviewed`, { method: "POST" }),
   },
 
   payments: {

@@ -46,8 +46,8 @@ function BookScreen() {
   const [loading, setLoading]         = useState(false);
   const [bookedId, setBookedId]       = useState('');
 
-  // Build a 21-day date strip from today
-  const dateStrip = Array.from({length: 21}, (_, i) => {
+  // Build a 90-day date strip from today
+  const dateStrip = Array.from({length: 90}, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() + i);
     return d.toISOString().slice(0, 10);
   });
