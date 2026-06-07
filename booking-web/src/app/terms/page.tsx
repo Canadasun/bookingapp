@@ -1,54 +1,86 @@
 import Link from "next/link";
-import { Calendar } from "lucide-react";
+import { Calendar, ShieldCheck, Scale, Database, CreditCard, AlertCircle } from "lucide-react";
 
 export const metadata = { title: "Terms of Service — Pulse" };
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        <Link href="/" className="inline-flex items-center gap-2 mb-8">
-          <Calendar className="w-7 h-7 text-violet-600" />
-          <span className="text-xl font-bold text-slate-900">Pulse</span>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-3xl mx-auto px-6 py-16">
+        <Link href="/" className="inline-flex items-center gap-2 mb-10">
+          <Calendar className="w-8 h-8 text-violet-600" />
+          <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse</span>
         </Link>
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Terms of Service</h1>
-        <p className="text-sm text-slate-400 mb-8">Last updated: June 2026</p>
+        
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-900 px-8 py-10 text-white">
+            <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
+            <p className="text-slate-400 text-sm">Last updated: June 6, 2026 · Calgary, Alberta</p>
+          </div>
 
-        <div className="space-y-6 text-sm text-slate-600 leading-relaxed">
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">1. Acceptance</h2>
-            <p>By creating an account or using Pulse (the “Service”) you agree to these Terms. If you are using the Service on behalf of a business, you represent that you are authorized to bind that business.</p>
-          </section>
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">2. Your account</h2>
-            <p>You are responsible for the activity under your account and for keeping your credentials secure. You must provide accurate information and promptly update it when it changes.</p>
-          </section>
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">3. Acceptable use</h2>
-            <p>You agree not to misuse the Service, including by attempting to access it in an unauthorized way, sending unsolicited messages, or using it to violate any law or the rights of others.</p>
-          </section>
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">4. Payments</h2>
-            <p>Where you collect deposits, no-show fees, or other payments through the Service, those transactions are processed by our payment provider and are subject to their terms. You are responsible for your own tax and refund obligations.</p>
-          </section>
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">5. Termination</h2>
-            <p>You may stop using the Service at any time. We may suspend or terminate access for violation of these Terms or to protect the Service and its users.</p>
-          </section>
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">6. Disclaimer</h2>
-            <p>The Service is provided “as is” without warranties of any kind. To the extent permitted by law, we are not liable for indirect or consequential damages arising from your use of the Service.</p>
-          </section>
-          <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">7. Contact</h2>
-            <p>Questions about these Terms? Contact us at support@pulseappointments.com.</p>
-          </section>
-        </div>
+          <div className="p-8 md:p-12 space-y-10 text-sm text-slate-600 leading-relaxed">
+            <div className="rounded-2xl bg-violet-50 border border-violet-100 p-6 flex gap-4">
+              <ShieldCheck className="w-6 h-6 text-violet-600 shrink-0" />
+              <p className="text-violet-900 font-medium">
+                Pulse provides booking infrastructure for independent businesses. We act as a service provider (Processor) while the business owner remains the Custodian and Controller of all client records.
+              </p>
+            </div>
 
-        <div className="mt-10 pt-6 border-t border-slate-100 text-sm">
-          <Link href="/privacy" className="text-violet-600 hover:underline">Privacy Policy</Link>
-          <span className="text-slate-300 mx-2">·</span>
-          <Link href="/" className="text-violet-600 hover:underline">Home</Link>
+            <section>
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Database className="w-5 h-5 text-violet-500" /> 1. Data Ownership & Privacy
+              </h2>
+              <div className="space-y-3">
+                <p><strong>Business Data:</strong> All client records, appointment history, and business-specific data are owned exclusively by the Business Owner (the "Subscriber"). Pulse does not claim any ownership rights to your data.</p>
+                <p><strong>Compliance:</strong> For users in Alberta, Canada, Pulse serves as an "Information Manager" under the <em>Health Information Act</em> (HIA) and a "Processor" under the <em>Personal Information Protection Act</em> (PIPA). Businesses are responsible for their own Privacy Impact Assessments (PIA) as required by the OIPC.</p>
+                <p><strong>Portability:</strong> You may export your data at any time. We do not hold your data hostage or charge exit fees for your records.</p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-violet-500" /> 2. Payments & Fee Transparency
+              </h2>
+              <div className="space-y-3">
+                <p><strong>Provider Fees:</strong> Pulse charges a monthly or per-feature subscription fee. This fee is separate from any payment processing fees charged by Square, Stripe, or other third-party processors.</p>
+                <p><strong>Processing Fees:</strong> Transaction fees are determined by the payment processor. Pulse does not control these fees and they are deducted directly by the processor during the transaction.</p>
+                <p><strong>Security:</strong> Pulse is PCI DSS compliant by design. We never store raw credit card numbers or CVVs on our servers. All sensitive payment data is tokenized by Square or Stripe.</p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-violet-500" /> 3. Liability & Indemnification
+              </h2>
+              <div className="space-y-3">
+                <p><strong>Limitation of Liability:</strong> To the maximum extent permitted by Alberta law, Pulse is not liable for indirect, incidental, or consequential damages, including lost profits or data loss resulting from your use of the service.</p>
+                <p><strong>Indemnification:</strong> You agree to defend, indemnify, and hold harmless Pulse from any legal claims, damages, or costs (including lawyer fees) arising from your misuse of the platform, violation of privacy laws, or disputes with your clients.</p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Scale className="w-5 h-5 text-violet-500" /> 4. Governing Law & Arbitration
+              </h2>
+              <div className="space-y-3">
+                <p><strong>Jurisdiction:</strong> These Terms are governed by the laws of the Province of Alberta and the federal laws of Canada applicable therein.</p>
+                <p><strong>Dispute Resolution:</strong> Any disputes arising from these Terms shall be resolved through individual binding arbitration in <strong>Calgary, Alberta</strong>, rather than in court. You waive any right to participate in class actions or class-wide arbitration.</p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-bold text-slate-900 mb-4">5. Account Suspension</h2>
+              <p>Pulse reserves the right to suspend or terminate any account that violates Square's Developer Terms, engages in fraudulent activity, harasses clients, or fails to comply with local privacy regulations.</p>
+            </section>
+
+            <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <p className="text-xs text-slate-400">© 2026 Pulse Appointments. All rights reserved.</p>
+              <div className="flex gap-6">
+                <Link href="/privacy" className="text-violet-600 font-semibold hover:underline">Privacy Policy</Link>
+                <Link href="mailto:support@pulseappointments.com" className="text-violet-600 font-semibold hover:underline">Support</Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

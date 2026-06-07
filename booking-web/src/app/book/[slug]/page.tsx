@@ -927,12 +927,17 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     </label>
                   </div>
 
-                  <button
-                    onClick={confirm}
-                    disabled={submitting || !policyAccepted}
-                    className="w-full py-4 rounded-xl bg-violet-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-violet-700 transition-colors">
-                    {submitting ? "Booking…" : `Confirm booking · ${fmtPrice(totalCents)}`}
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      onClick={confirm}
+                      disabled={submitting || !policyAccepted}
+                      className="w-full py-4 rounded-xl bg-violet-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-violet-700 transition-colors">
+                      {submitting ? "Booking…" : `Confirm booking · ${fmtPrice(totalCents)}`}
+                    </button>
+                    <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
+                      Payments are processed securely via Square or Stripe. Transaction fees may be applied by the payment processor as per your agreement. Pulse does not store your credit card information.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
