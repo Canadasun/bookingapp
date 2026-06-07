@@ -23,6 +23,10 @@ function BookScreen() {
   const [step, setStep]               = useState<Step>('service');
   const [services, setServices]       = useState<Service[]>([]);
   const [staffList, setStaffList]     = useState<Staff[]>([]);
+  // Unfiltered active providers (always includes the owner — the business itself).
+  // Used as the fallback provider so a booking never fails for lack of a match,
+  // mirroring the web checkout (sole-proprietor model: owner = the business).
+  const [allStaffList, setAllStaffList] = useState<Staff[]>([]);
   const [slots, setSlots]             = useState<BookingSlot[]>([]);
   const [selectedSvcs, setSelectedSvcs] = useState<Service[]>([]);
   const [staff, setStaff]             = useState<Staff|null|'any'>(null);
@@ -86,14 +90,18 @@ function BookScreen() {
     if (selectedSvcs.length === 0) return;
     try {
       const all = await api<Staff[]>(`/businesses/${bizId()}/staff`);
-      const filtered = all.filter(st => st.staffServices.length === 0 || selectedSvcs.every(sv => st.staffServices.some(ss=>ss.serviceId === sv.id)));
-      const hasAddedStaff = all.some(st => st.user.role !== 'OWNER');
+      const activeAll = all.filter(st => st.active !== false);
+      const filtered = activeAll.filter(st => st.staffServices.length === 0 || selectedSvcs.every(sv => st.staffServices.some(ss=>ss.serviceId === sv.id)));
+      const hasAddedStaff = activeAll.some(st => st.user.role !== 'OWNER');
+      setAllStaffList(activeAll);
       setStaffList(filtered);
       setShowStaffStep(hasAddedStaff);
       if (hasAddedStaff) {
         setStep('staff');
       } else {
-        setStaff(filtered[0] ?? 'any');
+        // Solo business → book as the owner (the business). Fall back to the
+        // unfiltered owner record if the service filter excluded it.
+        setStaff(filtered[0] ?? activeAll[0] ?? 'any');
         setStep('date');
       }
     } catch { Alert.alert('Error','Could not load staff'); }
@@ -104,10 +112,14 @@ function BookScreen() {
     try {
       const serviceId = selectedSvcs[0]?.id ?? '';
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const targets = staff && staff !== 'any' ? [staff] : staffList;
+      // Fall back to the unfiltered list (the owner/business) so we always have a
+      // provider to pull availability for — never block the booking outright.
+      const targets = staff && staff !== 'any' ? [staff] : (staffList.length ? staffList : allStaffList);
       if (targets.length === 0 || !serviceId) { Alert.alert('Provider required','No active provider is available for this service.'); return; }
       const rows = await Promise.all(targets.map(async st => {
-        const data = await api<Slot[]>(`/availability/slots?staffId=${st.id}&serviceId=${serviceId}&startDate=${d}&endDate=${d}&timezone=${tz}`);
+        // enforceNotice=false: owner-created bookings aren't bound by the public
+        // minimum-notice window (matches web), so today's times still show.
+        const data = await api<Slot[]>(`/availability/slots?staffId=${st.id}&serviceId=${serviceId}&startDate=${d}&endDate=${d}&timezone=${tz}&enforceNotice=false`);
         return data.map(sl => ({...sl, staffId:st.id, staffName:st.user.name}));
       }));
       setSlots(rows.flat().sort((a,b)=>new Date(a.startsAt).getTime()-new Date(b.startsAt).getTime()));
@@ -133,9 +145,12 @@ function BookScreen() {
       const customDate = customStartsAt.trim() ? new Date(customStartsAt.trim().replace(' ', 'T')) : null;
       if (customStartsAt && Number.isNaN(customDate?.getTime())) { Alert.alert('Check time','Use YYYY-MM-DD HH:mm for custom owner time.'); return; }
       const startsAt = customDate ? customDate.toISOString() : slot?.startsAt;
+      // Resolve the provider, always falling back to the owner (the business)
+      // so a solo business never hits "Choose a provider" (mirrors web checkout).
+      const ownerFallback = staffList[0]?.id ?? allStaffList[0]?.id ?? '';
       const staffId = customDate
-        ? (staff && staff !== 'any' ? staff.id : (staffList[0]?.id ?? ''))
-        : (staff && staff !== 'any' ? staff.id : (slot?.staffId ?? staffList[0]?.id ?? ''));
+        ? (staff && staff !== 'any' ? staff.id : ownerFallback)
+        : (staff && staff !== 'any' ? staff.id : (slot?.staffId ?? ownerFallback));
       if (!staffId){ Alert.alert('Provider required','Choose a provider before booking.'); return; }
       if (!startsAt){ Alert.alert('Time required','Choose an available time or enter a custom owner time.'); return; }
       const client = await api<{id:string; matched?:boolean}>(`/businesses/${bizId()}/clients`, {
@@ -177,7 +192,7 @@ function BookScreen() {
 
   function reset() {
     setStep('service'); setSelectedSvcs([]); setStaff(null); setDate(''); setSlot(null);
-    setStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
+    setStaffList([]); setAllStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
     setManualHour(9); setManualMin(0); setManualMeridiem('AM');
     setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId(''); setRepeat(null);
   }
@@ -346,7 +361,7 @@ function BookScreen() {
               </TouchableOpacity>
             </View>
             {loading&&<ActivityIndicator color={BRAND} style={{marginTop:20}}/>}
-            {!loading&&slots.length===0&&<Text style={s.emptyText}>No availability on this date — try another</Text>}
+            {!loading&&slots.length===0&&<Text style={s.emptyText}>No generated times for this date — pick another, or set a time manually above.</Text>}
             <View style={s.slotGrid}>
               {slots.map(sl=>(
                 <TouchableOpacity key={`${sl.staffId ?? 'staff'}-${sl.startsAt}`} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotBtnActive]}
