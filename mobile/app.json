@@ -17,7 +17,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDisplayName": "Pulse",
-        "NSCameraUsageDescription": "Pulse uses the camera to let you scan a payment card when entering card details at checkout."
+        "NSCameraUsageDescription": "Pulse uses the camera to let you scan a payment card when entering card details at checkout.",
+        "NSFaceIDUsageDescription": "Pulse uses Face ID to securely sign you in and protect access to your account."
       }
     },
     "android": {
