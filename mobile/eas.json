@@ -12,14 +12,16 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
-        "EXPO_PUBLIC_BUSINESS_ID": "cmpwffih20000rgxw61idarqm"
+        "EXPO_PUBLIC_BUSINESS_ID": "cmpwffih20000rgxw61idarqm",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tf7dZ9z1GKcmZ4GbDoVxKN4jm1xnJZpIRaoLCXWCig0ROD8GDPFvbCWErt1CervOVPPD3WijlaTa5WWOmu4yBjU00WcYa7RZ9"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
-        "EXPO_PUBLIC_BUSINESS_ID": "cmpwffih20000rgxw61idarqm"
+        "EXPO_PUBLIC_BUSINESS_ID": "cmpwffih20000rgxw61idarqm",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tf7dZ9z1GKcmZ4GbDoVxKN4jm1xnJZpIRaoLCXWCig0ROD8GDPFvbCWErt1CervOVPPD3WijlaTa5WWOmu4yBjU00WcYa7RZ9"
       }
     }
   },
