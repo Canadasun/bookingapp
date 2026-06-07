@@ -131,21 +131,22 @@ export class MessagesService {
     }
   }
 
-  // Inbound SMS (Twilio webhook): a client texted the business's Pulse number.
-  // Route by phone to the business with the most recent activity, store it as an
-  // SMS message in that inbox (which also records consent to reply by text).
+  // Inbound SMS (Twilio webhook): a client texted the shared Pulse number. Route
+  // by phone to the client record with the most recent activity (their latest
+  // message, else their latest appointment) and store it in that business inbox.
+  // A single shared number serves every business — no per-business number or
+  // Twilio plan upgrade required — so we route on activity rather than dropping
+  // replies from a phone that happens to be a client of more than one business.
   async handleInboundSms(from: string, body: string) {
     const phone = normalizePhone(from);
     if (!phone || !body.trim()) return;
     const clients = await this.prisma.client.findMany({ where: { phone }, select: { id: true, businessId: true } });
-    if (!clients.length) return;
-
-    let target = clients[0];
-    const businessIds = new Set(clients.map((client) => client.businessId));
-    if (businessIds.size > 1) {
-      this.logger.warn(`Inbound SMS from ${phone} matched multiple businesses; message was not routed.`);
+    if (!clients.length) {
+      this.logger.warn(`Inbound SMS from ${phone} matched no client; message was not routed.`);
       return;
     }
+
+    let target = clients[0];
     if (clients.length > 1) {
       const ids = clients.map((c) => c.id);
       const recentMsg = await this.prisma.message.findFirst({ where: { clientId: { in: ids } }, orderBy: { createdAt: 'desc' }, select: { clientId: true } });
