@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.canadasun.Mobile",
-      "buildNumber": "24",
+      "buildNumber": "25",
       "entitlements": {
         "aps-environment": "production"
       },
