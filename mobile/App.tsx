@@ -209,6 +209,25 @@ function AppContent() {
     registerPushNotifications();
   })(); },[]);
 
+  // Re-lock when the app returns from the background. We key off 'background'
+  // (not 'inactive') so the system Face ID sheet — which only makes the app
+  // 'inactive' — never triggers a re-lock loop.
+  const wasBackgrounded = useRef(false);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (next) => {
+      if (next === 'background') {
+        wasBackgrounded.current = true;
+      } else if (next === 'active' && wasBackgrounded.current) {
+        wasBackgrounded.current = false;
+        const a = getAuth();
+        if (a.token && await isBiometricEnabled() && (await biometricCapability()).available) {
+          setLocked(true);
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   function handleLogin(t:string, r:string, u:User) { setAuth(t,u,r); setToken(t); setUser(u); persistAuth(); registerPushNotifications(); }
   function handleLogout() { setAuth(null,null,null); setToken(null); setUser(null); persistAuth(); }
 
