@@ -31,6 +31,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { StripeProvider } from '@stripe/stripe-react-native';
@@ -204,12 +205,14 @@ function AppContent() {
 
   return (
     <ErrorBoundary>
+    <GestureHandlerRootView style={{ flex:1 }}>
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="#fff"/>
       <NavigationContainer>
         <MainTabs msgClient={msgClient} setMsgClient={setMsgClient} onLogout={handleLogout}/>
       </NavigationContainer>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

@@ -1,6 +1,7 @@
 // Shared, presentational building blocks used across screens.
 import React, { Component } from 'react';
 import { View, Text, SafeAreaView, TouchableOpacity } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { s } from './styles';
 
@@ -51,5 +52,27 @@ export function VerifiedPill() {
       <Ionicons name="shield-checkmark" size={10} color="#fff"/>
       <Text style={s.verifiedPillText}>Verified</Text>
     </View>
+  );
+}
+
+// Wrap any row to reveal a red Delete action on left-swipe. Closes itself before
+// firing onDelete so the confirm dialog isn't shown behind an open row.
+export function SwipeToDelete({ children, onDelete, label = 'Delete' }: { children: React.ReactNode; onDelete: () => void; label?: string }) {
+  const ref = React.useRef<Swipeable>(null);
+  return (
+    <Swipeable
+      ref={ref}
+      overshootRight={false}
+      rightThreshold={40}
+      renderRightActions={() => (
+        <TouchableOpacity
+          onPress={() => { ref.current?.close(); onDelete(); }}
+          style={{ width:84, backgroundColor:'#DC2626', borderRadius:14, alignItems:'center', justifyContent:'center', marginBottom:10, marginLeft:8 }}>
+          <Ionicons name="trash-outline" size={20} color="#fff"/>
+          <Text style={{ color:'#fff', fontSize:12, fontWeight:'700', marginTop:3 }}>{label}</Text>
+        </TouchableOpacity>
+      )}>
+      {children}
+    </Swipeable>
   );
 }

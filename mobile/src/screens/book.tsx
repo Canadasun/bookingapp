@@ -30,6 +30,11 @@ function BookScreen() {
   const [slot, setSlot]               = useState<BookingSlot|null>(null);
   const [showStaffStep, setShowStaffStep] = useState(false);
   const [customStartsAt, setCustomStartsAt] = useState('');
+  // Manual time picker (no native module needed) — composes customStartsAt for the
+  // already-selected `date`, so owners can book any time, overriding the calendar.
+  const [manualHour, setManualHour] = useState(9);          // 1–12
+  const [manualMin, setManualMin]   = useState(0);          // 0,5,…,55
+  const [manualMeridiem, setManualMeridiem] = useState<'AM'|'PM'>('AM');
   const [repeat, setRepeat] = useState<{ frequency:'WEEKLY'|'BIWEEKLY'|'THREE_WEEKS'|'EIGHT_WEEKS'|'MONTHLY'; count:number }|null>(null);
   const [overrideCalendar, setOverrideCalendar] = useState(false);
   const [form, setForm]               = useState({name:'',email:'',phone:''});
@@ -60,6 +65,14 @@ function BookScreen() {
   function totalPrice(svcs: Service[]) {
     return '$' + (svcs.reduce((s, x) => s + x.priceCents, 0) / 100).toFixed(2);
   }
+
+  // Compose "YYYY-MM-DD HH:mm" (24h) from the picked date + manual time controls.
+  function manualStartsAt() {
+    let h = manualHour % 12;
+    if (manualMeridiem === 'PM') h += 12;
+    return `${date} ${String(h).padStart(2,'0')}:${String(manualMin).padStart(2,'0')}`;
+  }
+  const manualLabel = `${String(manualHour).padStart(2,'0')}:${String(manualMin).padStart(2,'0')} ${manualMeridiem}`;
 
   useEffect(()=>{
     api<Service[]>(`/businesses/${bizId()}/services`).then(s=>setServices(s.filter(x=>x.active))).catch(()=>{});
@@ -165,6 +178,7 @@ function BookScreen() {
   function reset() {
     setStep('service'); setSelectedSvcs([]); setStaff(null); setDate(''); setSlot(null);
     setStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
+    setManualHour(9); setManualMin(0); setManualMeridiem('AM');
     setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId(''); setRepeat(null);
   }
 
@@ -301,21 +315,35 @@ function BookScreen() {
             <Text style={s.stepLabel}>Available times</Text>
             <Text style={[s.sub,{marginBottom:12}]}>{new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</Text>
             <View style={[s.policyBox,{ marginBottom:14 }]}>
-              <Text style={s.policyTitle}>Custom owner time</Text>
-              <Text style={s.policyText}>Enter YYYY-MM-DD HH:mm to book outside generated calendar slots. This uses the owner provider for solo businesses and can override calendar conflicts.</Text>
-              <TextInput style={[s.input,{ marginTop:10 }]} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400}
-                value={customStartsAt} onChangeText={(v)=>{setCustomStartsAt(v); setOverrideCalendar(!!v); if(v) setSlot(null);}}/>
-              <TouchableOpacity style={s.policyCheck} activeOpacity={0.7} onPress={()=>setOverrideCalendar(p=>!p)}>
-                <View style={[s.checkbox, overrideCalendar&&s.checkboxActive]}>
-                  {overrideCalendar&&<Ionicons name="checkmark" size={12} color="#fff"/>}
+              <Text style={s.policyTitle}>Set time manually</Text>
+              <Text style={s.policyText}>Pick any time on {new Date(date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} to book outside the generated slots — great for walk-ins or custom hours. This overrides calendar conflicts.</Text>
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:10, marginTop:14, marginBottom:4 }}>
+                {/* Hour */}
+                <View style={{ alignItems:'center' }}>
+                  <TouchableOpacity onPress={()=>setManualHour(h=>h===12?1:h+1)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-up" size={20} color={GRAY_500}/></TouchableOpacity>
+                  <Text style={{ fontSize:28, fontWeight:'800', color:GRAY_900, marginVertical:2, minWidth:46, textAlign:'center' }}>{String(manualHour).padStart(2,'0')}</Text>
+                  <TouchableOpacity onPress={()=>setManualHour(h=>h===1?12:h-1)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-down" size={20} color={GRAY_500}/></TouchableOpacity>
                 </View>
-                <Text style={s.policyCheckText}>Override availability and conflicts</Text>
+                <Text style={{ fontSize:28, fontWeight:'800', color:GRAY_400 }}>:</Text>
+                {/* Minute (5-min steps) */}
+                <View style={{ alignItems:'center' }}>
+                  <TouchableOpacity onPress={()=>setManualMin(m=>(m+5)%60)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-up" size={20} color={GRAY_500}/></TouchableOpacity>
+                  <Text style={{ fontSize:28, fontWeight:'800', color:GRAY_900, marginVertical:2, minWidth:46, textAlign:'center' }}>{String(manualMin).padStart(2,'0')}</Text>
+                  <TouchableOpacity onPress={()=>setManualMin(m=>(m+55)%60)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-down" size={20} color={GRAY_500}/></TouchableOpacity>
+                </View>
+                {/* AM / PM */}
+                <View style={{ gap:6, marginLeft:8 }}>
+                  {(['AM','PM'] as const).map(mer => (
+                    <TouchableOpacity key={mer} onPress={()=>setManualMeridiem(mer)}
+                      style={[s.slotBtn, manualMeridiem===mer && s.slotBtnActive, { paddingVertical:6, paddingHorizontal:14 }]}>
+                      <Text style={[s.slotText, manualMeridiem===mer && s.slotTextActive]}>{mer}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <TouchableOpacity style={[s.btnSecondary,{ marginTop:12 }]} onPress={()=>{ setCustomStartsAt(manualStartsAt()); setOverrideCalendar(true); setSlot(null); setStep('details'); }}>
+                <Text style={s.btnSecondaryText}>Use {manualLabel}</Text>
               </TouchableOpacity>
-              {customStartsAt && (
-                <TouchableOpacity style={[s.btnSecondary,{ marginTop:10 }]} onPress={()=>setStep('details')}>
-                  <Text style={s.btnSecondaryText}>Use custom time</Text>
-                </TouchableOpacity>
-              )}
             </View>
             {loading&&<ActivityIndicator color={BRAND} style={{marginTop:20}}/>}
             {!loading&&slots.length===0&&<Text style={s.emptyText}>No availability on this date — try another</Text>}
@@ -338,7 +366,7 @@ function BookScreen() {
             <View style={s.summaryBox}>
               <Text style={s.summaryTitle}>{selectedSvcs.map(s=>s.name).join(' + ')}</Text>
               <Text style={s.summarySub}>
-                {staff&&staff!=='any'?(staff as Staff).user.name:(slot?.staffName ?? 'Owner provider')} · {customStartsAt ? customStartsAt : `${date.slice(5).replace('-','/')} at ${slot ? fmtTime(slot.startsAtLocal) : ''}`}
+                {staff&&staff!=='any'?(staff as Staff).user.name:(slot?.staffName ?? 'Owner provider')} · {customStartsAt ? `${new Date(date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} at ${manualLabel}` : `${date.slice(5).replace('-','/')} at ${slot ? fmtTime(slot.startsAtLocal) : ''}`}
               </Text>
               <Text style={[s.summarySub,{marginTop:4}]}>{totalDuration(selectedSvcs)} · {totalPrice(selectedSvcs)}</Text>
             </View>

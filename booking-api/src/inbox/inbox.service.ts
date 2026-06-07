@@ -9,14 +9,20 @@ interface NotifyInput {
   linkUrl?: string;
 }
 
+// Notifications self-prune: the inbox keeps only the newest MAX_INBOX per user, so
+// old alerts disappear automatically and there's no need for a manual "clear".
+const MAX_INBOX = 30;
+
 @Injectable()
 export class InboxService {
   constructor(private prisma: PrismaService) {}
 
-  notify(userId: string, data: NotifyInput) {
-    return this.prisma.notification.create({
+  async notify(userId: string, data: NotifyInput) {
+    const row = await this.prisma.notification.create({
       data: { userId, kind: data.kind ?? 'SYSTEM', title: data.title, body: data.body, linkUrl: data.linkUrl },
     });
+    await this.prune(userId);
+    return row;
   }
 
   // Fan out to every owner of a business (e.g. a new booking).
@@ -28,6 +34,20 @@ export class InboxService {
         userId: o.id, kind: data.kind ?? 'SYSTEM', title: data.title, body: data.body ?? null, linkUrl: data.linkUrl ?? null,
       })),
     });
+    await Promise.all(owners.map((o) => this.prune(o.id)));
+  }
+
+  // Drop everything older than the newest MAX_INBOX rows for this user. Best-effort:
+  // a prune failure must never break the action that triggered the notification.
+  private async prune(userId: string) {
+    try {
+      const cutoff = await this.prisma.notification.findMany({
+        where: { userId }, orderBy: { createdAt: 'desc' }, skip: MAX_INBOX, take: 1, select: { createdAt: true },
+      });
+      if (cutoff.length) {
+        await this.prisma.notification.deleteMany({ where: { userId, createdAt: { lt: cutoff[0].createdAt } } });
+      }
+    } catch { /* non-fatal */ }
   }
 
   list(userId: string, limit = 30) {

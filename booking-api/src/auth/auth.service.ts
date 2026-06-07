@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { hashRefreshToken, refreshTokenTtlMs } from '../common/util/refresh-token';
 import { normalizePhone } from '../common/util/phone';
 import { User } from '@prisma/client';
@@ -265,7 +265,7 @@ export class AuthService {
   }
 
   private async createLoginChallenge(user: User): Promise<{ id: string; method: 'EMAIL' | 'SMS' }> {
-    const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 digits
+    const code = String(randomInt(100000, 1000000)); // 6 digits, CSPRNG (not Math.random)
     const codeHash = createHash('sha256').update(code).digest('hex');
     const smsPhone = user.twoFactorMethod === 'SMS' ? await this.resolveTwoFactorSmsPhone(user) : null;
     const method: 'EMAIL' | 'SMS' = user.twoFactorMethod === 'SMS' && smsPhone ? 'SMS' : 'EMAIL';
@@ -281,7 +281,10 @@ export class AuthService {
     if (!ch || ch.consumedAt || ch.expiresAt < new Date() || ch.attempts >= 5) {
       throw new UnauthorizedException('Invalid or expired code');
     }
-    const otpOk = createHash('sha256').update(code).digest('hex') === ch.codeHash;
+    // Constant-time compare so a wrong code can't be teased out by response timing.
+    const computedOtp = createHash('sha256').update(code).digest('hex');
+    const otpOk = computedOtp.length === ch.codeHash.length &&
+      timingSafeEqual(Buffer.from(computedOtp), Buffer.from(ch.codeHash));
 
     // Recovery-code fallback: if the OTP didn't match, the user may have entered
     // one of their one-time recovery codes (which bypass the email/SMS channel

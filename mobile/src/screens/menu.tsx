@@ -16,11 +16,20 @@ import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
-import { Pill, PriceTag, VerifiedPill } from '../components';
+import { Pill, PriceTag, VerifiedPill, SwipeToDelete } from '../components';
 
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'soon';
+
+// Plan tiers mirror the web billing page. Display-only on mobile for now — every
+// business is on Pro during testing; paid switching gets wired up after testing.
+const PLANS = [
+  { id:'FREE',  name:'Free',  price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page'] },
+  { id:'BASIC', name:'Basic', price:'$10', period:'/mo', features:['Everything in Free','Email reminders (24h)','Deposit collection','Cancellation policies'] },
+  { id:'PRO',   name:'Pro',   price:'$20', period:'/mo', features:['Everything in Basic','SMS reminders (2h)','Automatic no-show fees','Analytics'] },
+] as const;
+
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
   const nav = useNavigation<any>();
@@ -31,6 +40,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const view: MoreView = route.params?.view ?? 'menu';
   const soonLabel: string = route.params?.soonLabel ?? '';
   const [services, setServices] = useState<Service[] | null>(null);
+  const [categories, setCategories] = useState<ServiceCategory[] | null>(null);
   const [staff, setStaff]       = useState<Staff[] | null>(null);
   const [offers, setOffers]     = useState<any[] | null>(null);
   const [waitlist, setWaitlist] = useState<any[] | null>(null);
@@ -195,6 +205,39 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       setBiz({ ...biz, notificationSettings: previous });
       Alert.alert('Could not update notifications', e instanceof Error ? e.message : 'Please try again.');
     }
+  }
+
+  // Swipe-to-delete a service. The API refuses to delete a service with booking
+  // history (to keep records intact) — surface that and suggest deactivating.
+  function deleteService(sv: Service) {
+    Alert.alert('Delete service?', `Delete "${sv.name}"? This can't be undone.`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/services/${sv.id}`, { method:'DELETE' });
+          setServices(prev => (prev ?? []).filter(x => x.id !== sv.id));
+        } catch(e) {
+          Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
+  }
+
+  // Swipe-to-delete a category. The API keeps its services and just clears their
+  // category (categoryId → null), so nothing breaks and they stay bookable.
+  function deleteCategory(cat: ServiceCategory) {
+    Alert.alert('Delete category?', `Delete "${cat.name}"? Its services are kept and become uncategorized.`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/service-categories/${cat.id}`, { method:'DELETE' });
+          setCategories(prev => (prev ?? []).filter(x => x.id !== cat.id));
+          setServices(prev => (prev ?? []).map(x => x.categoryId === cat.id ? { ...x, categoryId:null, category:null } : x));
+        } catch(e) {
+          Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');
+        }
+      }},
+    ]);
   }
 
   async function saveInvoice() {
@@ -785,7 +828,15 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   useEffect(() => { if (view !== 'menu') loadView(view); }, []);
   async function loadView(v: MoreView) {
     try {
-      if (v === 'services' && !services) { setLoading(true); setServices(await api<Service[]>(`/businesses/${bizId()}/services`)); }
+      if (v === 'services' && !services) {
+        setLoading(true);
+        const [svc, cats] = await Promise.all([
+          api<Service[]>(`/businesses/${bizId()}/services`),
+          api<ServiceCategory[]>(`/businesses/${bizId()}/service-categories`).catch(() => [] as ServiceCategory[]),
+        ]);
+        setServices(svc);
+        setCategories(cats);
+      }
       else if (v === 'staff' && (!staff || !services))  {
         setLoading(true);
         const [staffRows, serviceRows] = await Promise.all([
@@ -840,29 +891,46 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       </View>
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          {!!(categories && categories.length) && (
+            <>
+              <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>CATEGORIES</Text>
+              {categories.map(cat => (
+                <SwipeToDelete key={cat.id} onDelete={()=>deleteCategory(cat)}>
+                  <View style={ms.row}>
+                    <View style={[ms.dot,{ backgroundColor: cat.color || BRAND }]}/>
+                    <Text style={[ms.rowTitle,{ flex:1 }]} numberOfLines={1}>{cat.name}</Text>
+                  </View>
+                </SwipeToDelete>
+              ))}
+              <Text style={[ms.cardLabel,{ marginTop:8, marginBottom:6, marginLeft:2 }]}>SERVICES</Text>
+            </>
+          )}
           {(services ?? []).map(sv => (
-            <TouchableOpacity key={sv.id} style={ms.row} onPress={()=>setServiceEditor({
-              id: sv.id,
-              name: sv.name,
-              durationMinutes: String(sv.durationMinutes),
-              price: (sv.priceCents / 100).toFixed(2),
-              active: sv.active,
-              capacity: String(sv.capacity ?? 1),
-              priceType: (sv.priceType as any) ?? 'FLAT',
-            })}>
-              <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
-              <View style={{ flex:1 }}>
-                <Text style={ms.rowTitle}>{sv.name}</Text>
-                <Text style={ms.rowMeta}>{sv.durationMinutes} min{(sv.capacity ?? 1) > 1 ? ` · group of ${sv.capacity}` : ''}{sv.active ? '' : ' · inactive'}</Text>
-              </View>
-              <View style={{ alignItems:'flex-end' }}>
-                <PriceTag cents={sv.priceCents}/>
-                {sv.priceType==='PER_HOUR' && <Text style={{ fontSize:10, color:GRAY_400, marginTop:1 }}>/hr</Text>}
-                {sv.priceType==='STARTING_AT' && <Text style={{ fontSize:10, color:GRAY_400, marginTop:1 }}>starting</Text>}
-              </View>
-            </TouchableOpacity>
+            <SwipeToDelete key={sv.id} onDelete={()=>deleteService(sv)}>
+              <TouchableOpacity style={ms.row} onPress={()=>setServiceEditor({
+                id: sv.id,
+                name: sv.name,
+                durationMinutes: String(sv.durationMinutes),
+                price: (sv.priceCents / 100).toFixed(2),
+                active: sv.active,
+                capacity: String(sv.capacity ?? 1),
+                priceType: (sv.priceType as any) ?? 'FLAT',
+              })}>
+                <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
+                <View style={{ flex:1 }}>
+                  <Text style={ms.rowTitle}>{sv.name}</Text>
+                  <Text style={ms.rowMeta}>{sv.durationMinutes} min{(sv.capacity ?? 1) > 1 ? ` · group of ${sv.capacity}` : ''}{sv.active ? '' : ' · inactive'}</Text>
+                </View>
+                <View style={{ alignItems:'flex-end' }}>
+                  <PriceTag cents={sv.priceCents}/>
+                  {sv.priceType==='PER_HOUR' && <Text style={{ fontSize:10, color:GRAY_400, marginTop:1 }}>/hr</Text>}
+                  {sv.priceType==='STARTING_AT' && <Text style={{ fontSize:10, color:GRAY_400, marginTop:1 }}>starting</Text>}
+                </View>
+              </TouchableOpacity>
+            </SwipeToDelete>
           ))}
           {services && services.length===0 && <Text style={ms.empty}>No services yet.</Text>}
+          {!!(services && services.length) && <Text style={[ms.empty,{ marginTop:4 }]}>Swipe a row left to delete. Create categories on the web dashboard.</Text>}
         </ScrollView>
       )}
       <Modal visible={!!serviceEditor} animationType="slide" onRequestClose={()=>setServiceEditor(null)}>
@@ -927,29 +995,35 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       {loading ? <Loader/> : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(staff ?? []).map(st => (
-            <View key={st.id} style={ms.row}>
-              {uploadUri(st.avatarUrl)
-                ? <Image source={{ uri: uploadUri(st.avatarUrl)! }} style={s.avatarImg} contentFit="cover"/>
-                : <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>}
-              <View style={{ flex:1 }}>
-                <Text style={ms.rowTitle}>{st.user.name}</Text>
-                <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
+            <View key={st.id} style={ms.card}>
+              {/* Name + avatar get their own full-width row so the name is never
+                  squeezed by the action buttons; actions sit on a second row. */}
+              <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
+                {uploadUri(st.avatarUrl)
+                  ? <Image source={{ uri: uploadUri(st.avatarUrl)! }} style={s.avatarImg} contentFit="cover"/>
+                  : <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>}
+                <View style={{ flex:1, minWidth:0 }}>
+                  <Text style={ms.rowTitle} numberOfLines={1}>{st.user.name}</Text>
+                  <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
+                </View>
               </View>
-              <TouchableOpacity style={ms.smallAction} onPress={()=>setTimeOffEditor({
-                staffId: st.id,
-                name: st.user.name,
-                startsAt: '',
-                endsAt: '',
-                reason: '',
-              })}>
-                <Text style={ms.smallActionText}>Time off</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={ms.smallAction} onPress={()=>openAvailabilityEditor(st)}>
-                <Text style={ms.smallActionText}>Hours</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={ms.smallAction} onPress={()=>openStaffServices(st)}>
-                <Text style={ms.smallActionText}>Services</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
+                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>setTimeOffEditor({
+                  staffId: st.id,
+                  name: st.user.name,
+                  startsAt: '',
+                  endsAt: '',
+                  reason: '',
+                })}>
+                  <Text style={ms.smallActionText}>Time off</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openAvailabilityEditor(st)}>
+                  <Text style={ms.smallActionText}>Hours</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openStaffServices(st)}>
+                  <Text style={ms.smallActionText}>Services</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
           {staff && staff.length===0 && <Text style={ms.empty}>No team members yet.</Text>}
@@ -1975,10 +2049,33 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               {(biz as any)?.verificationStatus === 'VERIFIED' && <VerifiedPill/>}
             </View>
           </View>
-          <View style={ms.card}>
-            <Text style={ms.cardLabel}>Plan</Text>
-            <Text style={ms.cardValue}>{(biz as any)?.plan ?? 'FREE'}</Text>
-          </View>
+          <Text style={[ms.cardLabel,{ marginTop:4, marginBottom:6, marginLeft:2 }]}>PLAN</Text>
+          {PLANS.map(p => {
+            const current = ((biz as any)?.plan ?? 'FREE') === p.id;
+            return (
+              <View key={p.id} style={[ms.card, current && { borderColor:BRAND, borderWidth:1.5 }]}>
+                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                  <View style={{ flexDirection:'row', alignItems:'baseline', gap:6 }}>
+                    <Text style={ms.cardValue}>{p.name}</Text>
+                    <Text style={ms.rowMeta}>{p.price}{p.period}</Text>
+                  </View>
+                  {current
+                    ? <View style={[s.pill,{ borderColor:BRAND+'33', backgroundColor:BRAND_LT }]}><Text style={[s.pillText,{ color:BRAND }]}>Current</Text></View>
+                    : <Text style={[ms.rowMeta,{ color:GRAY_400 }]}>Soon</Text>}
+                </View>
+                <View style={{ marginTop:8, gap:4 }}>
+                  {p.features.map(f => (
+                    <View key={f} style={{ flexDirection:'row', alignItems:'center', gap:6 }}>
+                      <Ionicons name="checkmark" size={14} color={current ? BRAND : GRAY_400}/>
+                      <Text style={ms.rowMeta}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+          <Text style={[ms.empty,{ marginTop:0, marginBottom:6 }]}>Every business is on Pro during testing. Paid plan changes will be enabled here soon.</Text>
+
           <View style={ms.card}>
             <Text style={ms.cardLabel}>Cancellation window</Text>
             <Text style={ms.cardValue}>{(biz as any)?.cancellationWindowHours ?? 24} hours</Text>
@@ -2093,8 +2190,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </TouchableOpacity>
                 </View>
               </View>
-              <TouchableOpacity disabled={acctBusy} onPress={confirmDelete} style={{ paddingVertical:12, alignItems:'center' }}>
-                <Text style={{ fontSize:13, color:'#DC2626', fontWeight:'600' }}>Delete business permanently</Text>
+              {/* Kept intentionally quiet — a muted text link, not an advertised
+                  red button. The confirm dialog spells out that it's permanent. */}
+              <TouchableOpacity disabled={acctBusy} onPress={confirmDelete} style={{ paddingVertical:16, alignItems:'center' }}>
+                <Text style={{ fontSize:12, color:GRAY_400, fontWeight:'400' }}>Delete business</Text>
               </TouchableOpacity>
             </>
           )}
@@ -2124,13 +2223,24 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <TextInput style={s.input} value={settingsEditor.maxAdvanceDays} keyboardType="number-pad" onChangeText={maxAdvanceDays=>setSettingsEditor({...settingsEditor,maxAdvanceDays})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Cancellation window hours</Text>
               <TextInput style={s.input} value={settingsEditor.cancellationWindowHours} keyboardType="number-pad" onChangeText={cancellationWindowHours=>setSettingsEditor({...settingsEditor,cancellationWindowHours})}/>
-              <View style={[ms.card,{ marginTop:14, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
-                <Text style={ms.rowTitle}>Require deposit</Text>
-                <Switch value={settingsEditor.requireDeposit} onValueChange={requireDeposit=>setSettingsEditor({...settingsEditor,requireDeposit})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
+              <Text style={s.fieldHint}>Clients can cancel for free until this many hours before the appointment.</Text>
+
+              <Text style={[s.fieldLabel,{ marginTop:14 }]}>Require deposit</Text>
+              <View style={{ flexDirection:'row', gap:8 }}>
+                {([['No', false],['Yes', true]] as const).map(([label, val]) => {
+                  const on = settingsEditor.requireDeposit === val;
+                  return (
+                    <TouchableOpacity key={label} onPress={()=>setSettingsEditor({...settingsEditor, requireDeposit: val})}
+                      style={[s.slotBtn, on && s.slotBtnActive, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8 }]}>
+                      <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={18} color={on ? BRAND : GRAY_400}/>
+                      <Text style={[s.slotText, on && s.slotTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               {settingsEditor.requireDeposit && (
                 <>
-                  <Text style={s.fieldLabel}>Deposit percent</Text>
+                  <Text style={[s.fieldLabel,{ marginTop:12 }]}>Deposit percent</Text>
                   <TextInput style={s.input} value={settingsEditor.depositPercent} keyboardType="number-pad" onChangeText={depositPercent=>setSettingsEditor({...settingsEditor,depositPercent})}/>
                 </>
               )}

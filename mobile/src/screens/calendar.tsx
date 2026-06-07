@@ -17,6 +17,11 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
+const STATUS_LABEL: Record<string,string> = {
+  ALL:'All', PENDING:'Pending', CONFIRMED:'Confirmed',
+  COMPLETED:'Completed', CANCELLED:'Cancelled', NO_SHOW:'No-show',
+};
+
 function CalendarScreen() {
   const { user } = getAuth();
   const nav = useNavigation<any>();
@@ -249,7 +254,7 @@ function CalendarScreen() {
         {(['ALL','PENDING','CONFIRMED','COMPLETED','CANCELLED','NO_SHOW'] as const).map(status => (
           <TouchableOpacity key={status} onPress={()=>setStatusFilter(status)}
             style={[cal.filterChip, statusFilter===status && cal.filterChipOn]}>
-            <Text style={[cal.filterText, statusFilter===status && cal.filterTextOn]}>{status.replace('_',' ')}</Text>
+            <Text style={[cal.filterText, statusFilter===status && cal.filterTextOn]}>{STATUS_LABEL[status] ?? status}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
