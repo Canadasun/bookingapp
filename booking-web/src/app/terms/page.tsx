@@ -31,8 +31,8 @@ export default function TermsPage() {
                 <Database className="w-5 h-5 text-violet-500" /> 1. Data Ownership & Privacy
               </h2>
               <div className="space-y-3">
-                <p><strong>Business Data:</strong> All client records, appointment history, and business-specific data are owned exclusively by the Business Owner (the "Subscriber"). Pulse does not claim any ownership rights to your data.</p>
-                <p><strong>Compliance:</strong> For users in Alberta, Canada, Pulse serves as an "Information Manager" under the <em>Health Information Act</em> (HIA) and a "Processor" under the <em>Personal Information Protection Act</em> (PIPA). Businesses are responsible for their own Privacy Impact Assessments (PIA) as required by the OIPC.</p>
+                <p><strong>Business Data:</strong> All client records, appointment history, and business-specific data are owned exclusively by the Business Owner (the &quot;Subscriber&quot;). Pulse does not claim any ownership rights to your data.</p>
+                <p><strong>Compliance:</strong> For users in Alberta, Canada, Pulse serves as an &quot;Information Manager&quot; under the <em>Health Information Act</em> (HIA) and a &quot;Processor&quot; under the <em>Personal Information Protection Act</em> (PIPA). Businesses are responsible for their own Privacy Impact Assessments (PIA) as required by the OIPC.</p>
                 <p><strong>Portability:</strong> You may export your data at any time. We do not hold your data hostage or charge exit fees for your records.</p>
               </div>
             </section>
@@ -42,9 +42,9 @@ export default function TermsPage() {
                 <CreditCard className="w-5 h-5 text-violet-500" /> 2. Payments & Fee Transparency
               </h2>
               <div className="space-y-3">
-                <p><strong>Provider Fees:</strong> Pulse charges a monthly or per-feature subscription fee. This fee is separate from any payment processing fees charged by Square, Stripe, or other third-party processors.</p>
+                <p><strong>Provider Fees:</strong> Pulse charges a monthly or per-feature subscription fee. This fee is separate from Stripe payment-processing fees.</p>
                 <p><strong>Processing Fees:</strong> Transaction fees are determined by the payment processor. Pulse does not control these fees and they are deducted directly by the processor during the transaction.</p>
-                <p><strong>Security:</strong> Pulse is PCI DSS compliant by design. We never store raw credit card numbers or CVVs on our servers. All sensitive payment data is tokenized by Square or Stripe.</p>
+                <p><strong>Security:</strong> Pulse is PCI DSS compliant by design. We never store raw credit card numbers or CVVs on our servers. All sensitive payment data is tokenized by Stripe.</p>
               </div>
             </section>
 
@@ -70,7 +70,7 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-lg font-bold text-slate-900 mb-4">5. Account Suspension</h2>
-              <p>Pulse reserves the right to suspend or terminate any account that violates Square's Developer Terms, engages in fraudulent activity, harasses clients, or fails to comply with local privacy regulations.</p>
+              <p>Pulse reserves the right to suspend or terminate any account that violates Stripe&apos;s Services Agreement, engages in fraudulent activity, harasses clients, or fails to comply with local privacy regulations.</p>
             </section>
 
             <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">

@@ -16,18 +16,18 @@ import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, ref
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
-
-const SQUARE_SANDBOX_DEMO = process.env.EXPO_PUBLIC_SQUARE_SANDBOX_DEMO === 'true';
-const SQUARE_SANDBOX_SOURCE_ID = 'cnon:card-nonce-ok';
+import { useStripe } from '@stripe/stripe-react-native';
 
 function CheckoutScreen() {
-  type Phase = 'amount'|'tap'|'done';
+  type Phase = 'amount'|'done';
   const [phase, setPhase]     = useState<Phase>('amount');
   const [digits, setDigits]   = useState('');   // raw cents, e.g. "1234" = $12.34
   const [note, setNote]       = useState('');
   const [tipPct, setTipPct]   = useState(0);     // 0/15/18/20% of the entered amount
   const [loading, setLoading] = useState(false);
   const [receipt, setReceipt] = useState<{ amountCents:number; ref:string; at:Date }|null>(null);
+  const chargeKey = useRef<string|null>(null);
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const cents     = parseInt(digits || '0', 10);
   const tipCents  = Math.round(cents * tipPct / 100);
@@ -37,72 +37,50 @@ function CheckoutScreen() {
   // Hardware back steps the flow back instead of leaving the app.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (phase==='tap') { setPhase('amount'); return true; }
       if (phase==='done') { reset(); return true; }
       return false;
     });
     return () => sub.remove();
   }, [phase]);
 
-  function pressDigit(d:string){ setDigits(p => (p + d).replace(/^0+/, '').slice(0, 7)); } // up to $99,999.99
-  function back(){ setDigits(p => p.slice(0, -1)); }
+  function pressDigit(d:string){ chargeKey.current = null; setDigits(p => (p + d).replace(/^0+/, '').slice(0, 7)); } // up to $99,999.99
+  function back(){ chargeKey.current = null; setDigits(p => p.slice(0, -1)); }
 
-  function charge() {
+  async function charge() {
     if (cents < 50) { Alert.alert('Amount too low', 'Enter at least $0.50.'); return; }
-    if (!SQUARE_SANDBOX_DEMO) {
-      Alert.alert(
-        'Mobile card reader not configured',
-        'This build does not include Square Mobile Payments SDK. Use the secure web checkout until a native EAS build with Square seller linking and Tap to Pay entitlement is installed.',
-        [
-          { text:'Cancel', style:'cancel' },
-          { text:'Open web checkout', onPress:()=>Linking.openURL(`${WEB_URL}/dashboard/checkout`) },
-        ],
-      );
-      return;
-    }
-    setPhase('tap');
-  }
-
-  // Development-only end-to-end sandbox check. Production must receive a real
-  // one-time token from Square's native SDK and must never send a test nonce.
-  async function completeTap() {
+    chargeKey.current ??= `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setLoading(true);
     try {
-      const r = await api<{ squarePaymentId:string; amountCents:number; status:string }>(`/payments/charge`, {
+      const payment = await api<{ paymentIntentId:string; clientSecret:string; amountCents:number; publishableKey:string }>(`/payments/charge`, {
         method:'POST',
-        body: JSON.stringify({ amountCents: totalCents, sourceId: SQUARE_SANDBOX_SOURCE_ID, tipCents: tipCents || undefined, description: note.trim() || undefined }),
+        body: JSON.stringify({
+          amountCents: totalCents,
+          tipCents: tipCents || undefined,
+          description: note.trim() || undefined,
+          idempotencyKey: chargeKey.current,
+        }),
       });
-      setReceipt({ amountCents: r.amountCents, ref: r.squarePaymentId, at: new Date() });
+      if (!payment.clientSecret) throw new Error('Stripe did not return a payment session.');
+      const initialized = await initPaymentSheet({
+        merchantDisplayName: 'Pulse',
+        paymentIntentClientSecret: payment.clientSecret,
+        returnURL: 'mobile://stripe-redirect',
+        allowsDelayedPaymentMethods: false,
+      });
+      if (initialized.error) throw new Error(initialized.error.message);
+      const presented = await presentPaymentSheet();
+      if (presented.error) {
+        if (presented.error.code === 'Canceled') { chargeKey.current = null; return; }
+        throw new Error(presented.error.message);
+      }
+      setReceipt({ amountCents: payment.amountCents, ref: payment.paymentIntentId, at: new Date() });
+      chargeKey.current = null;
       setPhase('done');
     } catch(e){ Alert.alert('Checkout failed', e instanceof Error ? e.message : 'Please try again'); }
     finally { setLoading(false); }
   }
 
-  function reset(){ setPhase('amount'); setDigits(''); setNote(''); setTipPct(0); setReceipt(null); }
-
-  // ── Tap to Pay on iPhone (full-screen prompt) ──
-  if (phase === 'tap') {
-    return (
-      <SafeAreaView style={[s.screen, { backgroundColor:'#111827' }]}>
-        <View style={co.tapWrap}>
-          <Text style={co.tapAmount}>${(totalCents/100).toFixed(2)}</Text>
-          <View style={co.tapNfc}>
-            <Ionicons name="wifi" size={44} color="#fff" style={{ transform:[{ rotate:'90deg' }] }}/>
-          </View>
-          <Text style={co.tapTitle}>Square sandbox payment</Text>
-          <Text style={co.tapSub}>Development mode uses Square&apos;s test nonce. No physical card is read or charged.</Text>
-          <ActivityIndicator color="#fff" style={{ marginTop:24 }}/>
-
-          <TouchableOpacity style={co.tapDone} onPress={completeTap} disabled={loading} activeOpacity={0.85}>
-            <Text style={co.tapDoneText}>{loading ? 'Charging…' : 'Run sandbox payment'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ marginTop:16 }} onPress={()=>setPhase('amount')}>
-            <Text style={co.tapCancel}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  function reset(){ setPhase('amount'); setDigits(''); setNote(''); setTipPct(0); setReceipt(null); chargeKey.current = null; }
 
   // ── Receipt ──
   if (phase === 'done' && receipt) {
@@ -115,7 +93,7 @@ function CheckoutScreen() {
 
           <View style={co.receiptCard}>
             {[
-              { l:'Method', v:SQUARE_SANDBOX_DEMO ? 'Square sandbox' : 'Card' },
+              { l:'Method', v:'Stripe card payment' },
               { l:'Date',   v: receipt.at.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) },
               { l:'Time',   v: fmtTime(receipt.at) },
               { l:'Reference', v: receipt.ref.slice(-10).toUpperCase() },
@@ -150,7 +128,7 @@ function CheckoutScreen() {
         {keys.map(k => {
           if (k==='note') return (
             <TouchableOpacity key={k} style={co.key} onPress={()=>{
-              Alert.prompt?.('Add a note', 'What is this charge for?', (t)=>setNote((t||'').slice(0,80)), 'plain-text', note);
+              Alert.prompt?.('Add a note', 'What is this charge for?', (t)=>{ chargeKey.current = null; setNote((t||'').slice(0,80)); }, 'plain-text', note);
             }}>
               <Ionicons name="create-outline" size={22} color={GRAY_500}/>
             </TouchableOpacity>
@@ -173,7 +151,7 @@ function CheckoutScreen() {
         <View style={co.tipRow}>
           <Text style={co.tipLabel}>Tip</Text>
           {[0,15,18,20].map(p => (
-            <TouchableOpacity key={p} onPress={()=>setTipPct(p)}
+            <TouchableOpacity key={p} onPress={()=>{ chargeKey.current = null; setTipPct(p); }}
               style={[co.tipChip, tipPct===p && co.tipChipOn]}>
               <Text style={[co.tipChipText, tipPct===p && { color:'#fff' }]}>{p===0?'None':`${p}%`}</Text>
             </TouchableOpacity>

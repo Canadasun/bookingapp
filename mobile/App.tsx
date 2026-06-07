@@ -33,6 +33,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { StripeProvider } from '@stripe/stripe-react-native';
 
 // ── Tab navigator ────────────────────────────────────────────────────────────
 const Tab = createBottomTabNavigator();
@@ -138,7 +139,7 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
   );
 }
 
-export default function App() {
+function AppContent() {
   const [token, setToken]             = useState<string|null>(null);
   const [user, setUser]               = useState<User|null>(null);
   const [msgClient, setMsgClient]     = useState<Client|null>(null);
@@ -210,5 +211,16 @@ export default function App() {
       </NavigationContainer>
     </SafeAreaProvider>
     </ErrorBoundary>
+  );
+}
+
+export default function App() {
+  return (
+    <StripeProvider
+      publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''}
+      urlScheme="mobile"
+    >
+      <AppContent />
+    </StripeProvider>
   );
 }

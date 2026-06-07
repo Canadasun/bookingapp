@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { SubscribeCardModal } from "@/components/SubscribeCardModal";
 import { cn } from "@/lib/utils";
 
 const TIMEZONES = [
@@ -195,7 +194,6 @@ export default function SettingsPage() {
   }));
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
-  const [subscribePlan, setSubscribePlan] = useState<"BASIC" | "PRO" | null>(null);
   const [referralInput, setReferralInput] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
   const [refCopied, setRefCopied] = useState(false);
@@ -257,24 +255,6 @@ export default function SettingsPage() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect"); }
   }
 
-  // Square payments connection (per-merchant). Required to take client payments.
-  const [sq, setSq] = useState<{ configured: boolean; connected: boolean; merchantName: string | null } | null>(null);
-  function loadSq() { api.square.status().then(setSq).catch(() => {}); }
-  useEffect(() => { loadSq(); }, []);
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("square");
-    if (p === "connected") { toast.success("Square account connected"); loadSq(); window.history.replaceState({}, "", "/dashboard/settings"); }
-    else if (p === "error") { toast.error("Could not connect Square"); window.history.replaceState({}, "", "/dashboard/settings"); }
-  }, []);
-  async function connectSquare() {
-    try { const { url } = await api.square.connect(); window.location.assign(url); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Square connect"); }
-  }
-  async function disconnectSquare() {
-    try { await api.square.disconnect(); toast.success("Square disconnected"); loadSq(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect Square"); }
-  }
-
   // Toast the result of a returning Stripe Checkout, then reload the plan.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("billing");
@@ -288,20 +268,28 @@ export default function SettingsPage() {
     if (tab && SECTIONS.some((s) => s.id === tab)) setSection(tab as Section);
   }, []);
 
-  // Open the Square card modal to subscribe to / switch a plan.
-  function upgrade(plan: "BASIC" | "PRO") {
-    setSubscribePlan(plan);
+  async function upgrade(plan: "BASIC" | "PRO") {
+    setBillingBusy(plan);
+    try {
+      const result = await api.subscriptions.checkout(plan, referralInput);
+      if (result.url) window.location.assign(result.url);
+      else {
+        toast.success(`Switched to ${plan}. Stripe applied the prorated difference.`);
+        if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
+        setBillingBusy(null);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not start Stripe Checkout");
+      setBillingBusy(null);
+    }
   }
 
   async function manageBilling() {
-    if (!window.confirm("Cancel your subscription? Your plan stays active until the end of the current billing period.")) return;
-    setBillingBusy("cancel");
+    setBillingBusy("portal");
     try {
-      await api.subscriptions.cancel();
-      toast.success("Subscription canceled");
-      if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
-      setBillingBusy(null);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not cancel"); setBillingBusy(null); }
+      const { url } = await api.subscriptions.portal();
+      window.location.assign(url);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not open Stripe billing"); setBillingBusy(null); }
   }
 
   async function save(e: React.FormEvent) {
@@ -675,26 +663,9 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-0.5">Deposits and manual charges are Basic+. Automatic saved-card fees are Pro.</p>
                 </div>
 
-                {/* Square account connection — required to take any payment. */}
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Square account</p>
-                      <p className="text-xs text-gray-500 mt-1 max-w-md">
-                        {sq?.connected
-                          ? `Connected${sq.merchantName ? ` — ${sq.merchantName}` : ""}. Client payments settle to your Square account.`
-                          : "Connect your Square account to take deposits, no-show fees, and in-person payments. Money goes straight to you."}
-                      </p>
-                    </div>
-                    {sq?.connected ? (
-                      <Button type="button" variant="outline" size="sm" onClick={disconnectSquare} className="shrink-0">Disconnect</Button>
-                    ) : (
-                      <Button type="button" size="sm" onClick={connectSquare} disabled={sq ? !sq.configured : false} className="shrink-0">Connect Square</Button>
-                    )}
-                  </div>
-                  {sq && !sq.configured && (
-                    <p className="text-xs text-amber-600 mt-2">Square isn&apos;t configured on the server yet — contact support.</p>
-                  )}
+                  <p className="text-sm font-medium text-gray-900">Stripe payments</p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-md">Deposits, saved cards, fees, refunds, receipts, and subscription billing are processed securely by Stripe. Card details never pass through Pulse servers.</p>
                 </div>
 
                 <hr className="border-gray-100" />
@@ -1173,12 +1144,12 @@ export default function SettingsPage() {
                 {(biz?.plan ?? "FREE") !== "FREE" && (
                   <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Cancel subscription</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Your plan stays active until the end of the current billing period.</p>
+                      <p className="text-sm font-medium text-gray-700">Stripe billing portal</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, switch billing details, or cancel your plan.</p>
                     </div>
                     <button type="button" onClick={manageBilling} disabled={billingBusy !== null}
                       className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-60 transition-colors shrink-0">
-                      {billingBusy === "cancel" ? "Canceling…" : "Cancel plan"}
+                      {billingBusy === "portal" ? "Opening…" : "Manage billing"}
                     </button>
                   </div>
                 )}
@@ -1201,17 +1172,6 @@ export default function SettingsPage() {
 
       </div>
 
-      {subscribePlan && (
-        <SubscribeCardModal
-          plan={subscribePlan}
-          referralCode={referralInput}
-          onClose={() => setSubscribePlan(null)}
-          onDone={() => {
-            setSubscribePlan(null);
-            if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
-          }}
-        />
-      )}
     </div>
   );
 }
