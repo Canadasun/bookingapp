@@ -9,10 +9,12 @@ COPY . .
 #  - API_INTERNAL_URL is baked into the /proxy rewrite destination (Next.js
 #    evaluates next.config rewrites at build time), so without it the proxy
 #    would point at localhost. Railway passes matching service vars as args.
+# Default to the Railway auto-domain so builds succeed even when Railway doesn't
+# pass the ARG (e.g. if the service variable hasn't been set yet).
 ARG NEXT_PUBLIC_BUSINESS_SLUG
 ARG NEXT_PUBLIC_BUSINESS_ID
-ARG API_INTERNAL_URL
-ARG NEXT_PUBLIC_API_URL
+ARG API_INTERNAL_URL=https://bookingapp-production-32f8.up.railway.app
+ARG NEXT_PUBLIC_API_URL=https://bookingapp-production-32f8.up.railway.app
 ENV NEXT_PUBLIC_BUSINESS_SLUG=$NEXT_PUBLIC_BUSINESS_SLUG
 ENV NEXT_PUBLIC_BUSINESS_ID=$NEXT_PUBLIC_BUSINESS_ID
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
