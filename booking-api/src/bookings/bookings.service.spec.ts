@@ -6,7 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
 import { AvailabilityService } from '../availability/availability.service';
-import { GoogleCalendarService } from '../calendar-sync/google-calendar.service';
+import { CalendarSyncService } from '../calendar-sync/calendar-sync.service';
 
 // 7 days out: within the default 60-day max-advance and past the 120-min notice
 // window, so public-booking policy checks pass.
@@ -130,7 +130,7 @@ async function buildService(prismaOverrides = {}, conflictExists = false) {
       { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
       { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
       { provide: AvailabilityService, useValue: mockAvailability() },
-      { provide: GoogleCalendarService, useValue: { syncAppointment: jest.fn(), removeAppointment: jest.fn() } },
+      { provide: CalendarSyncService, useValue: { syncWithRetry: jest.fn().mockResolvedValue(true), removeWithRetry: jest.fn().mockResolvedValue(true) } },
       { provide: PrismaService, useValue: prisma },
       {
         provide: NotificationsService,
@@ -254,7 +254,7 @@ describe('BookingsService', () => {
           { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: AvailabilityService, useValue: mockAvailability() },
-          { provide: GoogleCalendarService, useValue: { syncAppointment: jest.fn(), removeAppointment: jest.fn() } },
+          { provide: CalendarSyncService, useValue: { syncWithRetry: jest.fn().mockResolvedValue(true), removeWithRetry: jest.fn().mockResolvedValue(true) } },
           { provide: PrismaService, useValue: prisma },
           {
             provide: NotificationsService,
@@ -303,7 +303,7 @@ describe('BookingsService', () => {
           { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: AvailabilityService, useValue: mockAvailability() },
-          { provide: GoogleCalendarService, useValue: { syncAppointment: jest.fn(), removeAppointment: jest.fn() } },
+          { provide: CalendarSyncService, useValue: { syncWithRetry: jest.fn().mockResolvedValue(true), removeWithRetry: jest.fn().mockResolvedValue(true) } },
           { provide: PrismaService, useValue: mockPrisma() },
           {
             provide: NotificationsService,
@@ -443,7 +443,7 @@ describe('BookingsService', () => {
           { provide: EventsGateway, useValue: { emitBookingUpdate: jest.fn() } },
           { provide: PaymentsService, useValue: { chargeCancellationFee: jest.fn().mockResolvedValue({ charged: false, feeCents: 0 }) } },
           { provide: AvailabilityService, useValue: mockAvailability() },
-          { provide: GoogleCalendarService, useValue: { syncAppointment: jest.fn(), removeAppointment: jest.fn() } },
+          { provide: CalendarSyncService, useValue: { syncWithRetry: jest.fn().mockResolvedValue(true), removeWithRetry: jest.fn().mockResolvedValue(true) } },
           { provide: PrismaService, useValue: mockPrisma() },
           {
             provide: NotificationsService,

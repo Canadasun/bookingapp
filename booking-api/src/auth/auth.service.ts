@@ -174,13 +174,13 @@ export class AuthService {
   // changes the hash changes, so the signature no longer verifies. The userId is
   // carried in the (readable) payload so we can look up the hash to verify.
   private resetSecret(passwordHash: string): string {
-    return `${process.env.JWT_SECRET ?? ''}${passwordHash}`;
+    return `${process.env.JWT_SECRET!}${passwordHash}`;
   }
 
   // Trusted-device ("remember this device") token for 2FA. Bound to the user's
   // current passwordHash so changing the password revokes every trusted device.
   private trustedDeviceSecret(passwordHash: string): string {
-    return `td:${process.env.JWT_SECRET ?? ''}${passwordHash}`;
+    return `td:${process.env.JWT_SECRET!}${passwordHash}`;
   }
   private mintTrustedDeviceToken(user: User): string {
     return this.jwt.sign({ sub: user.id, kind: 'td' }, { secret: this.trustedDeviceSecret(user.passwordHash), expiresIn: '30d' });
@@ -199,7 +199,7 @@ export class AuthService {
     if (user) {
       const token = this.jwt.sign(
         { sub: user.id, kind: 'reset' },
-        { secret: this.resetSecret(user.passwordHash), expiresIn: '30m' },
+        { secret: this.resetSecret(user.passwordHash), expiresIn: '15m' },
       );
       await this.notifications.sendPasswordReset(user.id, token);
     }
@@ -229,9 +229,17 @@ export class AuthService {
     return { ok: true };
   }
 
+  // Dummy hash used when an email doesn't exist — ensures the no-account and
+  // wrong-password code paths take the same time, preventing email enumeration
+  // by comparing response latency.
+  private static readonly DUMMY_HASH = '$2a$12$AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
   async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string }) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) {
+      await bcrypt.compare(dto.password, AuthService.DUMMY_HASH);
+      throw new UnauthorizedException('Invalid credentials');
+    }
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
@@ -399,7 +407,7 @@ export class AuthService {
       if (total > 0 && !priorSameDevice) {
         const resetToken = this.jwt.sign(
           { sub: user.id, kind: 'reset' },
-          { secret: this.resetSecret(user.passwordHash), expiresIn: '30m' },
+          { secret: this.resetSecret(user.passwordHash), expiresIn: '15m' },
         );
         await this.notifications.sendSecurityAlert(user.id, { ip: ctx?.ip, userAgent: ua, resetToken });
       }

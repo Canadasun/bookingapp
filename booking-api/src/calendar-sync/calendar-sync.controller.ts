@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException, Logger, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CalendarSyncService } from './calendar-sync.service';
@@ -93,9 +93,7 @@ export class CalendarSyncController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   async sync(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    await this.calendarSyncService.syncAppointment(id, user);
-    await this.google.syncAppointment(id);
-    return { success: true };
+    return this.calendarSyncService.syncAppointment(id, user);
   }
 
   // Owner — download/subscribe to an iCal feed of all their appointments.

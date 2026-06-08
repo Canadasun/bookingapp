@@ -10,7 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
 import { AvailabilityService } from '../availability/availability.service';
-import { GoogleCalendarService } from '../calendar-sync/google-calendar.service';
+import { CalendarSyncService } from '../calendar-sync/calendar-sync.service';
 import { CreateAppointmentDto, CreateRecurringDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
@@ -28,7 +28,7 @@ export class BookingsService {
     private payments: PaymentsService,
     private events: EventsGateway,
     private availability: AvailabilityService,
-    private googleCalendar: GoogleCalendarService,
+    private calendarSync: CalendarSyncService,
   ) {}
 
   async findAll(
@@ -315,14 +315,14 @@ export class BookingsService {
       // Owner/staff booking: confirm immediately, send the real confirmation to
       // the client and schedule reminders. No pending notice, no owner alert.
       await this.notifications.scheduleReminders(appointment);
-      void this.googleCalendar.syncAppointment(appointment.id); // best-effort, fire-and-forget
+      void this.calendarSync.syncWithRetry(appointment.id); // best-effort, fire-and-forget
     } else {
       // Public self-service: notify client it's PENDING approval; alert owner to act.
       await Promise.allSettled([
         this.notifications.sendPendingNotification(appointment),
         this.notifications.sendAdminBookingAlert(appointment.id),
       ]);
-      void this.googleCalendar.syncAppointment(appointment.id); // keep connected calendars blocked even while pending
+      void this.calendarSync.syncWithRetry(appointment.id); // keep connected calendars blocked even while pending
     }
 
     // Manage token so the confirmation screen can link straight to the manage page.
@@ -397,7 +397,7 @@ export class BookingsService {
     });
 
     await this.notifications.scheduleReminders(updated);
-    void this.googleCalendar.syncAppointment(updated.id); // push to Google Calendar
+    void this.calendarSync.syncWithRetry(updated.id); // push to Google Calendar
     return updated;
   }
 
@@ -512,7 +512,7 @@ export class BookingsService {
     // (owner reschedule). Client reschedules drop to PENDING and get reminders
     // when the owner re-confirms, so we don't double-schedule here.
     if (updated.status === 'CONFIRMED') await this.notifications.scheduleReminders(updated);
-    void this.googleCalendar.syncAppointment(id); // update the Google event time
+    void this.calendarSync.syncWithRetry(id); // update the Google event time
     await this.logAction('APPOINTMENT', id, 'RESCHEDULE', {
       fromStartsAt: existing.startsAt,
       toStartsAt: startsAt,
@@ -571,7 +571,7 @@ export class BookingsService {
 
     if (dto.status === 'CANCELLED') {
       await this.notifications.cancelReminders(id);
-      void this.googleCalendar.removeAppointment(id); // remove the Google event
+      void this.calendarSync.removeWithRetry(id); // remove the Google event
 
       // Late-cancellation fee. PAID plans only; client-initiated cancels only
       // (byStaff=false — an owner/staff cancel never charges the client). It's a

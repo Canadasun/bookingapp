@@ -6,6 +6,13 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  // Fail fast if any secret env var is missing — prevents silent fallback to empty
+  // strings (which would allow token forgery in misconfigured deploys).
+  const required = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
+  for (const key of required) {
+    if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
+  }
+
   // rawBody: true preserves the unparsed request body on req.rawBody, which the
   // Stripe webhook needs for signature verification (stripe.webhooks.constructEvent).
   // Without it req.rawBody is undefined and every webhook fails the signature check.
