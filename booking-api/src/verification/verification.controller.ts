@@ -2,6 +2,7 @@ import { Controller, Get, Post, Param, Body, UseGuards, ForbiddenException, BadR
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { VerificationService } from './verification.service';
+import { BusinessesService } from '../businesses/businesses.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -98,10 +99,20 @@ export class AdminVerificationController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminOverviewController {
-  constructor(private svc: VerificationService) {}
+  constructor(private svc: VerificationService, private biz: BusinessesService) {}
 
   @Get('overview')
   overview() {
     return this.svc.adminOverview();
+  }
+
+  @Post('businesses/:id/suspend')
+  suspend(@Param('id') id: string) {
+    return this.biz.deactivate(id);
+  }
+
+  @Post('businesses/:id/unsuspend')
+  unsuspend(@Param('id') id: string) {
+    return this.biz.reactivate(id);
   }
 }

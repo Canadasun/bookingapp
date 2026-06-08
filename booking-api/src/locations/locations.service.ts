@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -12,7 +12,22 @@ export class LocationsService {
     });
   }
 
-  create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string }) {
+  async create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string }) {
+    const business = await this.prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { plan: true },
+    });
+
+    const existing = await this.prisma.location.count({ where: { businessId, active: true } });
+
+    // FREE: no extra locations. BASIC: up to 1 location. PRO: unlimited.
+    if (business.plan === 'FREE') {
+      throw new ForbiddenException('Managing multiple locations requires a Basic or Pro plan.');
+    }
+    if (business.plan === 'BASIC' && existing >= 1) {
+      throw new ForbiddenException('Pro plan required to manage more than one location.');
+    }
+
     return this.prisma.location.create({
       data: {
         businessId,

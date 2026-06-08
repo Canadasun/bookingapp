@@ -84,6 +84,8 @@ export interface Business {
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
   locations?: { id: string; name: string; address?: string | null }[];
+  suspectedDuplicateOfId?: string | null;
+  stripeConnectOnboarded?: boolean;
   createdAt: string; updatedAt: string;
 }
 
@@ -91,10 +93,13 @@ export interface IntakeQuestion { id: string; label: string; required?: boolean 
 export interface IntakeAnswer { label: string; answer: string }
 export interface NotificationSettings {
   emailConfirmation?: boolean;
+  emailReminder72h?: boolean;
   emailReminder24h?: boolean;
+  emailFollowUp?: boolean;
   emailCancellation?: boolean;
   emailReschedule?: boolean;
   emailStaffCancellation?: boolean;
+  smsConfirmation?: boolean;
   smsReminder2h?: boolean;
 }
 
@@ -432,10 +437,14 @@ export const api = {
     connect: () => req<{ url: string }>("/calendar-sync/google/connect"),
     status: () => req<{ connected: boolean; email: string | null; since: string | null; configured: boolean }>("/calendar-sync/google/status"),
     disconnect: () => req<{ ok: boolean }>("/calendar-sync/google/disconnect", { method: "POST" }),
+    // iCal feed URL — returns the full URL to download/subscribe to the appointment feed.
+    icalFeedUrl: () => `/proxy/calendar-sync/ical/feed`,
   },
   // Platform admin (Role.ADMIN) — review the business-verification queue.
   admin: {
     overview: () => req<AdminOverview>("/admin/overview"),
+    suspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/suspend`, { method: "POST" }),
+    unsuspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/unsuspend`, { method: "POST" }),
   },
   adminVerifications: {
     list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationGovernmentIdUrl: string | null; verificationLegalName: string | null; verificationAddress: string | null; verificationPhone: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
@@ -459,6 +468,21 @@ export const api = {
       req<{ refundedCents: number; status: PaymentStatus }>(`/payments/${paymentId}/refund`, {
         method: "POST",
         body: JSON.stringify({ ...(amountCents ? { amountCents } : {}), ...(reason ? { reason } : {}) }),
+      }),
+  },
+
+  connect: {
+    // Start or resume Stripe Connect Express onboarding.
+    onboard: () => req<{ url: string; accountId: string }>("/payments/connect/onboard", { method: "POST" }),
+    // Get Connect account status + balance.
+    status: () => req<{ onboarded: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] }>("/payments/connect/status"),
+    // Open the Stripe Express dashboard.
+    dashboard: () => req<{ url: string }>("/payments/connect/dashboard", { method: "POST" }),
+    // Trigger a manual or instant payout.
+    payout: (amountCents: number, instant = false, currency?: string) =>
+      req<{ payoutId: string; status: string; amountCents: number; currency: string }>("/payments/connect/payout", {
+        method: "POST",
+        body: JSON.stringify({ amountCents, instant, ...(currency ? { currency } : {}) }),
       }),
   },
 

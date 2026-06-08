@@ -18,10 +18,13 @@ export interface AppointmentWithRelations {
 
 type NotificationKey =
   | 'emailConfirmation'
+  | 'emailReminder72h'
   | 'emailReminder24h'
+  | 'emailFollowUp'
   | 'emailCancellation'
   | 'emailReschedule'
   | 'emailStaffCancellation'
+  | 'smsConfirmation'
   | 'smsReminder2h';
 
 @Injectable()
@@ -90,9 +93,19 @@ export class NotificationsService implements OnModuleInit {
       .findUnique({ where: { id: apt.id }, select: { business: { select: { plan: true, notificationSettings: true } } } })
       .then((row) => row?.business);
     const now = Date.now();
+    const delay72h = apt.startsAt.getTime() - now - 72 * 60 * 60 * 1000;
     const delay24h = apt.startsAt.getTime() - now - 24 * 60 * 60 * 1000;
-    const delay2h = apt.startsAt.getTime() - now - 2 * 60 * 60 * 1000;
+    const delay2h  = apt.startsAt.getTime() - now -  2 * 60 * 60 * 1000;
+    // 24h after the appointment ends
+    const delayFollowUp = apt.endsAt.getTime() - now + 24 * 60 * 60 * 1000;
 
+    if (delay72h > 0 && isProPlan(business?.plan) && this.enabled(business?.notificationSettings, 'emailReminder72h')) {
+      await this.queue.add(
+        'reminder-72h',
+        { appointmentId: apt.id, expectedStartsAt: apt.startsAt.toISOString() },
+        { delay: delay72h, jobId: `reminder-72h-${apt.id}`, removeOnComplete: true },
+      );
+    }
     if (delay24h > 0 && isPaidPlan(business?.plan) && this.enabled(business?.notificationSettings, 'emailReminder24h')) {
       await this.queue.add(
         'reminder-24h',
@@ -105,6 +118,13 @@ export class NotificationsService implements OnModuleInit {
         'reminder-2h',
         { appointmentId: apt.id, expectedStartsAt: apt.startsAt.toISOString() },
         { delay: delay2h, jobId: `reminder-2h-${apt.id}`, removeOnComplete: true },
+      );
+    }
+    if (delayFollowUp > 0 && isPaidPlan(business?.plan) && this.enabled(business?.notificationSettings, 'emailFollowUp')) {
+      await this.queue.add(
+        'follow-up-post-apt',
+        { appointmentId: apt.id },
+        { delay: delayFollowUp, jobId: `follow-up-post-apt-${apt.id}`, removeOnComplete: true },
       );
     }
 
@@ -128,8 +148,10 @@ export class NotificationsService implements OnModuleInit {
 
   async cancelReminders(appointmentId: string) {
     const jobs = await Promise.allSettled([
+      this.queue.remove(`reminder-72h-${appointmentId}`),
       this.queue.remove(`reminder-24h-${appointmentId}`),
       this.queue.remove(`reminder-2h-${appointmentId}`),
+      this.queue.remove(`follow-up-post-apt-${appointmentId}`),
     ]);
     return jobs;
   }

@@ -9,7 +9,7 @@ import {
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type Business } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { cn } from "@/lib/utils";

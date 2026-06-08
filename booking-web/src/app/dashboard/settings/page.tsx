@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download } from "lucide-react";
 import { toast } from "sonner";
-import { api, Business, VerificationStatus, IntakeQuestion } from "@/lib/api";
+import { api, Business, VerificationStatus, IntakeQuestion, Location } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +20,15 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
-type Section = "profile" | "booking" | "calendar" | "payments" | "online" | "notifications" | "security" | "billing";
+type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "notifications" | "security" | "billing";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
+  { id: "locations",     label: "Locations",          icon: MapPin,      desc: "Manage multiple business locations" },
   { id: "booking",       label: "Booking policies",   icon: Clock,       desc: "Notice, cancellations, advance limits" },
   { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar" },
   { id: "payments",      label: "Payments & fees",    icon: DollarSign,  desc: "Deposits, no-show fees" },
+  { id: "payouts",       label: "Payouts",            icon: Banknote,    desc: "Connect bank account & withdraw" },
   { id: "online",        label: "Online booking",     icon: Globe,       desc: "Booking page link, availability" },
   { id: "notifications", label: "Notifications",      icon: Bell,        desc: "Emails & SMS sent to clients" },
   { id: "security",      label: "Security",           icon: ShieldCheck, desc: "Two-factor sign-in, password" },
@@ -197,6 +199,26 @@ export default function SettingsPage() {
   const [referralInput, setReferralInput] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
   const [refCopied, setRefCopied] = useState(false);
+
+  // Locations
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [locationForm, setLocationForm] = useState({ name: "", address: "", phone: "", timezone: "" });
+  const [locationBusy, setLocationBusy] = useState(false);
+  function loadLocations() {
+    if (!bizId) return;
+    api.locations.list(bizId).then(setLocations).catch(() => {});
+  }
+  useEffect(() => { loadLocations(); }, [bizId]);
+
+  // Stripe Connect / Payouts
+  type ConnectStatus = { onboarded: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] };
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const [connectBusy, setConnectBusy] = useState<string | null>(null);
+  const [payoutAmount, setPayoutAmount] = useState("");
+  function loadConnect() {
+    api.connect.status().then(setConnectStatus).catch(() => {});
+  }
+  useEffect(() => { loadConnect(); }, []);
 
   // Load this business's own referral code + count.
   useEffect(() => {
@@ -379,6 +401,19 @@ export default function SettingsPage() {
         <h2 className="text-xl font-bold text-gray-900">Settings</h2>
         <p className="text-sm text-gray-400 mt-0.5">Manage your business profile and booking preferences</p>
       </div>
+
+      {/* Duplicate account warning */}
+      {biz?.suspectedDuplicateOfId && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Possible duplicate account detected</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              A business with a similar name and phone number already exists on Pulse. If this is intentional (e.g. a second location), please contact Pulse Admin to review. Opening multiple accounts with the same details may result in rejection.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-5">
 
@@ -653,6 +688,26 @@ export default function SettingsPage() {
                     )}
                   </div>
                 )}
+
+                {/* iCal feed — works regardless of Google sync status */}
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <Download className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">iCal feed (fallback)</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Subscribe to your appointments in any calendar app — Apple Calendar, Outlook, or any webcal-compatible app. Works even without Google Calendar connected. Confirmation emails also include a .ics calendar invite.
+                      </p>
+                      <a
+                        href={api.calendarSync.icalFeedUrl()}
+                        download="pulse-appointments.ics"
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:underline"
+                      >
+                        <Download className="w-3 h-3" /> Download / subscribe to iCal feed
+                      </a>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -840,6 +895,217 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {section === "locations" && (
+              <div className="p-6 space-y-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Locations</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Manage multiple branches under one account. Staff and appointments are assigned per location.</p>
+                </div>
+                <hr className="border-gray-100" />
+
+                {plan === "FREE" ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-amber-900">Multi-location requires Basic or Pro</p>
+                    <p className="text-xs text-amber-700 mt-1">Upgrade to manage multiple branches, each with their own staff and calendar, under one Pulse account — without needing separate logins per location.</p>
+                    <button type="button" onClick={() => { setSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
+                  </div>
+                ) : (
+                  <>
+                    {plan === "BASIC" && (
+                      <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                        <p className="text-xs text-blue-700">Basic supports 1 extra location. Upgrade to Pro for unlimited locations.</p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {locations.length === 0 && <p className="text-xs text-gray-400">No extra locations yet.</p>}
+                      {locations.map((loc) => (
+                        <div key={loc.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{loc.name}</p>
+                            {loc.address && <p className="text-xs text-gray-400 truncate">{loc.address}</p>}
+                            {!loc.active && <span className="text-xs text-amber-600 font-medium">Inactive</span>}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button type="button"
+                              onClick={async () => { try { await api.locations.update(bizId, loc.id, { active: !loc.active }); loadLocations(); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } }}
+                              className="text-xs text-gray-500 border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50">
+                              {loc.active ? "Deactivate" : "Activate"}
+                            </button>
+                            <button type="button"
+                              onClick={async () => { if (!confirm(`Remove "${loc.name}"?`)) return; try { await api.locations.remove(bizId, loc.id); loadLocations(); toast.success("Location removed"); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } }}
+                              className="text-xs text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Add location</p>
+                      <Input placeholder="Location name (e.g. Downtown)" value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} />
+                      <Input placeholder="Address (optional)" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input placeholder="Phone (optional)" type="tel" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: e.target.value }))} />
+                        <select value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
+                          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
+                          <option value="">Same timezone as business</option>
+                          {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}
+                        </select>
+                      </div>
+                      <Button type="button" size="sm" loading={locationBusy}
+                        onClick={async () => {
+                          if (!locationForm.name.trim()) { toast.error("Location name is required"); return; }
+                          setLocationBusy(true);
+                          try {
+                            await api.locations.create(bizId, { name: locationForm.name, address: locationForm.address || undefined, phone: locationForm.phone || undefined, timezone: locationForm.timezone || undefined });
+                            setLocationForm({ name: "", address: "", phone: "", timezone: "" });
+                            loadLocations();
+                            toast.success("Location added");
+                          } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add location"); }
+                          finally { setLocationBusy(false); }
+                        }}
+                      >Add location</Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {section === "payouts" && (
+              <div className="p-6 space-y-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Payouts</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Connect your bank account and withdraw your earnings. Powered by Stripe Connect.</p>
+                </div>
+                <hr className="border-gray-100" />
+
+                {/* Pricing table */}
+                <div className="rounded-2xl border border-gray-100 overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-100">
+                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Transaction fee schedule</p>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Plan</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Monthly</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Card-present</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Card-not-present</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Online</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { id: "FREE",  name: "Free",    mo: "$0",    cp: "2.6% + $0.15", cnp: "3.5% + $0.15", online: "3.3% + $0.30" },
+                        { id: "BASIC", name: "Plus",    mo: "$49",   cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
+                        { id: "PRO",   name: "Premium", mo: "$149",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
+                      ].map((row) => (
+                        <tr key={row.id} className={cn("border-b border-gray-50 last:border-0", plan === row.id && "bg-violet-50")}>
+                          <td className="px-4 py-2.5 font-semibold text-gray-800">{row.name}{plan === row.id && <span className="ml-1.5 text-violet-600">(current)</span>}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{row.mo}/mo</td>
+                          <td className="px-4 py-2.5 text-gray-600">{row.cp}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{row.cnp}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{row.online}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Connect status + onboarding */}
+                {!connectStatus ? (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                ) : !connectStatus.onboarded ? (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 space-y-3">
+                    <p className="text-sm font-semibold text-violet-900">Connect your bank account</p>
+                    <p className="text-xs text-violet-700">Complete a quick Stripe onboarding to link your bank account. Once connected, you can transfer your earnings anytime — instantly or on a schedule.</p>
+                    <ul className="text-xs text-violet-700 space-y-1 ml-3 list-disc">
+                      <li><strong>Holding Funds:</strong> Client payments are securely routed to your Stripe balance.</li>
+                      <li><strong>Flexible Payouts:</strong> Withdraw to your bank whenever you choose via the Stripe Express dashboard.</li>
+                      <li><strong>Instant Payouts:</strong> Transfer to a debit card for immediate access (instant payout fee applies).</li>
+                    </ul>
+                    <button type="button" disabled={connectBusy !== null}
+                      onClick={async () => {
+                        setConnectBusy("onboard");
+                        try { const { url } = await api.connect.onboard(); window.location.assign(url); }
+                        catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Stripe onboarding"); setConnectBusy(null); }
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
+                      <ExternalLink className="w-4 h-4" />
+                      {connectBusy === "onboard" ? "Redirecting…" : "Set up payouts with Stripe"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-800">Bank account connected</p>
+                        <p className="text-xs text-emerald-700 mt-0.5">Your Stripe Express account is active and ready to receive payouts.</p>
+                      </div>
+                    </div>
+
+                    {/* Balance */}
+                    {connectStatus.available.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-gray-100 bg-white p-4">
+                          <p className="text-xs text-gray-400 mb-1">Available balance</p>
+                          {connectStatus.available.map((b) => (
+                            <p key={b.currency} className="text-xl font-bold text-gray-900">${(b.amount / 100).toFixed(2)} <span className="text-sm font-normal text-gray-400">{b.currency.toUpperCase()}</span></p>
+                          ))}
+                        </div>
+                        <div className="rounded-xl border border-gray-100 bg-white p-4">
+                          <p className="text-xs text-gray-400 mb-1">Pending</p>
+                          {connectStatus.pending.map((b) => (
+                            <p key={b.currency} className="text-xl font-bold text-gray-500">${(b.amount / 100).toFixed(2)} <span className="text-sm font-normal text-gray-400">{b.currency.toUpperCase()}</span></p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Manual payout */}
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Withdraw funds</p>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number" min="1" step="0.01" placeholder="Amount (e.g. 100.00)"
+                          value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button type="button" loading={connectBusy === "payout"}
+                          onClick={async () => {
+                            const cents = Math.round(parseFloat(payoutAmount) * 100);
+                            if (!cents || cents < 100) { toast.error("Minimum payout is $1.00"); return; }
+                            setConnectBusy("payout");
+                            try {
+                              await api.connect.payout(cents, false, biz?.currency?.toLowerCase());
+                              toast.success("Payout initiated — funds will arrive in 1–2 business days");
+                              setPayoutAmount(""); loadConnect();
+                            } catch (e) { toast.error(e instanceof Error ? e.message : "Payout failed"); }
+                            finally { setConnectBusy(null); }
+                          }}
+                        >Withdraw</Button>
+                      </div>
+                      <p className="text-xs text-gray-400">Standard payout: 1–2 business days. Instant payout available via the Stripe Express dashboard.</p>
+                    </div>
+
+                    <button type="button" disabled={connectBusy !== null}
+                      onClick={async () => {
+                        setConnectBusy("dashboard");
+                        try { const { url } = await api.connect.dashboard(); window.open(url, "_blank"); }
+                        catch (e) { toast.error(e instanceof Error ? e.message : "Could not open dashboard"); }
+                        finally { setConnectBusy(null); }
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-2 hover:bg-violet-50 disabled:opacity-60 transition-colors">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      {connectBusy === "dashboard" ? "Opening…" : "Open Stripe Express dashboard"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {section === "notifications" && (
               <div className="p-6 space-y-4">
                 <div>
@@ -848,27 +1114,49 @@ export default function SettingsPage() {
                 </div>
                 <hr className="border-gray-100" />
 
+                {/* Plan capability summary */}
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  {(["FREE", "BASIC", "PRO"] as const).map((p) => (
+                    <div key={p} className={cn("rounded-xl border p-3", plan === p ? "border-violet-300 bg-violet-50" : "border-gray-100 bg-gray-50")}>
+                      <p className={cn("font-semibold mb-1", plan === p ? "text-violet-700" : "text-gray-500")}>{p}{plan === p && " ✓"}</p>
+                      <p className="text-gray-500 leading-relaxed">
+                        {p === "FREE" && "Confirmation\nCancellation\nReschedule"}
+                        {p === "BASIC" && "24h email reminder\nPost-visit follow-up\n+ all Free"}
+                        {p === "PRO" && "72h email reminder\nSMS confirmation\n2h SMS reminder\n+ all Basic"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications</p>
-                {[
-                  { key: "emailConfirmation" as const, label: "Booking confirmation", desc: "Sent immediately when a new appointment is booked", allowed: true },
-                  { key: "emailReminder24h" as const, label: "24-hour reminder", desc: "Sent the day before the appointment", allowed: isPaid, upgrade: "BASIC" as const },
-                  { key: "emailCancellation" as const, label: "Cancellation notice", desc: "Sent when a booking is cancelled by client or business", allowed: true },
-                  { key: "emailReschedule" as const, label: "Reschedule notice", desc: "Sent when an appointment is moved to a new time", allowed: true },
-                  { key: "emailStaffCancellation" as const, label: "Staff cancellation", desc: "Special email when business cancels on the client", allowed: true },
-                ].map(({ key, label, desc, allowed, upgrade }) => {
+                {([
+                  { key: "emailConfirmation" as const,     label: "Booking confirmation",    desc: "Sent immediately when a new appointment is booked", tier: "FREE" as const },
+                  { key: "emailReminder72h" as const,      label: "72-hour reminder",         desc: "Sent 3 days before the appointment (Pro only)",     tier: "PRO"  as const },
+                  { key: "emailReminder24h" as const,      label: "24-hour reminder",         desc: "Sent the day before the appointment",               tier: "BASIC" as const },
+                  { key: "emailFollowUp" as const,         label: "Post-visit follow-up",     desc: "Thank-you email sent 24h after the appointment to encourage rebooking", tier: "BASIC" as const },
+                  { key: "emailCancellation" as const,     label: "Cancellation notice",      desc: "Sent when a booking is cancelled by client or business", tier: "FREE" as const },
+                  { key: "emailReschedule" as const,       label: "Reschedule notice",        desc: "Sent when an appointment is moved to a new time",   tier: "FREE" as const },
+                  { key: "emailStaffCancellation" as const,label: "Staff cancellation email", desc: "Special email when the business cancels on the client", tier: "FREE" as const },
+                ] as const).map(({ key, label, desc, tier }) => {
+                  const allowed = tier === "FREE" || (tier === "BASIC" && isPaid) || (tier === "PRO" && plan === "PRO");
                   const enabled = notificationSettings[key] !== false;
+                  const badgeLabel = tier === "PRO" ? "Pro" : tier === "BASIC" ? "Basic+" : null;
                   return (
                     <div key={key} className="flex flex-col gap-3 py-3 border-b border-gray-50 last:border-0 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-700">{label}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-gray-700">{label}</p>
+                          {badgeLabel && (
+                            <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded-md", tier === "PRO" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700")}>
+                              {badgeLabel}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                       </div>
                       {allowed ? (
                         <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
-                          {[
-                            { label: "On", value: true },
-                            { label: "Off", value: false },
-                          ].map((opt) => (
+                          {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
                             <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
                               className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                                 enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
@@ -877,9 +1165,9 @@ export default function SettingsPage() {
                           ))}
                         </div>
                       ) : (
-                        <button type="button" onClick={() => promptUpgrade(upgrade ?? "BASIC", label)}
+                        <button type="button" onClick={() => promptUpgrade(tier === "PRO" ? "PRO" : "BASIC", label)}
                           className="self-start text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors shrink-0">
-                          Basic+
+                          {tier === "PRO" ? "Upgrade to Pro" : "Basic+"}
                         </button>
                       )}
                     </div>
@@ -887,38 +1175,40 @@ export default function SettingsPage() {
                 })}
 
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">SMS notifications (Pro plan only)</p>
-                <div className="flex items-start justify-between gap-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">2-hour SMS reminder</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Sent 2 hours before the appointment via Twilio</p>
-                  </div>
-                  {biz?.plan === "PRO" ? (
-                    <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
-                      {[
-                        { label: "On", value: true },
-                        { label: "Off", value: false },
-                      ].map((opt) => {
-                        const enabled = notificationSettings.smsReminder2h !== false;
-                        return (
-                          <button key={opt.label} type="button" onClick={() => nf("smsReminder2h", opt.value)}
-                            className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                              enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
-                            {opt.label}
-                          </button>
-                        );
-                      })}
+                {([
+                  { key: "smsConfirmation" as const, label: "Booking confirmation SMS", desc: "Text sent immediately when a booking is confirmed" },
+                  { key: "smsReminder2h"   as const, label: "2-hour SMS reminder",      desc: "Sent 2 hours before the appointment via Twilio" },
+                ] as const).map(({ key, label, desc }) => {
+                  const enabled = notificationSettings[key] !== false;
+                  return (
+                    <div key={key} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">{label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                      </div>
+                      {plan === "PRO" ? (
+                        <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
+                          {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
+                            <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
+                              className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                                enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setSection("billing")}
+                          className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1 hover:bg-violet-50 transition-colors shrink-0">
+                          Upgrade to Pro
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    <button type="button" onClick={() => setSection("billing")}
-                      className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1 hover:bg-violet-50 transition-colors shrink-0">
-                      Upgrade to Pro
-                    </button>
-                  )}
-                </div>
+                  );
+                })}
 
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-blue-800 mb-1">Email provider: Resend</p>
-                  <p className="text-xs text-blue-600">Confirmations, cancellations, and reschedules are included on every plan. Automated reminders follow the plan shown above.</p>
+                  <p className="text-xs font-semibold text-blue-800 mb-1">Email provider: Resend · SMS provider: Twilio</p>
+                  <p className="text-xs text-blue-600">Confirmations, cancellations, and reschedules are always sent on every plan. Reminders, follow-ups, and SMS messages follow the plan gating shown above. All appointment emails include a calendar (.ics) attachment as a backup.</p>
                 </div>
               </div>
             )}
@@ -1165,7 +1455,7 @@ export default function SettingsPage() {
             )}
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-              {section !== "billing" && section !== "security" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
+              {section !== "billing" && section !== "security" && section !== "payouts" && section !== "locations" && section !== "calendar" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
             </div>
           </form>
         </div>

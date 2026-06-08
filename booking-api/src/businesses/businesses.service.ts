@@ -23,7 +23,42 @@ export class BusinessesService {
       where: { id: ownerId },
       data: { businessId: business.id, role: 'OWNER' },
     });
+
+    // Anti-duplicate: flag the new account if another business shares the same normalized
+    // name + phone. Never blocks signup — just sets suspectedDuplicateOfId for admin review.
+    await this.flagIfDuplicate(business.id, dto.name, dto.phone ?? null);
+
     return business;
+  }
+
+  private async flagIfDuplicate(newId: string, name: string, phone: string | null) {
+    try {
+      const normPhone = phone?.replace(/\D/g, '') ?? '';
+      const normName = name.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+      if (!normName) return;
+
+      // Load recent businesses to compare in-memory (avoid unindexed LIKE scans).
+      const candidates = await this.prisma.business.findMany({
+        where: {
+          id: { not: newId },
+          ...(normPhone.length >= 7 ? { phone: { contains: normPhone.slice(-7) } } : {}),
+        },
+        select: { id: true, name: true, phone: true },
+        take: 50,
+      });
+
+      const matched = candidates.find((c) => {
+        const cNorm = c.name.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+        return cNorm === normName;
+      });
+
+      if (matched) {
+        await this.prisma.business.update({
+          where: { id: newId },
+          data: { suspectedDuplicateOfId: matched.id },
+        });
+      }
+    } catch { /* duplicate check is best-effort; never block account creation */ }
   }
 
   async findOne(id: string) {

@@ -1,9 +1,16 @@
 import { Resend } from 'resend';
 
+export interface EmailAttachment {
+  filename: string;
+  content: string; // base64-encoded
+  content_type: string;
+}
+
 export interface EmailPayload {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface EmailProvider {
@@ -45,7 +52,7 @@ export class ResendEmailProvider implements EmailProvider {
     const resend = new Resend(apiKey);
 
     const attempt = async (from: string, to: string, subject: string, html: string) => {
-      const result = await resend.emails.send({ from, to, subject, html });
+      const result = await resend.emails.send({ from, to, subject, html, ...(payload.attachments?.length ? { attachments: payload.attachments } : {}) });
       if (result.error) throw new Error(result.error.message);
       return result.data?.id;
     };

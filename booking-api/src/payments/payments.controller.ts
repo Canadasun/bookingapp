@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Param, Body, Headers, RawBodyRequest, Req, UseGuards, ForbiddenException, BadRequestException,
+  Controller, Get, Post, Param, Body, Headers, RawBodyRequest, Req, UseGuards, ForbiddenException, BadRequestException, Query,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -128,5 +128,59 @@ export class PaymentsController {
     @Headers('stripe-signature') sig: string,
   ) {
     return this.paymentService.handleWebhook(req.rawBody!, sig);
+  }
+
+  // ── Stripe Connect Express (business payouts) ────────────────────────────────
+
+  /** Start or resume Stripe Connect onboarding; returns the account-link URL. */
+  @Post('connect/onboard')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  connectOnboard(@CurrentUser() user: { role: string; businessId: string | null }) {
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.getConnectOnboardingUrl(user.businessId);
+  }
+
+  /** Return the Connect account status and available/pending balance. */
+  @Get('connect/status')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  connectStatus(@CurrentUser() user: { role: string; businessId: string | null }) {
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.getConnectStatus(user.businessId);
+  }
+
+  /** Open the Stripe Express dashboard (login link). */
+  @Post('connect/dashboard')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  connectDashboard(@CurrentUser() user: { role: string; businessId: string | null }) {
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.getConnectDashboardUrl(user.businessId);
+  }
+
+  /** Trigger a manual or instant payout to the business's linked bank / debit card. */
+  @Post('connect/payout')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  connectPayout(
+    @Body() body: unknown,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    const parsed = z.object({
+      amountCents: z.number().int().min(100),
+      currency: z.string().length(3).optional(),
+      instant: z.boolean().optional(),
+    }).safeParse(body);
+    if (!parsed.success) throw new BadRequestException('amountCents (>= 100) is required');
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.createConnectPayout(user.businessId, parsed.data);
   }
 }

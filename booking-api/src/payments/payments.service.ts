@@ -730,6 +730,101 @@ export class PaymentsService {
     }
   }
 
+  // ── Stripe Connect Express (business payouts) ────────────────────────────────
+
+  /**
+   * Get or create a Stripe Connect Express account for the business and return
+   * an account-link onboarding URL. Idempotent: re-entering the onboarding flow
+   * (e.g. after an interrupted session) returns a fresh link for the same account.
+   */
+  async getConnectOnboardingUrl(businessId: string): Promise<{ url: string; accountId: string }> {
+    const stripe = this.getStripe();
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+
+    let accountId = business.stripeConnectAccountId;
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: business.email,
+        business_type: 'individual',
+        metadata: { businessId },
+        settings: { payouts: { schedule: { interval: 'manual' } } },
+      });
+      accountId = account.id;
+      await this.prisma.business.update({ where: { id: businessId }, data: { stripeConnectAccountId: accountId } });
+    }
+
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${webUrl}/dashboard/settings?tab=payouts&connect=refresh`,
+      return_url: `${webUrl}/dashboard/settings?tab=payouts&connect=success`,
+      type: 'account_onboarding',
+    });
+
+    return { url: link.url, accountId };
+  }
+
+  /** Open the Stripe Express dashboard (login link) for the business. */
+  async getConnectDashboardUrl(businessId: string): Promise<{ url: string }> {
+    const stripe = this.getStripe();
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    if (!business.stripeConnectAccountId) {
+      throw new BadRequestException('Connect account not set up — complete onboarding first.');
+    }
+    const link = await stripe.accounts.createLoginLink(business.stripeConnectAccountId);
+    return { url: link.url };
+  }
+
+  /** Return onboarding status + available/pending balance for the Connect account. */
+  async getConnectStatus(businessId: string) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    if (!business.stripeConnectAccountId) {
+      return { onboarded: false, accountId: null, available: [], pending: [] };
+    }
+    const stripe = this.getStripe();
+    const [account, balance] = await Promise.all([
+      stripe.accounts.retrieve(business.stripeConnectAccountId),
+      stripe.balance.retrieve({}, { stripeAccount: business.stripeConnectAccountId }),
+    ]);
+    const onboarded = !!account.details_submitted;
+    if (onboarded !== business.stripeConnectOnboarded) {
+      await this.prisma.business.update({ where: { id: businessId }, data: { stripeConnectOnboarded: onboarded } });
+    }
+    return {
+      onboarded,
+      accountId: business.stripeConnectAccountId,
+      available: balance.available.map((b) => ({ amount: b.amount, currency: b.currency })),
+      pending: balance.pending.map((b) => ({ amount: b.amount, currency: b.currency })),
+    };
+  }
+
+  /**
+   * Trigger a manual payout from the Connect account to the business's linked bank account.
+   * `instant` triggers an instant payout to a registered debit card (higher fee, immediate).
+   */
+  async createConnectPayout(
+    businessId: string,
+    input: { amountCents: number; currency?: string; instant?: boolean },
+  ) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+    if (!business.stripeConnectAccountId || !business.stripeConnectOnboarded) {
+      throw new BadRequestException('Complete Stripe onboarding before requesting a payout.');
+    }
+    const stripe = this.getStripe();
+    const currency = (input.currency ?? business.currency ?? 'CAD').toLowerCase();
+    const payout = await stripe.payouts.create(
+      {
+        amount: input.amountCents,
+        currency,
+        ...(input.instant ? { method: 'instant' as const } : {}),
+        metadata: { businessId },
+      },
+      { stripeAccount: business.stripeConnectAccountId },
+    );
+    return { payoutId: payout.id, status: payout.status, amountCents: payout.amount, currency: payout.currency };
+  }
+
   // ── Client card-on-file management (portal) ─────────────────────────────────
   // Does this client (matched by email across their records) have a saved card?
   async clientCardStatus(email: string) {

@@ -43,8 +43,10 @@ enum NotificationChannel {
 
 enum NotificationType {
   CONFIRMATION
+  REMINDER_72H
   REMINDER_24H
   REMINDER_2H
+  FOLLOW_UP
   CANCELLATION
   RESCHEDULE
 }
@@ -141,6 +143,10 @@ model Business {
   // normalized name + phone. Flags (never blocks) the account for admin review.
   suspectedDuplicateOfId      String?
   duplicateReviewedAt         DateTime?
+
+  // Stripe Connect Express: the business's own connected account for payouts.
+  stripeConnectAccountId   String?
+  stripeConnectOnboarded   Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

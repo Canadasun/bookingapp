@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException, Logger, Inject } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CalendarSyncService } from './calendar-sync.service';
@@ -8,6 +8,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PrismaService } from '../prisma/prisma.service';
+import { generateICalFeed } from './ical.util';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
 
@@ -21,6 +23,7 @@ export class CalendarSyncController {
   constructor(
     private readonly calendarSyncService: CalendarSyncService,
     private readonly google: GoogleCalendarService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get('google/last-attempt')
@@ -93,5 +96,34 @@ export class CalendarSyncController {
     await this.calendarSyncService.syncAppointment(id, user);
     await this.google.syncAppointment(id);
     return { success: true };
+  }
+
+  // Owner — download/subscribe to an iCal feed of all their appointments.
+  // Works even without Google Calendar connected; subscribe via webcal:// in any calendar app.
+  @Get('ical/feed')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  async icalFeed(@CurrentUser() user: AuthUser, @Res() res: Response) {
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    const business = await this.prisma.business.findUnique({ where: { id: user.businessId }, select: { name: true } });
+    const apts = await this.prisma.appointment.findMany({
+      where: {
+        businessId: user.businessId,
+        status: { in: ['CONFIRMED', 'PENDING', 'COMPLETED'] },
+        startsAt: { gte: new Date(Date.now() - 90 * 86_400_000) }, // last 90 days + future
+      },
+      include: {
+        service: { select: { name: true } },
+        client: { select: { name: true } },
+        staff: { include: { user: { select: { name: true } } } },
+      },
+      orderBy: { startsAt: 'asc' },
+      take: 500,
+    });
+    const ical = generateICalFeed(apts, `${business?.name ?? 'Pulse'} Appointments`);
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="pulse-appointments.ics"');
+    res.send(ical);
   }
 }

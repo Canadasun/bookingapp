@@ -8,6 +8,7 @@ import { NOTIFICATION_QUEUE } from './notifications.service';
 import { effectivePlan } from '../common/util/plan';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { formatInTimeZone } from 'date-fns-tz';
+import { generateICalEvent, generateICalCancellation } from '../calendar-sync/ical.util';
 
 // Escape user-controlled text before interpolating into email HTML — prevents
 // HTML/markup injection via names, reasons, notes, gift-card messages, etc.
@@ -73,10 +74,13 @@ function aptDate(apt: { startsAt: Date; business: { timezone?: string | null } }
 
 type NotificationKey =
   | 'emailConfirmation'
+  | 'emailReminder72h'
   | 'emailReminder24h'
+  | 'emailFollowUp'
   | 'emailCancellation'
   | 'emailReschedule'
   | 'emailStaffCancellation'
+  | 'smsConfirmation'
   | 'smsReminder2h';
 
 function notificationEnabled(settings: unknown, key: NotificationKey) {
@@ -765,6 +769,23 @@ ${aptDetails(apt)}
       }
 
       case 'send-confirmation': {
+        // Generate .ics calendar invite as a fallback — ensures clients always get a calendar event
+        // even if the business hasn't connected Google Calendar.
+        const icsContent = generateICalEvent({
+          id: apt.id,
+          startsAt: apt.startsAt,
+          endsAt: apt.endsAt,
+          service: apt.service,
+          staff: apt.staff,
+          client: apt.client,
+          business: apt.business,
+          notes: apt.notes,
+        });
+        const icsAttachment = {
+          filename: 'appointment.ics',
+          content: Buffer.from(icsContent).toString('base64'),
+          content_type: 'text/calendar; method=REQUEST',
+        };
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment confirmed — ${apt.service.name}`,
@@ -772,11 +793,12 @@ ${aptDetails(apt)}
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">You're booked! ✓</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment is confirmed.</p>
 ${aptDetails(apt)}
-<p style="margin:0;color:#6B7280;font-size:13px">You'll receive a reminder 24 hours before your appointment.</p>
+<p style="margin:0;color:#6B7280;font-size:13px">You'll receive a reminder 24 hours before your appointment. A calendar invite is attached to this email.</p>
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
+          attachments: [icsAttachment],
         });
-        if (apt.client.phone) {
+        if (apt.client.phone && smsEnabled && shouldSend('smsConfirmation')) {
           await this.sms.send({
             to: apt.client.phone,
             body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
@@ -790,7 +812,28 @@ ${aptDetails(apt)}
           linkUrl: '/dashboard/appointments',
         });
         if (apt.client.email) await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
-        if (apt.client.phone) await this.logNotification(apt.id, 'SMS', 'CONFIRMATION', 'SENT');
+        if (apt.client.phone && smsEnabled && shouldSend('smsConfirmation')) await this.logNotification(apt.id, 'SMS', 'CONFIRMATION', 'SENT');
+        break;
+      }
+
+      case 'reminder-72h': {
+        if (apt.status !== 'CONFIRMED' || (job.data.expectedStartsAt && apt.startsAt.toISOString() !== job.data.expectedStartsAt)) break;
+        if (!shouldSend('emailReminder72h')) {
+          await this.logNotification(apt.id, 'EMAIL', 'REMINDER_72H', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
+        if (apt.client.email) await this.email.send({
+          to: apt.client.email,
+          subject: `Reminder: ${apt.service.name} in 3 days`,
+          html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Coming up in 3 days</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, a heads-up about your upcoming appointment.</p>
+${aptDetails(apt)}
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
+          `),
+        });
+        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Reminder: You have an appointment for ${apt.service.name} in 3 days at ${aptDate(apt, 'h:mm a')}.`);
+        await this.logNotification(apt.id, 'EMAIL', 'REMINDER_72H', 'SENT');
         break;
       }
 
@@ -832,11 +875,33 @@ ${aptDetails(apt)}
         break;
       }
 
+      case 'follow-up-post-apt': {
+        if (apt.status !== 'COMPLETED') break;
+        if (!shouldSend('emailFollowUp')) {
+          await this.logNotification(apt.id, 'EMAIL', 'FOLLOW_UP', 'SKIPPED', 'disabled_by_business');
+          break;
+        }
+        const bookUrl = `${webUrl}/book/${apt.business.slug ?? ''}`;
+        if (apt.client.email) await this.email.send({
+          to: apt.client.email,
+          subject: `Thanks for visiting ${apt.business.name}!`,
+          html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Thanks for your visit!</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, we hope you enjoyed your ${apt.service.name} with ${apt.staff.user.name}. It was great to see you!</p>
+<p style="margin:0 0 20px;color:#374151;font-size:14px">Ready to book your next appointment? You can do it in seconds online.</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
+          `),
+        });
+        await this.logNotification(apt.id, 'EMAIL', 'FOLLOW_UP', 'SENT');
+        break;
+      }
+
       case 'send-cancellation': {
         if (!shouldSend('emailCancellation')) {
           await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SKIPPED', 'disabled_by_business');
           break;
         }
+        const cancelIcs = generateICalCancellation({ id: apt.id, startsAt: apt.startsAt, endsAt: apt.endsAt, service: apt.service, business: apt.business });
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment cancelled — ${apt.service.name}`,
@@ -847,6 +912,7 @@ ${aptDetails(apt)}
 ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Reason: <em>${esc(apt.cancelReason)}</em></p>` : ''}
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
           `),
+          attachments: [{ filename: 'cancellation.ics', content: Buffer.from(cancelIcs).toString('base64'), content_type: 'text/calendar; method=CANCEL' }],
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
@@ -885,15 +951,26 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
           await this.logNotification(apt.id, 'EMAIL', 'RESCHEDULE', 'SKIPPED', 'disabled_by_business');
           break;
         }
+        const reschedIcs = generateICalEvent({
+          id: apt.id,
+          startsAt: apt.startsAt,
+          endsAt: apt.endsAt,
+          service: apt.service,
+          staff: apt.staff,
+          client: apt.client,
+          business: apt.business,
+          notes: apt.notes,
+        });
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment rescheduled — ${apt.service.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#E9A23C;font-size:20px;font-weight:700">Appointment rescheduled</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been moved to a new time.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been moved to a new time. An updated calendar invite is attached.</p>
 ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
           `),
+          attachments: [{ filename: 'appointment.ics', content: Buffer.from(reschedIcs).toString('base64'), content_type: 'text/calendar; method=REQUEST' }],
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
@@ -960,7 +1037,7 @@ ${aptDetails(apt)}
   private logNotification(
     appointmentId: string,
     channel: 'EMAIL' | 'SMS',
-    type: 'CONFIRMATION' | 'REMINDER_24H' | 'REMINDER_2H' | 'CANCELLATION' | 'RESCHEDULE',
+    type: 'CONFIRMATION' | 'REMINDER_72H' | 'REMINDER_24H' | 'REMINDER_2H' | 'FOLLOW_UP' | 'CANCELLATION' | 'RESCHEDULE',
     status: 'SENT' | 'FAILED' | 'SKIPPED',
     errorMessage?: string,
   ) {

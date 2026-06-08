@@ -27,6 +27,7 @@ import { MessagesScreen } from './src/screens/messages';
 import { NotificationsScreen } from './src/screens/notifications';
 import { MenuScreen } from './src/screens/menu';
 import { LoginScreen, ForgotPasswordScreen, RegisterScreen, ChangePasswordScreen, ClientPortalScreen } from './src/screens/auth';
+import { AdminScreen } from './src/screens/admin';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -271,6 +272,16 @@ function AppContent() {
       <SafeAreaProvider>
         <StatusBar barStyle="dark-content" backgroundColor="#fff"/>
         <ClientPortalScreen onLogout={handleLogout}/>
+      </SafeAreaProvider>
+    </ErrorBoundary>
+  );
+
+  // Platform admin gets a dedicated admin dashboard — not the business owner UI.
+  if (user?.role === 'ADMIN') return (
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff"/>
+        <AdminScreen onLogout={handleLogout}/>
       </SafeAreaProvider>
     </ErrorBoundary>
   );
