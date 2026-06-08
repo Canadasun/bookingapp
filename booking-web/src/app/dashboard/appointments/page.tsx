@@ -16,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { formatPrice, cn } from "@/lib/utils";
+import { formatPrice, cn, normalizePhoneE164 } from "@/lib/utils";
 
 type Tab = "today" | "week" | "all";
 type ViewMode = "list" | "staff" | "calendar" | "week";
@@ -711,7 +711,7 @@ export default function AppointmentsPage() {
         await api.appointments.update(bizId, id, {
           clientName: extra.clientName,
           clientEmail: extra.clientEmail,
-          clientPhone: extra.clientPhone,
+          clientPhone: extra.clientPhone ? normalizePhoneE164(extra.clientPhone) : extra.clientPhone,
           startsAt: extra.startsAt ? new Date(extra.startsAt).toISOString() : undefined,
           notes: extra.notes,
           notifyClient: extra.notifyClient !== "false",

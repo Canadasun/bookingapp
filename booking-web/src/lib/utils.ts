@@ -43,10 +43,11 @@ export function formatPhoneInput(raw: string): string {
 
 // Normalise a displayed phone string back to E.164 (+1XXXXXXXXXX) for the API.
 export function normalizePhoneE164(display: string): string {
+  if (!display) return "";
   const digits = display.replace(/\D/g, "");
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits[0] === "1") return `+${digits}`;
-  return display;
+  return digits.length === 0 ? "" : display;
 }
 
 // Only allow same-origin internal paths as post-login redirect targets.

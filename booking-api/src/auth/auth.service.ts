@@ -240,7 +240,8 @@ export class AuthService {
   private static readonly DUMMY_HASH = '$2a$12$AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
   async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string }) {
-    if (await this.authLock.isLocked(dto.email)) {
+    const locked = await this.authLock.isLocked(dto.email).catch(() => false);
+    if (locked) {
       throw new HttpException({ message: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.', statusCode: 429 }, 429);
     }
 

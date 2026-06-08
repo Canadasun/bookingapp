@@ -7,7 +7,7 @@ import { format, startOfDay, addMinutes, parseISO, isBefore, isAfter } from "dat
 import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
-import { cn, formatPhoneInput } from "@/lib/utils";
+import { cn, formatPhoneInput, normalizePhoneE164 } from "@/lib/utils";
 import Link from "next/link";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -270,7 +270,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       }
 
       const client = await api.clients.create(bizId, {
-        name: form.name, email: form.email || undefined, phone: form.phone || undefined, notes: form.notes || undefined,
+        name: form.name, email: form.email || undefined, phone: form.phone ? normalizePhoneE164(form.phone) : undefined, notes: form.notes || undefined,
       });
       setClientMatched(!!client.matched);
 
@@ -345,7 +345,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       await api.waitlist.join(bizId, {
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim() || undefined,
+        phone: form.phone.trim() ? normalizePhoneE164(form.phone.trim()) : undefined,
         serviceId: selectedServices[0]?.id,
         staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : undefined,
         desiredDate: selectedDate ? selectedDate.toISOString() : undefined,
