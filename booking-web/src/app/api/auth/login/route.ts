@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     method?: string;
     accessToken: string;
     refreshToken: string;
-    user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: string };
+    user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; emailVerified: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: string };
   }>(upstream);
 
   if (!data) {

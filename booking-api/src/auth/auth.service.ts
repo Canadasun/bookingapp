@@ -520,6 +520,7 @@ export class AuthService {
         staffId,
         permissions,
         mustResetPassword: user.mustResetPassword,
+        emailVerified: user.emailVerified,
         twoFactorEnabled: user.twoFactorEnabled,
         twoFactorMethod: user.twoFactorMethod,
       },

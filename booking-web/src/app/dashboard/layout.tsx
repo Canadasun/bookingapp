@@ -195,6 +195,45 @@ function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[];
   );
 }
 
+function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
+  const [dismissed, setDismissed] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  if (!user || user.emailVerified !== false || dismissed) return null;
+
+  async function resend() {
+    setSending(true);
+    try {
+      await fetch("/proxy/auth/resend-verification", { method: "POST" });
+      setSent(true);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-800">
+      <span>
+        {sent
+          ? "Verification email sent — check your inbox."
+          : "Please verify your email address to unlock all features."}
+      </span>
+      <div className="flex items-center gap-3 shrink-0">
+        {!sent && (
+          <button onClick={resend} disabled={sending}
+            className="font-medium underline underline-offset-2 hover:text-amber-900 disabled:opacity-50">
+            {sending ? "Sending…" : "Resend email"}
+          </button>
+        )}
+        <button onClick={() => setDismissed(true)} aria-label="Dismiss" className="hover:text-amber-900">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -406,6 +445,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
+        <EmailVerificationBanner user={user} />
         <main className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
       </div>
     </div>

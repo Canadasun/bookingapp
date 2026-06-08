@@ -6,6 +6,7 @@ export interface SessionUser {
   businessId: string | null;
   staffId: string | null;
   permissions?: string[];
+  emailVerified?: boolean;
   twoFactorEnabled?: boolean;
   twoFactorMethod?: "EMAIL" | "SMS";
 }
