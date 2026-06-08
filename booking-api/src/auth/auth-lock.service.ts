@@ -27,4 +27,22 @@ export class AuthLockService {
   async clearFailures(email: string): Promise<void> {
     await this.redis.client.del(FAIL_KEY(email));
   }
+
+  /** Admin action: clear both the lock and the failure counter immediately. */
+  async unlockAccount(email: string): Promise<void> {
+    await this.redis.client.del(LOCK_KEY(email), FAIL_KEY(email));
+  }
+
+  async lockStatus(email: string): Promise<{ locked: boolean; failCount: number; lockTtlSeconds: number }> {
+    const [exists, failRaw, ttl] = await Promise.all([
+      this.redis.client.exists(LOCK_KEY(email)),
+      this.redis.client.get(FAIL_KEY(email)),
+      this.redis.client.ttl(LOCK_KEY(email)),
+    ]);
+    return {
+      locked: exists === 1,
+      failCount: parseInt(failRaw ?? '0', 10),
+      lockTtlSeconds: exists === 1 ? Math.max(ttl, 0) : 0,
+    };
+  }
 }

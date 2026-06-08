@@ -30,7 +30,7 @@ import { getUser, clearSession } from "@/lib/auth";
 import { formatPrice, cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
-type Tab = "overview" | "verifications" | "businesses" | "duplicates" | "errors";
+type Tab = "overview" | "verifications" | "businesses" | "duplicates" | "errors" | "users";
 
 type Pending = {
   id: string;
@@ -240,6 +240,7 @@ export default function AdminPage() {
     { id: "businesses",    label: "Businesses",    icon: Building2 },
     { id: "duplicates",    label: "Duplicates",    icon: AlertTriangle, badge: duplicates.length || undefined },
     { id: "errors",        label: "Errors",        icon: Activity, badge: sysErrors.filter((e) => !e.resolved && e.severity === "CRITICAL").length || undefined },
+    { id: "users",         label: "Users",         icon: Users },
   ];
 
   return (
@@ -758,7 +759,128 @@ export default function AdminPage() {
           </div>
         )}
 
+        {tab === "users" && <UserSupportTab />}
+
       </main>
+    </div>
+  );
+}
+
+function UserSupportTab() {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  type UserResult = { id: string; email: string; name: string; role: string; createdAt: string; emailVerified: boolean; business: { id: string; name: string; plan: string; suspended: boolean } | null; lockStatus: { locked: boolean; failCount: number; lockTtlSeconds: number } };
+  const [result, setResult] = useState<UserResult | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  async function lookup() {
+    if (!email.trim()) return;
+    setBusy("lookup"); setResult(null); setNotFound(false);
+    try {
+      const u = await api.admin.lookupUser(email.trim().toLowerCase());
+      setResult(u);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.toLowerCase().includes("not found") || msg.includes("404")) setNotFound(true);
+      else toast.error(msg || "Lookup failed");
+    } finally { setBusy(null); }
+  }
+
+  async function unlock() {
+    if (!result) return;
+    setBusy("unlock");
+    try {
+      const r = await api.admin.unlockUser(result.email);
+      toast.success(r.message);
+      setResult((prev) => prev ? { ...prev, lockStatus: { locked: false, failCount: 0, lockTtlSeconds: 0 } } : prev);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function sendReset() {
+    if (!result) return;
+    setBusy("reset");
+    try {
+      const r = await api.admin.sendPasswordReset(result.email);
+      toast.success(r.message);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  return (
+    <div className="max-w-xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-lg font-bold text-gray-900">User support</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Look up any account to check lock status, unlock it, or send a password reset on their behalf.</p>
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); setNotFound(false); setResult(null); }}
+          onKeyDown={(e) => e.key === "Enter" && lookup()}
+          placeholder="user@email.com"
+          className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+        />
+        <button
+          onClick={lookup}
+          disabled={busy === "lookup"}
+          className="px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50"
+        >
+          {busy === "lookup" ? "…" : "Look up"}
+        </button>
+      </div>
+
+      {notFound && (
+        <p className="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-xl p-4">No account found with that email address.</p>
+      )}
+
+      {result && (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm divide-y divide-gray-50">
+          <div className="p-5 space-y-1">
+            <p className="font-semibold text-gray-900">{result.name}</p>
+            <p className="text-sm text-gray-500">{result.email}</p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">{result.role}</span>
+              {result.emailVerified
+                ? <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">Email verified</span>
+                : <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">Email not verified</span>
+              }
+              {result.business && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-600 border border-gray-200">{result.business.name} · {result.business.plan}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="p-5 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Login lock status</p>
+            {result.lockStatus.locked ? (
+              <div className="flex items-center justify-between bg-red-50 border border-red-100 rounded-xl p-3">
+                <div>
+                  <p className="text-sm font-medium text-red-800 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> Account locked</p>
+                  <p className="text-xs text-red-600 mt-0.5">Unlocks in {Math.ceil(result.lockStatus.lockTtlSeconds / 60)} min · {result.lockStatus.failCount} failed attempts</p>
+                </div>
+                <button onClick={unlock} disabled={busy === "unlock"} className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50">
+                  {busy === "unlock" ? "…" : "Unlock now"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                Not locked{result.lockStatus.failCount > 0 ? ` · ${result.lockStatus.failCount} recent failed attempts` : ""}
+              </div>
+            )}
+          </div>
+
+          <div className="p-5">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Support actions</p>
+            <button onClick={sendReset} disabled={busy === "reset"} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {busy === "reset" ? "Sending…" : "Send password reset email"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

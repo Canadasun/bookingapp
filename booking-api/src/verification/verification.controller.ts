@@ -1,8 +1,11 @@
-import { Controller, Get, Post, Param, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { VerificationService } from './verification.service';
 import { BusinessesService } from '../businesses/businesses.service';
+import { AuthLockService } from '../auth/auth-lock.service';
+import { AuthService } from '../auth/auth.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -93,13 +96,21 @@ export class AdminVerificationController {
   }
 }
 
+const EmailBodySchema = z.object({ email: z.string().trim().toLowerCase().email() });
+
 @ApiTags('admin')
 @ApiBearerAuth()
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminOverviewController {
-  constructor(private svc: VerificationService, private biz: BusinessesService) {}
+  constructor(
+    private svc: VerificationService,
+    private biz: BusinessesService,
+    private authLock: AuthLockService,
+    private authService: AuthService,
+    private prisma: PrismaService,
+  ) {}
 
   @Get('overview')
   overview() {
@@ -114,5 +125,37 @@ export class AdminOverviewController {
   @Post('businesses/:id/unsuspend')
   unsuspend(@Param('id') id: string) {
     return this.biz.reactivate(id);
+  }
+
+  /** Look up a user by email — returns basic profile + lock status. */
+  @Post('users/lookup')
+  async lookupUser(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: body.email },
+      select: {
+        id: true, email: true, name: true, role: true,
+        createdAt: true, emailVerified: true,
+        business: { select: { id: true, name: true, plan: true, suspended: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('No account found with that email address');
+    const lockStatus = await this.authLock.lockStatus(body.email).catch(() => ({ locked: false, failCount: 0, lockTtlSeconds: 0 }));
+    return { ...user, lockStatus };
+  }
+
+  /** Immediately clear a brute-force lock on an account. */
+  @Post('users/unlock')
+  async unlockUser(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }) {
+    const user = await this.prisma.user.findUnique({ where: { email: body.email }, select: { id: true } });
+    if (!user) throw new NotFoundException('No account found with that email address');
+    await this.authLock.unlockAccount(body.email);
+    return { ok: true, message: `Account unlocked for ${body.email}` };
+  }
+
+  /** Send a password-reset email on behalf of support. */
+  @Post('users/send-reset')
+  async sendReset(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }) {
+    await this.authService.forgotPassword(body.email);
+    return { ok: true, message: `Password reset email sent to ${body.email}` };
   }
 }

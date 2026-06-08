@@ -461,6 +461,9 @@ export const api = {
     overview: () => req<AdminOverview>("/admin/overview"),
     suspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/suspend`, { method: "POST" }),
     unsuspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/unsuspend`, { method: "POST" }),
+    lookupUser: (email: string) => req<{ id: string; email: string; name: string; role: string; createdAt: string; emailVerified: boolean; business: { id: string; name: string; plan: string; suspended: boolean } | null; lockStatus: { locked: boolean; failCount: number; lockTtlSeconds: number } }>("/admin/users/lookup", { method: "POST", body: JSON.stringify({ email }) }),
+    unlockUser: (email: string) => req<{ ok: boolean; message: string }>("/admin/users/unlock", { method: "POST", body: JSON.stringify({ email }) }),
+    sendPasswordReset: (email: string) => req<{ ok: boolean; message: string }>("/admin/users/send-reset", { method: "POST", body: JSON.stringify({ email }) }),
   },
   adminVerifications: {
     list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationGovernmentIdUrl: string | null; verificationLegalName: string | null; verificationAddress: string | null; verificationPhone: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
