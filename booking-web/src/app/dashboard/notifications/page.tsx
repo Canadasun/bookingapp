@@ -52,6 +52,7 @@ export default function NotificationsPage() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [logsLoading, setLogsLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
   const [view, setView] = useState<View>("inbox");
@@ -81,9 +82,9 @@ export default function NotificationsPage() {
   const renderTemplate = (body: string) => body.replace(/\{\{(\w+)\}\}/g, (_, k) => sample[k] ?? `{{${k}}}`);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setLoadError(""); setLoading(true);
     try { setItems(await api.notifications.list()); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load notifications"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load notifications"); }
     finally { setLoading(false); }
   }, []);
 
@@ -97,7 +98,7 @@ export default function NotificationsPage() {
         limit: 100,
       }));
     }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load delivery logs"); }
+    catch { /* delivery log errors are non-critical; silently reset to empty */ setDeliveries([]); }
     finally { setLogsLoading(false); }
   }, [deliveryChannel, deliverySearch, deliveryStatus]);
 
@@ -106,7 +107,7 @@ export default function NotificationsPage() {
   const loadDevices = useCallback(async () => {
     setDevicesLoading(true);
     try { setDevices(await api.devices.list()); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load devices"); }
+    catch { setDevices([]); }
     finally { setDevicesLoading(false); }
   }, []);
 
@@ -190,7 +191,12 @@ export default function NotificationsPage() {
       </div>
 
       {view === "inbox" ? (
-        loading ? <LoadingSpinner /> : visible.length === 0 ? (
+        loading ? <LoadingSpinner /> : loadError ? (
+          <div className="text-center py-16">
+            <p className="text-red-500 mb-3">{loadError}</p>
+            <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          </div>
+        ) : visible.length === 0 ? (
           <EmptyState title="No matching notifications" description="New bookings, payments, and system updates will show here." />
         ) : (
           <div className="space-y-2">
