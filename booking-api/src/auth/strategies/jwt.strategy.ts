@@ -45,8 +45,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload) {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) throw new UnauthorizedException();
+    // Fail-open: if Redis is unavailable treat the token as not-revoked so a
+    // Redis outage doesn't log everyone out of the app.
     if (payload.jti) {
-      const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`);
+      const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`).catch(() => 0);
       if (revoked) throw new UnauthorizedException();
     }
     return { ...user, _jti: payload.jti, _tokenExp: payload.exp };
