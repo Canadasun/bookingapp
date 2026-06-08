@@ -30,6 +30,25 @@ export function clearToken() {
   document.cookie = "booking_user=; Max-Age=0; path=/";
 }
 
+// Format a phone number as the user types into +1 (XXX) XXX-XXXX.
+// Strips everything except digits, then applies the North American format.
+export function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^1/, "");
+  if (digits.length === 0) return "";
+  if (digits.length <= 3)  return `+1 (${digits}`;
+  if (digits.length <= 6)  return `+1 (${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+}
+
+// Normalise a displayed phone string back to E.164 (+1XXXXXXXXXX) for the API.
+export function normalizePhoneE164(display: string): string {
+  const digits = display.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits[0] === "1") return `+${digits}`;
+  return display;
+}
+
 // Only allow same-origin internal paths as post-login redirect targets.
 // Rejects protocol-relative ("//evil.com") and "/\\evil.com" open-redirect tricks.
 export function safeNextPath(next: string | null | undefined, fallback: string): string {

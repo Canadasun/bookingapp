@@ -22,3 +22,23 @@ export function normalizePhoneClient(input?: string|null): string|null {
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
   return null;
 }
+
+// Format an E.164 number for display: +14165550123 → "+1 (416) 555-0123"
+export function formatPhoneDisplay(e164?: string | null): string {
+  if (!e164) return '';
+  const digits = e164.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+  }
+  return e164;
+}
+
+// Format a phone number as the user types, applying +1 (XXX) XXX-XXXX mask progressively.
+export function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length <= 3) return `+1 (${digits}`;
+  if (digits.length <= 6) return `+1 (${digits.slice(0,3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
+}

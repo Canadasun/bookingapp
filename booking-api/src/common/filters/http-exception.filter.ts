@@ -4,11 +4,18 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  Logger,
+  Optional,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  constructor(@Optional() private prisma?: PrismaService) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -23,6 +30,29 @@ export class HttpExceptionFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getResponse()
         : 'Internal server error';
+
+    // Log 5xx errors to SystemError table (best-effort, non-blocking)
+    if (status >= 500) {
+      const err = exception instanceof Error ? exception : null;
+      const bizId: string | undefined = (request as any)?.user?.businessId ?? undefined;
+      this.logger.error(`${request.method} ${request.url} → ${status}: ${err?.message ?? String(message)}`);
+      if (this.prisma) {
+        this.prisma.systemError.create({
+          data: {
+            businessId: bizId ?? null,
+            category: 'GENERAL',
+            severity: 'ERROR',
+            message: (err?.message ?? String(message)).slice(0, 2000),
+            stack: err?.stack?.slice(0, 5000) ?? null,
+            context: {
+              method: request.method,
+              path: request.url,
+              statusCode: status,
+            },
+          },
+        }).catch(() => {});
+      }
+    }
 
     response.status(status).json({
       statusCode: status,

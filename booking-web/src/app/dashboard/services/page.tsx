@@ -327,6 +327,8 @@ export default function ServicesPage() {
   const [editCat, setEditCat]     = useState<ServiceCategory | null>(null);
   const [resourceName, setResourceName] = useState("");
   const [showResources, setShowResources] = useState(false);
+  const [editingResource, setEditingResource] = useState<{ id: string; name: string } | null>(null);
+  const [savingResource, setSavingResource] = useState(false);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -370,14 +372,30 @@ export default function ServicesPage() {
   async function addResource() {
     const n = resourceName.trim();
     if (!n || !bizId) return;
+    setSavingResource(true);
     try { await api.resources.create(bizId, { name: n }); setResourceName(""); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+    finally { setSavingResource(false); }
   }
   async function removeResource(r: Resource) {
     if (!bizId) return;
-    if (!confirm(`Delete "${r.name}"? Services using it will be unset.`)) return;
+    if (!confirm(`Delete "${r.name}"? Services using it will lose their room assignment.`)) return;
     try { await api.resources.remove(bizId, r.id); load(); }
     catch { toast.error("Failed to delete"); }
+  }
+  async function toggleResourceActive(r: Resource) {
+    if (!bizId) return;
+    try { await api.resources.update(bizId, r.id, { active: !r.active }); load(); }
+    catch { toast.error("Failed to update"); }
+  }
+  async function saveResourceRename() {
+    if (!editingResource || !bizId) return;
+    const name = editingResource.name.trim();
+    if (!name) return;
+    setSavingResource(true);
+    try { await api.resources.update(bizId, editingResource.id, { name }); setEditingResource(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to rename"); }
+    finally { setSavingResource(false); }
   }
 
   async function deleteCategory(cat: ServiceCategory) {
@@ -418,29 +436,116 @@ export default function ServicesPage() {
         </div>
 
         {/* Rooms & resources */}
-        <div className="mb-5 rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="mb-5 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
           <button onClick={() => setShowResources((s) => !s)}
             className="flex w-full items-center justify-between px-4 py-3 text-left">
-            <span className="text-sm font-semibold text-gray-900">Rooms &amp; resources {resources.length > 0 && <span className="text-gray-400 font-normal">({resources.length})</span>}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900">Rooms &amp; resources</span>
+              {resources.length > 0 && (
+                <span className="text-xs bg-gray-100 text-gray-500 font-medium px-2 py-0.5 rounded-full">{resources.length}</span>
+              )}
+            </div>
             <span className="text-xs text-violet-600 font-medium">{showResources ? "Hide" : "Manage"}</span>
           </button>
           {showResources && (
-            <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-2">
-              <p className="text-xs text-gray-400">Shared rooms or equipment. Assign one to a service and that slot is blocked whenever the resource is in use.</p>
-              <div className="flex flex-wrap gap-2">
-                {resources.map((r) => (
-                  <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 border border-gray-200 px-3 py-1 text-sm text-gray-700">
-                    {r.name}
-                    <button onClick={() => removeResource(r)} className="text-gray-400 hover:text-red-600" aria-label={`Delete ${r.name}`}>×</button>
-                  </span>
-                ))}
-                {resources.length === 0 && <span className="text-xs text-gray-400">No resources yet.</span>}
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Input placeholder="e.g. Room 1 · Chair 2 · Laser" value={resourceName}
+            <div className="border-t border-gray-50">
+              <p className="text-xs text-gray-400 px-4 pt-3 pb-2">
+                Shared rooms, chairs, or equipment. Assign one to a service and the slot is blocked whenever that resource is already in use.
+              </p>
+
+              {/* Resource list */}
+              {resources.length > 0 && (
+                <div className="divide-y divide-gray-50">
+                  {resources.map((r) => {
+                    const usedBy = services.filter(s => s.resourceId === r.id);
+                    const isEditing = editingResource?.id === r.id;
+                    return (
+                      <div key={r.id} className="flex items-center gap-3 px-4 py-2.5">
+                        {/* Active dot */}
+                        <div className={cn("w-2 h-2 rounded-full shrink-0", r.active ? "bg-emerald-400" : "bg-gray-300")} />
+
+                        {/* Name / inline edit */}
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <Input
+                              autoFocus
+                              value={editingResource.name}
+                              onChange={(e) => setEditingResource({ ...editingResource, name: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); saveResourceRename(); }
+                                if (e.key === "Escape") setEditingResource(null);
+                              }}
+                              className="h-7 text-sm py-0"
+                            />
+                            <button onClick={saveResourceRename} disabled={savingResource}
+                              className="text-xs font-medium text-violet-600 hover:text-violet-800 shrink-0">
+                              {savingResource ? "…" : "Save"}
+                            </button>
+                            <button onClick={() => setEditingResource(null)}
+                              className="text-xs text-gray-400 hover:text-gray-600 shrink-0">Cancel</button>
+                          </div>
+                        ) : (
+                          <div className="flex-1 min-w-0">
+                            <span className={cn("text-sm font-medium", r.active ? "text-gray-900" : "text-gray-400 line-through")}>
+                              {r.name}
+                            </span>
+                            {usedBy.length > 0 && (
+                              <span className="ml-2 text-xs text-gray-400">
+                                {usedBy.length} service{usedBy.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        {!isEditing && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => toggleResourceActive(r)}
+                              title={r.active ? "Deactivate" : "Activate"}
+                              className={cn(
+                                "text-xs px-2 py-0.5 rounded-full border font-medium transition-colors",
+                                r.active
+                                  ? "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+                                  : "text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100",
+                              )}>
+                              {r.active ? "Active" : "Inactive"}
+                            </button>
+                            <button
+                              onClick={() => setEditingResource({ id: r.id, name: r.name })}
+                              title="Rename"
+                              className="p-1 text-gray-400 hover:text-gray-700 rounded">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => removeResource(r)}
+                              title="Delete"
+                              className="p-1 text-gray-400 hover:text-red-600 rounded">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {resources.length === 0 && (
+                <p className="px-4 pb-3 text-xs text-gray-400">No resources yet. Add one below.</p>
+              )}
+
+              {/* Add new resource */}
+              <div className="flex gap-2 px-4 pb-4 pt-2 border-t border-gray-50">
+                <Input
+                  placeholder="e.g. Room 1, Chair 2, Laser"
+                  value={resourceName}
                   onChange={(e) => setResourceName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addResource(); } }} />
-                <Button size="sm" onClick={addResource} disabled={!resourceName.trim()}>Add</Button>
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addResource(); } }}
+                />
+                <Button size="sm" onClick={addResource} disabled={!resourceName.trim() || savingResource}>
+                  {savingResource ? "Adding…" : "Add"}
+                </Button>
               </div>
             </div>
           )}

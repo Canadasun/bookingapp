@@ -8,7 +8,7 @@ import {
 } from "date-fns";
 import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { api, Appointment } from "@/lib/api";
+import { api, Appointment, AvailabilityRule } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -435,13 +435,50 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
 }
 
 // Week view — seven day columns with each day's appointments in time order.
-function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect, onReschedule }: {
+// Time-grid WeekView: shows 7am–9pm with business hours highlighted and non-business hours greyed.
+const GRID_START = 7;   // 7 am
+const GRID_END   = 21;  // 9 pm
+const ROW_H      = 56;  // px per hour
+
+function timeToGridOffset(isoString: string): number {
+  const d = new Date(isoString);
+  return (d.getHours() + d.getMinutes() / 60 - GRID_START) * ROW_H;
+}
+function durationToHeight(startsAt: string, endsAt: string): number {
+  const mins = (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60000;
+  return Math.max((mins / 60) * ROW_H, 20);
+}
+function timeStrToFrac(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h + (m || 0) / 60;
+}
+
+function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelect, onReschedule }: {
   weekStart: Date; appts: Appointment[];
+  allStaff: { availabilityRules?: AvailabilityRule[] }[];
   onPrev: () => void; onNext: () => void; onToday: () => void;
   onSelect: (a: Appointment) => void;
   onReschedule: (id: string, dayKey: string) => void;
 }) {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [nowOffset, setNowOffset] = useState<number | null>(null);
+
+  // Update "now" indicator every minute
+  useEffect(() => {
+    function update() {
+      const now = new Date();
+      const frac = now.getHours() + now.getMinutes() / 60;
+      if (frac >= GRID_START && frac <= GRID_END) {
+        setNowOffset((frac - GRID_START) * ROW_H);
+      } else {
+        setNowOffset(null);
+      }
+    }
+    update();
+    const id = setInterval(update, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const byDay = new Map<string, Appointment[]>();
   for (const a of appts) {
@@ -450,8 +487,27 @@ function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect, onResch
   }
   const weekEnd = addDays(weekStart, 6);
   const rangeLabel = format(weekStart, "MMM d") + " – " + format(weekEnd, isSameMonth(weekStart, weekEnd) ? "d" : "MMM d");
+
+  // Aggregate business open hours per day-of-week (0=Sun–6=Sat) from all staff rules
+  const bizHours = useMemo(() => {
+    const map = new Map<number, { open: number; close: number }>();
+    for (const s of allStaff) {
+      for (const r of s.availabilityRules ?? []) {
+        const open  = timeStrToFrac(r.startTime);
+        const close = timeStrToFrac(r.endTime);
+        const cur = map.get(r.dayOfWeek);
+        map.set(r.dayOfWeek, { open: Math.min(cur?.open ?? open, open), close: Math.max(cur?.close ?? close, close) });
+      }
+    }
+    return map;
+  }, [allStaff]);
+
+  const hours = Array.from({ length: GRID_END - GRID_START }, (_, i) => GRID_START + i);
+  const gridH = (GRID_END - GRID_START) * ROW_H;
+
   return (
     <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-900">{rangeLabel}</p>
         <div className="flex items-center gap-1">
@@ -460,38 +516,129 @@ function WeekView({ weekStart, appts, onPrev, onNext, onToday, onSelect, onResch
           <button onClick={onNext} aria-label="Next week" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-x divide-gray-50">
-        {days.map((day) => {
-          const k = format(day, "yyyy-MM-dd");
-          const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
-          return (
-            <div key={k}
-              onDragOver={(e) => { e.preventDefault(); setDragOverKey(k); }}
-              onDragLeave={() => setDragOverKey((cur) => cur === k ? null : cur)}
-              onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); setDragOverKey(null); if (id) onReschedule(id, k); }}
-              className={cn("min-h-[180px] transition-colors", dragOverKey === k && "bg-violet-50 ring-1 ring-inset ring-violet-300")}>
-              <div className={cn("px-2 py-2 text-center border-b border-gray-50", isSameDay(day, new Date()) && "bg-violet-50")}>
-                <p className="text-[11px] font-semibold text-gray-400 uppercase">{format(day, "EEE")}</p>
-                <p className={cn("text-sm font-bold", isSameDay(day, new Date()) ? "text-violet-700" : "text-gray-700")}>{format(day, "d")}</p>
+
+      {/* Day headers */}
+      <div className="flex border-b border-gray-100">
+        <div className="w-12 shrink-0" />
+        {days.map((day) => (
+          <div key={day.toISOString()} className={cn(
+            "flex-1 text-center py-2 border-l border-gray-50",
+            isSameDay(day, new Date()) && "bg-violet-50",
+          )}>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{format(day, "EEE")}</p>
+            <p className={cn("text-sm font-bold", isSameDay(day, new Date()) ? "text-violet-700" : "text-gray-700")}>{format(day, "d")}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Scrollable time grid */}
+      <div className="overflow-y-auto" style={{ maxHeight: "600px" }}>
+        <div className="flex" style={{ height: `${gridH}px`, minWidth: 0 }}>
+          {/* Hour labels */}
+          <div className="w-12 shrink-0 relative">
+            {hours.map((h) => (
+              <div key={h} style={{ position: "absolute", top: `${(h - GRID_START) * ROW_H - 8}px`, right: "4px" }}
+                className="text-[10px] text-gray-400 text-right w-10">
+                {format(new Date(2000, 0, 1, h), "ha")}
               </div>
-              <div className="p-1.5 space-y-1">
-                {list.map((a) => (
-                  <button key={a.id} onClick={() => onSelect(a)}
-                    draggable
-                    onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
-                    className="block w-full text-left rounded-lg border border-gray-100 px-2 py-1.5 hover:bg-gray-50 cursor-grab active:cursor-grabbing">
-                    <span className="flex items-center gap-1">
-                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
-                      <span className="text-[11px] font-semibold text-gray-700">{format(new Date(a.startsAt), "h:mm a")}</span>
-                    </span>
-                    <span className="block truncate text-[11px] text-gray-600">{a.client.name}</span>
-                  </button>
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {days.map((day) => {
+            const k = format(day, "yyyy-MM-dd");
+            const dow = day.getDay();
+            const biz = bizHours.get(dow);
+            const isOpen = !!biz;
+            const openOffset  = isOpen ? Math.max(0, (biz!.open  - GRID_START) * ROW_H) : 0;
+            const closeOffset = isOpen ? Math.min(gridH, (biz!.close - GRID_START) * ROW_H) : 0;
+            const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+            const isCurrentDay = isSameDay(day, new Date());
+
+            return (
+              <div key={k} className="flex-1 relative border-l border-gray-100 min-w-0"
+                onDragOver={(e) => { e.preventDefault(); setDragOverKey(k); }}
+                onDragLeave={() => setDragOverKey((cur) => cur === k ? null : cur)}
+                onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); setDragOverKey(null); if (id) onReschedule(id, k); }}>
+
+                {/* Hour grid lines */}
+                {hours.map((h) => (
+                  <div key={h} style={{ top: `${(h - GRID_START) * ROW_H}px`, height: `${ROW_H}px` }}
+                    className="absolute inset-x-0 border-t border-gray-50" />
                 ))}
-                {list.length === 0 && <p className="px-1 py-2 text-[11px] text-gray-300 text-center">—</p>}
+
+                {/* Non-business hours overlay: full column grey if closed, or top/bottom strips */}
+                {bizHours.size > 0 && (
+                  <>
+                    {!isOpen ? (
+                      // Full day closed
+                      <div className="absolute inset-0 bg-gray-50/80" />
+                    ) : (
+                      <>
+                        {/* Before open */}
+                        {openOffset > 0 && (
+                          <div className="absolute inset-x-0 top-0 bg-gray-50/80" style={{ height: `${openOffset}px` }} />
+                        )}
+                        {/* After close */}
+                        {closeOffset < gridH && (
+                          <div className="absolute inset-x-0 bottom-0 bg-gray-50/80" style={{ height: `${gridH - closeOffset}px` }} />
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* Today column tint (below greys) */}
+                {isCurrentDay && <div className="absolute inset-0 bg-violet-500/[0.03] pointer-events-none" />}
+
+                {/* Drag-over highlight */}
+                {dragOverKey === k && <div className="absolute inset-0 bg-violet-100/60 ring-1 ring-inset ring-violet-300 pointer-events-none" />}
+
+                {/* Current time indicator */}
+                {isCurrentDay && nowOffset !== null && (
+                  <div className="absolute inset-x-0 z-20 flex items-center pointer-events-none" style={{ top: `${nowOffset}px` }}>
+                    <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shrink-0" />
+                    <div className="flex-1 h-px bg-red-400" />
+                  </div>
+                )}
+
+                {/* Appointments */}
+                {list.map((a) => {
+                  const top = timeToGridOffset(a.startsAt);
+                  const height = durationToHeight(a.startsAt, a.endsAt);
+                  if (top + height < 0 || top > gridH) return null;
+                  return (
+                    <button key={a.id}
+                      style={{ top: `${Math.max(0, top)}px`, height: `${height}px`, left: "2px", right: "2px", position: "absolute" }}
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
+                      onClick={() => onSelect(a)}
+                      className={cn(
+                        "z-10 rounded-md text-left overflow-hidden border text-white cursor-grab active:cursor-grabbing hover:brightness-95 transition-all",
+                        STATUS_DOT[a.status] === "bg-emerald-500" ? "bg-emerald-500 border-emerald-600"
+                          : STATUS_DOT[a.status] === "bg-red-500"     ? "bg-red-500 border-red-600"
+                          : STATUS_DOT[a.status] === "bg-gray-400"    ? "bg-gray-400 border-gray-500"
+                          : "bg-violet-500 border-violet-600",
+                      )}>
+                      <div className="px-1.5 pt-1 leading-tight">
+                        <p className="text-[10px] font-bold truncate">{format(new Date(a.startsAt), "h:mm a")}</p>
+                        <p className="text-[10px] truncate opacity-90">{a.client.name}</p>
+                        {height >= 48 && <p className="text-[10px] truncate opacity-75">{a.service?.name}</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Closed label */}
+                {!isOpen && bizHours.size > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest rotate-[-90deg]">Closed</span>
+                  </div>
+                )}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -505,20 +652,26 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<Tab>("today");
+  const [tab, setTab] = useState<Tab>("all");
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [staffFilter, setStaffFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [calMonth, setCalMonth] = useState<Date>(() => new Date());
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [showBlock, setShowBlock] = useState(false);
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string } }[]>([]);
+  const [allStaffFull, setAllStaffFull] = useState<{ availabilityRules?: AvailabilityRule[] }[]>([]);
 
   useEffect(() => {
     if (!bizId) return;
-    api.staff.listAll(bizId).then((all) => setStaffList(all.filter((s) => s.active))).catch(() => {});
+    api.staff.listAll(bizId).then((all) => {
+      const active = all.filter((s) => s.active);
+      setStaffList(active);
+      setAllStaffFull(active);
+    }).catch(() => {});
   }, [bizId]);
 
   const load = useCallback(async () => {
@@ -670,21 +823,24 @@ export default function AppointmentsPage() {
 
       {/* Tabs + filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-          {(["today","week","all"] as Tab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
-              className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                tab === t ? "bg-white text-gray-900 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700")}>
-              {t === "all" ? "All" : t === "week" ? "This week" : "Today"}
-            </button>
-          ))}
-        </div>
+        <select value={tab} onChange={(e) => setTab(e.target.value as Tab)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700 font-medium">
+          <option value="all">All appointments</option>
+          <option value="week">This week</option>
+          <option value="today">Today</option>
+        </select>
 
-        <div className="relative flex-1 min-w-40">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input placeholder="Search client…" value={search} onChange={(e) => setSearch(e.target.value)}
-            className="pl-9" />
+        <div className="flex items-center gap-1">
+          <button onClick={() => { setShowSearch(s => !s); if (showSearch) setSearch(""); }}
+            className={cn("p-2 rounded-xl border transition-colors", showSearch ? "bg-violet-50 border-violet-200 text-violet-600" : "border-gray-200 text-gray-400 hover:text-gray-600")}>
+            <Search className="w-4 h-4" />
+          </button>
+          {showSearch && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input placeholder="Search client…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-48" autoFocus />
+            </div>
+          )}
         </div>
 
         <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}
@@ -732,6 +888,7 @@ export default function AppointmentsPage() {
         <WeekView
           weekStart={weekStart}
           appts={calendarAppts}
+          allStaff={allStaffFull}
           onPrev={() => setWeekStart((w) => subWeeks(w, 1))}
           onNext={() => setWeekStart((w) => addWeeks(w, 1))}
           onToday={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }))}

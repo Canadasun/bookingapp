@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2 } from "lucide-react";
+import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Location } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -28,6 +28,9 @@ export default function StaffPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [locName, setLocName] = useState("");
   const [showLocations, setShowLocations] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [locForm, setLocForm] = useState({ name: "", address: "", phone: "", timezone: "", active: true });
+  const [savingLocation, setSavingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
@@ -112,6 +115,31 @@ export default function StaffPage() {
     try { await api.locations.create(bizId, { name: n }); setLocName(""); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
   }
+
+  function openEditLocation(l: Location) {
+    setEditingLocation(l);
+    setLocForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", active: l.active });
+  }
+
+  async function saveLocation() {
+    if (!editingLocation || !bizId) return;
+    if (!locForm.name.trim()) { toast.error("Name required"); return; }
+    setSavingLocation(true);
+    try {
+      await api.locations.update(bizId, editingLocation.id, {
+        name: locForm.name.trim(),
+        address: locForm.address.trim() || undefined,
+        phone: locForm.phone.trim() || undefined,
+        timezone: locForm.timezone.trim() || undefined,
+        active: locForm.active,
+      });
+      setEditingLocation(null);
+      load();
+      toast.success("Location updated");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to save"); }
+    finally { setSavingLocation(false); }
+  }
+
   async function removeLocation(l: Location) {
     if (!bizId) return;
     if (!confirm(`Delete "${l.name}"? Staff there become unassigned.`)) return;
@@ -177,17 +205,32 @@ export default function StaffPage() {
           <span className="text-xs text-violet-600 font-medium">{showLocations ? "Hide" : "Manage"}</span>
         </button>
         {showLocations && (
-          <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-2">
+          <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-3">
             <p className="text-xs text-gray-400">Add branches, then assign each staff member to one. Clients booking a location only see that location&apos;s providers. Single-location businesses can leave this empty.</p>
-            <div className="flex flex-wrap gap-2">
-              {locations.map((l) => (
-                <span key={l.id} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 border border-gray-200 px-3 py-1 text-sm text-gray-700">
-                  {l.name}
-                  <button onClick={() => removeLocation(l)} className="text-gray-400 hover:text-red-600" aria-label={`Delete ${l.name}`}>×</button>
-                </span>
-              ))}
-              {locations.length === 0 && <span className="text-xs text-gray-400">No locations yet.</span>}
-            </div>
+            {locations.map((l) => {
+              const staffCount = staff.filter((s) => s.locationId === l.id).length;
+              return (
+                <div key={l.id} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900">{l.name}</p>
+                      {!l.active && <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">inactive</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 mt-0.5">
+                      {l.address && <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3"/>{l.address}</p>}
+                      {l.phone && <p className="text-xs text-gray-500">{l.phone}</p>}
+                      {l.timezone && <p className="text-xs text-gray-400">{l.timezone}</p>}
+                      <p className="text-xs text-gray-400">{staffCount} staff</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => openEditLocation(l)} className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5"/></button>
+                    <button onClick={() => removeLocation(l)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
+                  </div>
+                </div>
+              );
+            })}
+            {locations.length === 0 && <p className="text-xs text-gray-400">No locations yet.</p>}
             <div className="flex gap-2 pt-1">
               <Input placeholder="e.g. Downtown · West End" value={locName}
                 onChange={(e) => setLocName(e.target.value)}
@@ -197,6 +240,47 @@ export default function StaffPage() {
           </div>
         )}
       </div>
+
+      {/* Location edit modal */}
+      {editingLocation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingLocation(null)} />
+          <Card className="relative w-full max-w-sm z-10">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Edit location</h3>
+            </div>
+            <CardContent className="space-y-3 pt-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
+                <Input value={locForm.name} onChange={(e) => setLocForm((p) => ({ ...p, name: e.target.value }))} placeholder="Downtown" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                <Input value={locForm.address} onChange={(e) => setLocForm((p) => ({ ...p, address: e.target.value }))} placeholder="123 Main St" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                <Input value={locForm.phone} onChange={(e) => setLocForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 0000" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
+                <Input value={locForm.timezone} onChange={(e) => setLocForm((p) => ({ ...p, timezone: e.target.value }))} placeholder="America/Toronto" />
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
+                <span className="text-sm text-gray-700">Active</span>
+                <button type="button" onClick={() => setLocForm((p) => ({ ...p, active: !p.active }))}
+                  className={cn("relative w-9 h-5 rounded-full transition-colors shrink-0", locForm.active ? "bg-violet-600" : "bg-gray-200")}>
+                  <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform", locForm.active ? "translate-x-4" : "translate-x-0.5")} />
+                </button>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <Button variant="secondary" className="flex-1" onClick={() => setEditingLocation(null)}>Cancel</Button>
+                <Button className="flex-1" loading={savingLocation} onClick={saveLocation}>Save</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" /> : (
         <div className="space-y-3">
@@ -210,9 +294,10 @@ export default function StaffPage() {
                     : initials(s.user.name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900">{s.user.name}</p>
                     {!s.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">inactive</span>}
+                    {s.locationId && (() => { const loc = locations.find((l) => l.id === s.locationId); return loc ? <span className="inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full"><MapPin className="w-3 h-3"/>{loc.name}</span> : null; })()}
                   </div>
                   {s.user.email && <p className="text-xs text-gray-500">{s.user.email}</p>}
                   {s.staffServices.length > 0 && (

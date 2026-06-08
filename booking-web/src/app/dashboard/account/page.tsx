@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageUpload } from "@/components/ImageUpload";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { formatPhoneInput } from "@/lib/utils";
 
 type Me = {
   id: string; email: string; name: string; phone?: string | null;
@@ -125,7 +126,7 @@ export default function AccountPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <Input type="tel" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 123 4567" />
+            <Input type="tel" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} placeholder="+1 (416) 555-0123" />
           </div>
 
           <div>

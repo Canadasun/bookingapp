@@ -119,8 +119,24 @@ export interface Invoice {
   id: string; businessId: string; clientId?: string | null; number: number;
   status: "DRAFT" | "SENT" | "PAID" | "VOID"; lineItems: InvoiceLineItem[]; notes?: string | null;
   currency: string; subtotalCents: number; taxRatePercent: number; taxCents: number; totalCents: number;
+  discountCents?: number; discountLabel?: string | null;
+  paymentTerms?: string | null; poNumber?: string | null; billingAddress?: string | null;
   dueAt?: string | null; createdAt: string; updatedAt: string;
-  client?: { id: string; name: string; email: string; phone?: string } | null;
+  client?: { id: string; name: string; email: string; phone?: string | null } | null;
+  business?: { name: string; email?: string | null; phone?: string | null; address?: string | null; taxNumber?: string | null; currency: string } | null;
+}
+
+export type InvoiceCreatePayload = {
+  clientId?: string | null; notes?: string | null; dueAt?: string | null;
+  lineItems: { description: string; quantity: number; unitCents: number }[];
+  taxRatePercent?: number | null; discountCents?: number; discountLabel?: string | null;
+  paymentTerms?: string | null; poNumber?: string | null; billingAddress?: string | null;
+}
+
+export interface SystemError {
+  id: string; businessId?: string | null; category: string; severity: string;
+  message: string; stack?: string | null; context: Record<string, unknown>;
+  resolved: boolean; resolvedAt?: string | null; createdAt: string;
 }
 
 export interface Service {
@@ -606,12 +622,30 @@ export const api = {
   invoices: {
     list: (businessId: string) => req<Invoice[]>(`/businesses/${businessId}/invoices`),
     get: (businessId: string, id: string) => req<Invoice>(`/businesses/${businessId}/invoices/${id}`),
-    create: (businessId: string, data: { clientId?: string | null; notes?: string; dueAt?: string; lineItems: { description: string; quantity: number; unitCents: number }[] }) =>
+    create: (businessId: string, data: InvoiceCreatePayload) =>
       req<Invoice>(`/businesses/${businessId}/invoices`, { method: "POST", body: JSON.stringify(data) }),
+    update: (businessId: string, id: string, data: Partial<InvoiceCreatePayload>) =>
+      req<Invoice>(`/businesses/${businessId}/invoices/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     setStatus: (businessId: string, id: string, status: "DRAFT" | "SENT" | "PAID" | "VOID") =>
       req<Invoice>(`/businesses/${businessId}/invoices/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+    sendByEmail: (businessId: string, id: string) =>
+      req<{ ok: boolean; sentTo: string }>(`/businesses/${businessId}/invoices/${id}/send`, { method: "POST" }),
     remove: (businessId: string, id: string) =>
       req<{ ok: boolean }>(`/businesses/${businessId}/invoices/${id}`, { method: "DELETE" }),
+  },
+
+  systemErrors: {
+    list: (params?: { resolved?: boolean; category?: string; limit?: number; businessId?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.resolved !== undefined) q.set("resolved", String(params.resolved));
+      if (params?.category) q.set("category", params.category);
+      if (params?.limit) q.set("limit", String(params.limit));
+      if (params?.businessId) q.set("businessId", params.businessId);
+      return req<SystemError[]>(`/system-errors${q.toString() ? "?" + q.toString() : ""}`);
+    },
+    counts: () => req<{ critical: number; error: number; warn: number; total: number }>("/system-errors/counts"),
+    resolve: (id: string) => req<{ count: number }>(`/system-errors/${id}/resolve`, { method: "PATCH" }),
+    resolveAll: () => req<{ count: number }>("/system-errors/resolve-all", { method: "POST" }),
   },
 
   serviceCategories: {

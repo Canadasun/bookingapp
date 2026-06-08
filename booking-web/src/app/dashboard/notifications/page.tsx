@@ -155,7 +155,7 @@ export default function NotificationsPage() {
         </div>
         <div className="flex gap-2">
           {unread > 0 && <Button variant="outline" size="sm" onClick={markAll}><CheckCheck className="w-4 h-4 mr-1.5" /> Mark all read</Button>}
-          {items.length > 0 && <Button variant="outline" size="sm" onClick={clearHistory}><Trash2 className="w-4 h-4 mr-1.5" /> Clear history</Button>}
+          {items.length > 0 && <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7" onClick={clearHistory}><Trash2 className="w-4 h-4 mr-1.5" /> Clear history</Button>}
         </div>
       </div>
 

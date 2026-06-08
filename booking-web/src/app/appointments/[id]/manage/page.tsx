@@ -127,8 +127,9 @@ export default function ManageAppointmentPage() {
                 <div className="flex items-start gap-3">
                   <User className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Staff</p>
-                    <p className="text-gray-900 font-semibold">{appointment.staff.user.name}</p>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Salon</p>
+                    <p className="text-gray-900 font-semibold">{appointment.business.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{appointment.staff.user.name}</p>
                   </div>
                 </div>
               </div>

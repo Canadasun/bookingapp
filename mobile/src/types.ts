@@ -1,11 +1,11 @@
 // Shared domain types (mirror the API response shapes).
 
 export interface User { id:string; name:string; email:string; role:string; staffId:string|null; businessId:string|null; mustResetPassword?:boolean; twoFactorEnabled?:boolean; twoFactorMethod?:'EMAIL'|'SMS' }
-export interface Appointment { id:string; startsAt:string; endsAt:string; status:string; notes?:string; cancelReason?:string; service:{id:string;name:string;durationMinutes:number;priceCents:number}; staff:{id:string;user:{name:string}}; client:{id:string;name:string;email:string;phone?:string} }
+export interface Appointment { id:string; startsAt:string; endsAt:string; status:string; notes?:string; cancelReason?:string; service:{id:string;name:string;durationMinutes:number;priceCents:number}; staff:{id:string;user:{name:string}}; client:{id:string;name:string;email:string;phone?:string}; location?:{id:string;name:string}|null }
 export interface ServiceCategory { id:string; name:string; color:string; sortOrder:number }
 export interface Service { id:string; name:string; durationMinutes:number; priceCents:number; color:string; active:boolean; description?:string; categoryId?:string|null; category?:ServiceCategory|null; capacity?:number; priceType?:'FLAT'|'PER_HOUR'|'STARTING_AT' }
 export interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:number; startTime:string; endTime:string }
-export interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string; avatarUrl?:string }
+export interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string; avatarUrl?:string; locationId?:string|null }
 export interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }
 export type BookingSlot = Slot & { staffId?:string; staffName?:string };
 export interface Client { id:string; name:string; email?:string|null; phone?:string; totalVisits?:number; lastVisit?:string; tags?:string[] }
@@ -17,3 +17,5 @@ export interface ServiceDueItem { id:string; status:'SCHEDULED'|'DUE'|'SENT'|'CA
 export interface ClientPortalAppointment extends Appointment { business:{id:string;name:string;slug?:string;phone?:string;address?:string}; manageToken?:string }
 export interface ClientPortalMessageThread { businessId:string; businessName:string; clientId:string; messages:Message[] }
 export interface ClientPortalOffer { id:string; title:string; description?:string; discount?:string; expiresAt?:string; business:{id:string;name:string;slug?:string} }
+export interface Resource { id:string; businessId:string; name:string; active:boolean; createdAt:string; updatedAt:string }
+export interface Location { id:string; businessId:string; name:string; address?:string|null; phone?:string|null; timezone?:string|null; active:boolean; createdAt:string; updatedAt:string }

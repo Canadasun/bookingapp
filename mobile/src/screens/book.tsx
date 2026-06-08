@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
-import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
+import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneInput } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
@@ -45,6 +45,8 @@ function BookScreen() {
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [loading, setLoading]         = useState(false);
   const [bookedId, setBookedId]       = useState('');
+  const [wlPrompt, setWlPrompt]       = useState(false);
+  const [wlSaving, setWlSaving]       = useState(false);
 
   // Build a 90-day date strip from today
   const dateStrip = Array.from({length: 90}, (_, i) => {
@@ -186,7 +188,13 @@ function BookScreen() {
         }
         setBookedId(apt.id); setStep('done');
       }
-    } catch(e){ Alert.alert('Booking failed', e instanceof Error ? e.message : 'Please try again'); }
+    } catch(e){
+      const msg = e instanceof Error ? e.message : '';
+      if (msg && (msg.toLowerCase().includes('conflict') || msg.toLowerCase().includes('taken') || msg.toLowerCase().includes('no longer available'))) {
+        setWlPrompt(true);
+      }
+      Alert.alert('Booking failed', msg || 'Please try again');
+    }
     finally { setLoading(false); }
   }
 
@@ -195,6 +203,7 @@ function BookScreen() {
     setStaffList([]); setAllStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
     setManualHour(9); setManualMin(0); setManualMeridiem('AM');
     setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId(''); setRepeat(null);
+    setWlPrompt(false); setWlSaving(false);
   }
 
   return (
@@ -361,18 +370,28 @@ function BookScreen() {
               </TouchableOpacity>
             </View>
             {loading&&<ActivityIndicator color={BRAND} style={{marginTop:20}}/>}
-            {!loading&&slots.length===0&&<Text style={s.emptyText}>No generated times for this date — pick another, or set a time manually above.</Text>}
-            <View style={s.slotGrid}>
-              {slots.map(sl=>(
-                <TouchableOpacity key={`${sl.staffId ?? 'staff'}-${sl.startsAt}`} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotBtnActive]}
-                  onPress={()=>{setSlot(sl);setStep('details');}}>
-                  <Text style={[s.slotText, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotTextActive]}>
-                    {fmtTime(sl.startsAtLocal)}
-                  </Text>
-                  {showStaffStep && sl.staffName && <Text style={[s.sub,{fontSize:10,textAlign:'center',marginTop:2}]} numberOfLines={1}>{sl.staffName}</Text>}
+            {slots.length === 0 && !loading && date ? (
+              <View style={[ms.card, { alignItems:'center', paddingVertical:24 }]}>
+                <Ionicons name="time-outline" size={28} color={GRAY_400}/>
+                <Text style={[ms.rowTitle,{ marginTop:8, textAlign:'center' }]}>Fully booked on this day</Text>
+                <Text style={[ms.empty,{ textAlign:'center', marginTop:4 }]}>Join the waitlist and we'll contact you when a spot opens.</Text>
+                <TouchableOpacity style={[s.btnPrimary,{ marginTop:12, paddingHorizontal:24 }]} onPress={()=>setWlPrompt(true)}>
+                  <Text style={s.btnPrimaryText}>Join Waitlist</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+              </View>
+            ) : (
+              <View style={s.slotGrid}>
+                {slots.map(sl=>(
+                  <TouchableOpacity key={`${sl.staffId ?? 'staff'}-${sl.startsAt}`} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotBtnActive]}
+                    onPress={()=>{setSlot(sl);setStep('details');}}>
+                    <Text style={[s.slotText, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotTextActive]}>
+                      {fmtTime(sl.startsAtLocal)}
+                    </Text>
+                    {showStaffStep && sl.staffName && <Text style={[s.sub,{fontSize:10,textAlign:'center',marginTop:2}]} numberOfLines={1}>{sl.staffName}</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </>}
 
           {/* ── Details + Policy ───────────────────────────────────── */}
@@ -388,14 +407,14 @@ function BookScreen() {
             {[
               {k:'name',   label:'Full name *',    type:'default' as const,       ph:'Jane Doe'},
               {k:'email',  label:'Email',            type:'email-address' as const, ph:'you@example.com'},
-              {k:'phone',  label:'Phone',            type:'phone-pad' as const,     ph:'+1 555 123 4567'},
+              {k:'phone',  label:'Phone',            type:'phone-pad' as const,     ph:'+1 (416) 555-0123'},
             ].map(({k,label,type,ph})=>(
               <View key={k} style={{marginBottom:12}}>
                 <Text style={s.fieldLabel}>{label}</Text>
                 <TextInput style={s.input} placeholder={ph} placeholderTextColor={GRAY_400}
                   keyboardType={type} autoCapitalize={k==='name'?'words':'none'}
                   value={form[k as keyof typeof form]}
-                  onChangeText={v=>setForm(p=>({...p,[k]:v}))}
+                  onChangeText={k==='phone' ? (text=>setForm(p=>({...p,phone:formatPhoneInput(text)}))) : (v=>setForm(p=>({...p,[k]:v})))}
                   onBlur={k==='phone'?()=>{ const np=normalizePhoneClient(form.phone); if(np) setForm(p=>({...p,phone:np})); }:undefined}/>
                 {k==='phone' && <Text style={s.fieldHint}>Enter an email address, a phone number, or both.</Text>}
               </View>
@@ -455,6 +474,33 @@ function BookScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal visible={wlPrompt} animationType="slide" onRequestClose={()=>setWlPrompt(false)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setWlPrompt(false)} style={{marginRight:6}}>
+              <Ionicons name="close" size={24} color={GRAY_700}/>
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>Join Waitlist</Text>
+          </View>
+          <ScrollView contentContainerStyle={s.listContent}>
+            <Text style={ms.empty}>We'll notify you the moment a spot opens up.</Text>
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={wlSaving} onPress={async()=>{
+              setWlSaving(true);
+              try {
+                await api(`/businesses/${bizId()}/waitlist`, { method:'POST', body: JSON.stringify({
+                  name: form.name, email: form.email, phone: form.phone||undefined,
+                  serviceId: selectedSvcs[0]?.id, date: date,
+                })});
+                setWlPrompt(false);
+                Alert.alert("You're on the waitlist!", "We'll contact you when a spot opens.");
+              } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not join.'); }
+              finally { setWlSaving(false); }
+            }}>
+              <Text style={s.btnPrimaryText}>{wlSaving ? 'Joining…' : 'Notify me'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }

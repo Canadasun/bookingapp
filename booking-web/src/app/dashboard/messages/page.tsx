@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Send, MessageSquare, ChevronLeft, Mail, Smartphone } from "lucide-react";
+import { Send, MessageSquare, ChevronLeft, Mail, Smartphone, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -22,6 +22,7 @@ export default function MessagesPage() {
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<"all" | "unread" | "archived">("all");
+  const [channel, setChannel]   = useState<"ALL" | "IN_APP" | "SMS">("ALL");
   const [search, setSearch]     = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -34,12 +35,12 @@ export default function MessagesPage() {
       return;
     }
     try {
-      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: search.trim() || undefined });
+      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: search.trim() || undefined, channel: channel !== "ALL" ? channel : undefined });
       setThreads(threadData);
     }
     catch { toast.error("Failed to load messages"); }
     finally { setLoading(false); }
-  }, [bizId, filter, search]);
+  }, [bizId, filter, channel, search]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
@@ -105,7 +106,19 @@ export default function MessagesPage() {
         <div className="p-3 border-b border-gray-100 space-y-2">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search messages" />
           <div className="flex gap-1">
-            {(["all", "unread", "archived"] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", filter === value ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-500")}>{value}</button>)}
+            {(["all", "unread", "archived"] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={cn("rounded-full px-2.5 py-1 text-xs font-semibold capitalize", filter === value ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-500")}>{value}</button>)}
+          </div>
+          <div className="flex gap-1">
+            {([
+              { val: "ALL", icon: null, label: "All" },
+              { val: "IN_APP", icon: <Mail className="w-3 h-3" />, label: "In-app" },
+              { val: "SMS", icon: <MessageCircle className="w-3 h-3" />, label: "SMS" },
+            ] as const).map(({ val, icon, label }) => (
+              <button key={val} onClick={() => setChannel(val)}
+                className={cn("rounded-full px-2.5 py-1 text-xs font-semibold flex items-center gap-1", channel === val ? "bg-amber-500 text-white" : "bg-gray-100 text-gray-500")}>
+                {icon}{label}
+              </button>
+            ))}
           </div>
         </div>
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">

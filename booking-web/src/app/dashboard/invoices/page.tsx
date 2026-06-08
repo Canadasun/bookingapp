@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Plus, X, Trash2, FileText } from "lucide-react";
+import { Plus, X, Trash2, FileText, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { api, Invoice, ClientWithStats, Business } from "@/lib/api";
+import { api, Invoice, ClientWithStats, Business, InvoiceCreatePayload } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
@@ -94,8 +95,11 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
   const [clientId, setClientId] = useState("");
   const [notes, setNotes] = useState("");
   const [dueAt, setDueAt] = useState("");
+  const [poNumber, setPoNumber] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([{ description: "", quantity: "1", unitCents: "" }]);
   const [saving, setSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const setLine = (i: number, patch: Partial<DraftLine>) => setLines((p) => p.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const addLine = () => setLines((p) => [...p, { description: "", quantity: "1", unitCents: "" }]);
@@ -110,12 +114,15 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
     if (lineItems.length === 0) { toast.error("Add at least one line item with a description and quantity"); return; }
     setSaving(true);
     try {
-      const inv = await api.invoices.create(bizId, {
+      const payload: InvoiceCreatePayload = {
         clientId: clientId || undefined,
-        notes: notes.trim() || undefined,
-        dueAt: dueAt ? new Date(`${dueAt}T00:00:00`).toISOString() : undefined,
+        notes: notes.trim() || null,
+        dueAt: dueAt ? new Date(`${dueAt}T00:00:00`).toISOString() : null,
         lineItems,
-      });
+        poNumber: poNumber.trim() || null,
+        paymentTerms: paymentTerms.trim() || null,
+      };
+      const inv = await api.invoices.create(bizId, payload);
       toast.success(`Invoice #${String(inv.number).padStart(4, "0")} created`);
       onCreated(inv);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to create invoice"); }
@@ -163,8 +170,38 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <Input placeholder="Payment terms, thank-you note…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Textarea placeholder="Thank-you note, additional info…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="resize-none" />
           </div>
+
+          {/* Advanced fields toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-violet-600 hover:text-violet-700"
+          >
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showAdvanced && "rotate-180")} />
+            {showAdvanced ? "Hide" : "Show"} advanced fields
+          </button>
+
+          {showAdvanced && (
+            <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">PO Number (optional)</label>
+                <Input placeholder="e.g. PO-2026-001" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Payment Terms (optional)</label>
+                <Textarea
+                  placeholder="e.g. Net 30 days. Payment by e-transfer to payments@business.com"
+                  value={paymentTerms}
+                  onChange={(e) => setPaymentTerms(e.target.value)}
+                  rows={2}
+                  className="text-sm resize-none"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400">More fields (discount, billing address, tax rate) can be edited after creation.</p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between border-t border-gray-100 pt-3">
             <span className="text-sm text-gray-500">Subtotal</span>

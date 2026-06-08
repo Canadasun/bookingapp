@@ -7,7 +7,7 @@ import { format, startOfDay, addMinutes, parseISO, isBefore, isAfter } from "dat
 import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, formatPhoneInput } from "@/lib/utils";
 import Link from "next/link";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -33,7 +33,11 @@ function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
 function groupSlots<T extends Slot>(slots: T[]) {
   const m: T[] = [], a: T[] = [], e: T[] = [];
   for (const s of slots) {
-    const h = new Date(s.startsAtLocal).getHours();
+    // Slice the HH from the offset-aware local string (e.g. "2024-01-15T09:00:00-05:00")
+    // instead of using new Date().getHours() which returns the browser's local-timezone
+    // hour and breaks grouping for clients in a different timezone than the business.
+    // It also avoids Safari's inconsistent handling of timezone-offset date strings.
+    const h = parseInt(s.startsAtLocal.slice(11, 13), 10);
     if (h < 12) m.push(s); else if (h < 17) a.push(s); else e.push(s);
   }
   return { morning: m, afternoon: a, evening: e };
@@ -471,7 +475,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">That time was just booked</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">Someone grabbed{selectedSlot ? ` ${format(parseISO(selectedSlot.startsAtLocal), "EEE, MMM d 'at' HH:mm")}` : " this slot"} a moment before you. Want us to notify you if it opens back up?</p>
+                    <p className="text-sm text-gray-500 mt-0.5">Someone grabbed{selectedSlot ? ` ${format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "EEE, MMM d 'at' HH:mm")}` : " this slot"} a moment before you. Want us to notify you if it opens back up?</p>
                   </div>
                 </div>
                 <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-sm space-y-1 mb-5">
@@ -498,7 +502,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
               <Check className="w-8 h-8 text-emerald-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re booked!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Booking is Confirmed</h2>
+            <p className="text-sm text-violet-600 font-medium mb-2">You&apos;re all set!</p>
             <p className="text-gray-500 mb-1">Confirmation sent to <span className="font-medium text-gray-800">{[form.email, form.phone].filter(Boolean).join(" and ")}</span></p>
             <p className="text-xs text-gray-400 font-mono mb-3">#{booking.id.slice(-8).toUpperCase()}</p>
             {clientMatched && (
@@ -535,7 +540,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               </div>
               <div className="flex justify-between text-gray-500 text-xs">
                 <span>When</span>
-                <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}</span>
+                <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a")}</span>
               </div>
             </div>
 
@@ -816,7 +821,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                                       ? "bg-violet-600 text-white border-violet-600"
                                       : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50",
                                   )}>
-                                  {format(parseISO(sl.startsAtLocal), "h:mm a")}
+                                  {format(parseISO(sl.startsAtLocal.slice(0, 19)), "h:mm a")}
                                   {selectedStaff === "any" && sl.staffName && <span className="block truncate px-1 text-[10px] font-medium opacity-70">{sl.staffName}</span>}
                                 </button>
                               ))}
@@ -847,7 +852,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       </p>
                       <p className="text-violet-600 mt-0.5">
                         {selectedDate && format(selectedDate, "EEE, MMM d")}
-                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal), "h:mm a")}`}
+                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a")}`}
                         {` · ${providerText(chosenStaffName)}`}
                       </p>
                     </div>
@@ -862,33 +867,28 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   {([
                     { k: "name",  label: "Full name *",  type: "text",  ph: "Jane Smith" },
                     { k: "email", label: "Email",         type: "email", ph: "jane@example.com" },
-                    { k: "phone", label: "Phone",         type: "tel",   ph: "555 000 0000" },
+                    { k: "phone", label: "Phone",         type: "tel",   ph: "+1 (416) 555-0123" },
                     { k: "notes", label: "Notes (optional)", type: "text", ph: "Anything we should know?" },
-                  ] as const).map(({ k, label, type, ph }) => {
-                    const prefix = k === "phone" ? "+1" : undefined; // US/Canada default; server normalizes
-                    return (
+                  ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-                      <div className="relative">
-                        {prefix && (
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 select-none pointer-events-none">{prefix}</span>
+                      <input
+                        type={type}
+                        placeholder={ph}
+                        value={form[k]}
+                        onChange={(e) => {
+                          const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
+                          setForm((p) => ({ ...p, [k]: val }));
+                          setErrs((p) => ({ ...p, [k]: "" }));
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow",
+                          errs[k] ? "border-red-400" : "border-gray-200",
                         )}
-                        <input
-                          type={type}
-                          placeholder={ph}
-                          value={form[k]}
-                          onChange={(e) => { setForm((p) => ({ ...p, [k]: e.target.value })); setErrs((p) => ({ ...p, [k]: "" })); }}
-                          className={cn(
-                            "w-full py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow",
-                            prefix ? "pl-9 pr-3" : "px-3",
-                            errs[k] ? "border-red-400" : "border-gray-200",
-                          )}
-                        />
-                      </div>
+                      />
                       {errs[k] && <p className="text-xs text-red-500 mt-1">{errs[k]}</p>}
                     </div>
-                    );
-                  })}
+                  ))}
 
                   {/* Intake / consultation questions (owner-defined) */}
                   {(biz?.intakeQuestions ?? []).map((q) => (

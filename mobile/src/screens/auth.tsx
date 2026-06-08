@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
-import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
+import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneInput } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
@@ -265,8 +265,8 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
             keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail}/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Business phone (optional)</Text>
-          <TextInput style={s.input} placeholder="+1 555 123 4567" placeholderTextColor={GRAY_400}
-            keyboardType="phone-pad" value={phone} onChangeText={setPhone}
+          <TextInput style={s.input} placeholder="+1 (416) 555-0123" placeholderTextColor={GRAY_400}
+            keyboardType="phone-pad" value={phone} onChangeText={text=>setPhone(formatPhoneInput(text))}
             onBlur={()=>{ const np=normalizePhoneClient(phone); if(np) setPhone(np); }}/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Password</Text>

@@ -25,12 +25,12 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { api, AdminOverview, FlaggedDuplicate, VerificationStatus } from "@/lib/api";
+import { api, AdminOverview, FlaggedDuplicate, VerificationStatus, SystemError } from "@/lib/api";
 import { getUser, clearSession } from "@/lib/auth";
 import { formatPrice, cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
-type Tab = "overview" | "verifications" | "businesses" | "duplicates";
+type Tab = "overview" | "verifications" | "businesses" | "duplicates" | "errors";
 
 type Pending = {
   id: string;
@@ -93,6 +93,9 @@ export default function AdminPage() {
   const [duplicates, setDuplicates] = useState<FlaggedDuplicate[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [sysErrors, setSysErrors] = useState<SystemError[]>([]);
+  const [errFilter, setErrFilter] = useState<"unresolved" | "resolved" | "all">("unresolved");
+  const [errBusy, setErrBusy] = useState(false);
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [passwordBusy, setPasswordBusy] = useState(false);
 
@@ -115,6 +118,33 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadErrors = useCallback(async () => {
+    try {
+      const data = await api.systemErrors.list({
+        resolved: errFilter === "resolved" ? true : errFilter === "unresolved" ? false : undefined,
+        limit: 200,
+      });
+      setSysErrors(data);
+    } catch { toast.error("Failed to load system errors"); }
+  }, [errFilter]);
+
+  useEffect(() => { if (tab === "errors") loadErrors(); }, [tab, loadErrors]);
+
+  async function resolveError(id: string) {
+    setErrBusy(true);
+    try { await api.systemErrors.resolve(id); await loadErrors(); }
+    catch { toast.error("Failed"); }
+    finally { setErrBusy(false); }
+  }
+
+  async function resolveAllErrors() {
+    if (!window.confirm("Mark all unresolved errors as resolved?")) return;
+    setErrBusy(true);
+    try { await api.systemErrors.resolveAll(); await loadErrors(); toast.success("All errors resolved"); }
+    catch { toast.error("Failed"); }
+    finally { setErrBusy(false); }
+  }
 
   const planTotal = useMemo(() => {
     if (!overview) return 0;
@@ -209,6 +239,7 @@ export default function AdminPage() {
     { id: "verifications", label: "Verifications", icon: BadgeCheck, badge: queue.length || undefined },
     { id: "businesses",    label: "Businesses",    icon: Building2 },
     { id: "duplicates",    label: "Duplicates",    icon: AlertTriangle, badge: duplicates.length || undefined },
+    { id: "errors",        label: "Errors",        icon: Activity, badge: sysErrors.filter((e) => !e.resolved && e.severity === "CRITICAL").length || undefined },
   ];
 
   return (
@@ -446,7 +477,7 @@ export default function AdminPage() {
                               </div>
                               <p className="mt-0.5 text-xs text-gray-500">{b.email} · /{b.slug}</p>
                               <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-600 space-y-1">
-                                <p><span className="font-semibold text-gray-800">Legal name:</span> {b.verificationLegalName || "Missing"}</p>
+                                <p><span className="font-semibold text-gray-800">Business name:</span> {b.verificationLegalName || "Missing"}</p>
                                 <p><span className="font-semibold text-gray-800">Address:</span> {b.verificationAddress || "Missing"}</p>
                                 <p><span className="font-semibold text-gray-800">Phone:</span> {b.verificationPhone || "Missing"}</p>
                               </div>
@@ -636,6 +667,89 @@ export default function AdminPage() {
                           {busy === d.id ? "Clearing…" : "Not a duplicate"}
                         </button>
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── SYSTEM ERRORS ──────────────────────────────────────────────── */}
+        {tab === "errors" && (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-950">System Errors</h1>
+                <p className="mt-1 text-sm text-gray-500">Server-side errors logged automatically. Resolve them once investigated.</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex gap-1">
+                  {(["unresolved", "resolved", "all"] as const).map((f) => (
+                    <button key={f} onClick={() => setErrFilter(f)}
+                      className={cn("rounded-full px-3 py-1 text-xs font-semibold capitalize", errFilter === f ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-500")}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                {errFilter === "unresolved" && sysErrors.length > 0 && (
+                  <button onClick={resolveAllErrors} disabled={errBusy}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">
+                    Resolve all
+                  </button>
+                )}
+                <button onClick={loadErrors} disabled={errBusy} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+                  <RefreshCw className={cn("w-4 h-4", errBusy && "animate-spin")} />
+                </button>
+              </div>
+            </div>
+
+            {sysErrors.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
+                <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400 mb-3" />
+                <p className="font-semibold text-gray-900">No {errFilter !== "all" ? errFilter : ""} errors</p>
+                <p className="mt-1 text-sm text-gray-400">500 errors and webhook failures are logged here automatically.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sysErrors.map((e) => (
+                  <div key={e.id} className={cn(
+                    "rounded-xl border bg-white p-4 shadow-sm",
+                    e.severity === "CRITICAL" ? "border-red-300" : e.severity === "ERROR" ? "border-orange-200" : "border-gray-200",
+                  )}>
+                    <div className="flex items-start gap-3">
+                      <span className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide mt-0.5",
+                        e.severity === "CRITICAL" ? "bg-red-100 text-red-700" : e.severity === "ERROR" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700",
+                      )}>
+                        {e.severity}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">{e.category}</span>
+                          {e.businessId && <span className="text-xs text-gray-400 font-mono">{e.businessId.slice(0, 8)}…</span>}
+                          <span className="text-xs text-gray-400">{format(new Date(e.createdAt), "MMM d, HH:mm")}</span>
+                          {e.resolved && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded px-1.5 py-0.5">RESOLVED</span>}
+                        </div>
+                        <p className="mt-1 text-sm font-medium text-gray-900 break-words">{e.message}</p>
+                        {e.context && Object.keys(e.context).length > 0 && (
+                          <p className="mt-1 text-xs text-gray-400 font-mono break-words">
+                            {Object.entries(e.context).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                          </p>
+                        )}
+                        {e.stack && (
+                          <details className="mt-2">
+                            <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Stack trace</summary>
+                            <pre className="mt-1 text-[11px] text-gray-500 bg-gray-50 rounded p-2 overflow-x-auto whitespace-pre-wrap">{e.stack.slice(0, 1000)}</pre>
+                          </details>
+                        )}
+                      </div>
+                      {!e.resolved && (
+                        <button onClick={() => resolveError(e.id)} disabled={errBusy}
+                          className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 transition-colors disabled:opacity-50">
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

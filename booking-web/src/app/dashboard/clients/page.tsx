@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SkeletonList, SkeletonCard } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ClientMergeModal } from "@/components/ClientMergeModal";
-import { formatPrice, cn } from "@/lib/utils";
+import { formatPrice, cn, formatPhoneInput } from "@/lib/utils";
 
 const DAY_MS = 86_400_000;
 
@@ -297,14 +297,18 @@ export default function ClientsPage() {
                 <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/40 p-4">
                   <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Edit contact</p>
                   {([
-                    { k: "name", label: "Full name *", type: "text" },
-                    { k: "email", label: "Email *", type: "email" },
-                    { k: "phone", label: "Phone", type: "tel" },
-                    { k: "notes", label: "Notes", type: "text" },
-                  ] as const).map(({ k, label, type }) => (
+                    { k: "name",  label: "Full name *", type: "text",  ph: "Jane Doe" },
+                    { k: "email", label: "Email *",      type: "email", ph: "jane@example.com" },
+                    { k: "phone", label: "Phone",        type: "tel",   ph: "+1 (416) 555-0123" },
+                    { k: "notes", label: "Notes",        type: "text",  ph: "" },
+                  ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
                       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                      <Input type={type} value={editForm[k]} onChange={(e) => setEditForm((p) => ({ ...p, [k]: e.target.value }))} />
+                      <Input type={type} placeholder={ph} value={editForm[k]}
+                        onChange={(e) => {
+                          const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
+                          setEditForm((p) => ({ ...p, [k]: val }));
+                        }} />
                     </div>
                   ))}
                   <div>
@@ -463,13 +467,16 @@ export default function ClientsPage() {
               {[
                 { k:"name",  label:"Full name *",   type:"text",  ph:"Jane Doe" },
                 { k:"email", label:"Email *",        type:"email", ph:"jane@example.com" },
-                { k:"phone", label:"Phone",          type:"tel",   ph:"+1 555 000 0000" },
+                { k:"phone", label:"Phone",          type:"tel",   ph:"+1 (416) 555-0123" },
                 { k:"notes", label:"Notes",          type:"text",  ph:"Any notes…" },
               ].map(({ k, label, type, ph }) => (
                 <div key={k}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
                   <Input type={type} placeholder={ph} value={form[k as keyof typeof form]}
-                    onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))} />
+                    onChange={(e) => {
+                      const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
+                      setForm((p) => ({ ...p, [k]: val }));
+                    }} />
                 </div>
               ))}
               <div className="flex gap-3 pt-2">

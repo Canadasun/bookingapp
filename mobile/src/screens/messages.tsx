@@ -26,12 +26,16 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<'all'|'unread'|'archived'>('all');
+  const [channel, setChannel]   = useState<'ALL'|'IN_APP'|'SMS'>('ALL');
   const scrollRef = useRef<ScrollView>(null);
 
   const loadThreads = useCallback(async () => {
     try {
+      const filterPart = filter==='unread'?'?unread=true':filter==='archived'?'?archived=true':'?';
+      const channelPart = channel !== 'ALL' ? `${filterPart === '?' ? '' : '&'}channel=${channel}` : '';
+      const url = `/businesses/${bizId()}/messages${filterPart}${channelPart}`;
       const [threadData, unread] = await Promise.all([
-        api<any[]>(`/businesses/${bizId()}/messages${filter==='unread'?'?unread=true':filter==='archived'?'?archived=true':''}`),
+        api<any[]>(url),
         api<{unreadMessages:number}>(`/businesses/${bizId()}/messages/unread-count`).catch(() => ({ unreadMessages:0 })),
       ]);
       setThreads(threadData);
@@ -39,7 +43,7 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     }
     catch {}
     finally { setLoading(false); }
-  }, [onUnreadChanged, filter]);
+  }, [onUnreadChanged, filter, channel]);
   useEffect(()=>{ loadThreads(); },[loadThreads]);
   useEffect(() => navigation.addListener('focus', loadThreads), [navigation, loadThreads]);
   useEffect(() => {
@@ -50,6 +54,14 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   useEffect(()=>{
     if (initialClient) { openThread(initialClient); onClearClient(); }
   },[initialClient]);
+
+  async function loadMessages(clientId: string) {
+    try {
+      const data = await api<Message[]>(`/businesses/${bizId()}/clients/${clientId}/messages`);
+      setMsgs(data);
+      setTimeout(()=>scrollRef.current?.scrollToEnd({animated:false}),50);
+    } catch {}
+  }
 
   async function openThread(c:Client) {
     setSelected(c);
@@ -62,6 +74,13 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     } catch {}
     setTimeout(()=>scrollRef.current?.scrollToEnd({animated:false}),100);
   }
+
+  // FIX C: auto-refresh messages while a thread is open
+  useEffect(() => {
+    if (!selected) return;
+    const interval = setInterval(() => loadMessages(selected.id), 5000);
+    return () => clearInterval(interval);
+  }, [selected]);
 
   async function send() {
     if (!reply.trim()||!selected) return;
@@ -116,6 +135,16 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
       <View style={s.header}><Text style={s.headerTitle}>Messages</Text></View>
       <View style={{flexDirection:'row',gap:8,paddingHorizontal:16,paddingBottom:8}}>
         {(['all','unread','archived'] as const).map(value=><TouchableOpacity key={value} onPress={()=>setFilter(value)} style={[cal.filterChip,filter===value&&cal.filterChipOn]}><Text style={[cal.filterText,filter===value&&cal.filterTextOn]}>{value}</Text></TouchableOpacity>)}
+      </View>
+      <View style={{ flexDirection:'row', gap:6, marginBottom:8, paddingHorizontal:16 }}>
+        {(['ALL','IN_APP','SMS'] as const).map(c => (
+          <TouchableOpacity key={c} onPress={()=>setChannel(c)}
+            style={[ms.methodChip, channel===c && ms.methodChipOn]}>
+            <Text style={[ms.methodChipText, channel===c && {color:BRAND}]}>
+              {c==='ALL'?'All':c==='IN_APP'?'In-app':'SMS'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
       {loading?<ActivityIndicator color={BRAND} style={{marginTop:40}}/>:(
         <FlatList

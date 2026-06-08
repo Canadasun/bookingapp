@@ -148,6 +148,9 @@ model Business {
   stripeConnectAccountId   String?
   stripeConnectOnboarded   Boolean @default(false)
 
+  // Tax/registration number shown on invoices (GST, HST, EIN, BN, etc.)
+  taxNumber String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -671,6 +674,11 @@ model Invoice {
   taxRatePercent Float     @default(0)
   taxCents       Int       @default(0)
   totalCents     Int       @default(0)
+  discountCents  Int       @default(0)  // flat discount before tax
+  discountLabel  String?               // e.g. "10% loyalty discount"
+  paymentTerms   String?               // e.g. "Net 30", "Due on receipt"
+  poNumber       String?               // purchase order reference
+  billingAddress String?               // free-text bill-to address override
   dueAt          DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -680,6 +688,24 @@ model Invoice {
 
   @@index([businessId])
   @@index([clientId])
+}
+
+model SystemError {
+  id         String   @id @default(cuid())
+  businessId String?  // null = platform-level error
+  category   String   // PAYMENT | BOOKING | SMS | EMAIL | CALENDAR | AUTH | GENERAL
+  severity   String   @default("ERROR") // WARN | ERROR | CRITICAL
+  message    String
+  stack      String?
+  context    Json     @default("{}") // request path, userId, etc.
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+  @@index([category])
+  @@index([resolved])
+  @@index([createdAt])
 }
 
 model ServiceCategory {

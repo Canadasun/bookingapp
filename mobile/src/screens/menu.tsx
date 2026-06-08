@@ -11,8 +11,8 @@ import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
-import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
-import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
+import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer, Resource, Location } from '../types';
+import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneInput } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, setBiometricEnabled, biometricCapability, authenticateBiometric } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
@@ -20,7 +20,7 @@ import { Pill, PriceTag, VerifiedPill, SwipeToDelete } from '../components';
 
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
-  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'soon';
+  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations' | 'soon';
 
 // Plan tiers mirror the web billing page. Display-only on mobile for now — every
 // business is on Pro during testing; paid switching gets wired up after testing.
@@ -111,11 +111,18 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [packageIssue, setPackageIssue] = useState<{ client:Client|null; search:string; packageId:string; results:Client[] }|null>(null);
   const [campaignEditor, setCampaignEditor] = useState<{ name:string; channel:'EMAIL'|'SMS'; audience:'ALL'|'RECENT'|'LAPSED'; subject:string; body:string; count:number|null }|null>(null);
   const [taskEditor, setTaskEditor] = useState<{ title:string; staffId:string; dueAt:string; notes:string }|null>(null);
-  const [settingsEditor, setSettingsEditor] = useState<{ name:string; email:string; phone:string; address:string; minNoticeMinutes:string; maxAdvanceDays:string; cancellationWindowHours:string; requireDeposit:boolean; depositPercent:string }|null>(null);
+  const [settingsEditor, setSettingsEditor] = useState<{ name:string; email:string; phone:string; address:string; minNoticeMinutes:string; maxAdvanceDays:string; cancellationWindowHours:string; requireDeposit:boolean; depositPercent:string; cancellationPolicy:string }|null>(null);
   const [timeOffEditor, setTimeOffEditor] = useState<{ staffId:string; name:string; startsAt:string; endsAt:string; reason:string }|null>(null);
   const [staffServiceEditor, setStaffServiceEditor] = useState<{ staffId:string; name:string; serviceIds:string[] }|null>(null);
+  const [staffLocationEditor, setStaffLocationEditor] = useState<{ staffId:string; name:string; locationId:string }>();
   const [followupBusy, setFollowupBusy] = useState<string|null>(null);
   const [followupSnoozing, setFollowupSnoozing] = useState<string|null>(null);
+  const [resources, setResources] = useState<Resource[]|null>(null);
+  const [resourceEditor, setResourceEditor] = useState<{ id?:string; name:string }|null>(null);
+  const [resourceSaving, setResourceSaving] = useState(false);
+  const [locations, setLocations] = useState<Location[]|null>(null);
+  const [locationEditor, setLocationEditor] = useState<{ id?:string; name:string; address:string; phone:string; timezone:string; active:boolean }|null>(null);
+  const [locationSaving, setLocationSaving] = useState(false);
   const [availabilityEditor, setAvailabilityEditor] = useState<{
     staffId:string;
     name:string;
@@ -771,6 +778,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         cancellationWindowHours: Number.parseInt(settingsEditor.cancellationWindowHours, 10),
         requireDeposit: settingsEditor.requireDeposit,
         depositPercent,
+        cancellationPolicy: settingsEditor.cancellationPolicy.trim() || undefined,
       };
       if (!payload.name || !payload.email || !Number.isFinite(payload.minNoticeMinutes) || !Number.isFinite(payload.maxAdvanceDays)) {
         Alert.alert('Check settings', 'Business name, email, notice, and advance window are required.');
@@ -872,6 +880,21 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     }
   }
 
+  async function saveStaffLocation() {
+    if (!staffLocationEditor) return;
+    try {
+      await api(`/businesses/${bizId()}/staff/${staffLocationEditor.staffId}`, {
+        method:'PATCH',
+        body: JSON.stringify({ locationId: staffLocationEditor.locationId || null }),
+      });
+      setStaff(await api<Staff[]>(`/businesses/${bizId()}/staff/all`));
+      setStaffLocationEditor(undefined);
+      Alert.alert('Saved', 'Location was updated.');
+    } catch(e) {
+      Alert.alert('Could not save location', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
+
   async function removeWaitlistEntry(id: string) {
     Alert.alert('Remove from waitlist', 'Remove this person from the active waitlist?', [
       { text:'Cancel', style:'cancel' },
@@ -905,12 +928,14 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       }
       else if (v === 'staff' && (!staff || !services))  {
         setLoading(true);
-        const [staffRows, serviceRows] = await Promise.all([
+        const [staffRows, serviceRows, locationRows] = await Promise.all([
           api<Staff[]>(`/businesses/${bizId()}/staff/all`),
           api<Service[]>(`/businesses/${bizId()}/services`),
+          api<Location[]>(`/businesses/${bizId()}/locations`).catch(() => [] as Location[]),
         ]);
         setStaff(staffRows);
         setServices(serviceRows);
+        setLocations(locationRows);
       }
       else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${bizId()}/offers`)); }
       else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${bizId()}/waitlist`)); }
@@ -933,6 +958,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       }
       else if (v === 'transactions') { setLoading(true); setPayments(await api<any[]>(`/payments`)); }
       else if (v === 'invoices' && !invoices) { setLoading(true); setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`)); }
+      else if (v === 'resources') { setLoading(true); setResources(await api<Resource[]>(`/businesses/${bizId()}/resources`)); }
+      else if (v === 'locations') { setLoading(true); setLocations(await api<Location[]>(`/businesses/${bizId()}/locations`)); }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
 
@@ -1071,6 +1098,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <View style={{ flex:1, minWidth:0 }}>
                   <Text style={ms.rowTitle} numberOfLines={1}>{st.user.name}</Text>
                   <Text style={ms.rowMeta} numberOfLines={1}>{st.bio || `${st.staffServices?.length ?? 0} services`}</Text>
+                  {st.locationId && (locations ?? []).find(l => l.id === st.locationId) && (
+                    <Text style={[ms.rowMeta,{ color:BRAND, marginTop:2 }]} numberOfLines={1}>
+                      <Ionicons name="location-outline" size={11} color={BRAND}/>{' '}{(locations ?? []).find(l => l.id === st.locationId)?.name}
+                    </Text>
+                  )}
                 </View>
               </View>
               <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
@@ -1089,6 +1121,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openStaffServices(st)}>
                   <Text style={ms.smallActionText}>Services</Text>
                 </TouchableOpacity>
+                {(locations ?? []).length > 0 && (
+                  <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>setStaffLocationEditor({ staffId:st.id, name:st.user.name, locationId:st.locationId??'' })}>
+                    <Text style={ms.smallActionText}>Location</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))}
@@ -1217,6 +1254,43 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               })}
               <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffServices}>
                 <Text style={s.btnPrimaryText}>Save services</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+      <Modal visible={!!staffLocationEditor} animationType="slide" onRequestClose={()=>setStaffLocationEditor(undefined)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setStaffLocationEditor(undefined)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Assign location</Text>
+          </View>
+          {staffLocationEditor && (
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={ms.cardLabel}>{staffLocationEditor.name}</Text>
+              <TouchableOpacity
+                style={[ms.row, !staffLocationEditor.locationId && { borderColor:BRAND, backgroundColor:BRAND_LT }]}
+                onPress={()=>setStaffLocationEditor({...staffLocationEditor, locationId:''})}>
+                <View style={[ms.dot,{ backgroundColor: !staffLocationEditor.locationId ? BRAND : GRAY_200 }]}/>
+                <Text style={ms.rowTitle}>Any / unassigned</Text>
+                <Ionicons name={!staffLocationEditor.locationId ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={!staffLocationEditor.locationId ? BRAND : GRAY_400}/>
+              </TouchableOpacity>
+              {(locations ?? []).filter(l => l.active).map(l => {
+                const selected = staffLocationEditor.locationId === l.id;
+                return (
+                  <TouchableOpacity key={l.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]}
+                    onPress={()=>setStaffLocationEditor({...staffLocationEditor, locationId:l.id})}>
+                    <View style={[ms.dot,{ backgroundColor: selected ? BRAND : GRAY_200 }]}/>
+                    <View style={{ flex:1 }}>
+                      <Text style={ms.rowTitle}>{l.name}</Text>
+                      {l.address && <Text style={ms.rowMeta} numberOfLines={1}>{l.address}</Text>}
+                    </View>
+                    <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? BRAND : GRAY_400}/>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffLocation}>
+                <Text style={s.btnPrimaryText}>Save location</Text>
               </TouchableOpacity>
             </ScrollView>
           )}
@@ -2089,6 +2163,360 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  // ── Locations ───────────────────────────────────────────────────────────────
+  async function loadLocations() {
+    setLoading(true);
+    try { setLocations(await api<Location[]>(`/businesses/${bizId()}/locations`)); }
+    catch { Alert.alert('Error', 'Could not load locations.'); }
+    finally { setLoading(false); }
+  }
+  async function saveLocation() {
+    if (!locationEditor) return;
+    const name = locationEditor.name.trim();
+    if (!name) return;
+    setLocationSaving(true);
+    try {
+      const payload = {
+        name,
+        address: locationEditor.address.trim() || undefined,
+        phone: locationEditor.phone.trim() || undefined,
+        timezone: locationEditor.timezone.trim() || undefined,
+        active: locationEditor.active,
+      };
+      if (locationEditor.id) {
+        await api(`/businesses/${bizId()}/locations/${locationEditor.id}`, { method:'PATCH', body: JSON.stringify(payload) });
+      } else {
+        await api(`/businesses/${bizId()}/locations`, { method:'POST', body: JSON.stringify(payload) });
+      }
+      setLocationEditor(null);
+      await loadLocations();
+    } catch (e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not save.'); }
+    finally { setLocationSaving(false); }
+  }
+  async function toggleLocation(l: Location) {
+    try {
+      await api(`/businesses/${bizId()}/locations/${l.id}`, { method:'PATCH', body: JSON.stringify({ active: !l.active }) });
+      setLocations(prev => (prev ?? []).map(x => x.id === l.id ? { ...x, active: !l.active } : x));
+    } catch { Alert.alert('Error', 'Could not update location.'); }
+  }
+  async function deleteLocation(l: Location) {
+    Alert.alert('Delete location?', `Delete "${l.name}"? Staff assigned to it become unassigned.`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/locations/${l.id}`, { method:'DELETE' });
+          setLocations(prev => (prev ?? []).filter(x => x.id !== l.id));
+        } catch { Alert.alert('Error', 'Could not delete location.'); }
+      }},
+    ]);
+  }
+
+  // ── Resources ───────────────────────────────────────────────────────────────
+  async function loadResources() {
+    setLoading(true);
+    try { setResources(await api<Resource[]>(`/businesses/${bizId()}/resources`)); }
+    catch { Alert.alert('Error', 'Could not load resources.'); }
+    finally { setLoading(false); }
+  }
+  async function saveResource() {
+    if (!resourceEditor) return;
+    const name = resourceEditor.name.trim();
+    if (!name) return;
+    setResourceSaving(true);
+    try {
+      if (resourceEditor.id) {
+        await api(`/businesses/${bizId()}/resources/${resourceEditor.id}`, { method:'PATCH', body: JSON.stringify({ name }) });
+      } else {
+        await api(`/businesses/${bizId()}/resources`, { method:'POST', body: JSON.stringify({ name }) });
+      }
+      setResourceEditor(null);
+      await loadResources();
+    } catch (e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not save.'); }
+    finally { setResourceSaving(false); }
+  }
+  async function toggleResource(r: Resource) {
+    try {
+      await api(`/businesses/${bizId()}/resources/${r.id}`, { method:'PATCH', body: JSON.stringify({ active: !r.active }) });
+      setResources(prev => (prev ?? []).map(x => x.id === r.id ? { ...x, active: !r.active } : x));
+    } catch { Alert.alert('Error', 'Could not update resource.'); }
+  }
+  async function deleteResource(r: Resource) {
+    Alert.alert('Delete resource?', `Delete "${r.name}"? Services using it will lose their room assignment.`, [
+      { text:'Cancel', style:'cancel' },
+      { text:'Delete', style:'destructive', onPress: async () => {
+        try {
+          await api(`/businesses/${bizId()}/resources/${r.id}`, { method:'DELETE' });
+          setResources(prev => (prev ?? []).filter(x => x.id !== r.id));
+        } catch { Alert.alert('Error', 'Could not delete resource.'); }
+      }},
+    ]);
+  }
+
+  if (view === 'locations') return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}>
+          <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Locations</Text>
+        <TouchableOpacity onPress={()=>setLocationEditor({ name:'', address:'', phone:'', timezone:'', active:true })}>
+          <Ionicons name="add" size={24} color={BRAND}/>
+        </TouchableOpacity>
+      </View>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          <Text style={[ms.empty,{ marginBottom:12 }]}>
+            Add branches or locations. Assign staff to a location so clients only see that branch's providers when booking.
+          </Text>
+
+          {(locations ?? []).length === 0 ? (
+            <View style={[ms.card, { alignItems:'center', paddingVertical:28 }]}>
+              <Ionicons name="location-outline" size={32} color={GRAY_400}/>
+              <Text style={[ms.rowTitle,{ marginTop:10, textAlign:'center' }]}>No locations yet</Text>
+              <Text style={[ms.empty,{ marginTop:4, textAlign:'center' }]}>
+                Tap + to add your first location or branch.
+              </Text>
+            </View>
+          ) : (
+            <View style={ms.card}>
+              {(locations ?? []).map((l, i, arr) => (
+                <View key={l.id} style={[ms.notifRow, i < arr.length - 1 && ms.notifRowBorder]}>
+                  <View style={{
+                    width:8, height:8, borderRadius:4, marginRight:10,
+                    backgroundColor: l.active ? '#34d399' : GRAY_200,
+                  }}/>
+                  <View style={{ flex:1 }}>
+                    <Text style={[ms.rowTitle, !l.active && { color:GRAY_400, textDecorationLine:'line-through' }]}>
+                      {l.name}
+                    </Text>
+                    {(l.address || l.phone || l.timezone) ? (
+                      <Text style={ms.rowMeta} numberOfLines={1}>
+                        {[l.address, l.phone, l.timezone].filter(Boolean).join(' · ')}
+                      </Text>
+                    ) : (
+                      <Text style={ms.rowMeta}>{l.active ? 'Active' : 'Inactive'}</Text>
+                    )}
+                  </View>
+                  <View style={{ flexDirection:'row', gap:4 }}>
+                    <TouchableOpacity
+                      onPress={()=>toggleLocation(l)}
+                      style={{
+                        paddingHorizontal:10, paddingVertical:4, borderRadius:12, borderWidth:1,
+                        borderColor: l.active ? '#a7f3d0' : GRAY_200,
+                        backgroundColor: l.active ? '#ecfdf5' : GRAY_50,
+                      }}>
+                      <Text style={{ fontSize:11, fontWeight:'600', color: l.active ? '#065f46' : GRAY_500 }}>
+                        {l.active ? 'Active' : 'Inactive'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={()=>setLocationEditor({ id:l.id, name:l.name, address:l.address??'', phone:l.phone??'', timezone:l.timezone??'', active:l.active })}
+                      style={{ padding:6, borderRadius:8, backgroundColor:GRAY_50 }}>
+                      <Ionicons name="pencil-outline" size={15} color={GRAY_500}/>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={()=>deleteLocation(l)}
+                      style={{ padding:6, borderRadius:8, backgroundColor:'#fff0f0' }}>
+                      <Ionicons name="trash-outline" size={15} color="#ef4444"/>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[s.btnPrimary, { marginTop:16 }]}
+            onPress={()=>setLocationEditor({ name:'', address:'', phone:'', timezone:'', active:true })}>
+            <Text style={s.btnPrimaryText}>+ Add location</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      <Modal visible={!!locationEditor} animationType="slide" onRequestClose={()=>setLocationEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setLocationEditor(null)} style={{ marginRight:6 }}>
+              <Ionicons name="close" size={24} color={GRAY_700}/>
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>{locationEditor?.id ? 'Edit location' : 'New location'}</Text>
+          </View>
+          {locationEditor && (
+            <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS==='ios'?'padding':'height'}>
+              <ScrollView contentContainerStyle={s.listContent}>
+                <Text style={s.fieldLabel}>Name *</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="e.g. Downtown, West End"
+                  placeholderTextColor={GRAY_400}
+                  value={locationEditor.name}
+                  onChangeText={name=>setLocationEditor({...locationEditor, name})}
+                  autoFocus
+                />
+                <Text style={[s.fieldLabel,{ marginTop:12 }]}>Address</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="123 Main St"
+                  placeholderTextColor={GRAY_400}
+                  value={locationEditor.address}
+                  onChangeText={address=>setLocationEditor({...locationEditor, address})}
+                />
+                <Text style={[s.fieldLabel,{ marginTop:12 }]}>Phone</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="+1 555 000 0000"
+                  placeholderTextColor={GRAY_400}
+                  keyboardType="phone-pad"
+                  value={locationEditor.phone}
+                  onChangeText={phone=>setLocationEditor({...locationEditor, phone})}
+                />
+                <Text style={[s.fieldLabel,{ marginTop:12 }]}>Timezone</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="America/Toronto"
+                  placeholderTextColor={GRAY_400}
+                  value={locationEditor.timezone}
+                  onChangeText={timezone=>setLocationEditor({...locationEditor, timezone})}
+                  autoCapitalize="none"
+                />
+                <View style={[ms.card,{ marginTop:14, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
+                  <Text style={ms.rowTitle}>Active</Text>
+                  <Switch value={locationEditor.active} onValueChange={active=>setLocationEditor({...locationEditor,active})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
+                </View>
+                <TouchableOpacity
+                  style={[s.btnPrimary, { marginTop:24, opacity: locationSaving || !locationEditor.name.trim() ? 0.5 : 1 }]}
+                  disabled={locationSaving || !locationEditor.name.trim()}
+                  onPress={saveLocation}>
+                  <Text style={s.btnPrimaryText}>{locationSaving ? 'Saving…' : (locationEditor.id ? 'Save changes' : 'Add location')}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          )}
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+
+  if (view === 'resources') return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}>
+          <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Rooms &amp; Resources</Text>
+        <TouchableOpacity onPress={()=>setResourceEditor({ name:'' })}>
+          <Ionicons name="add" size={24} color={BRAND}/>
+        </TouchableOpacity>
+      </View>
+      {loading ? <Loader/> : (
+        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+          <Text style={[ms.empty,{ marginBottom:12 }]}>
+            Shared rooms, chairs, or equipment. Assign one to a service to block it when already in use.
+          </Text>
+
+          {(resources ?? []).length === 0 ? (
+            <View style={[ms.card, { alignItems:'center', paddingVertical:28 }]}>
+              <Ionicons name="business-outline" size={32} color={GRAY_400}/>
+              <Text style={[ms.rowTitle,{ marginTop:10, textAlign:'center' }]}>No resources yet</Text>
+              <Text style={[ms.empty,{ marginTop:4, textAlign:'center' }]}>
+                Tap + to add a room, chair, or piece of equipment.
+              </Text>
+            </View>
+          ) : (
+            <View style={ms.card}>
+              {(resources ?? []).map((r, i, arr) => (
+                <View key={r.id} style={[ms.notifRow, i < arr.length - 1 && ms.notifRowBorder]}>
+                  {/* Active indicator dot */}
+                  <View style={{
+                    width:8, height:8, borderRadius:4, marginRight:10,
+                    backgroundColor: r.active ? '#34d399' : GRAY_200,
+                  }}/>
+
+                  {/* Name + meta */}
+                  <View style={{ flex:1 }}>
+                    <Text style={[ms.rowTitle, !r.active && { color:GRAY_400, textDecorationLine:'line-through' }]}>
+                      {r.name}
+                    </Text>
+                    <Text style={ms.rowMeta}>{r.active ? 'Active' : 'Inactive'}</Text>
+                  </View>
+
+                  {/* Action buttons */}
+                  <View style={{ flexDirection:'row', gap:4 }}>
+                    <TouchableOpacity
+                      onPress={()=>toggleResource(r)}
+                      style={{
+                        paddingHorizontal:10, paddingVertical:4, borderRadius:12, borderWidth:1,
+                        borderColor: r.active ? '#a7f3d0' : GRAY_200,
+                        backgroundColor: r.active ? '#ecfdf5' : GRAY_50,
+                      }}>
+                      <Text style={{ fontSize:11, fontWeight:'600', color: r.active ? '#065f46' : GRAY_500 }}>
+                        {r.active ? 'Active' : 'Inactive'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={()=>setResourceEditor({ id:r.id, name:r.name })}
+                      style={{ padding:6, borderRadius:8, backgroundColor:GRAY_50 }}>
+                      <Ionicons name="pencil-outline" size={15} color={GRAY_500}/>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={()=>deleteResource(r)}
+                      style={{ padding:6, borderRadius:8, backgroundColor:'#fff0f0' }}>
+                      <Ionicons name="trash-outline" size={15} color="#ef4444"/>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[s.btnPrimary, { marginTop:16 }]}
+            onPress={()=>setResourceEditor({ name:'' })}>
+            <Text style={s.btnPrimaryText}>+ Add resource</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Add / Edit modal */}
+      <Modal visible={!!resourceEditor} animationType="slide" onRequestClose={()=>setResourceEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setResourceEditor(null)} style={{ marginRight:6 }}>
+              <Ionicons name="close" size={24} color={GRAY_700}/>
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>{resourceEditor?.id ? 'Edit resource' : 'New resource'}</Text>
+          </View>
+          {resourceEditor && (
+            <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS==='ios'?'padding':'height'}>
+              <ScrollView contentContainerStyle={s.listContent}>
+                <Text style={s.fieldLabel}>Name</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="e.g. Room 1, Chair 2, Laser"
+                  placeholderTextColor={GRAY_400}
+                  value={resourceEditor.name}
+                  onChangeText={name=>setResourceEditor({...resourceEditor, name})}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={saveResource}
+                />
+                <Text style={[ms.empty,{ marginTop:8 }]}>
+                  Give this room or piece of equipment a short, recognisable name.
+                </Text>
+                <TouchableOpacity
+                  style={[s.btnPrimary, { marginTop:24, opacity: resourceSaving || !resourceEditor.name.trim() ? 0.5 : 1 }]}
+                  disabled={resourceSaving || !resourceEditor.name.trim()}
+                  onPress={saveResource}>
+                  <Text style={s.btnPrimaryText}>{resourceSaving ? 'Saving…' : (resourceEditor.id ? 'Save changes' : 'Add resource')}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          )}
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+
   if (view === 'soon') return (
     <SafeAreaView style={s.screen}>
       <Head title={soonLabel}/>
@@ -2169,6 +2597,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             cancellationWindowHours: String(biz?.cancellationWindowHours ?? 24),
             requireDeposit: !!biz?.requireDeposit,
             depositPercent: String(biz?.depositPercent ?? 25),
+            cancellationPolicy: biz?.cancellationPolicy ?? '',
           })}>
             <Text style={s.btnPrimaryText}>Edit business settings</Text>
           </TouchableOpacity>
@@ -2307,7 +2736,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Email</Text>
               <TextInput style={s.input} value={settingsEditor.email} autoCapitalize="none" keyboardType="email-address" onChangeText={email=>setSettingsEditor({...settingsEditor,email})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Phone</Text>
-              <TextInput style={s.input} value={settingsEditor.phone} keyboardType="phone-pad" onChangeText={phone=>setSettingsEditor({...settingsEditor,phone})}/>
+              <TextInput style={s.input} value={settingsEditor.phone} keyboardType="phone-pad" placeholder="+1 (416) 555-0123" placeholderTextColor={GRAY_400} onChangeText={phone=>setSettingsEditor({...settingsEditor,phone:formatPhoneInput(phone)})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Address</Text>
               <TextInput style={s.input} value={settingsEditor.address} onChangeText={address=>setSettingsEditor({...settingsEditor,address})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Minimum notice minutes</Text>
@@ -2317,6 +2746,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Cancellation window hours</Text>
               <TextInput style={s.input} value={settingsEditor.cancellationWindowHours} keyboardType="number-pad" onChangeText={cancellationWindowHours=>setSettingsEditor({...settingsEditor,cancellationWindowHours})}/>
               <Text style={s.fieldHint}>Clients can cancel for free until this many hours before the appointment.</Text>
+
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Cancellation policy text</Text>
+              <TextInput
+                style={[s.input, { height:80, textAlignVertical:'top' }]}
+                multiline
+                numberOfLines={3}
+                placeholder="Appointments cancelled within 24 hours..."
+                placeholderTextColor={GRAY_400}
+                value={settingsEditor.cancellationPolicy}
+                onChangeText={cancellationPolicy=>setSettingsEditor({...settingsEditor,cancellationPolicy})}
+              />
 
               <Text style={[s.fieldLabel,{ marginTop:14 }]}>Require deposit</Text>
               <View style={{ flexDirection:'row', gap:8 }}>
@@ -2346,8 +2786,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   );
 
   // ── default menu (exact spec order) ──
-  const MENU: Array<{ label:string; icon:any; onPress:()=>void }> = [
+  const MENU: Array<{ label:string; icon:any; onPress:()=>void; badge?:string }> = [
     { label:'Items & Services', icon:'pricetags-outline',       onPress:()=>open('services') },
+    { label:'Locations',        icon:'location-outline',        onPress:()=>open('locations') },
+    { label:'Rooms & Resources',icon:'business-outline',        onPress:()=>open('resources'), badge:'New' },
     { label:'Online Booking',   icon:'globe-outline',           onPress:()=>open('booking') },
     { label:'Waitlist',         icon:'hourglass-outline',       onPress:()=>open('waitlist') },
     { label:'Tasks',            icon:'checkbox-outline',        onPress:()=>open('tasks') },
@@ -2383,6 +2825,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <TouchableOpacity key={r.label} style={[s.menuRow, i<MENU.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}>
               <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
               <Text style={s.menuLabel}>{r.label}</Text>
+              {r.badge && (
+                <View style={{ backgroundColor:BRAND, borderRadius:10, paddingHorizontal:7, paddingVertical:2, marginRight:6 }}>
+                  <Text style={{ color:'#fff', fontSize:10, fontWeight:'700' }}>{r.badge}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
             </TouchableOpacity>
           ))}

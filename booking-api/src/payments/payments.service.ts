@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -11,6 +11,7 @@ import { ReferralsService } from '../referrals/referrals.service';
 @Injectable()
 export class PaymentsService {
   private stripe: Stripe | null = null;
+  private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
     private prisma: PrismaService,
@@ -363,6 +364,63 @@ export class PaymentsService {
             data: { status: 'CANCELED', plan: 'FREE', cancelAtPeriodEnd: false },
           });
           await this.prisma.business.update({ where: { id: businessId }, data: { plan: 'FREE', planExpiresAt: null } });
+        }
+        break;
+      }
+      case 'account.updated': {
+        const account = event.data.object as Stripe.Account;
+        if (account.details_submitted) {
+          await this.prisma.business.updateMany({
+            where: { stripeConnectAccountId: account.id },
+            data: { stripeConnectOnboarded: true },
+          });
+        }
+        break;
+      }
+      case 'payout.paid': {
+        const payout = event.data.object as Stripe.Payout;
+        this.logger.log(`Payout paid: ${payout.id} amount=${payout.amount} ${payout.currency}`);
+        // Notify the business owner that the payout landed
+        const stripeAcct = (event as any).account as string | undefined;
+        if (stripeAcct) {
+          const biz = await this.prisma.business.findFirst({
+            where: { stripeConnectAccountId: stripeAcct },
+            select: { id: true },
+          });
+          if (biz) {
+            await this.prisma.systemError?.create?.({
+              data: {
+                businessId: biz.id,
+                category: 'PAYMENT',
+                severity: 'WARN',
+                message: `Payout of ${(payout.amount / 100).toFixed(2)} ${payout.currency.toUpperCase()} arrived in your bank account.`,
+                context: { payoutId: payout.id, status: 'paid' },
+              },
+            }).catch(() => {});
+          }
+        }
+        break;
+      }
+      case 'payout.failed': {
+        const payout = event.data.object as Stripe.Payout;
+        this.logger.warn(`Payout failed: ${payout.id} reason=${payout.failure_message}`);
+        const stripeAcct = (event as any).account as string | undefined;
+        if (stripeAcct) {
+          const biz = await this.prisma.business.findFirst({
+            where: { stripeConnectAccountId: stripeAcct },
+            select: { id: true },
+          });
+          if (biz) {
+            await this.prisma.systemError?.create?.({
+              data: {
+                businessId: biz.id,
+                category: 'PAYMENT',
+                severity: 'ERROR',
+                message: `Payout failed: ${payout.failure_message ?? 'Unknown reason'}`,
+                context: { payoutId: payout.id, status: 'failed' },
+              },
+            }).catch(() => {});
+          }
         }
         break;
       }

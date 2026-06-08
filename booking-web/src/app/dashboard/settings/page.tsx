@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api, Business, VerificationStatus, IntakeQuestion, Location } from "@/lib/api";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { cn } from "@/lib/utils";
+import { cn, formatPhoneInput } from "@/lib/utils";
 
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
@@ -141,6 +142,8 @@ export default function SettingsPage() {
   const [embedCopied, setEmbedCopied] = useState(false);
   const [section, setSection] = useState<Section>("profile");
   const [form, setForm]       = useState<Partial<Business>>({});
+
+  const searchParams = useSearchParams();
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -290,6 +293,18 @@ export default function SettingsPage() {
     if (tab && SECTIONS.some((s) => s.id === tab)) setSection(tab as Section);
   }, []);
 
+  useEffect(() => {
+    const connect = searchParams.get("connect");
+    if (connect === "success") {
+      loadConnect();
+      toast.success("Stripe account connected successfully — you can now accept payouts.");
+      setSection("payouts");
+    } else if (connect === "refresh") {
+      // Auto-restart onboarding
+      api.connect.onboard().then(({ url }) => window.location.assign(url)).catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function upgrade(plan: "BASIC" | "PRO") {
     setBillingBusy(plan);
     try {
@@ -415,10 +430,24 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="flex gap-5">
+      <div className="flex flex-col md:flex-row gap-5">
+
+        {/* Mobile tab bar — hidden on md+ */}
+        <div className="md:hidden mb-4 -mx-4 px-4 overflow-x-auto">
+          <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
+            {SECTIONS.map((s) => (
+              <button key={s.id} onClick={() => setSection(s.id)}
+                className={cn("flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors",
+                  section === s.id ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>
+                <s.icon className="w-4 h-4" />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Left nav */}
-        <aside className="w-56 shrink-0">
+        <aside className="hidden md:block w-56 shrink-0">
           <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {SECTIONS.map(({ id, label, icon: Icon, desc }) => (
               <button key={id} onClick={() => setSection(id)}
@@ -441,7 +470,7 @@ export default function SettingsPage() {
         </aside>
 
         {/* Right panel */}
-        <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <form onSubmit={save}>
 
             {section === "profile" && (
@@ -469,12 +498,12 @@ export default function SettingsPage() {
                         ) : (
                           <>
                             <p className="text-xs text-violet-700 mt-1">
-                              Provide the legal details and documents the review team needs before requesting verification.
+                              Provide your business details and documents the review team needs before requesting verification.
                               {verif.status === "REJECTED" && verif.note ? ` Previous submission declined: ${verif.note}` : ""}
                             </p>
                             <div className={cn("mt-3 space-y-3", verifBusy && "opacity-60 pointer-events-none")}>
-                              <Input placeholder="Legal name" value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
-                              <Input placeholder="Legal business address" value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
+                              <Input placeholder="Full business name" value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
+                              <Input placeholder="Business address" value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
                               <Input placeholder="Phone number" type="tel" value={verificationForm.phone} onChange={(e) => setVerificationForm((p) => ({ ...p, phone:e.target.value }))} />
                               <div>
                                 <p className="text-xs font-medium text-violet-700 mb-1.5">Government-issued ID</p>
@@ -516,7 +545,7 @@ export default function SettingsPage() {
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Phone">
-                    <Input type="tel" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", e.target.value)} />
+                    <Input type="tel" placeholder="+1 (416) 555-0123" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
                   </Field>
                   <Field label="Timezone">
                     <select value={(form.timezone as string) ?? "America/New_York"} onChange={(e) => f("timezone", e.target.value)}
@@ -946,7 +975,7 @@ export default function SettingsPage() {
                       <Input placeholder="Location name (e.g. Downtown)" value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} />
                       <Input placeholder="Address (optional)" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} />
                       <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Phone (optional)" type="tel" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: e.target.value }))} />
+                        <Input placeholder="+1 (416) 555-0123" type="tel" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} />
                         <select value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
                           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
                           <option value="">Same timezone as business</option>
@@ -985,6 +1014,7 @@ export default function SettingsPage() {
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-100">
                     <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Transaction fee schedule</p>
                   </div>
+                  <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-gray-100">
@@ -1011,6 +1041,7 @@ export default function SettingsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
 
                 {/* Connect status + onboarding */}

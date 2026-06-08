@@ -27,6 +27,9 @@ export const metadata: Metadata = {
     title: "Pulse — Scheduling made simple",
     description: "Book appointments online, 24/7.",
   },
+  other: {
+    'apple-itunes-app': 'app-id=6774881206, app-argument=https://www.pulseappointments.com',
+  },
 };
 
 export const viewport: Viewport = {
