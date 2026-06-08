@@ -4,10 +4,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UploadsService, type IncomingFile } from './uploads.service';
-import { UploadKind } from '@prisma/client';
+import { UploadKind, User } from '@prisma/client';
 
 @ApiTags('uploads')
 @Controller('uploads')
@@ -33,10 +33,12 @@ export class UploadsController {
   }
 
   // Public — images are served by id (logos appear on the public booking page).
+  // Documents (kind=OTHER) require authentication.
   // Resolves to a redirect (public bucket/CDN) or raw bytes (DB or private bucket).
   @Get(':id')
-  async serve(@Param('id') id: string, @Res() res: Response) {
-    const r = await this.uploads.resolve(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async serve(@Param('id') id: string, @Res() res: Response, @CurrentUser() user: User | null) {
+    const r = await this.uploads.resolve(id, user);
     if (r.redirectUrl) return res.redirect(302, r.redirectUrl);
     res.setHeader('Content-Type', r.contentType);
     res.setHeader('X-Content-Type-Options', 'nosniff');

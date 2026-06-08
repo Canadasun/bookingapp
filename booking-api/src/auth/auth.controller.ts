@@ -62,7 +62,11 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
-  logout(@CurrentUser() user: User) {
+  logout(@CurrentUser() user: User & { _jti?: string; _tokenExp?: number }, @Req() req: Request) {
+    const jtiUser = user as User & { _jti?: string; _tokenExp?: number };
+    if (jtiUser._jti && jtiUser._tokenExp) {
+      this.authService.revokeAccessToken(jtiUser._jti, jtiUser._tokenExp).catch(() => {});
+    }
     return this.authService.logout(user.id);
   }
 

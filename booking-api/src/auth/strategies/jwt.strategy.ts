@@ -2,11 +2,14 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../common/redis/redis.service';
 
 export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
+  jti?: string;
+  exp?: number;
 }
 
 // Fail closed: refuse to start without a configured secret rather than silently
@@ -29,7 +32,7 @@ function cookieExtractor(req: { headers?: { cookie?: string } }): string | null 
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(private prisma: PrismaService) {
+  constructor(private prisma: PrismaService, private redis: RedisService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -42,6 +45,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload) {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) throw new UnauthorizedException();
-    return user;
+    if (payload.jti) {
+      const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`);
+      if (revoked) throw new UnauthorizedException();
+    }
+    return { ...user, _jti: payload.jti, _tokenExp: payload.exp };
   }
 }

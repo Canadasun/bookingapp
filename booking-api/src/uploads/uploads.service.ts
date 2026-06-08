@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, PayloadTooLargeException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadKind } from '@prisma/client';
 import { sniffDocumentMime, sniffImageMime } from './sniff';
@@ -77,8 +77,11 @@ export class UploadsService {
 
   // Resolve an upload for serving: either a redirect URL (public bucket / CDN) or
   // the raw bytes (DB storage, or streamed from a private bucket).
-  async resolve(id: string): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string }> {
+  async resolve(id: string, user?: { role: string } | null): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string }> {
     const file = await this.get(id);
+    if (file.kind === 'OTHER' && (!user || !['ADMIN', 'OWNER'].includes(user.role))) {
+      throw new ForbiddenException('Document access requires authentication');
+    }
     if (file.storageKey) {
       const pub = publicUrlFor(file.storageKey);
       if (pub) return { redirectUrl: pub, contentType: file.mimeType };

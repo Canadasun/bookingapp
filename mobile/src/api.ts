@@ -3,10 +3,11 @@
 import { Platform } from 'react-native';
 import { API_BASE } from './config';
 import { getAuth, refreshSession } from './auth';
+import { pinnedFetch } from './pinnedFetch';
 
 export async function api<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
   const { token } = getAuth();
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await pinnedFetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

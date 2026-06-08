@@ -3,10 +3,13 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  HttpException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuthLockService } from './auth-lock.service';
+import { RedisService } from '../common/redis/redis.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
@@ -20,6 +23,8 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private notifications: NotificationsService,
+    private authLock: AuthLockService,
+    private redis: RedisService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -235,13 +240,23 @@ export class AuthService {
   private static readonly DUMMY_HASH = '$2a$12$AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
   async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string }) {
+    if (await this.authLock.isLocked(dto.email)) {
+      throw new HttpException({ message: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.', statusCode: 429 }, 429);
+    }
+
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
       await bcrypt.compare(dto.password, AuthService.DUMMY_HASH);
+      await this.authLock.recordFailure(dto.email).catch(() => {});
       throw new UnauthorizedException('Invalid credentials');
     }
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid) {
+      await this.authLock.recordFailure(dto.email).catch(() => {});
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    await this.authLock.clearFailures(dto.email).catch(() => {});
 
     // Opt-in 2FA: password ok, but require a one-time code before issuing tokens —
     // UNLESS this device was previously remembered (trusted), so we don't bug the
@@ -445,8 +460,14 @@ export class AuthService {
     return { ok: true };
   }
 
+  async revokeAccessToken(jti: string, exp: number) {
+    const ttl = Math.max(1, exp - Math.floor(Date.now() / 1000));
+    await this.redis.client.set(`auth:revoked:${jti}`, '1', 'EX', ttl).catch(() => {});
+  }
+
   private async issueTokens(user: User, opts: { userAgent?: string; replaceTokenHash?: string } = {}) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const jti = randomBytes(8).toString('hex');
+    const payload = { sub: user.id, email: user.email, role: user.role, jti };
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET,
       // @nestjs/jwt v11 types expiresIn as number | ms.StringValue; env strings

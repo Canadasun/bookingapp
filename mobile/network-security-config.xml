@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Network Security Configuration
+  https://developer.android.com/training/articles/security-config
+
+  In RELEASE builds: trust only system (device manufacturer) CAs.
+  User-installed certificates (e.g. a MITM proxy cert added via Settings)
+  are NOT trusted. This closes the "install a corporate proxy cert" attack
+  vector that allows interception of all HTTPS traffic.
+
+  In DEBUG builds: user CAs are still trusted so developers can use
+  Charles / Proxyman / mitmproxy for local debugging.
+
+  To implement full certificate pinning (pin to a specific public key):
+  1. Get the SHA-256 SPKI fingerprint of your API certificate:
+       openssl s_client -connect api.pulseappointments.com:443 </dev/null | \
+         openssl x509 -pubkey -noout | \
+         openssl pkey -pubin -outform DER | \
+         openssl dgst -sha256 -binary | base64
+  2. Replace the commented-out <pin-set> block below with actual values.
+  3. Always include a backup pin (from a spare key pair) for rotation safety.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <!-- Release: system CAs only — user-installed CAs are NOT trusted -->
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <debug-overrides>
+    <trust-anchors>
+      <!-- Debug: also trust user-installed CAs so devtools proxies work -->
+      <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </debug-overrides>
+
+  <!--
+  Optional: uncomment and fill in to add full public-key pinning on the API domain.
+  Get fingerprints with the openssl command shown above.
+
+  <domain-config>
+    <domain includeSubdomains="true">api.pulseappointments.com</domain>
+    <pin-set expiration="2027-06-01">
+      <pin digest="SHA-256">REPLACE_WITH_PRIMARY_SPKI_HASH=</pin>
+      <pin digest="SHA-256">REPLACE_WITH_BACKUP_SPKI_HASH=</pin>
+    </pin-set>
+  </domain-config>
+  -->
+</network-security-config>

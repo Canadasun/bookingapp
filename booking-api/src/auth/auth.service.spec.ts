@@ -4,6 +4,8 @@ import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuthLockService } from './auth-lock.service';
+import { RedisService } from '../common/redis/redis.service';
 
 async function build(decoded: unknown | 'throw') {
   const prisma = { user: { update: jest.fn().mockResolvedValue({}) } };
@@ -19,6 +21,8 @@ async function build(decoded: unknown | 'throw') {
       { provide: JwtService, useValue: jwt },
       { provide: PrismaService, useValue: prisma },
       { provide: NotificationsService, useValue: {} },
+      { provide: AuthLockService, useValue: { isLocked: jest.fn().mockResolvedValue(false), recordFailure: jest.fn(), clearFailures: jest.fn() } },
+      { provide: RedisService, useValue: { client: { set: jest.fn(), exists: jest.fn().mockResolvedValue(0) } } },
     ],
   }).compile();
   return { svc: module.get<AuthService>(AuthService), prisma };
@@ -45,10 +49,14 @@ describe('AuthService.verifyEmail', () => {
 
 describe('AuthService SMS 2FA phone resolution', () => {
   function buildResolver(prisma: Record<string, unknown>) {
+    const mockAuthLock = { isLocked: jest.fn().mockResolvedValue(false), recordFailure: jest.fn(), clearFailures: jest.fn() } as unknown as AuthLockService;
+    const mockRedis = { client: { set: jest.fn(), exists: jest.fn().mockResolvedValue(0) } } as unknown as RedisService;
     return new AuthService(
       prisma as unknown as PrismaService,
       {} as JwtService,
       { sendOtp: jest.fn() } as unknown as NotificationsService,
+      mockAuthLock,
+      mockRedis,
     ) as unknown as { resolveTwoFactorSmsPhone(user: Record<string, unknown>): Promise<string | null> };
   }
 

@@ -50,6 +50,14 @@
         {
           "enableGooglePay": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "networkSecurityConfig": "./network-security-config.xml"
+          }
+        }
       ]
     ],
     "extra": {
