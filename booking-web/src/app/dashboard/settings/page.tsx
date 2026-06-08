@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -134,7 +134,7 @@ function IntakeFormEditor({ bizId, initial }: { bizId: string; initial: IntakeQu
   );
 }
 
-export default function SettingsPage() {
+function SettingsPage() {
   const [biz, setBiz]       = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -1494,5 +1494,13 @@ export default function SettingsPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function SettingsPageWrapper() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <SettingsPage />
+    </Suspense>
   );
 }
