@@ -33,25 +33,28 @@ export default function AccountPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", avatarUrl: null as string | null });
   const [acctBusy, setAcctBusy] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [delConfirm, setDelConfirm] = useState("");
 
-  useEffect(() => {
+  function loadAccount() {
+    setLoadError("");
+    setLoading(true);
     api.users.me()
       .then((u) => {
         setMe(u);
         setForm({ name: u.name ?? "", phone: u.phone ?? "", avatarUrl: u.avatarUrl ?? null });
-        // Owners also manage the business lifecycle (pause / delete) from here.
         if (u.role === "OWNER" && u.businessId) {
           api.business.get(u.businessId).then(setBiz).catch(() => {});
         }
       })
-      .catch((e) => toast.error(e instanceof Error ? e.message : "Could not load your account"))
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load your account"))
       .finally(() => setLoading(false));
-  }, []);
+  }
+  useEffect(() => { loadAccount(); }, []);
 
   async function toggleActive() {
     if (!biz) return;
@@ -95,6 +98,12 @@ export default function AccountPage() {
   }
 
   if (loading) return <LoadingSpinner />;
+  if (loadError) return (
+    <div className="text-center py-20">
+      <p className="text-red-500 mb-3">{loadError}</p>
+      <button onClick={loadAccount} className="text-violet-600 hover:underline text-sm">Try again</button>
+    </div>
+  );
   if (!me) return null;
 
   const isOwner = me.role === "OWNER";

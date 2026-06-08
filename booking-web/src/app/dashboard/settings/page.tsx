@@ -405,8 +405,11 @@ function SettingsPage() {
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const embedSnippet = `<script src="${embedOrigin}/embed.js" data-business-id="${biz?.id ?? ""}" async></script>`;
   const plan = biz?.plan ?? "FREE";
-  const isPro = plan === "PRO";
-  const isPaid = plan === "BASIC" || plan === "PRO";
+  // While NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false' treat every account as Pro
+  // for UI gating so all features are accessible during testing/launch.
+  const featuresOpen = process.env.NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false';
+  const isPro = featuresOpen || plan === "PRO";
+  const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO";
   function promptUpgrade(target: "BASIC" | "PRO", feature: string) {
     toast.info(`${feature} requires ${target === "BASIC" ? "Basic or Pro" : "Pro"}.`);
     setSection("billing");

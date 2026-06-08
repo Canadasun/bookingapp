@@ -8,7 +8,7 @@ import {
 } from "date-fns";
 import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { api, Appointment, AvailabilityRule } from "@/lib/api";
+import { api, Appointment, AvailabilityRule, Service } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { formatPrice, cn, normalizePhoneE164 } from "@/lib/utils";
+import { formatPrice, cn, normalizePhoneE164, formatPhoneInput } from "@/lib/utils";
 
 type Tab = "today" | "week" | "all";
 type ViewMode = "list" | "staff" | "calendar" | "week";
@@ -310,6 +310,142 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// Quick "New appointment" modal — lets staff/owners book for a client using
+// just name + phone/email, then picks service, provider, date and time.
+function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
+  bizId: string;
+  staffList: { id: string; user: { name: string } }[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const today = format(new Date(), "yyyy-MM-dd");
+  const nextHour = format(new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000), "HH:mm");
+
+  const [clientName, setClientName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [staffId, setStaffId] = useState(staffList[0]?.id ?? "");
+  const [date, setDate] = useState(today);
+  const [time, setTime] = useState(nextHour);
+  const [notes, setNotes] = useState("");
+  const [services, setServices] = useState<Service[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!bizId) return;
+    api.services.listAll(bizId)
+      .then((list) => {
+        setServices(list);
+        if (list.length > 0) setServiceId(list[0].id);
+      })
+      .catch(() => {});
+  }, [bizId]);
+
+  async function submit() {
+    const trimName = clientName.trim();
+    if (trimName.length < 2) { toast.error("Client name must be at least 2 characters"); return; }
+    if (!phone.trim() && !email.trim()) { toast.error("Provide at least a phone number or email"); return; }
+    if (!serviceId) { toast.error("Select a service"); return; }
+    if (!staffId) { toast.error("Select a staff member"); return; }
+    const startsAt = new Date(`${date}T${time}`);
+    if (Number.isNaN(startsAt.getTime())) { toast.error("Enter a valid date and time"); return; }
+
+    setBusy(true);
+    try {
+      const clientPayload: { name: string; phone?: string; email?: string } = { name: trimName };
+      if (phone.trim()) clientPayload.phone = normalizePhoneE164(phone.trim());
+      if (email.trim()) clientPayload.email = email.trim();
+
+      const clientRes = await api.clients.create(bizId, clientPayload);
+      await api.appointments.createManual(bizId, {
+        staffId,
+        serviceId,
+        clientId: clientRes.id,
+        startsAt: startsAt.toISOString(),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
+      });
+      toast.success("Appointment created");
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to create appointment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-base font-semibold text-gray-900">New appointment</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="space-y-3">
+          {/* Client */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Client name <span className="text-red-500">*</span></label>
+            <Input placeholder="Jane Smith" value={clientName} onChange={(e) => setClientName(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <Input type="tel" placeholder="(555) 123-4567" value={phone}
+              onChange={(e) => setPhone(formatPhoneInput(e.target.value))} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <Input type="email" placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <p className="text-xs text-gray-400 -mt-1">At least one of phone or email is required.</p>
+
+          {/* Service */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service <span className="text-red-500">*</span></label>
+            <select value={serviceId} onChange={(e) => setServiceId(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
+              {services.length === 0 && <option value="">Loading…</option>}
+              {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          {/* Staff */}
+          {staffList.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Staff member <span className="text-red-500">*</span></label>
+              <select value={staffId} onChange={(e) => setStaffId(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
+                {staffList.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Date & time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <Input placeholder="Any notes for this appointment…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+
+          <Button className="w-full mt-1" loading={busy} onClick={submit}>Book appointment</Button>
+        </div>
       </div>
     </div>
   );
@@ -662,6 +798,7 @@ export default function AppointmentsPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [showBlock, setShowBlock] = useState(false);
+  const [showNewApt, setShowNewApt] = useState(false);
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string } }[]>([]);
   const [allStaffFull, setAllStaffFull] = useState<{ availabilityRules?: AvailabilityRule[] }[]>([]);
 
@@ -806,6 +943,9 @@ export default function AppointmentsPage() {
           <p className="text-sm text-gray-500">{appointments.length} total</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setShowNewApt(true)} className="gap-1.5">
+            + New appointment
+          </Button>
           {!isStaff && (
             <Button variant="outline" size="sm" onClick={() => setShowBlock(true)} className="gap-1.5">
               <CalendarOff className="w-4 h-4" /> Block time
@@ -817,6 +957,9 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
+      {showNewApt && (
+        <NewAppointmentModal bizId={bizId} staffList={staffList} onClose={() => setShowNewApt(false)} onSaved={load} />
+      )}
       {showBlock && (
         <BlockTimeModal bizId={bizId} staffList={staffList} onClose={() => setShowBlock(false)} onSaved={load} />
       )}

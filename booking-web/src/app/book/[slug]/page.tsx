@@ -339,7 +339,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   // when the chosen slot was taken by someone else mid-checkout).
   async function joinWaitlistFromBooking() {
     if (!bizId) return;
-    if (!form.name.trim() || !/\S+@\S+\.\S+/.test(form.email)) { toast.error("Enter your name and a valid email"); return; }
+    if (!form.name.trim() || (!form.email.trim() && !form.phone.trim())) { toast.error("Enter your name and an email address or phone number"); return; }
     setWlSaving(true);
     try {
       await api.waitlist.join(bizId, {
