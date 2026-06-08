@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, HttpCode, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, HttpCode, Req, ForbiddenException } from '@nestjs/common';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
@@ -7,12 +7,13 @@ import { RegisterSchema, LoginSchema, ChangePasswordSchema, ForgotPasswordSchema
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard, JwtRefreshGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PrismaService } from '../prisma/prisma.service';
 import { User } from '@prisma/client';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService, private prisma: PrismaService) {}
 
   @Post('register')
   register(@Body(new ZodValidationPipe(RegisterSchema)) dto: RegisterDto) {
@@ -108,5 +109,22 @@ export class AuthController {
   @HttpCode(200)
   resetPassword(@Body(new ZodValidationPipe(ResetPasswordSchema)) dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
+
+  // One-time bootstrap: promote BOOTSTRAP_ADMIN_EMAIL to ADMIN role.
+  // Only active when BOOTSTRAP_ADMIN_SECRET env var is set. Remove the env var to disable.
+  @Post('bootstrap-admin')
+  @HttpCode(200)
+  async bootstrapAdmin(@Body() body: { secret: string; email: string }) {
+    const expected = process.env.BOOTSTRAP_ADMIN_SECRET;
+    if (!expected || body.secret !== expected) throw new ForbiddenException('Invalid bootstrap secret');
+    const allowed = process.env.BOOTSTRAP_ADMIN_EMAIL;
+    if (!allowed || body.email.toLowerCase().trim() !== allowed.toLowerCase()) throw new ForbiddenException('Email not authorised for bootstrap');
+    const user = await this.prisma.user.update({
+      where: { email: body.email.toLowerCase().trim() },
+      data: { role: 'ADMIN' },
+      select: { id: true, email: true, role: true },
+    });
+    return { ok: true, user };
   }
 }
