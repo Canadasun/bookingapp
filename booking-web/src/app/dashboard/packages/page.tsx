@@ -19,6 +19,7 @@ export default function PackagesPage() {
   const [issued, setIssued] = useState<ClientPackage[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [creating, setCreating] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const user = getUser();
@@ -26,6 +27,7 @@ export default function PackagesPage() {
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try {
       const [p, i, s] = await Promise.all([
@@ -34,7 +36,7 @@ export default function PackagesPage() {
         api.services.list(bizId),
       ]);
       setProducts(p); setIssued(i); setServices(s);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -83,7 +85,12 @@ export default function PackagesPage() {
         <IssueForm bizId={bizId} products={products} services={services} onDone={() => { setIssuing(false); load(); }} onCancel={() => setIssuing(false)} />
       )}
 
-      {loading ? <LoadingSpinner /> : tab === "products" ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : tab === "products" ? (
         products.length === 0 && !creating ? <EmptyState title="No package products yet" description="Define a bundle like “5x Haircut — $200”." /> : (
           <div className="space-y-3 mt-4">
             {products.map((p) => (

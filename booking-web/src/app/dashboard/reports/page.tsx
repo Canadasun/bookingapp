@@ -20,12 +20,14 @@ export default function ReportsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [currency, setCurrency] = useState<"CAD" | "USD">("CAD");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const money = useCallback((cents: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100), [currency]);
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try {
       const [a, c, p, b] = await Promise.all([
@@ -38,7 +40,7 @@ export default function ReportsPage() {
       setClients(c.data);
       setPayments(p);
       if (b?.currency) setCurrency(b.currency);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load reports"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load reports"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -90,6 +92,12 @@ export default function ReportsPage() {
   }, [appts, clients, payments]);
 
   if (loading) return <LoadingSpinner />;
+  if (loadError) return (
+    <div className="text-center py-20">
+      <p className="text-red-500 mb-3">{loadError}</p>
+      <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+    </div>
+  );
 
   return (
     <div className="max-w-5xl mx-auto min-w-0">

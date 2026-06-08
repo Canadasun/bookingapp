@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/EmptyState";
 export default function GiftCardsPage() {
   const [cards, setCards] = useState<GiftCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [mode, setMode] = useState<null | "issue" | "redeem">(null);
   const [copied, setCopied] = useState<string | null>(null);
   const user = getUser();
@@ -23,9 +24,10 @@ export default function GiftCardsPage() {
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try { setCards(await api.giftCards.list(bizId)); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -61,7 +63,12 @@ export default function GiftCardsPage() {
       {mode === "issue" && <IssueForm bizId={bizId} onDone={() => { setMode(null); load(); }} onCancel={() => setMode(null)} />}
       {mode === "redeem" && <RedeemForm bizId={bizId} onDone={() => { setMode(null); load(); }} onCancel={() => setMode(null)} />}
 
-      {loading ? <LoadingSpinner /> : cards.length === 0 && !mode ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : cards.length === 0 && !mode ? (
         <EmptyState title="No gift cards yet" description="Issue your first gift card to get started." />
       ) : (
         <div className="space-y-3 mt-4">

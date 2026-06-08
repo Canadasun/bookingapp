@@ -21,12 +21,14 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", staffId: "", dueAt: "", notes: "" });
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try {
       const [t, s] = await Promise.all([
@@ -35,7 +37,7 @@ export default function TasksPage() {
       ]);
       setTasks(t);
       setStaff(s.filter((x) => x.active));
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load tasks"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load tasks"); }
     finally { setLoading(false); }
   }, [bizId, isOwner]);
   useEffect(() => { load(); }, [load]);
@@ -107,7 +109,12 @@ export default function TasksPage() {
         </Card>
       )}
 
-      {loading ? <LoadingSpinner /> : tasks.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : tasks.length === 0 ? (
         <EmptyState title="No tasks yet" description={isOwner ? "Add a task and assign it to a team member." : "Nothing assigned to you right now."} />
       ) : (
         <div className="space-y-5">

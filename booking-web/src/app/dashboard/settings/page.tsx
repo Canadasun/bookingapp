@@ -137,6 +137,7 @@ function IntakeFormEditor({ bizId, initial }: { bizId: string; initial: IntakeQu
 function SettingsPage() {
   const [biz, setBiz]       = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving]   = useState(false);
   const [copied, setCopied]   = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
@@ -182,7 +183,7 @@ function SettingsPage() {
     }
     api.business.get(bizId)
       .then((b) => { setBiz(b); setForm(b); })
-      .catch(() => toast.error("Failed to load settings"))
+      .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); setLoading(false); })
       .finally(() => setLoading(false));
   }, [bizId]);
 
@@ -393,6 +394,12 @@ function SettingsPage() {
   }
 
   if (loading) return <LoadingSpinner />;
+  if (loadError) return (
+    <div className="text-center py-20">
+      <p className="text-red-500 mb-3">{loadError}</p>
+      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+    </div>
+  );
 
   const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/b/${biz?.id ?? ""}`;
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";

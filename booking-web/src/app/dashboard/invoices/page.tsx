@@ -31,10 +31,12 @@ export default function InvoicesPage() {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showNew, setShowNew] = useState(false);
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try {
       const [inv, cl, b] = await Promise.all([
@@ -45,7 +47,7 @@ export default function InvoicesPage() {
       setInvoices(inv);
       setClients(cl.data);
       setBiz(b);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load invoices"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load invoices"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -60,7 +62,12 @@ export default function InvoicesPage() {
         <Button size="sm" onClick={() => setShowNew(true)} className="gap-1.5"><Plus className="w-4 h-4" /> New invoice</Button>
       </div>
 
-      {loading ? <LoadingSpinner /> : invoices.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : invoices.length === 0 ? (
         <EmptyState title="No invoices yet" description="Create an invoice with custom line items — it gets the next sequential number automatically." />
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">

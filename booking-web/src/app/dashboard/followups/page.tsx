@@ -39,14 +39,17 @@ export default function FollowupsPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [policy, setPolicy] = useState({ name:"", serviceId:"", delayDays:14, subject:"Time for a follow-up", body:"We hope you are doing well. Book your follow-up appointment when you are ready." });
 
+  const [loadError, setLoadError] = useState("");
+
   const load = useCallback(async (silent = false) => {
     if (!bizId) { setLoading(false); return; }
+    if (!silent) setLoadError("");
     if (silent) setRefreshing(true); else setLoading(true);
     try {
       const [dueItems, policyItems, serviceItems] = await Promise.all([api.serviceDue.list(bizId), api.serviceDue.policies(bizId), api.services.listAll(bizId)]);
       setItems(dueItems); setPolicies(policyItems); setServices(serviceItems);
     }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load follow-ups"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load follow-ups"); }
     finally { setLoading(false); setRefreshing(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -145,7 +148,12 @@ export default function FollowupsPage() {
         })}
       </div>
 
-      {loading ? <LoadingSpinner /> : items.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : items.length === 0 ? (
         <EmptyState title="No follow-ups yet" description="Open a client and set 'Next visit due' (e.g. every 8 weeks) to start a routine." />
       ) : (
         <div className="space-y-6">

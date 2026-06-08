@@ -21,15 +21,17 @@ const AUDIENCES: { value: CampaignAudience; label: string; hint: string }[] = [
 export default function MarketingPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [composing, setComposing] = useState(false);
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try { setCampaigns(await api.campaigns.list(bizId)); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -63,7 +65,12 @@ export default function MarketingPage() {
 
       {composing && <Composer bizId={bizId} onDone={() => { setComposing(false); load(); }} onCancel={() => setComposing(false)} />}
 
-      {loading ? <LoadingSpinner /> : campaigns.length === 0 && !composing ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : campaigns.length === 0 && !composing ? (
         <EmptyState title="No campaigns yet" description="Create your first campaign to start reaching clients." />
       ) : (
         <div className="space-y-3 mt-4">

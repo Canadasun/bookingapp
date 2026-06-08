@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://api.stripe.com https://js.stripe.com",
+      "connect-src 'self' wss://api.pulseappointments.com https://api.stripe.com https://js.stripe.com",
       "font-src 'self' data:",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",

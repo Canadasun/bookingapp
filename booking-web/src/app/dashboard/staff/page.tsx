@@ -32,6 +32,7 @@ export default function StaffPage() {
   const [locForm, setLocForm] = useState({ name: "", address: "", phone: "", timezone: "", active: true });
   const [savingLocation, setSavingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
   const [form, setForm] = useState<{ name: string; email: string; bio: string; avatarUrl: string; permissions: string[]; locationId: string }>({ name: "", email: "", bio: "", avatarUrl: "", permissions: [], locationId: "" });
@@ -48,6 +49,7 @@ export default function StaffPage() {
       setLoading(false);
       return;
     }
+    setLoadError("");
     setLoading(true);
     try {
       const [s, svcs, locs] = await Promise.all([
@@ -56,7 +58,7 @@ export default function StaffPage() {
         api.locations.list(bizId).catch(() => [] as Location[]),
       ]);
       setStaff(s); setServices(svcs.filter((sv) => sv.active)); setLocations(locs);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
 
@@ -282,7 +284,12 @@ export default function StaffPage() {
         </div>
       )}
 
-      {loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" /> : (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" /> : (
         <div className="space-y-3">
           {staff.map((s) => (
             <Card key={s.id} className={!s.active ? "opacity-60" : ""}>

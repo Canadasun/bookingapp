@@ -18,6 +18,7 @@ const EMPTY = { title: "", description: "", discount: "", expiresAt: "" };
 export default function OffersPage() {
   const [offers, setOffers]   = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Offer | null>(null);
   const [form, setForm]       = useState(EMPTY);
@@ -31,9 +32,10 @@ export default function OffersPage() {
       setLoading(false);
       return;
     }
+    setLoadError("");
     setLoading(true);
     try { setOffers(await api.offers.list(bizId)); }
-    catch { toast.error("Failed to load offers"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load offers"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -77,7 +79,12 @@ export default function OffersPage() {
         <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4" />New offer</Button>
       </div>
 
-      {loading ? <LoadingSpinner /> : offers.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : offers.length === 0 ? (
         <EmptyState title="No offers yet" description="Create your first promotion — clients will see it in their portal." />
       ) : (
         <div className="space-y-3">

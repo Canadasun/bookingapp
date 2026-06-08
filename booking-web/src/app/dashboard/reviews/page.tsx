@@ -16,11 +16,13 @@ export default function ReviewsPage() {
   const [reviews, setReviews] = useState<R[]>([]);
   const [businessSlug, setBusinessSlug] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
+    setLoadError("");
     setLoading(true);
     try {
       const [reviewRows, business] = await Promise.all([
@@ -30,7 +32,7 @@ export default function ReviewsPage() {
       setReviews(reviewRows);
       setBusinessSlug(business.slug);
     }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
@@ -75,7 +77,12 @@ export default function ReviewsPage() {
           </div>
         )}
       </div>
-      {loading ? <LoadingSpinner /> : reviews.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : reviews.length === 0 ? (
         <EmptyState title="No reviews yet" description="Mark completed appointments to send signed review requests automatically." />
       ) : (
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">

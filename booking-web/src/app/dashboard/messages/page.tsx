@@ -21,6 +21,8 @@ export default function MessagesPage() {
   const [reply, setReply]       = useState("");
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [threadError, setThreadError] = useState("");
   const [filter, setFilter]     = useState<"all" | "unread" | "archived">("all");
   const [channel, setChannel]   = useState<"ALL" | "IN_APP" | "SMS">("ALL");
   const [search, setSearch]     = useState("");
@@ -34,11 +36,12 @@ export default function MessagesPage() {
       setLoading(false);
       return;
     }
+    setLoadError("");
     try {
       const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: search.trim() || undefined, channel: channel !== "ALL" ? channel : undefined });
       setThreads(threadData);
     }
-    catch { toast.error("Failed to load messages"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load messages"); }
     finally { setLoading(false); }
   }, [bizId, filter, channel, search]);
 
@@ -54,13 +57,14 @@ export default function MessagesPage() {
   async function openThread(t: Thread) {
     if (!bizId) return;
     setSelected(t);
+    setThreadError("");
     try {
       const data = await api.messages.thread(bizId, t.clientId);
       setMsgs(data);
       await api.messages.markRead(bizId, t.clientId);
       setThreads((prev) => prev.map((thread) => thread.clientId === t.clientId ? { ...thread, read:true, unreadCount:0 } : thread));
       loadThreads();
-    } catch { toast.error("Failed to load thread"); }
+    } catch (e) { setThreadError(e instanceof Error ? e.message : "Failed to load thread"); }
     setTimeout(() => scrollRef.current?.scrollTo({ top: 9999 }), 80);
   }
 
@@ -122,7 +126,12 @@ export default function MessagesPage() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-          {loading ? <LoadingSpinner className="py-8" /> :
+          {loadError ? (
+            <div className="text-center py-10 px-4">
+              <p className="text-red-500 text-sm mb-3">{loadError}</p>
+              <button onClick={() => { setLoadError(""); loadThreads(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+            </div>
+          ) : loading ? <LoadingSpinner className="py-8" /> :
            threads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4">
               <MessageSquare className="w-8 h-8 text-gray-200 mb-2" />
@@ -190,7 +199,13 @@ export default function MessagesPage() {
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3">
-              {msgs.length === 0 && (
+              {threadError && (
+                <div className="text-center py-8">
+                  <p className="text-red-500 text-sm mb-3">{threadError}</p>
+                  <button onClick={() => { setThreadError(""); if (selected) openThread(selected); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+                </div>
+              )}
+              {!threadError && msgs.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
               )}
               {msgs.map((m) => (

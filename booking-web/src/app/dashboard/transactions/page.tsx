@@ -32,12 +32,14 @@ const STATUS_STYLE: Record<PaymentStatus, string> = {
 export default function TransactionsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [refundFor, setRefundFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoadError("");
     setLoading(true);
     try { setPayments(await api.payments.list()); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load transactions"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load transactions"); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -58,7 +60,12 @@ export default function TransactionsPage() {
         )}
       </div>
 
-      {loading ? <LoadingSpinner /> : payments.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <LoadingSpinner /> : payments.length === 0 ? (
         <EmptyState title="No transactions yet" description="Deposits and in-person charges will appear here." />
       ) : (
         <div className="space-y-3">

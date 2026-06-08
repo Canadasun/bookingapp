@@ -25,6 +25,7 @@ function dueAtForCadence(cadenceDays: number) {
 export default function ClientsPage() {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -54,7 +55,7 @@ export default function ClientsPage() {
       setLoading(false);
       return;
     }
-    if (!append) setLoading(true); else setLoadingMore(true);
+    if (!append) { setLoadError(""); setLoading(true); } else setLoadingMore(true);
     try {
       const res = await api.clients.list(bizId, q, pg);
       setClients((prev) => append ? [...prev, ...res.data] : res.data);
@@ -62,7 +63,7 @@ export default function ClientsPage() {
       setTotalPages(res.pages);
       setTotal(res.total);
     }
-    catch { toast.error("Failed to load clients"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load clients"); }
     finally { setLoading(false); setLoadingMore(false); }
   }, [bizId]);
 
@@ -229,7 +230,12 @@ export default function ClientsPage() {
           onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
 
-      {loading ? <SkeletonList rows={8} /> : clients.length === 0 ? (
+      {loadError ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-3">{loadError}</p>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+        </div>
+      ) : loading ? <SkeletonList rows={8} /> : clients.length === 0 ? (
         <EmptyState title="No clients found" description="Add your first client or adjust the search." />
       ) : (
         <div className="space-y-2">
