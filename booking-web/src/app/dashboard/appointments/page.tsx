@@ -16,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { formatPrice, cn, normalizePhoneE164, formatPhoneInput } from "@/lib/utils";
+import { formatPrice, cn, normalizePhoneE164, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 
 type Tab = "today" | "week" | "all";
 type ViewMode = "list" | "staff" | "calendar" | "week";
@@ -48,7 +48,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
   const [edit, setEdit] = useState({
     clientName: apt.client.name,
     clientEmail: apt.client.email ?? "",
-    clientPhone: apt.client.phone ?? "",
+    clientPhone: formatPhoneDisplay(apt.client.phone),
     startsAt: format(new Date(apt.startsAt), "yyyy-MM-dd'T'HH:mm"),
     notes: apt.notes ?? "",
     notifyClient: "true",
@@ -109,7 +109,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Client</p>
             <p className="font-semibold text-gray-900">{apt.client.name}</p>
             <p className="text-sm text-gray-500">{apt.client.email}</p>
-            {apt.client.phone && <p className="text-sm text-gray-500">{apt.client.phone}</p>}
+            {apt.client.phone && <p className="text-sm text-gray-500">{formatPhoneDisplay(apt.client.phone)}</p>}
           </div>
 
           {/* Notes */}

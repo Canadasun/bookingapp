@@ -12,7 +12,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer, Resource, Location } from '../types';
-import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneInput } from '../format';
+import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneInput, formatPhoneDisplay } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, setBiometricEnabled, biometricCapability, authenticateBiometric } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
@@ -2357,7 +2357,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      onPress={()=>setLocationEditor({ id:l.id, name:l.name, address:l.address??'', phone:l.phone??'', timezone:l.timezone??'', active:l.active })}
+                      onPress={()=>setLocationEditor({ id:l.id, name:l.name, address:l.address??'', phone:formatPhoneDisplay(l.phone), timezone:l.timezone??'', active:l.active })}
                       style={{ padding:6, borderRadius:8, backgroundColor:GRAY_50 }}>
                       <Ionicons name="pencil-outline" size={15} color={GRAY_500}/>
                     </TouchableOpacity>
@@ -2966,7 +2966,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setSettingsEditor({
             name: biz?.name ?? '',
             email: biz?.email ?? '',
-            phone: biz?.phone ?? '',
+            phone: formatPhoneDisplay(biz?.phone),
             address: biz?.address ?? '',
             minNoticeMinutes: String(biz?.minNoticeMinutes ?? 120),
             maxAdvanceDays: String(biz?.maxAdvanceDays ?? 60),

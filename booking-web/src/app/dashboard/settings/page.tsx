@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { cn, formatPhoneInput } from "@/lib/utils";
+import { cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
@@ -186,7 +186,7 @@ function SettingsPage() {
       return;
     }
     api.business.get(bizId)
-      .then((b) => { setBiz(b); setForm(b); })
+      .then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); })
       .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); setLoading(false); })
       .finally(() => setLoading(false));
   }, [bizId]);
@@ -317,7 +317,7 @@ function SettingsPage() {
       if (result.url) window.location.assign(result.url);
       else {
         toast.success(`Switched to ${plan}. Stripe applied the prorated difference.`);
-        if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch(() => {});
+        if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch(() => {});
         setBillingBusy(null);
       }
     } catch (e) {
@@ -384,7 +384,7 @@ function SettingsPage() {
       };
       const updated = await api.business.update(bizId, payload);
       setBiz(updated);
-      setForm(updated);
+      setForm({ ...updated, phone: formatPhoneDisplay(updated.phone) });
       toast.success("Settings saved");
     }
     catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
@@ -401,7 +401,7 @@ function SettingsPage() {
   if (loadError) return (
     <div className="text-center py-20">
       <p className="text-red-500 mb-3">{loadError}</p>
-      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm(b); }).catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">Retry</button>
     </div>
   );
 

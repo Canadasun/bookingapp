@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
-import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
+import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneDisplay } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
@@ -98,7 +98,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
             <View style={{flex:1}}>
               <Text style={s.clientName}>{c.name}</Text>
               <Text style={s.sub}>{c.email}</Text>
-              {c.phone&&<Text style={s.sub}>{c.phone}</Text>}
+              {c.phone&&<Text style={s.sub}>{formatPhoneDisplay(c.phone)}</Text>}
               {c.totalVisits!==undefined&&<Text style={s.sub}>{c.totalVisits} visit{c.totalVisits!==1?'s':''}</Text>}
               {c.tags&&c.tags.length>0&&(
                 <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4 }}>
@@ -128,7 +128,7 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
             </View>
             {[
               { l:'Email', v:profile.email },
-              { l:'Phone', v:profile.phone || '—' },
+              { l:'Phone', v:profile.phone ? formatPhoneDisplay(profile.phone) : '—' },
               { l:'Visits', v: profile.totalVisits!==undefined ? String(profile.totalVisits) : '—' },
               { l:'Last visit', v: profile.lastVisit ? new Date(profile.lastVisit).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—' },
             ].map(({l,v})=>(

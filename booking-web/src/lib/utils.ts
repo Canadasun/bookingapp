@@ -30,6 +30,13 @@ export function clearToken() {
   document.cookie = "booking_user=; Max-Age=0; path=/";
 }
 
+// Convert any stored phone value (E.164 or partial) to display format +1 (XXX) XXX-XXXX.
+// Use this when loading a phone value from the API into a form field.
+export function formatPhoneDisplay(stored: string | null | undefined): string {
+  if (!stored) return "";
+  return formatPhoneInput(stored);
+}
+
 // Format a phone number as the user types into +1 (XXX) XXX-XXXX.
 // Strips everything except digits, then applies the North American format.
 export function formatPhoneInput(raw: string): string {

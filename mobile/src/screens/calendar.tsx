@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
-import { fmtTime, fmtDur, normalizePhoneClient } from '../format';
+import { fmtTime, fmtDur, normalizePhoneClient, formatPhoneDisplay } from '../format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession } from '../auth';
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
@@ -170,7 +170,7 @@ function CalendarScreen() {
       appointment: a,
       name: a.client.name,
       email: a.client.email,
-      phone: a.client.phone ?? '',
+      phone: formatPhoneDisplay(a.client.phone),
       notes: a.notes ?? '',
       notifyClient: true,
     });
@@ -404,7 +404,7 @@ function CalendarScreen() {
             {[
               {l:'Client', v:selected.client.name},
               {l:'Email',  v:selected.client.email},
-              {l:'Phone',  v:selected.client.phone||'—'},
+              {l:'Phone',  v:selected.client.phone ? formatPhoneDisplay(selected.client.phone) : '—'},
               {l:'Status', v:selected.status},
               {l:'Price',  v:`$${(selected.service.priceCents/100).toFixed(2)}`},
               {l:'Location', v:selected.location?.name || biz?.address || '—'},

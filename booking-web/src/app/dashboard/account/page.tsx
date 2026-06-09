@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ImageUpload } from "@/components/ImageUpload";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { formatPhoneInput } from "@/lib/utils";
+import { formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 
 type Me = {
   id: string; email: string; name: string; phone?: string | null;
@@ -46,7 +46,7 @@ export default function AccountPage() {
     api.users.me()
       .then((u) => {
         setMe(u);
-        setForm({ name: u.name ?? "", phone: u.phone ?? "", avatarUrl: u.avatarUrl ?? null });
+        setForm({ name: u.name ?? "", phone: formatPhoneDisplay(u.phone), avatarUrl: u.avatarUrl ?? null });
         if (u.role === "OWNER" && u.businessId) {
           api.business.get(u.businessId).then(setBiz).catch(() => {});
         }

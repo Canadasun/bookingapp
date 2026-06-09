@@ -14,7 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SkeletonList, SkeletonCard } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ClientMergeModal } from "@/components/ClientMergeModal";
-import { formatPrice, cn, formatPhoneInput } from "@/lib/utils";
+import { formatPrice, cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 
 const DAY_MS = 86_400_000;
 
@@ -137,7 +137,7 @@ export default function ClientsPage() {
     setEditForm({
       name: selected.name ?? "",
       email: selected.email ?? "",
-      phone: selected.phone ?? "",
+      phone: formatPhoneDisplay(selected.phone),
       notes: selected.notes ?? "",
       birthday: selected.birthday ?? "",
     });
@@ -280,7 +280,7 @@ export default function ClientsPage() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
                     <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.email}</span>
-                    {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{c.phone}</span>}
+                    {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{formatPhoneDisplay(c.phone)}</span>}
                   </div>
                 </div>
                 <div className="text-right text-xs text-gray-500 shrink-0 hidden sm:block">
@@ -356,7 +356,7 @@ export default function ClientsPage() {
               ) : (
                 <div className="space-y-1.5 text-sm">
                   <div className="flex items-center gap-2 text-gray-600"><Mail className="w-4 h-4 text-gray-400" />{selected.email}</div>
-                  {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{selected.phone}</div>}
+                  {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{formatPhoneDisplay(selected.phone)}</div>}
                   {selected.birthday && <div className="flex items-center gap-2 text-gray-600"><span className="w-4 text-center">🎂</span>{format(new Date(`2000-${selected.birthday}T00:00:00`), "MMMM d")}</div>}
                 </div>
               )}
