@@ -77,7 +77,7 @@ export interface Business {
   depositPercent: number; noShowFeeCents: number; cancellationFeeCents: number; collectCardOnFile: boolean; allowClientReschedule: boolean;
   cancellationPolicy: string;
   currency: "CAD" | "USD";
-  plan: "FREE" | "BASIC" | "PRO";
+  plan: "FREE" | "BASIC" | "PRO" | "UNLIMITED";
   planExpiresAt?: string;
   suspended?: boolean;
   verificationStatus?: VerificationStatus;
@@ -307,7 +307,7 @@ export interface AdminOverview {
     name: string;
     email: string;
     slug: string;
-    plan: "FREE" | "BASIC" | "PRO";
+    plan: "FREE" | "BASIC" | "PRO" | "UNLIMITED";
     verificationStatus: VerificationStatus;
     suspended: boolean;
     createdAt: string;
@@ -451,7 +451,7 @@ export const api = {
 
   subscriptions: {
     get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),
-    checkout: (plan: "BASIC" | "PRO", referralCode?: string) =>
+    checkout: (plan: "BASIC" | "PRO" | "UNLIMITED", referralCode?: string) =>
       req<{ url?: string; updated?: boolean; plan?: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
     portal: () => req<{ url: string }>("/subscriptions/portal", { method: "POST" }),
   },

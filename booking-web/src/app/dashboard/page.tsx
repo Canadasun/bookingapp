@@ -67,7 +67,6 @@ export default function OverviewPage() {
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
   const [verifStatus, setVerifStatus] = useState<string | null>(null);
-  const [serviceCount, setServiceCount] = useState<number | null>(null);
   const [biz, setBiz] = useState<{ slug: string; logoUrl?: string } | null>(null);
 
   const user    = getUser();
@@ -96,7 +95,6 @@ export default function OverviewPage() {
         api.notifications.deliveries({ status: "FAILED", limit: 10 }).catch(() => []),
       ]);
       if (!isStaff) {
-        api.services.listAll(bizId).then((s) => setServiceCount(s.length)).catch(() => setServiceCount(0));
         api.business.get(bizId).then((b) => setBiz({ slug: b.slug, logoUrl: b.logoUrl })).catch(() => {});
       }
       const filtered = isStaff && user?.staffId
@@ -191,40 +189,6 @@ export default function OverviewPage() {
         </Link>
       </div>
 
-      {/* First-run setup checklist — shows until the basics are done */}
-      {!isStaff && serviceCount !== null && !((serviceCount > 0) && !!biz?.logoUrl && appointments.length > 0) && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold text-gray-900">Get set up</p>
-          <p className="text-xs text-gray-400 mt-0.5 mb-3">A few quick steps to start taking bookings.</p>
-          <div className="space-y-2">
-            {[
-              { done: serviceCount > 0, label: "Add your first service", href: "/dashboard/services", cta: "Add service" },
-              { done: !!biz?.logoUrl, label: "Add your logo & business details", href: "/dashboard/settings", cta: "Open settings" },
-              { done: appointments.length > 0, label: "Take your first booking", href: "/dashboard/checkout", cta: "New booking" },
-            ].map((s) => (
-              <div key={s.label} className="flex items-center gap-3">
-                <span className={cn("w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                  s.done ? "bg-emerald-500 text-white" : "border-2 border-gray-200")}>
-                  {s.done && <CheckCircle2 className="w-3.5 h-3.5" />}
-                </span>
-                <span className={cn("flex-1 text-sm", s.done ? "text-gray-400 line-through" : "text-gray-700")}>{s.label}</span>
-                {!s.done && (
-                  <Link href={s.href} className="text-xs font-semibold text-violet-600 hover:underline shrink-0">{s.cta} →</Link>
-                )}
-              </div>
-            ))}
-            <div className="flex items-center gap-3">
-              <span className="w-5 h-5 rounded-full border-2 border-gray-200 shrink-0" />
-              <span className="flex-1 text-sm text-gray-700">Share your booking link with clients</span>
-              {biz?.slug && (
-                <button
-                  onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/book/${biz.slug}`); toast.success("Booking link copied"); }}
-                  className="text-xs font-semibold text-violet-600 hover:underline shrink-0">Copy link →</button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Get verified — one-click request, lands the business in the admin queue */}
       {!isStaff && (verifStatus === "UNVERIFIED" || verifStatus === "REJECTED") && (

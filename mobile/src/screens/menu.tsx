@@ -26,9 +26,10 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 // Plan tiers mirror the web billing page. Display-only on mobile for now — every
 // business is on Pro during testing; paid switching gets wired up after testing.
 const PLANS = [
-  { id:'FREE',  name:'Free',  price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page'] },
-  { id:'BASIC', name:'Basic', price:'$10', period:'/mo', features:['Everything in Free','Email reminders (24h)','Deposit collection','Cancellation policies'] },
-  { id:'PRO',   name:'Pro',   price:'$20', period:'/mo', features:['Everything in Basic','SMS reminders (2h)','Automatic no-show fees','Analytics'] },
+  { id:'FREE',      name:'Free',      price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page'] },
+  { id:'BASIC',     name:'Basic',     price:'$10', period:'/mo', features:['Everything in Free','Email reminders (24h)','Deposit collection','Cancellation policies'] },
+  { id:'PRO',       name:'Pro',       price:'$20', period:'/mo', features:['Everything in Basic','SMS reminders (2h)','Automatic no-show fees','Analytics'] },
+  { id:'UNLIMITED', name:'Unlimited', price:'$80', period:'/mo', features:['Everything in Pro','Unlimited staff accounts','Multiple locations','Remove Pulse branding','Dedicated support'] },
 ] as const;
 
 import * as ImagePicker from 'expo-image-picker';

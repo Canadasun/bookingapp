@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -309,7 +310,7 @@ function SettingsPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function upgrade(plan: "BASIC" | "PRO") {
+  async function upgrade(plan: "BASIC" | "PRO" | "UNLIMITED") {
     setBillingBusy(plan);
     try {
       const result = await api.subscriptions.checkout(plan, referralInput);
@@ -411,8 +412,8 @@ function SettingsPage() {
   // While NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false' treat every account as Pro
   // for UI gating so all features are accessible during testing/launch.
   const featuresOpen = process.env.NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false';
-  const isPro = featuresOpen || plan === "PRO";
-  const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO";
+  const isPro = featuresOpen || plan === "PRO" || plan === "UNLIMITED";
+  const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED";
   function promptUpgrade(target: "BASIC" | "PRO", feature: string) {
     toast.info(`${feature} requires ${target === "BASIC" ? "Basic or Pro" : "Pro"}.`);
     setSection("billing");
@@ -604,6 +605,17 @@ function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Booking policies</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Set the client booking rules that protect your calendar.</p>
                 </div>
+                <Link
+                  href="/dashboard/staff"
+                  className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 hover:bg-amber-100 transition-colors"
+                >
+                  <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-900">Working hours</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Set the days and times you (and your staff) are available. Clients can only book within these hours.</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-500 shrink-0" />
+                </Link>
                 <hr className="border-gray-100" />
 
                 <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -1190,7 +1202,7 @@ function SettingsPage() {
 
                 {/* Plan capability summary */}
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  {(["FREE", "BASIC", "PRO"] as const).map((p) => (
+                  {(["FREE", "BASIC", "PRO", "UNLIMITED"] as const).map((p) => (
                     <div key={p} className={cn("rounded-xl border p-3", plan === p ? "border-violet-300 bg-violet-50" : "border-gray-100 bg-gray-50")}>
                       <p className={cn("font-semibold mb-1", plan === p ? "text-violet-700" : "text-gray-500")}>{p}{plan === p && " ✓"}</p>
                       <p className="text-gray-500 leading-relaxed">
@@ -1212,7 +1224,7 @@ function SettingsPage() {
                   { key: "emailReschedule" as const,       label: "Reschedule notice",        desc: "Sent when an appointment is moved to a new time",   tier: "FREE" as const },
                   { key: "emailStaffCancellation" as const,label: "Staff cancellation email", desc: "Special email when the business cancels on the client", tier: "FREE" as const },
                 ] as const).map(({ key, label, desc, tier }) => {
-                  const allowed = tier === "FREE" || (tier === "BASIC" && isPaid) || (tier === "PRO" && plan === "PRO");
+                  const allowed = tier === "FREE" || (tier === "BASIC" && isPaid) || (tier === "PRO" && isPro);
                   const enabled = notificationSettings[key] !== false;
                   const badgeLabel = tier === "PRO" ? "Pro" : tier === "BASIC" ? "Basic+" : null;
                   return (
@@ -1443,6 +1455,12 @@ function SettingsPage() {
                       features: ["Everything in Basic","SMS reminders (2h)","Automatic no-show fees","Late-cancellation fees","Priority support","Analytics"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
+                    {
+                      id: "UNLIMITED", name: "Unlimited", price: "$80", period: "/mo",
+                      desc: "No limits — for high-volume businesses",
+                      features: ["Everything in Pro","Unlimited staff accounts","Multiple locations","Remove Pulse branding","Dedicated support","Early access to new features"],
+                      cta: "Upgrade to Unlimited", disabled: false,
+                    },
                   ].map((plan) => (
                     <div key={plan.id} className={cn(
                       "rounded-2xl border-2 p-5 relative",
@@ -1471,12 +1489,12 @@ function SettingsPage() {
                         </div>
                         {(() => {
                           const isCurrent = (biz?.plan ?? "FREE") === plan.id;
-                          const canBuy = (plan.id === "BASIC" || plan.id === "PRO") && !isCurrent;
+                          const canBuy = (plan.id === "BASIC" || plan.id === "PRO" || plan.id === "UNLIMITED") && !isCurrent;
                           return (
                             <button
                               type="button"
                               disabled={isCurrent || billingBusy !== null}
-                              onClick={() => { if (canBuy) upgrade(plan.id as "BASIC" | "PRO"); }}
+                              onClick={() => { if (canBuy) upgrade(plan.id as "BASIC" | "PRO" | "UNLIMITED"); }}
                               className={cn(
                                 "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
                                 isCurrent
