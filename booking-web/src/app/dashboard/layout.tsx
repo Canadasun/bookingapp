@@ -45,6 +45,8 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/waitlist",     label: "Waitlist" },
       { group: "Growth" },
       { href: "/dashboard/offers",       label: "Offers" },
+      { href: "/dashboard/promo-codes",  label: "Promo codes" },
+      { href: "/dashboard/memberships",  label: "Memberships" },
       { href: "/dashboard/reviews",      label: "Reviews" },
       { href: "/dashboard/marketing",    label: "Marketing" },
       { href: "/dashboard/gift-cards",   label: "Gift cards" },

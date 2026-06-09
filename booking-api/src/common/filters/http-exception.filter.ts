@@ -7,6 +7,7 @@ import {
   Logger,
   Optional,
 } from '@nestjs/common';
+import * as Sentry from '@sentry/node';
 import { Request, Response } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -31,8 +32,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
-    // Log 5xx errors to SystemError table (best-effort, non-blocking)
+    // Log 5xx errors to Sentry and SystemError table (best-effort, non-blocking)
     if (status >= 500) {
+      if (exception instanceof Error) Sentry.captureException(exception);
       const err = exception instanceof Error ? exception : null;
       const bizId: string | undefined = (request as any)?.user?.businessId ?? undefined;
       this.logger.error(`${request.method} ${request.url} → ${status}: ${err?.message ?? String(message)}`);

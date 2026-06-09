@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge } from "lucide-react";
+import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge, Download, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
@@ -220,6 +220,31 @@ export default function ClientsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />Merge duplicates</Button>
+          <a href={api.clients.exportCsv(bizId)} download="clients.csv"
+            className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
+            <Download className="w-4 h-4" />Export CSV
+          </a>
+          <label className="cursor-pointer inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
+            <Upload className="w-4 h-4" />Import CSV
+            <input type="file" accept=".csv" className="hidden" onChange={async (e) => {
+              const file = e.target.files?.[0]; if (!file) return;
+              const text = await file.text();
+              const lines = text.trim().split("\n"); const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/^"|"$/g, ""));
+              const rows = lines.slice(1).map(line => {
+                const vals = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""));
+                const obj: Record<string, string> = {};
+                headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
+                return { name: obj.name ?? obj["full name"] ?? "", email: obj.email || undefined, phone: obj.phone || undefined, tags: obj.tags || undefined, notes: obj.notes || undefined };
+              }).filter(r => r.name);
+              if (!rows.length) { toast.error("No valid rows found"); return; }
+              try {
+                const r = await api.clients.importCsv(bizId, rows);
+                toast.success(`Imported ${r.created} new, updated ${r.updated}`);
+                window.location.reload();
+              } catch (err) { toast.error(err instanceof Error ? err.message : "Import failed"); }
+              e.target.value = "";
+            }} />
+          </label>
           <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
         </div>
       </div>

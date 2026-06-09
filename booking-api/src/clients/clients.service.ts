@@ -255,4 +255,33 @@ export class ClientsService {
       return { ok: true, merged: dupes.length };
     });
   }
+
+  exportAll(businessId: string) {
+    return this.prisma.client.findMany({
+      where: { businessId },
+      select: { name: true, email: true, phone: true, tags: true, notes: true, birthday: true, createdAt: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async bulkImport(businessId: string, rows: Array<{ name: string; email?: string; phone?: string; tags?: string; notes?: string }>) {
+    let created = 0; let updated = 0;
+    for (const row of rows) {
+      if (!row.name?.trim()) continue;
+      const email = row.email?.trim().toLowerCase() || undefined;
+      const phone = row.phone?.trim() ? normalizePhone(row.phone.trim()) : undefined;
+      const tags = row.tags ? row.tags.split(';').map(t => t.trim()).filter(Boolean) : [];
+      const existing = email
+        ? await this.prisma.client.findFirst({ where: { businessId, email } })
+        : null;
+      if (existing) {
+        await this.prisma.client.update({ where: { id: existing.id }, data: { phone: phone ?? existing.phone, tags: tags.length ? tags : existing.tags, notes: row.notes?.trim() ?? existing.notes } });
+        updated++;
+      } else {
+        await this.prisma.client.create({ data: { businessId, name: row.name.trim(), email, phone, tags, notes: row.notes?.trim() } }).catch(() => { updated++; });
+        created++;
+      }
+    }
+    return { created, updated, total: rows.length };
+  }
 }

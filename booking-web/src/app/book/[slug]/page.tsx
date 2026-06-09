@@ -129,6 +129,10 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [selectedSlot, setSelectedSlot]         = useState<BookingSlot | null>(null);
 
   const [form, setForm]     = useState({ name: "", email: "", phone: "", notes: "" });
+  const [referralSource, setReferralSource] = useState("");
+  const [promoCode, setPromoCode]           = useState("");
+  const [promoResult, setPromoResult]       = useState<{ id: string; discountCents: number; label: string } | null>(null);
+  const [promoChecking, setPromoChecking]   = useState(false);
   const [intake, setIntake] = useState<Record<string, string>>({}); // questionId → answer
   const [errs, setErrs]     = useState<Record<string, string>>({});
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -288,6 +292,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         startsAt: selectedSlot.startsAt,
         notes: form.notes || undefined,
         intakeAnswers: intakeAnswers.length ? intakeAnswers : undefined,
+        referralSource: referralSource || undefined,
+        promoCodeId: promoResult?.id || undefined,
+        discountCents: promoResult?.discountCents ?? 0,
       });
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before
@@ -393,7 +400,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const advanceLimit = addMinutes(new Date(), biz?.maxAdvanceMinutes ?? ((biz?.maxAdvanceDays ?? 60) * 1440));
   const { morning, afternoon, evening } = groupSlots(slots);
   const totalMins   = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
-  const totalCents  = selectedServices.reduce((s, x) => s + x.priceCents, 0);
+  const subtotalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
+  const totalCents  = Math.max(0, subtotalCents - (promoResult?.discountCents ?? 0));
   const policy      = biz?.cancellationPolicy ?? "Appointments cancelled within 24 hours may be subject to a cancellation fee.";
 
   // Sole-proprietor first: the provider step + per-person names only appear once
@@ -907,6 +915,61 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       {errs[`intake_${q.id}`] && <p className="text-xs text-red-500 mt-1">{errs[`intake_${q.id}`]}</p>}
                     </div>
                   ))}
+
+                  {/* Promo code */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Promo code (optional)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. SUMMER20"
+                        value={promoCode}
+                        onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
+                        className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 uppercase"
+                      />
+                      <button
+                        type="button"
+                        disabled={!promoCode.trim() || promoChecking}
+                        onClick={async () => {
+                          if (!bizId || !promoCode.trim()) return;
+                          setPromoChecking(true);
+                          try {
+                            const r = await api.promoCodes.validate(bizId, promoCode, subtotalCents);
+                            setPromoResult({ id: r.id, discountCents: r.discountCents, label: r.discountType === "PERCENT" ? `${r.discountValue}% off` : `$${(r.discountCents / 100).toFixed(2)} off` });
+                          } catch { setPromoResult(null); toast.error("Invalid or expired promo code"); }
+                          finally { setPromoChecking(false); }
+                        }}
+                        className="px-4 py-2.5 text-sm bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                      >
+                        {promoChecking ? "…" : "Apply"}
+                      </button>
+                    </div>
+                    {promoResult && (
+                      <p className="text-xs text-green-600 mt-1.5 font-medium flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> {promoResult.label} applied
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Source tracking */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">How did you hear about us? <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <select
+                      value={referralSource}
+                      onChange={(e) => setReferralSource(e.target.value)}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      <option value="">Select one…</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="TikTok">TikTok</option>
+                      <option value="Google">Google</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Referral">Friend or referral</option>
+                      <option value="Walk-in">Walk-in / saw sign</option>
+                      <option value="Returning">Returning client</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
 
                   {/* Cancellation policy */}
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">

@@ -13,6 +13,9 @@ export const CreateAppointmentSchema = z.object({
     label: z.string().min(1).max(200),
     answer: z.string().max(2000),
   })).max(20).optional(),
+  referralSource: z.string().max(100).optional(),
+  promoCodeId: z.string().cuid().optional(),
+  discountCents: z.number().int().min(0).optional(),
 });
 
 // Owner-initiated recurring series: the base booking + how it repeats. Each

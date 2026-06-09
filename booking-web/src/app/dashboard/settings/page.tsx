@@ -2,7 +2,10 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore – react-qr-code ships types but they're not resolved via "exports"; works fine at runtime
+import QRCode from "react-qr-code";
 import { toast } from "sonner";
 import { api, Business, VerificationStatus, IntakeQuestion, Location } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -867,6 +870,34 @@ function SettingsPage() {
                     </button>
                   </div>
                   <p className="text-xs text-violet-500 mt-2">Share this non-email public link on your website, Instagram bio, or Google Business profile.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <QrCode className="w-4 h-4 text-gray-700" />
+                    <span className="text-sm font-semibold text-gray-900">QR code</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-4">Print and display in your shop, on flyers, or business cards so walk-in clients can scan to book instantly.</p>
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="bg-white p-4 rounded-2xl border border-gray-200 inline-block" id="booking-qr">
+                      <QRCode value={bookingUrl} size={160} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const svg = document.querySelector("#booking-qr svg");
+                        if (!svg) return;
+                        const data = new XMLSerializer().serializeToString(svg);
+                        const blob = new Blob([data], { type: "image/svg+xml" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a"); a.href = url; a.download = "booking-qr.svg"; a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="flex items-center gap-1.5 text-sm text-violet-600 hover:underline"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download SVG
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">

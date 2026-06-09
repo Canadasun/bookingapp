@@ -20,7 +20,8 @@ import { Pill, PriceTag, VerifiedPill, SwipeToDelete } from '../components';
 
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
-  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations' | 'soon';
+  | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations'
+  | 'promo-codes' | 'memberships' | 'soon';
 
 // Plan tiers mirror the web billing page. Display-only on mobile for now — every
 // business is on Pro during testing; paid switching gets wired up after testing.
@@ -31,6 +32,8 @@ const PLANS = [
 ] as const;
 
 import * as ImagePicker from 'expo-image-picker';
+// @ts-ignore
+import QRCode from 'react-native-qrcode-svg';
 
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const { user } = getAuth();
@@ -123,6 +126,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [locations, setLocations] = useState<Location[]|null>(null);
   const [locationEditor, setLocationEditor] = useState<{ id?:string; name:string; address:string; phone:string; timezone:string; active:boolean }|null>(null);
   const [locationSaving, setLocationSaving] = useState(false);
+  const [promoCodes, setPromoCodes] = useState<any[]|null>(null);
+  const [promoEditor, setPromoEditor] = useState<{ id?:string; code:string; discountType:'PERCENT'|'FLAT'; discountValue:string; maxUsages:string; expiresAt:string }|null>(null);
+  const [membershipPlans, setMembershipPlans] = useState<any[]|null>(null);
+  const [membershipMembers, setMembershipMembers] = useState<any[]|null>(null);
   const [availabilityEditor, setAvailabilityEditor] = useState<{
     staffId:string;
     name:string;
@@ -960,6 +967,15 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'invoices' && !invoices) { setLoading(true); setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`)); }
       else if (v === 'resources') { setLoading(true); setResources(await api<Resource[]>(`/businesses/${bizId()}/resources`)); }
       else if (v === 'locations') { setLoading(true); setLocations(await api<Location[]>(`/businesses/${bizId()}/locations`)); }
+      else if (v === 'promo-codes') { setLoading(true); setPromoCodes(await api<any[]>(`/businesses/${bizId()}/promo-codes`)); }
+      else if (v === 'memberships') {
+        setLoading(true);
+        const [plans, members] = await Promise.all([
+          api<any[]>(`/businesses/${bizId()}/memberships/plans`),
+          api<any[]>(`/businesses/${bizId()}/memberships/members`),
+        ]);
+        setMembershipPlans(plans); setMembershipMembers(members);
+      }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
 
@@ -1881,6 +1897,15 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 </TouchableOpacity>
               </View>
             </View>
+            <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>QR CODE</Text>
+            <View style={[ms.card,{ alignItems:'center', paddingVertical:20 }]}>
+              {biz?.slug ? (
+                <QRCode value={bookingUrl} size={180} color={GRAY_900} backgroundColor="#fff"/>
+              ) : (
+                <Text style={ms.empty}>Save your business settings first to generate a QR code.</Text>
+              )}
+              <Text style={[ms.rowMeta,{ marginTop:12, textAlign:'center' }]}>Clients can scan this to go straight to your booking page.</Text>
+            </View>
             <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>BOOKING-PAGE TOOLS</Text>
             {[
               { label:'Reviews', icon:'star-outline' as const, v:'reviews' as MoreView },
@@ -2517,6 +2542,184 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'promo-codes') {
+    async function savePromoCode() {
+      if (!promoEditor) return;
+      const val = Number(promoEditor.discountValue);
+      if (!promoEditor.code.trim() || isNaN(val) || val <= 0) {
+        Alert.alert('Missing info', 'Enter a code and a valid discount value.'); return;
+      }
+      try {
+        const body = {
+          code: promoEditor.code.trim().toUpperCase(),
+          discountType: promoEditor.discountType,
+          discountValue: val,
+          maxUsages: promoEditor.maxUsages ? Number(promoEditor.maxUsages) : undefined,
+          expiresAt: promoEditor.expiresAt || undefined,
+          active: true,
+        };
+        if (promoEditor.id) {
+          await api(`/businesses/${bizId()}/promo-codes/${promoEditor.id}`, { method:'PATCH', body: JSON.stringify(body) });
+        } else {
+          await api(`/businesses/${bizId()}/promo-codes`, { method:'POST', body: JSON.stringify(body) });
+        }
+        setPromoCodes(null); setPromoEditor(null);
+        setLoading(true);
+        setPromoCodes(await api<any[]>(`/businesses/${bizId()}/promo-codes`));
+      } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not save promo code.'); }
+      finally { setLoading(false); }
+    }
+    async function deletePromoCode(id: string) {
+      Alert.alert('Delete promo code','This cannot be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:async()=>{
+        try {
+          await api(`/businesses/${bizId()}/promo-codes/${id}`, { method:'DELETE' });
+          setPromoCodes(p => p?.filter(x=>x.id!==id) ?? null);
+        } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete.'); }
+      }}]);
+    }
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <Text style={[s.headerTitle,{ flex:1 }]}>Promo Codes</Text>
+          <TouchableOpacity onPress={()=>setPromoEditor({ code:'', discountType:'PERCENT', discountValue:'10', maxUsages:'', expiresAt:'' })}>
+            <Ionicons name="add" size={24} color={BRAND}/>
+          </TouchableOpacity>
+        </View>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {(!promoCodes || promoCodes.length === 0) ? (
+              <View style={[s.center,{ padding:40 }]}>
+                <Ionicons name="pricetag-outline" size={40} color={GRAY_200}/>
+                <Text style={[ms.empty,{ marginTop:10 }]}>No promo codes yet. Tap + to create one.</Text>
+              </View>
+            ) : promoCodes.map((pc,i,arr)=>(
+              <TouchableOpacity key={pc.id} style={[ms.row, i<arr.length-1&&{ borderBottomWidth:1, borderColor:GRAY_100 }]}
+                onPress={()=>setPromoEditor({ id:pc.id, code:pc.code, discountType:pc.discountType, discountValue:String(pc.discountValue), maxUsages:pc.maxUsages?String(pc.maxUsages):'', expiresAt:pc.expiresAt?pc.expiresAt.slice(0,10):'' })}>
+                <View style={{ flex:1 }}>
+                  <Text style={ms.rowTitle}>{pc.code}</Text>
+                  <Text style={ms.rowMeta}>
+                    {pc.discountType==='PERCENT' ? `${pc.discountValue}% off` : `$${(pc.discountValue/100).toFixed(2)} off`}
+                    {pc.maxUsages ? ` · ${pc.usageCount}/${pc.maxUsages} used` : ` · ${pc.usageCount} used`}
+                    {!pc.active && ' · Inactive'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={()=>deletePromoCode(pc.id)} style={{ padding:8 }}>
+                  <Ionicons name="trash-outline" size={18} color="#EF4444"/>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+        <Modal visible={!!promoEditor} animationType="slide" presentationStyle="formSheet" onRequestClose={()=>setPromoEditor(null)}>
+          <SafeAreaView style={s.screen}>
+            <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
+              <TouchableOpacity onPress={()=>setPromoEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <Text style={s.headerTitle}>{promoEditor?.id ? 'Edit code' : 'New promo code'}</Text>
+            </View>
+            <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS==='ios'?'padding':'height'}>
+              <ScrollView contentContainerStyle={{ padding:16 }}>
+                {(
+                  [
+                    { k:'code' as const, label:'Code', ph:'SUMMER20', upper:true, numeric:false },
+                    { k:'discountValue' as const, label:'Discount amount', ph:'10', upper:false, numeric:true },
+                    { k:'maxUsages' as const, label:'Max usages (leave blank = unlimited)', ph:'100', upper:false, numeric:true },
+                    { k:'expiresAt' as const, label:'Expires (YYYY-MM-DD, leave blank = never)', ph:'2026-12-31', upper:false, numeric:false },
+                  ]
+                ).map(({k,label,ph,upper,numeric})=>(
+                  <View key={k} style={{ marginBottom:12 }}>
+                    <Text style={s.fieldLabel}>{label}</Text>
+                    <TextInput style={s.input} placeholder={ph} placeholderTextColor={GRAY_400}
+                      keyboardType={numeric?'numeric':'default'}
+                      autoCapitalize={upper?'characters':'none'}
+                      value={promoEditor?.[k] ?? ''}
+                      onChangeText={v=>setPromoEditor(p=>p?({...p,[k]:upper?v.toUpperCase():v}):p)}/>
+                  </View>
+                ))}
+                <Text style={s.fieldLabel}>Discount type</Text>
+                <View style={{ flexDirection:'row', gap:8, marginBottom:16 }}>
+                  {(['PERCENT','FLAT'] as const).map(t=>(
+                    <TouchableOpacity key={t} onPress={()=>setPromoEditor(p=>p?({...p,discountType:t}):p)}
+                      style={[s.slotBtn, promoEditor?.discountType===t&&s.slotBtnActive]}>
+                      <Text style={[s.slotText, promoEditor?.discountType===t&&s.slotTextActive]}>{t==='PERCENT'?'Percent':'Flat $'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TouchableOpacity style={s.btnPrimary} onPress={savePromoCode}>
+                  <Text style={s.btnPrimaryText}>{promoEditor?.id ? 'Save changes' : 'Create code'}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
+
+  if (view === 'memberships') {
+    async function cancelMembership(id: string) {
+      Alert.alert('Cancel membership','The member will keep access until their period ends.',[{text:'Keep',style:'cancel'},{text:'Cancel membership',style:'destructive',onPress:async()=>{
+        try {
+          await api(`/businesses/${bizId()}/memberships/${id}/cancel`, { method:'PATCH' });
+          setMembershipMembers(m => m?.map(x=>x.id===id?{...x,status:'CANCELLED'}:x) ?? null);
+        } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not cancel.'); }
+      }}]);
+    }
+    const activeCount = (membershipMembers??[]).filter(m=>m.status==='ACTIVE').length;
+    const mrr = (membershipMembers??[]).filter(m=>m.status==='ACTIVE').reduce((sum,m)=>{
+      const plan = (membershipPlans??[]).find(p=>p.id===m.planId);
+      return sum + (plan?.priceMonthly ?? 0);
+    }, 0);
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <Text style={s.headerTitle}>Memberships</Text>
+        </View>
+        {loading ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            <View style={[ms.card,{ flexDirection:'row', gap:0 }]}>
+              <View style={{ flex:1, alignItems:'center' }}>
+                <Text style={{ fontSize:24, fontWeight:'800', color:BRAND }}>{activeCount}</Text>
+                <Text style={ms.rowMeta}>Active members</Text>
+              </View>
+              <View style={{ width:1, backgroundColor:GRAY_100 }}/>
+              <View style={{ flex:1, alignItems:'center' }}>
+                <Text style={{ fontSize:24, fontWeight:'800', color:BRAND }}>${(mrr/100).toFixed(0)}</Text>
+                <Text style={ms.rowMeta}>MRR / mo</Text>
+              </View>
+            </View>
+            <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>PLANS</Text>
+            {(!membershipPlans || membershipPlans.length===0) ? (
+              <Text style={[ms.empty,{ marginLeft:2 }]}>No plans yet — create them on the web dashboard.</Text>
+            ) : membershipPlans.map((p,i,arr)=>(
+              <View key={p.id} style={[ms.row, i<arr.length-1&&{ borderBottomWidth:1, borderColor:GRAY_100 }]}>
+                <View style={{ flex:1 }}>
+                  <Text style={ms.rowTitle}>{p.name}</Text>
+                  <Text style={ms.rowMeta}>${(p.priceMonthly/100).toFixed(0)}/mo · {!p.active && 'Inactive'}</Text>
+                </View>
+              </View>
+            ))}
+            <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>ACTIVE MEMBERS</Text>
+            {(!membershipMembers || membershipMembers.filter(m=>m.status==='ACTIVE').length===0) ? (
+              <Text style={[ms.empty,{ marginLeft:2 }]}>No active members yet.</Text>
+            ) : membershipMembers.filter(m=>m.status==='ACTIVE').map((m,i,arr)=>(
+              <View key={m.id} style={[ms.row, i<arr.length-1&&{ borderBottomWidth:1, borderColor:GRAY_100 }]}>
+                <View style={{ flex:1 }}>
+                  <Text style={ms.rowTitle}>{m.client?.name ?? 'Client'}</Text>
+                  <Text style={ms.rowMeta}>{(membershipPlans??[]).find(p=>p.id===m.planId)?.name ?? 'Plan'} · renews {m.currentPeriodEnd ? new Date(m.currentPeriodEnd).toLocaleDateString('en-CA') : '—'}</Text>
+                </View>
+                <TouchableOpacity onPress={()=>cancelMembership(m.id)} style={{ padding:8 }}>
+                  <Ionicons name="close-circle-outline" size={20} color="#EF4444"/>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   if (view === 'soon') return (
     <SafeAreaView style={s.screen}>
       <Head title={soonLabel}/>
@@ -2798,6 +3001,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
     { label:'Invoices',         icon:'receipt-outline',         onPress:()=>open('invoices') },
     { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
+    { label:'Promo Codes',       icon:'pricetag-outline',        onPress:()=>open('promo-codes') },
+    { label:'Memberships',      icon:'people-circle-outline',   onPress:()=>open('memberships') },
     { label:'Add-ons',          icon:'extension-puzzle-outline',onPress:()=>open('addons') },
     { label:'Subscriptions',    icon:'card-outline',            onPress:()=>open('subscriptions') },
     { label:'Support',          icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },

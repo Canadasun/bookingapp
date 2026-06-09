@@ -186,6 +186,9 @@ model Business {
   subscription        Subscription?
   privacyConsents     PrivacyConsent[]
   dataErasureRequests DataErasureRequest[]
+  promoCodes          PromoCode[]
+  membershipPlans     MembershipPlan[]
+  clientMemberships   ClientMembership[]
 }
 
 model Review {
@@ -789,6 +792,7 @@ model Client {
   serviceDues         ServiceDue[]
   messageThreadStates MessageThreadState[]
   invoices            Invoice[]
+  memberships         ClientMembership[]
 
   @@unique([businessId, email])
   @@index([businessId])
@@ -819,6 +823,9 @@ model Appointment {
   recurringGroupId      String? // shared id linking occurrences of a recurring series
   intakeAnswers         Json? // client's answers to the business intake questions, [{ label, answer }]
   locationId            String? // which location this appointment is at (multi-location)
+  referralSource        String? // "How did you hear about us?" — e.g. Instagram, Google, Referral, Walk-in
+  promoCodeId           String? // promo code applied at booking
+  discountCents         Int               @default(0) // discount applied via promo code
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
@@ -827,6 +834,7 @@ model Appointment {
   staff            Staff             @relation(fields: [staffId], references: [id], onDelete: Restrict)
   service          Service           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  promoCode        PromoCode?        @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   notificationLogs NotificationLog[]
   payments         Payment[]
 
@@ -1167,6 +1175,78 @@ model GoogleCalendarConnection {
   updatedAt    DateTime  @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+// ── Promo codes ───────────────────────────────────────────────────────────────
+enum DiscountType {
+  PERCENT // discountValue is 0-100 (percentage)
+  FLAT    // discountValue is cents
+}
+
+model PromoCode {
+  id            String       @id @default(cuid())
+  businessId    String
+  code          String       // case-insensitive coupon code, e.g. "SUMMER20"
+  discountType  DiscountType @default(PERCENT)
+  discountValue Int          // percent or flat cents
+  maxUsages     Int?         // null = unlimited
+  usageCount    Int          @default(0)
+  expiresAt     DateTime?
+  active        Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@unique([businessId, code])
+  @@index([businessId])
+}
+
+// ── Memberships ───────────────────────────────────────────────────────────────
+enum MembershipStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+}
+
+model MembershipPlan {
+  id              String   @id @default(cuid())
+  businessId      String
+  name            String
+  description     String?
+  priceMonthly    Int      // cents per month
+  active          Boolean  @default(true)
+  stripeProductId String?
+  stripePriceId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business    Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  memberships ClientMembership[]
+
+  @@index([businessId])
+}
+
+model ClientMembership {
+  id                   String           @id @default(cuid())
+  businessId           String
+  clientId             String
+  planId               String
+  status               MembershipStatus @default(ACTIVE)
+  stripeSubscriptionId String?          @unique
+  currentPeriodEnd     DateTime?
+  cancelledAt          DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  business Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  plan     MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([businessId])
+  @@index([clientId])
 }
 
 // Per-merchant Square connection (OAuth). Each business links their own Square

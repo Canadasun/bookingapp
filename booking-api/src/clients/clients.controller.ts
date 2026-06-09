@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException, Res, HttpCode } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientsService } from './clients.service';
 import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto } from './dto/client.dto';
@@ -35,6 +36,38 @@ export class ClientsController {
   // dropped: it disclosed a person's name, phone and booking history to anyone
   // who knew their email/phone. Clients now manage bookings only via the signed
   // link in their confirmation email, or by signing into the portal.
+
+  // CSV export — before :id so the literal path isn't consumed as a param
+  @Get('export-csv')
+  @UseGuards(JwtAuthGuard)
+  async exportCsv(
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
+    @Res() res: Response,
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) throw new ForbiddenException();
+    const clients = await this.clientService.exportAll(businessId);
+    const header = 'Name,Email,Phone,Tags,Notes,Birthday,Created\n';
+    const rows = clients.map(c =>
+      [c.name, c.email ?? '', c.phone ?? '', c.tags.join(';'), (c.notes ?? '').replace(/,/g, ' '), c.birthday ?? '', c.createdAt.toISOString()].map(v => `"${v}"`).join(',')
+    ).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="clients.csv"');
+    res.send(header + rows);
+  }
+
+  // CSV import — bulk upsert clients from uploaded CSV
+  @Post('import-csv')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  importCsv(
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
+    @Body() body: { rows: Array<{ name: string; email?: string; phone?: string; tags?: string; notes?: string }> },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) throw new ForbiddenException();
+    return this.clientService.bulkImport(businessId, body.rows);
+  }
 
   // Declared before @Get(':id') so "duplicates" isn't swallowed as a client id.
   @Get('duplicates')

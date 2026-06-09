@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
 import { formatPrice, cn } from "@/lib/utils";
 import { getUser } from "@/lib/auth";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 function MetricCard({ label, value, icon: Icon, accent }: {
   label: string; value: string | number; icon: React.ElementType; accent: string;
@@ -173,6 +174,8 @@ export default function OverviewPage() {
 
   return (
     <div className="max-w-5xl mx-auto min-w-0 space-y-5 sm:space-y-6">
+
+      <OnboardingWizard />
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

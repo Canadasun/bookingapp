@@ -240,6 +240,23 @@ export interface Campaign {
 }
 
 export type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
+
+export interface PromoCode {
+  id: string; businessId: string; code: string; discountType: "PERCENT" | "FLAT";
+  discountValue: number; maxUsages: number | null; usageCount: number;
+  expiresAt: string | null; active: boolean; createdAt: string;
+}
+export interface MembershipPlan {
+  id: string; businessId: string; name: string; description?: string | null;
+  priceMonthly: number; active: boolean; createdAt: string;
+}
+export type MembershipStatus = "ACTIVE" | "CANCELLED" | "EXPIRED" | "PAST_DUE";
+export interface MembershipMember {
+  id: string; businessId: string; clientId: string; planId: string; status: MembershipStatus;
+  currentPeriodEnd?: string | null; cancelledAt?: string | null; createdAt: string;
+  client: { id: string; name: string; email?: string | null; phone?: string | null };
+  plan: { id: string; name: string; priceMonthly: number };
+}
 export type PaymentKind = "DEPOSIT" | "NO_SHOW_FEE" | "LATE_CANCEL_FEE" | "IN_PERSON" | "OTHER";
 export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "REFUNDED" | "PARTIALLY_REFUNDED";
 export interface RefundRow {
@@ -759,6 +776,9 @@ export const api = {
       req<{ ok: boolean; merged: number }>(`/businesses/${businessId}/clients/merge`, { method: "POST", body: JSON.stringify(data) }),
     delete: (businessId: string, id: string) =>
       req<{ ok: boolean; deletedAppointments: number }>(`/businesses/${businessId}/clients/${id}`, { method: "DELETE" }),
+    exportCsv: (businessId: string) => `/proxy/businesses/${businessId}/clients/export-csv`,
+    importCsv: (businessId: string, rows: unknown[]) =>
+      req<{ created: number; updated: number; total: number }>(`/businesses/${businessId}/clients/import-csv`, { method: "POST", body: JSON.stringify({ rows }) }),
   },
 
   appointments: {
@@ -770,7 +790,7 @@ export const api = {
     get: (id: string, token?: string) => req<Appointment>(`/bookings/${id}${token ? `?token=${encodeURIComponent(token)}` : ""}`, undefined, null),
     // Owner-scoped single appointment (for receipts/detail).
     getOne: (businessId: string, id: string) => req<Appointment>(`/businesses/${businessId}/bookings/${id}`),
-    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[] }) =>
+    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string; discountCents?: number }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).
@@ -855,6 +875,29 @@ export const api = {
       req<unknown>(`/businesses/${businessId}/offers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     remove: (businessId: string, id: string) =>
       req<void>(`/businesses/${businessId}/offers/${id}`, { method: "DELETE" }),
+  },
+
+  promoCodes: {
+    list: (businessId: string) => req<PromoCode[]>(`/businesses/${businessId}/promo-codes`),
+    validate: (businessId: string, code: string, priceCents: number) =>
+      req<{ id: string; code: string; discountType: string; discountValue: number; discountCents: number }>(
+        `/businesses/${businessId}/promo-codes/validate?code=${encodeURIComponent(code)}&priceCents=${priceCents}`, undefined, null
+      ),
+    create: (businessId: string, data: unknown) => req<PromoCode>(`/businesses/${businessId}/promo-codes`, { method: "POST", body: JSON.stringify(data) }),
+    update: (businessId: string, id: string, data: unknown) => req<PromoCode>(`/businesses/${businessId}/promo-codes/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    remove: (businessId: string, id: string) => req<void>(`/businesses/${businessId}/promo-codes/${id}`, { method: "DELETE" }),
+  },
+
+  memberships: {
+    listPlans: (businessId: string) => req<MembershipPlan[]>(`/businesses/${businessId}/memberships/plans`),
+    createPlan: (businessId: string, data: unknown) => req<MembershipPlan>(`/businesses/${businessId}/memberships/plans`, { method: "POST", body: JSON.stringify(data) }),
+    updatePlan: (businessId: string, id: string, data: unknown) => req<MembershipPlan>(`/businesses/${businessId}/memberships/plans/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deletePlan: (businessId: string, id: string) => req<void>(`/businesses/${businessId}/memberships/plans/${id}`, { method: "DELETE" }),
+    listMembers: (businessId: string) => req<MembershipMember[]>(`/businesses/${businessId}/memberships/members`),
+    subscribe: (businessId: string, clientId: string, planId: string) =>
+      req<unknown>(`/businesses/${businessId}/memberships/subscribe`, { method: "POST", body: JSON.stringify({ clientId, planId }) }),
+    cancel: (businessId: string, id: string) => req<unknown>(`/businesses/${businessId}/memberships/${id}/cancel`, { method: "PATCH" }),
+    clientMemberships: (businessId: string, clientId: string) => req<MembershipMember[]>(`/businesses/${businessId}/memberships/clients/${clientId}`),
   },
 
   clientPortal: {

@@ -42,6 +42,7 @@ function BookScreen() {
   const [repeat, setRepeat] = useState<{ frequency:'WEEKLY'|'BIWEEKLY'|'THREE_WEEKS'|'EIGHT_WEEKS'|'MONTHLY'; count:number }|null>(null);
   const [overrideCalendar, setOverrideCalendar] = useState(false);
   const [form, setForm]               = useState({name:'',email:'',phone:''});
+  const [referralSource, setReferralSource] = useState('');
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [loading, setLoading]         = useState(false);
   const [bookedId, setBookedId]       = useState('');
@@ -167,6 +168,7 @@ function BookScreen() {
         clientId:client.id,
         startsAt,
         allowOverride: overrideCalendar || !!customStartsAt,
+        referralSource: referralSource || undefined,
       };
       if (repeat) {
         // Recurring series: first occurrence must succeed; later conflicts are skipped.
@@ -202,7 +204,7 @@ function BookScreen() {
     setStep('service'); setSelectedSvcs([]); setStaff(null); setDate(''); setSlot(null);
     setStaffList([]); setAllStaffList([]); setShowStaffStep(false); setCustomStartsAt(''); setOverrideCalendar(false);
     setManualHour(9); setManualMin(0); setManualMeridiem('AM');
-    setForm({name:'',email:'',phone:''}); setPolicyAccepted(false); setBookedId(''); setRepeat(null);
+    setForm({name:'',email:'',phone:''}); setReferralSource(''); setPolicyAccepted(false); setBookedId(''); setRepeat(null);
     setWlPrompt(false); setWlSaving(false);
   }
 
@@ -440,6 +442,16 @@ function BookScreen() {
                 <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.min(12,r.count+1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>+</Text></TouchableOpacity>
               </View>
             )}
+            {/* How did you hear about us */}
+            <Text style={s.fieldLabel}>How did you hear about us? (optional)</Text>
+            <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom:14 }}>
+              {(['Instagram','TikTok','Google','Facebook','Referral','Walk-in','Returning','Other'] as const).map(src=>(
+                <TouchableOpacity key={src} onPress={()=>setReferralSource(s=>s===src?'':src)}
+                  style={[s.slotBtn, referralSource===src&&s.slotBtnActive]}>
+                  <Text style={[s.slotText, referralSource===src&&s.slotTextActive]}>{src}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             {/* Cancellation policy */}
             <View style={s.policyBox}>
               <Text style={s.policyTitle}>Cancellation Policy</Text>

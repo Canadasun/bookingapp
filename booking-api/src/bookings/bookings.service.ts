@@ -271,6 +271,8 @@ export class BookingsService {
               ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
               // Multi-location: the appointment inherits its provider's location.
               ...(staff.locationId ? { locationId: staff.locationId } : {}),
+              ...(dto.referralSource ? { referralSource: dto.referralSource } : {}),
+              ...(dto.promoCodeId ? { promoCodeId: dto.promoCodeId, discountCents: dto.discountCents ?? 0 } : {}),
             },
             include: { client: true, service: true, staff: { include: { user: true } }, business: true },
           });
@@ -310,6 +312,11 @@ export class BookingsService {
       appointmentId: appointment.id,
       status: appointment.status,
     });
+
+    // Increment promo code usage counter (best-effort, non-blocking)
+    if (dto.promoCodeId) {
+      this.prisma.promoCode.update({ where: { id: dto.promoCodeId }, data: { usageCount: { increment: 1 } } }).catch(() => {});
+    }
 
     if (opts.confirmed) {
       // Owner/staff booking: confirm immediately, send the real confirmation to
