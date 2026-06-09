@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const input = await req.json() as { email: string; password: string };
   // A prior "remember this device" token lets a 2FA user skip the OTP here.
   const trustedDeviceToken = req.cookies.get("booking_td")?.value;
-  const body = { ...input, email: input.email.trim().toLowerCase(), ...(trustedDeviceToken ? { trustedDeviceToken } : {}) };
+  const body = { ...input, email: input.email.trim().toLowerCase(), platform: 'web' as const, ...(trustedDeviceToken ? { trustedDeviceToken } : {}) };
   const upstream = await fetch(`${API}/auth/login`, {
     method: "POST",
     headers: {
