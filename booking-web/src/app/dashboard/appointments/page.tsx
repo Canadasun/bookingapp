@@ -830,12 +830,7 @@ function AppointmentsPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [showBlock, setShowBlock] = useState(false);
-  const [showNewApt, setShowNewApt] = useState(() => false);
-
-  // Auto-open the new appointment modal when redirected with ?new=1
-  useEffect(() => {
-    if (searchParams.get("new") === "1") setShowNewApt(true);
-  }, [searchParams]);
+  const [showNewApt, setShowNewApt] = useState(() => searchParams.get("new") === "1");
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string }; locationId?: string | null }[]>([]);
   const [allStaffFull, setAllStaffFull] = useState<{ availabilityRules?: AvailabilityRule[] }[]>([]);
 
