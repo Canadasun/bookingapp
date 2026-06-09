@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Query, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SystemErrorsService } from './system-errors.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -39,6 +39,18 @@ export class SystemErrorsController {
     return this.svc.counts(user.businessId);
   }
 
+  @Get('patterns')
+  @Roles(Role.ADMIN)
+  patterns() {
+    return this.svc.patterns();
+  }
+
+  @Get('business-health')
+  @Roles(Role.ADMIN)
+  businessHealth(@Query('limit') limit?: string) {
+    return this.svc.businessHealth(limit ? Math.min(parseInt(limit, 10), 100) : 20);
+  }
+
   @Patch(':id/resolve')
   @Roles(Role.OWNER, Role.ADMIN)
   resolve(
@@ -54,5 +66,12 @@ export class SystemErrorsController {
   resolveAll(@CurrentUser() user: { role: string; businessId: string | null }) {
     if (!user.businessId) throw new ForbiddenException('No business');
     return this.svc.resolveAll(user.businessId);
+  }
+
+  /** Call OpenAI to explain a batch of recent error patterns (requires OPENAI_API_KEY). */
+  @Post('ai-explain')
+  @Roles(Role.ADMIN)
+  aiExplain(@Body() body: { category?: string }) {
+    return this.svc.aiExplain(body.category);
   }
 }

@@ -199,4 +199,41 @@ export class VerificationService {
       select: { verificationStatus: true, verificationNote: true },
     });
   }
+
+  /**
+   * Onboarding funnel: for every business, derive which setup steps are complete.
+   * Steps: signed_up → added_service → added_staff → stripe_connected → first_booking → verified
+   */
+  async onboardingFunnel() {
+    const businesses = await this.prisma.business.findMany({
+      select: {
+        id: true,
+        name: true,
+        plan: true,
+        verificationStatus: true,
+        stripeConnectAccountId: true,
+        createdAt: true,
+        _count: { select: { services: true, staff: true, appointments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const rows = businesses.map((b) => ({
+      id: b.id,
+      name: b.name,
+      plan: b.plan,
+      createdAt: b.createdAt,
+      signedUp: true,
+      addedService: b._count.services > 0,
+      addedStaff: b._count.staff > 0,
+      stripeConnected: !!b.stripeConnectAccountId,
+      firstBooking: b._count.appointments > 0,
+      verified: b.verificationStatus === 'VERIFIED',
+    }));
+
+    const steps = ['signedUp', 'addedService', 'addedStaff', 'stripeConnected', 'firstBooking', 'verified'] as const;
+    const totals = Object.fromEntries(steps.map((s) => [s, rows.filter((r) => r[s]).length])) as Record<typeof steps[number], number>;
+
+    return { total: rows.length, totals, businesses: rows };
+  }
 }

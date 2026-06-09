@@ -464,6 +464,11 @@ export const api = {
     lookupUser: (email: string) => req<{ id: string; email: string; name: string; role: string; createdAt: string; emailVerified: boolean; business: { id: string; name: string; plan: string; suspended: boolean } | null; lockStatus: { locked: boolean; failCount: number; lockTtlSeconds: number } }>("/admin/users/lookup", { method: "POST", body: JSON.stringify({ email }) }),
     unlockUser: (email: string) => req<{ ok: boolean; message: string }>("/admin/users/unlock", { method: "POST", body: JSON.stringify({ email }) }),
     sendPasswordReset: (email: string) => req<{ ok: boolean; message: string }>("/admin/users/send-reset", { method: "POST", body: JSON.stringify({ email }) }),
+    onboardingFunnel: () => req<{
+      total: number;
+      totals: { signedUp: number; addedService: number; addedStaff: number; stripeConnected: number; firstBooking: number; verified: number };
+      businesses: { id: string; name: string; plan: string; createdAt: string; signedUp: boolean; addedService: boolean; addedStaff: boolean; stripeConnected: boolean; firstBooking: boolean; verified: boolean }[];
+    }>("/admin/onboarding/funnel"),
   },
   adminVerifications: {
     list: () => req<{ id: string; name: string; email: string; slug: string; verificationDocUrl: string | null; verificationGovernmentIdUrl: string | null; verificationLegalName: string | null; verificationAddress: string | null; verificationPhone: string | null; verificationSubmittedAt: string | null }[]>("/admin/verifications"),
@@ -649,6 +654,9 @@ export const api = {
     counts: () => req<{ critical: number; error: number; warn: number; total: number }>("/system-errors/counts"),
     resolve: (id: string) => req<{ count: number }>(`/system-errors/${id}/resolve`, { method: "PATCH" }),
     resolveAll: () => req<{ count: number }>("/system-errors/resolve-all", { method: "POST" }),
+    patterns: () => req<{ category: string; total: number; critical: number; error: number; warn: number }[]>("/system-errors/patterns"),
+    businessHealth: (limit?: number) => req<{ id?: string; name?: string; email?: string; plan?: string; errorCount: number }[]>(`/system-errors/business-health${limit ? "?limit=" + limit : ""}`),
+    aiExplain: (category?: string) => req<{ explanation: string | null; reason?: string }>("/system-errors/ai-explain", { method: "POST", body: JSON.stringify({ category }) }),
   },
 
   serviceCategories: {

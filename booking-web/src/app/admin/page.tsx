@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   Ban,
+  Bot,
   Building2,
   CalendarClock,
   Check,
@@ -17,6 +18,8 @@ import {
   CreditCard,
   ExternalLink,
   FileText,
+  Funnel,
+  HeartPulse,
   LayoutDashboard,
   Lock,
   LogOut,
@@ -30,7 +33,7 @@ import { getUser, clearSession } from "@/lib/auth";
 import { formatPrice, cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 
-type Tab = "overview" | "verifications" | "businesses" | "duplicates" | "errors" | "users";
+type Tab = "overview" | "verifications" | "businesses" | "duplicates" | "errors" | "users" | "funnel" | "health";
 
 type Pending = {
   id: string;
@@ -96,6 +99,16 @@ export default function AdminPage() {
   const [sysErrors, setSysErrors] = useState<SystemError[]>([]);
   const [errFilter, setErrFilter] = useState<"unresolved" | "resolved" | "all">("unresolved");
   const [errBusy, setErrBusy] = useState(false);
+  const [errPatterns, setErrPatterns] = useState<{ category: string; total: number; critical: number; error: number; warn: number }[]>([]);
+  const [bizHealth, setBizHealth] = useState<{ id?: string; name?: string; email?: string; plan?: string; errorCount: number }[]>([]);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [funnel, setFunnel] = useState<{
+    total: number;
+    totals: { signedUp: number; addedService: number; addedStaff: number; stripeConnected: number; firstBooking: number; verified: number };
+    businesses: { id: string; name: string; plan: string; createdAt: string; signedUp: boolean; addedService: boolean; addedStaff: boolean; stripeConnected: boolean; firstBooking: boolean; verified: boolean }[];
+  } | null>(null);
+  const [funnelBusy, setFunnelBusy] = useState(false);
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [passwordBusy, setPasswordBusy] = useState(false);
 
@@ -130,6 +143,37 @@ export default function AdminPage() {
   }, [errFilter]);
 
   useEffect(() => { if (tab === "errors") loadErrors(); }, [tab, loadErrors]);
+
+  const loadHealth = useCallback(async () => {
+    try {
+      const [patterns, health] = await Promise.all([
+        api.systemErrors.patterns(),
+        api.systemErrors.businessHealth(),
+      ]);
+      setErrPatterns(patterns);
+      setBizHealth(health);
+    } catch { toast.error("Failed to load error health data"); }
+  }, []);
+
+  useEffect(() => { if (tab === "health") loadHealth(); }, [tab, loadHealth]);
+
+  const loadFunnel = useCallback(async () => {
+    setFunnelBusy(true);
+    try { setFunnel(await api.admin.onboardingFunnel()); }
+    catch { toast.error("Failed to load funnel"); }
+    finally { setFunnelBusy(false); }
+  }, []);
+
+  useEffect(() => { if (tab === "funnel") loadFunnel(); }, [tab, loadFunnel]);
+
+  async function runAiExplain(category?: string) {
+    setAiLoading(true);
+    try {
+      const res = await api.systemErrors.aiExplain(category);
+      setAiExplanation(res.explanation ?? res.reason ?? "No response");
+    } catch { toast.error("AI explain failed"); }
+    finally { setAiLoading(false); }
+  }
 
   async function resolveError(id: string) {
     setErrBusy(true);
@@ -240,6 +284,8 @@ export default function AdminPage() {
     { id: "businesses",    label: "Businesses",    icon: Building2 },
     { id: "duplicates",    label: "Duplicates",    icon: AlertTriangle, badge: duplicates.length || undefined },
     { id: "errors",        label: "Errors",        icon: Activity, badge: sysErrors.filter((e) => !e.resolved && e.severity === "CRITICAL").length || undefined },
+    { id: "health",        label: "Health",        icon: HeartPulse },
+    { id: "funnel",        label: "Funnel",        icon: Funnel },
     { id: "users",         label: "Users",         icon: Users },
   ];
 
@@ -755,6 +801,183 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {tab === "health" && (
+          <div className="space-y-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-950">Error Health</h1>
+                <p className="mt-1 text-sm text-gray-500">Patterns in unresolved errors and which businesses need attention.</p>
+              </div>
+              <button onClick={loadHealth} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* AI Explain */}
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-violet-600" />
+                  <p className="text-sm font-semibold text-violet-900">AI Error Analysis</p>
+                  <span className="text-xs text-violet-500 bg-violet-100 rounded px-1.5 py-0.5">requires OPENAI_API_KEY</span>
+                </div>
+                <button onClick={() => runAiExplain()} disabled={aiLoading}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 flex items-center gap-1.5">
+                  {aiLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
+                  {aiLoading ? "Analysing…" : "Explain errors"}
+                </button>
+              </div>
+              {aiExplanation && (
+                <div className="mt-3 text-sm text-violet-800 whitespace-pre-wrap bg-white rounded-lg p-3 border border-violet-100">{aiExplanation}</div>
+              )}
+            </div>
+
+            {/* Error patterns by category */}
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-3">Patterns by category</h2>
+              {errPatterns.length === 0 ? (
+                <p className="text-sm text-gray-400">No unresolved errors.</p>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {errPatterns.map((p) => (
+                    <div key={p.category} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{p.category}</span>
+                        <span className="text-lg font-bold text-gray-900">{p.total}</span>
+                      </div>
+                      <div className="flex gap-2 text-xs">
+                        {p.critical > 0 && <span className="bg-red-100 text-red-700 rounded px-1.5 py-0.5 font-semibold">{p.critical} CRITICAL</span>}
+                        {p.error > 0 && <span className="bg-orange-100 text-orange-700 rounded px-1.5 py-0.5 font-semibold">{p.error} ERROR</span>}
+                        {p.warn > 0 && <span className="bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5">{p.warn} WARN</span>}
+                      </div>
+                      <button onClick={() => runAiExplain(p.category)} disabled={aiLoading}
+                        className="mt-2 text-xs text-violet-600 hover:underline flex items-center gap-1">
+                        <Bot className="w-3 h-3" /> Explain this category
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Business health table */}
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-3">Businesses with most errors</h2>
+              {bizHealth.length === 0 ? (
+                <p className="text-sm text-gray-400">No business-specific errors.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Business</th>
+                        <th className="px-4 py-3 font-semibold">Plan</th>
+                        <th className="px-4 py-3 font-semibold text-right">Unresolved errors</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bizHealth.map((b, i) => (
+                        <tr key={b.id ?? i} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-900">{b.name ?? "Unknown"}</p>
+                            <p className="text-xs text-gray-400">{b.email}</p>
+                          </td>
+                          <td className="px-4 py-3 text-xs font-semibold text-gray-500">{b.plan ?? "—"}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={cn("font-bold", b.errorCount >= 10 ? "text-red-600" : b.errorCount >= 3 ? "text-orange-500" : "text-gray-700")}>
+                              {b.errorCount}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === "funnel" && (
+          <div className="space-y-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-950">Onboarding Funnel</h1>
+                <p className="mt-1 text-sm text-gray-500">How many businesses completed each setup step.</p>
+              </div>
+              <button onClick={loadFunnel} disabled={funnelBusy} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100">
+                <RefreshCw className={cn("w-4 h-4", funnelBusy && "animate-spin")} />
+              </button>
+            </div>
+
+            {funnel && (
+              <>
+                <div className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {(
+                    [
+                      { key: "signedUp",       label: "Signed up" },
+                      { key: "addedService",   label: "Added service" },
+                      { key: "addedStaff",     label: "Added staff" },
+                      { key: "stripeConnected",label: "Stripe connected" },
+                      { key: "firstBooking",   label: "First booking" },
+                      { key: "verified",       label: "Verified" },
+                    ] as { key: keyof typeof funnel.totals; label: string }[]
+                  ).map((step) => {
+                    const count = funnel.totals[step.key];
+                    const pct = funnel.total > 0 ? Math.round((count / funnel.total) * 100) : 0;
+                    return (
+                      <div key={step.key} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm text-center">
+                        <p className="text-2xl font-bold text-gray-900">{count}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{step.label}</p>
+                        <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">{pct}%</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Business</th>
+                        <th className="px-4 py-3 font-semibold">Plan</th>
+                        <th className="px-4 py-3 font-semibold text-center">Service</th>
+                        <th className="px-4 py-3 font-semibold text-center">Staff</th>
+                        <th className="px-4 py-3 font-semibold text-center">Stripe</th>
+                        <th className="px-4 py-3 font-semibold text-center">Booking</th>
+                        <th className="px-4 py-3 font-semibold text-center">Verified</th>
+                        <th className="px-4 py-3 font-semibold text-right">Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {funnel.businesses.map((b) => (
+                        <tr key={b.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900 max-w-[180px] truncate">{b.name}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-gray-500">{b.plan}</td>
+                          {([b.addedService, b.addedStaff, b.stripeConnected, b.firstBooking, b.verified] as boolean[]).map((done, i) => (
+                            <td key={i} className="px-4 py-3 text-center">
+                              {done
+                                ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                                : <X className="w-4 h-4 text-gray-200 mx-auto" />}
+                            </td>
+                          ))}
+                          <td className="px-4 py-3 text-right text-xs text-gray-400">{format(new Date(b.createdAt), "MMM d, yyyy")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+            {!funnel && !funnelBusy && (
+              <p className="text-sm text-gray-400">Click refresh to load funnel data.</p>
             )}
           </div>
         )}

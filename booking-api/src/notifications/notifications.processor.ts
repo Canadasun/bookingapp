@@ -985,12 +985,12 @@ ${aptDetails(apt)}
 
       case 'send-admin-booking-alert': {
         const adminEmail = apt.business.email || this.configService.get<string>('ADMIN_ALERT_EMAIL');
-        if (!adminEmail) break;
         const dashUrl = `${webUrl}/dashboard`;
-        await this.email.send({
-          to: adminEmail,
-          subject: `New booking: ${apt.client.name} — ${apt.service.name}`,
-          html: emailWrap(`
+        if (adminEmail) {
+          await this.email.send({
+            to: adminEmail,
+            subject: `New booking: ${apt.client.name} — ${apt.service.name}`,
+            html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">New booking received</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">A new appointment has been booked through your booking page.</p>
 ${aptDetails(apt)}
@@ -999,8 +999,15 @@ ${aptDetails(apt)}
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Booking ID</td><td style="color:#111827;font-size:12px;font-family:monospace">${apt.id}</td></tr>
 </table>
 <a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View in dashboard →</a>
-          `),
-        });
+            `),
+          });
+        }
+        if (apt.business.phone) {
+          await this.sms.send({
+            to: apt.business.phone,
+            body: `New booking from ${apt.client.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. View: ${dashUrl}`,
+          });
+        }
         break;
       }
 

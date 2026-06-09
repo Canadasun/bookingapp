@@ -117,6 +117,11 @@ export class AdminOverviewController {
     return this.svc.adminOverview();
   }
 
+  @Get('onboarding/funnel')
+  onboardingFunnel() {
+    return this.svc.onboardingFunnel();
+  }
+
   @Post('businesses/:id/suspend')
   suspend(@Param('id') id: string) {
     return this.biz.deactivate(id);
