@@ -28,7 +28,7 @@ export class AuthService {
     private redis: RedisService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, ctx?: { ip?: string }) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException("Email already registered");
 
@@ -102,6 +102,7 @@ export class AuthService {
             granted: true,
             version: dto.consentVersion,
             source: 'registration',
+            ipAddress: ctx?.ip?.slice(0, 64) || null,
           },
           {
             userId: user.id,
@@ -110,6 +111,7 @@ export class AuthService {
             granted: true,
             version: dto.consentVersion,
             source: 'registration',
+            ipAddress: ctx?.ip?.slice(0, 64) || null,
           },
           {
             userId: user.id,
@@ -118,6 +120,7 @@ export class AuthService {
             granted: dto.marketingConsent,
             version: dto.consentVersion,
             source: 'registration',
+            ipAddress: ctx?.ip?.slice(0, 64) || null,
           },
           {
             userId: user.id,
@@ -126,6 +129,7 @@ export class AuthService {
             granted: dto.trackingConsent,
             version: dto.consentVersion,
             source: 'registration',
+            ipAddress: ctx?.ip?.slice(0, 64) || null,
           },
         ],
       });

@@ -16,8 +16,9 @@ export class AuthController {
   constructor(private authService: AuthService, private prisma: PrismaService) {}
 
   @Post('register')
-  register(@Body(new ZodValidationPipe(RegisterSchema)) dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body(new ZodValidationPipe(RegisterSchema)) dto: RegisterDto, @Req() req: Request) {
+    const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+    return this.authService.register(dto, { ip: fwd || req.ip });
   }
 
   @Post('login')

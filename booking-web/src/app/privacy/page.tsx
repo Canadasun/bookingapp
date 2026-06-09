@@ -105,7 +105,7 @@ export default function PrivacyPage() {
                 <Trash2 className="w-5 h-5 text-violet-500" /> 7. Data Retention &amp; Deletion
               </h2>
               <div className="space-y-3">
-                <p><strong>Retention:</strong> We retain your account data for as long as your account is active or as needed to provide the service. Appointment records and client data are retained for a minimum of 7 years to comply with Canadian financial record-keeping requirements, unless you request earlier deletion and no legal retention obligation applies.</p>
+                <p><strong>Retention:</strong> We retain your account data for as long as your account is active or as needed to provide the service. <em>Financial transaction records</em> (invoices, payment confirmations, payout records) are retained for a minimum of 7 years to comply with the Canada Revenue Agency&apos;s record-keeping requirements under the <em>Income Tax Act</em> and <em>Excise Tax Act</em>. <em>Personal contact data</em> (names, emails, phone numbers) associated with inactive accounts is deleted or anonymized within 2 years of account closure, unless a longer period is required by law or you have an active legal dispute with a business on the platform.</p>
                 <p><strong>Deletion:</strong> You have the right to request deletion of your personal data. To submit a deletion request, email <strong>support@pulseappointments.com</strong> with the subject line &quot;Data Deletion Request.&quot; We will process your request within 30 days and confirm when your data has been deleted. Note that some data may be retained where required by law (e.g., financial transaction records).</p>
                 <p><strong>Account Closure:</strong> When you close your Pulse account, your business data and client records are queued for deletion within 90 days, subject to legal retention requirements.</p>
               </div>
@@ -123,7 +123,15 @@ export default function PrivacyPage() {
                 <Scale className="w-5 h-5 text-violet-500" /> 9. Your Rights (PIPA / Alberta)
               </h2>
               <div className="space-y-3">
-                <p>Under Alberta&apos;s <em>Personal Information Protection Act</em> (PIPA), you have the right to access the personal information we hold about you, request corrections, and withdraw consent for non-essential processing. To exercise these rights, contact us at <strong>support@pulseappointments.com</strong>.</p>
+                <p>Under Alberta&apos;s <em>Personal Information Protection Act</em> (PIPA), you have the right to access the personal information we hold about you, request corrections, and withdraw consent for non-essential processing.</p>
+                <p><strong>Privacy Officer:</strong> Pulse has designated a Privacy Officer responsible for handling data requests and PIPA compliance inquiries.</p>
+                <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-xs space-y-0.5">
+                  <p className="font-semibold text-slate-700">Privacy Officer, Pulse Appointments</p>
+                  <p>Email: <strong>privacy@pulseappointments.com</strong></p>
+                  <p>Mailing Address: Pulse Appointments Inc., Privacy Officer</p>
+                  <p>Suite 500 — 999 8th Street SW, Calgary, Alberta T2R 1J5, Canada</p>
+                </div>
+                <p>If you are unsatisfied with our response, you may file a complaint with the <strong>Office of the Information and Privacy Commissioner of Alberta (OIPC)</strong> at <strong>www.oipc.ab.ca</strong>.</p>
               </div>
             </section>
 

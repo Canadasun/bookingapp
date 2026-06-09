@@ -937,6 +937,12 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
                       Payments are processed securely by Stripe. Stripe processing fees may apply under the business&apos;s Stripe agreement. Pulse does not store card numbers.
                     </p>
+                    <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
+                      By confirming, your name, contact details, and appointment information are collected and stored by this business and processed by{" "}
+                      <a href="/privacy" target="_blank" className="underline hover:text-violet-500">Pulse</a>{" "}
+                      as its booking platform. View Pulse&apos;s{" "}
+                      <a href="/privacy" target="_blank" className="underline hover:text-violet-500">Privacy Policy</a>.
+                    </p>
                   </div>
                 </div>
               </div>
