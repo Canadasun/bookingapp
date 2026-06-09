@@ -25,7 +25,7 @@ export class ClientPortalController {
   @Get('appointments')
   appointments(@CurrentUser() user: User) {
     this.assertVerified(user);
-    return this.svc.getAppointments(user.email);
+    return this.svc.getAppointments(user.email, user.name);
   }
 
   @Get('messages')

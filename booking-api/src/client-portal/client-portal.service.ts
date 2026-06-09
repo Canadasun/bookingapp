@@ -6,7 +6,7 @@ import { signAppointmentToken } from '../common/util/appointment-token';
 export class ClientPortalService {
   constructor(private prisma: PrismaService) {}
 
-  async getAppointments(email: string) {
+  async getAppointments(email: string, displayName: string) {
     const clients = await this.prisma.client.findMany({
       where: { email },
       include: {
@@ -21,11 +21,13 @@ export class ClientPortalService {
       },
     });
 
+    // Use the user's own account name (not the business's internal label for them).
+    // Never expose c.name, c.notes, or c.tags to the client.
     return clients.flatMap((c) =>
       c.appointments.map((a) => ({
         ...a,
         business: c.business,
-        client: { id: c.id, name: c.name, email: c.email, phone: c.phone },
+        client: { id: c.id, name: displayName, email: c.email, phone: c.phone },
         manageToken: signAppointmentToken(a.id),
       }))
     ).sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());

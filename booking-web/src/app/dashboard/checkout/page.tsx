@@ -6,6 +6,7 @@ import { DayPicker } from "react-day-picker";
 import { parseISO } from "date-fns";
 import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus, Repeat } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { api, Service, StaffMember, Client, Slot, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -36,8 +37,8 @@ export default function CheckoutPage() {
   const [clientSearch, setClientSearch]   = useState("");
   const [clientResults, setClientResults] = useState<Client[]>([]);
   const [searching, setSearching]         = useState(false);
-  const [newClientMode, setNewClientMode] = useState(false);
-  const [newClient, setNewClient]         = useState({ firstName: "", lastName: "", email: "", phone: "" });
+
+  const router = useRouter();
 
   const [selectedClient, setSelectedClient]   = useState<Client | null>(null);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -134,17 +135,8 @@ export default function CheckoutPage() {
   async function createOrGetClient(): Promise<Client | null> {
     if (!bizId) return null;
     if (selectedClient) return selectedClient;
-    if (!newClientValid) {
-      toast.error("Enter a valid first name, last name, email and phone"); return null;
-    }
-    const name = `${newClient.firstName.trim()} ${newClient.lastName.trim()}`.trim();
-    try {
-      return await api.clients.create(bizId, {
-        name, email: newClient.email.trim(), phone: newClient.phone.trim() || undefined,
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create client"); return null;
-    }
+    toast.error("Select a client from the list first");
+    return null;
   }
 
   function customStartsAtValue() {
@@ -207,17 +199,9 @@ export default function CheckoutPage() {
     setCustomDate(""); setCustomTime(""); setCustomStaffId(""); setOverrideCalendar(false);
     setRecurring({ enabled: false, frequency: "WEEKLY", count: 4 });
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
-    setNewClientMode(false); setNewClient({ firstName: "", lastName: "", email: "", phone: "" });
+    setClientSearch(""); setClientResults([]);
   }
 
-  // New-client field validation — block "Continue" on bad email / phone / missing names.
-  const ncEmailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newClient.email.trim());
-  const ncPhoneDigits = newClient.phone.replace(/\D/g, "");
-  const ncPhoneOk = ncPhoneDigits.length >= 10 && ncPhoneDigits.length <= 15;
-  const ncFirstOk = newClient.firstName.trim().length >= 1;
-  const ncLastOk = newClient.lastName.trim().length >= 1;
-  const newClientValid = ncFirstOk && ncLastOk && ncEmailOk && ncPhoneOk;
-  const newClientName = `${newClient.firstName.trim()} ${newClient.lastName.trim()}`.trim();
 
   const today = startOfDay(new Date());
   const advanceLimit = addMinutes(new Date(), biz?.maxAdvanceMinutes ?? ((biz?.maxAdvanceDays ?? 60) * 1440));
@@ -245,7 +229,7 @@ export default function CheckoutPage() {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking confirmed!</h2>
         <p className="text-gray-500 mb-1">
-          {selectedClient?.name ?? newClientName} — {selectedServices.map(s => s.name).join(" + ")}
+          {selectedClient?.name ?? ""} — {selectedServices.map(s => s.name).join(" + ")}
         </p>
         <p className="text-xs text-gray-400 font-mono mb-6">#{booked.id.slice(-8).toUpperCase()}</p>
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
@@ -299,101 +283,46 @@ export default function CheckoutPage() {
           <div className="p-6">
             <h3 className="text-base font-semibold text-gray-900 mb-4">Who is this booking for?</h3>
 
-            {!newClientMode ? (
-              <>
-                <div className="relative mb-3">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    className="pl-9"
-                    placeholder="Search by name, email or phone…"
-                    value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
-                    autoFocus
-                  />
+            <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search by name, email or phone…"
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              {searching && <p className="text-sm text-gray-400 text-center py-4">Searching…</p>}
+
+              {clientResults.length > 0 && (
+                <div className="space-y-1 mb-3 max-h-60 overflow-y-auto">
+                  {clientResults.map((c) => (
+                    <button key={c.id} onClick={() => { setSelectedClient(c); setStep("services"); }}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50 text-left transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
+                        {c.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{c.email}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+                    </button>
+                  ))}
                 </div>
+              )}
 
-                {searching && <p className="text-sm text-gray-400 text-center py-4">Searching…</p>}
+              {clientSearch && clientResults.length === 0 && !searching && (
+                <p className="text-sm text-gray-400 text-center py-3">No clients found</p>
+              )}
 
-                {clientResults.length > 0 && (
-                  <div className="space-y-1 mb-3 max-h-60 overflow-y-auto">
-                    {clientResults.map((c) => (
-                      <button key={c.id} onClick={() => { setSelectedClient(c); setStep("services"); }}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50 text-left transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
-                          {c.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{c.email}</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {clientSearch && clientResults.length === 0 && !searching && (
-                  <p className="text-sm text-gray-400 text-center py-3">No clients found</p>
-                )}
-
-                <button
-                  onClick={() => setNewClientMode(true)}
-                  className="flex items-center gap-2 text-sm text-violet-600 font-medium hover:underline mt-2">
-                  <Plus className="w-4 h-4" /> Add new client
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => setNewClientMode(false)}
-                  className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
-                  ← Back to search
-                </button>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">First name *</label>
-                      <Input type="text" placeholder="Jane"
-                        value={newClient.firstName}
-                        onChange={(e) => setNewClient((p) => ({ ...p, firstName: e.target.value }))} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Last name *</label>
-                      <Input type="text" placeholder="Doe"
-                        value={newClient.lastName}
-                        onChange={(e) => setNewClient((p) => ({ ...p, lastName: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
-                    <Input type="email" placeholder="jane@example.com"
-                      className={newClient.email.trim() && !ncEmailOk ? "border-red-300 focus-visible:ring-red-200" : ""}
-                      value={newClient.email}
-                      onChange={(e) => setNewClient((p) => ({ ...p, email: e.target.value }))} />
-                    {newClient.email.trim() && !ncEmailOk && (
-                      <p className="mt-1 text-xs text-red-600">Enter a valid email address.</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone *</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 select-none pointer-events-none z-10">+1</span>
-                      <Input type="tel" placeholder="555 123 4567"
-                        className={newClient.phone.trim() && !ncPhoneOk ? "pl-9 border-red-300 focus-visible:ring-red-200" : "pl-9"}
-                        value={newClient.phone}
-                        onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))} />
-                    </div>
-                    {newClient.phone.trim() && !ncPhoneOk && (
-                      <p className="mt-1 text-xs text-red-600">Enter a valid phone number (10–15 digits).</p>
-                    )}
-                  </div>
-                  <Button className="w-full"
-                    disabled={!newClientValid}
-                    onClick={() => setStep("services")}>
-                    Continue
-                  </Button>
-                </div>
-              </>
-            )}
+              <button
+                onClick={() => router.push("/dashboard/appointments")}
+                className="flex items-center gap-2 text-sm text-violet-600 font-medium hover:underline mt-2">
+                <Plus className="w-4 h-4" /> New appointment
+              </button>
           </div>
         )}
 
@@ -404,7 +333,7 @@ export default function CheckoutPage() {
               ← Back
             </button>
             <h3 className="text-base font-semibold text-gray-900 mb-4">
-              Choose services for <span className="text-violet-700">{selectedClient?.name ?? newClientName}</span>
+              Choose services for <span className="text-violet-700">{selectedClient?.name ?? ""}</span>
             </h3>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {allServices.map((svc) => {
@@ -614,7 +543,7 @@ export default function CheckoutPage() {
 
             <div className="space-y-3 text-sm mb-6">
               {[
-                { label: "Client", value: selectedClient?.name ?? newClientName, icon: User },
+                { label: "Client", value: selectedClient?.name ?? "", icon: User },
                 { label: "Services", value: selectedServices.map(s => s.name).join(", "), icon: Check },
                 { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
                 { label: "Provider", value: providerText(customStartsAt ? customStaff?.user.name : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName), icon: Check },

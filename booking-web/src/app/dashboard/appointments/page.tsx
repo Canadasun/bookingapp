@@ -793,7 +793,7 @@ export default function AppointmentsPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [staffFilter, setStaffFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [calMonth, setCalMonth] = useState<Date>(() => new Date());
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
