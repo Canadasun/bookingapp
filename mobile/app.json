@@ -9,16 +9,18 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.canadasun.Mobile",
+      "bundleIdentifier": "com.pulseappointments.app",
       "buildNumber": "27",
       "entitlements": {
-        "aps-environment": "production"
+        "aps-environment": "production",
+        "com.apple.developer.in-app-payments": ["merchant.com.pulseappointments.stripe"]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDisplayName": "Pulse",
         "NSCameraUsageDescription": "Pulse uses the camera to let you scan a payment card when entering card details at checkout.",
-        "NSFaceIDUsageDescription": "Pulse uses Face ID to securely sign you in and protect access to your account."
+        "NSFaceIDUsageDescription": "Pulse uses Face ID to securely sign you in and protect access to your account.",
+        "NSPhotoLibraryUsageDescription": "Pulse uses your photo library to let you set your business logo and upload profile images."
       }
     },
     "android": {

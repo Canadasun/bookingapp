@@ -2801,6 +2801,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Add-ons',          icon:'extension-puzzle-outline',onPress:()=>open('addons') },
     { label:'Subscriptions',    icon:'card-outline',            onPress:()=>open('subscriptions') },
     { label:'Support',          icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
+    { label:'Privacy Policy',   icon:'shield-checkmark-outline',onPress:()=>Linking.openURL(`${WEB_URL}/privacy`) },
+    { label:'Terms of Service', icon:'document-text-outline',   onPress:()=>Linking.openURL(`${WEB_URL}/terms`) },
     { label:'Settings',         icon:'settings-outline',        onPress:()=>open('settings') },
   ];
   return (

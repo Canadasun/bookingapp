@@ -17,6 +17,25 @@ import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Sta
 import { fmtTime, fmtDur, normalizePhoneClient } from './src/format';
 import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, biometricCapability, authenticateBiometric } from './src/auth';
 import { api, registerPushNotifications } from './src/api';
+
+// Show an explanation before the iOS system push permission dialog.
+// Apple requires users to understand why notifications are needed before
+// the system prompt appears (Attachment 1 §1.3 of the Developer Agreement).
+async function requestPushWithContext() {
+  const Notifications = (() => { try { return require('expo-notifications'); } catch { return null; } })();
+  if (!Notifications) return;
+  const current = await Notifications.getPermissionsAsync().catch(() => ({ status: 'undetermined' }));
+  if (current.status === 'granted') { registerPushNotifications(); return; }
+  if (current.status !== 'undetermined') return; // already denied — respect that
+  Alert.alert(
+    'Stay in the loop',
+    'Pulse sends notifications for new booking requests, urgent client messages, and appointment reminders. You can change this in Settings at any time.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Allow notifications', onPress: () => registerPushNotifications() },
+    ],
+  );
+}
 import { s, cal, co, ms, dst } from './src/styles';
 import { ErrorBoundary, Pill, PriceTag, VerifiedPill } from './src/components';
 import { CalendarScreen } from './src/screens/calendar';
@@ -207,7 +226,7 @@ function AppContent() {
       setLocked(true);
     }
     setBooting(false);
-    registerPushNotifications();
+    requestPushWithContext();
   })(); },[]);
 
   // Re-lock when the app returns from the background. We key off 'background'
@@ -229,7 +248,7 @@ function AppContent() {
     return () => sub.remove();
   }, []);
 
-  function handleLogin(t:string, r:string, u:User) { setAuth(t,u,r); setToken(t); setUser(u); persistAuth(); registerPushNotifications(); }
+  function handleLogin(t:string, r:string, u:User) { setAuth(t,u,r); setToken(t); setUser(u); persistAuth(); requestPushWithContext(); }
   function handleLogout() { setAuth(null,null,null); setToken(null); setUser(null); persistAuth(); }
 
   if (booting) return (
