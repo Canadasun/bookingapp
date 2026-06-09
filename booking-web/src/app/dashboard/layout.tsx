@@ -200,7 +200,7 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  if (!user || user.emailVerified !== false || dismissed) return null;
+  if (!user || user.role === "ADMIN" || user.emailVerified !== false || dismissed) return null;
 
   async function resend() {
     setSending(true);
