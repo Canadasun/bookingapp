@@ -606,13 +606,13 @@ function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-0.5">Set the client booking rules that protect your calendar.</p>
                 </div>
                 <Link
-                  href="/dashboard/staff"
+                  href="/dashboard/hours"
                   className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 hover:bg-amber-100 transition-colors"
                 >
                   <Clock className="w-5 h-5 text-amber-600 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-amber-900">Working hours</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Set the days and times you (and your staff) are available. Clients can only book within these hours.</p>
+                    <p className="text-sm font-semibold text-amber-900">Business hours</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Set the days and times you&apos;re open. Clients can only book within these hours.</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-amber-500 shrink-0" />
                 </Link>

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
-  DollarSign, BarChart3, FileText, Search,
+  DollarSign, BarChart3, FileText, Search, Clock,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -35,6 +35,7 @@ const OWNER_NAV: NavItem[] = [
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
   { href: "/dashboard/services",     label: "Services",     icon: Scissors },
   { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
+  { href: "/dashboard/hours",        label: "Hours",        icon: Clock },
   {
     href: "/dashboard/more",         label: "More",         icon: MenuIcon,
     children: [
