@@ -25,6 +25,9 @@ export const LoginSchema = z.object({
   // Trusted-device token from a prior "remember this device" — lets a 2FA user
   // skip the OTP on a known device.
   trustedDeviceToken: z.string().optional(),
+  // Caller declares its surface so the API can enforce platform-specific rules
+  // (e.g. admin accounts are blocked on mobile).
+  platform: z.enum(['web', 'mobile']).optional(),
 });
 
 export const RefreshSchema = z.object({

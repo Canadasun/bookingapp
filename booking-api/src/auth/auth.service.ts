@@ -1,6 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
+  ForbiddenException,
   ConflictException,
   BadRequestException,
   HttpException,
@@ -258,6 +259,10 @@ export class AuthService {
     }
 
     await this.authLock.clearFailures(dto.email).catch(() => {});
+
+    if (user.role === 'ADMIN' && dto.platform === 'mobile') {
+      throw new ForbiddenException('Admin accounts must be accessed from the web dashboard at pulseappointments.com');
+    }
 
     // Opt-in 2FA: password ok, but require a one-time code before issuing tokens —
     // UNLESS this device was previously remembered (trusted), so we don't bug the

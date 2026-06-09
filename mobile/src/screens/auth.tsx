@@ -33,15 +33,16 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
     setLoading(true);
     try {
       const res = await api<{accessToken?:string;refreshToken?:string;user?:User;twoFactorRequired?:boolean;challengeId?:string;method?:string}>('/auth/login',{
-        method:'POST', body:JSON.stringify({email,password}),
+        method:'POST', body:JSON.stringify({email,password,platform:'mobile'}),
       });
       if (res.twoFactorRequired && res.challengeId) {
         setChallenge({ id: res.challengeId, method: res.method ?? 'EMAIL' });
         return;
       }
       onLogin(res.accessToken!, res.refreshToken!, res.user!);
-    } catch {
-      Alert.alert('Sign in failed','Check your email and password and try again.');
+    } catch(err) {
+      const msg = err instanceof Error ? err.message : '';
+      Alert.alert('Sign in failed', msg || 'Check your email and password and try again.');
     } finally { setLoading(false); }
   }
 
