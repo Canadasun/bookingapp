@@ -128,12 +128,12 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||!email||!password} onPress={login}>
-          {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Sign in</Text>}
+        <TouchableOpacity style={{ alignSelf:'flex-end', marginTop:8 }} onPress={onForgot}>
+          <Text style={s.authSwitchLink}>Forgot password?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={onForgot}>
-          <Text style={s.authSwitchLink}>Forgot password?</Text>
+        <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={loading||!email||!password} onPress={login}>
+          {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Sign in</Text>}
         </TouchableOpacity>
 
         <View style={s.authSwitch}>

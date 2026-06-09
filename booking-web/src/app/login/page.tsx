@@ -163,10 +163,7 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)} required autoFocus />
       </div>
       <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="block text-sm font-medium text-slate-700">Password</label>
-          <Link href="/forgot-password" className="text-xs text-violet-600 hover:underline font-medium">Forgot password?</Link>
-        </div>
+        <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
         <div className="relative">
           <Input type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
             onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
@@ -174,6 +171,9 @@ function LoginForm() {
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
+        </div>
+        <div className="flex justify-end mt-1.5">
+          <Link href="/forgot-password" className="text-xs text-violet-600 hover:underline font-medium">Forgot password?</Link>
         </div>
       </div>
       <Button type="submit" loading={loading} className="w-full" size="lg">Sign in</Button>
