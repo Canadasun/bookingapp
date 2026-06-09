@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessSchema, UpdateBusinessSchema, CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
@@ -98,5 +98,54 @@ export class BusinessesController {
       throw new ForbiddenException('You do not have access to this business');
     }
     return this.businessService.deleteAccount(id, body?.confirmation ?? '');
+  }
+
+  // ── Business hours ──────────────────────────────────────────────────────────
+
+  @Get(':id/hours')
+  @UseGuards(JwtAuthGuard)
+  getHours(@Param('id') id: string, @CurrentUser() user: User) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    return this.businessService.getHours(id);
+  }
+
+  // Upserts all 7 days in one call. Pass enabled days only; omitted days are deleted.
+  @Post(':id/hours')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  setHours(
+    @Param('id') id: string,
+    @Body() body: { hours: { dayOfWeek: number; startTime: string; endTime: string }[] },
+    @CurrentUser() user: User,
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    return this.businessService.setHours(id, body.hours ?? []);
+  }
+
+  // ── Business closures ───────────────────────────────────────────────────────
+
+  @Post(':id/closures')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  addClosure(
+    @Param('id') id: string,
+    @Body() body: { startsAt: string; endsAt: string; reason?: string },
+    @CurrentUser() user: User,
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    if (!body.startsAt || !body.endsAt) throw new BadRequestException('startsAt and endsAt are required');
+    return this.businessService.addClosure(id, body);
+  }
+
+  @Delete(':id/closures/:closureId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  removeClosure(
+    @Param('id') id: string,
+    @Param('closureId') closureId: string,
+    @CurrentUser() user: User,
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    return this.businessService.removeClosure(id, closureId);
   }
 }

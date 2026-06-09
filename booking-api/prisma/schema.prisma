@@ -18,6 +18,7 @@ enum PlanTier {
   FREE
   BASIC
   PRO
+  UNLIMITED
 }
 
 enum SubscriptionStatus {
@@ -189,6 +190,8 @@ model Business {
   promoCodes          PromoCode[]
   membershipPlans     MembershipPlan[]
   clientMemberships   ClientMembership[]
+  businessHours       BusinessHours[]
+  businessClosures    BusinessClosure[]
 }
 
 model Review {
@@ -762,6 +765,38 @@ model TimeOff {
   staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@index([staffId])
+  @@index([startsAt, endsAt])
+}
+
+// Business-level operating hours (sole-proprietor default; future staff can
+// override per-provider with their own AvailabilityRule rows).
+model BusinessHours {
+  id         String @id @default(cuid())
+  businessId String
+  dayOfWeek  Int    // 0 = Sunday … 6 = Saturday
+  startTime  String // "HH:mm" in business timezone
+  endTime    String // "HH:mm" in business timezone
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, dayOfWeek])
+  @@index([businessId])
+}
+
+// Date ranges when the business is closed (holidays, vacation, etc.).
+// These block booking slots just like staff time-off, and also fall back for
+// any staff who inherit business-level hours.
+model BusinessClosure {
+  id         String   @id @default(cuid())
+  businessId String
+  startsAt   DateTime
+  endsAt     DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
   @@index([startsAt, endsAt])
 }
 

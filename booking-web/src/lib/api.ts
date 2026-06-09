@@ -610,6 +610,14 @@ export const api = {
     reactivate: (id: string) => req<Business>(`/businesses/${id}/reactivate`, { method: "POST" }),
     remove: (id: string, confirmation: string) =>
       req<{ deleted: boolean }>(`/businesses/${id}`, { method: "DELETE", body: JSON.stringify({ confirmation }) }),
+    getHours: (id: string) =>
+      req<{ hours: { id: string; dayOfWeek: number; startTime: string; endTime: string }[]; closures: { id: string; startsAt: string; endsAt: string; reason?: string }[] }>(`/businesses/${id}/hours`),
+    setHours: (id: string, hours: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
+      req<{ hours: { id: string; dayOfWeek: number; startTime: string; endTime: string }[]; closures: { id: string; startsAt: string; endsAt: string; reason?: string }[] }>(`/businesses/${id}/hours`, { method: "POST", body: JSON.stringify({ hours }) }),
+    addClosure: (id: string, data: { startsAt: string; endsAt: string; reason?: string }) =>
+      req<{ id: string; startsAt: string; endsAt: string; reason?: string }>(`/businesses/${id}/closures`, { method: "POST", body: JSON.stringify(data) }),
+    removeClosure: (id: string, closureId: string) =>
+      req<{ ok: boolean }>(`/businesses/${id}/closures/${closureId}`, { method: "DELETE" }),
   },
 
   services: {

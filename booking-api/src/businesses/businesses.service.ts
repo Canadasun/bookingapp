@@ -233,6 +233,42 @@ export class BusinessesService {
     return { deleted: true };
   }
 
+  async getHours(businessId: string) {
+    const [hours, closures] = await Promise.all([
+      this.prisma.businessHours.findMany({ where: { businessId }, orderBy: { dayOfWeek: 'asc' } }),
+      this.prisma.businessClosure.findMany({ where: { businessId }, orderBy: { startsAt: 'asc' } }),
+    ]);
+    return { hours, closures };
+  }
+
+  async setHours(businessId: string, rules: { dayOfWeek: number; startTime: string; endTime: string }[]) {
+    await this.prisma.businessHours.deleteMany({ where: { businessId } });
+    if (rules.length > 0) {
+      await this.prisma.businessHours.createMany({
+        data: rules.map((r) => ({ businessId, dayOfWeek: r.dayOfWeek, startTime: r.startTime, endTime: r.endTime })),
+        skipDuplicates: true,
+      });
+    }
+    return this.getHours(businessId);
+  }
+
+  async addClosure(businessId: string, body: { startsAt: string; endsAt: string; reason?: string }) {
+    const closure = await this.prisma.businessClosure.create({
+      data: {
+        businessId,
+        startsAt: new Date(body.startsAt),
+        endsAt: new Date(body.endsAt),
+        reason: body.reason ?? null,
+      },
+    });
+    return closure;
+  }
+
+  async removeClosure(businessId: string, closureId: string) {
+    await this.prisma.businessClosure.deleteMany({ where: { id: closureId, businessId } });
+    return { ok: true };
+  }
+
   async update(id: string, dto: UpdateBusinessDto) {
     const current = await this.findOne(id);
     const { bookingPageSettings, notificationSettings, ...rest } = dto;

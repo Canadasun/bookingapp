@@ -57,7 +57,9 @@ export class AvailabilityService {
     const rangeStart = fromZonedTime(`${startDate}T00:00:00`, timezone);
     const rangeEnd = fromZonedTime(`${endDate}T23:59:59`, timezone);
 
-    const [rules, appointments, timeOffs] = await Promise.all([
+    const businessId = staff.businessId;
+
+    const [rules, appointments, timeOffs, bizHours, bizClosures] = await Promise.all([
       this.prisma.availabilityRule.findMany({ where: { staffId } }),
       this.prisma.appointment.findMany({
         where: {
@@ -73,6 +75,12 @@ export class AvailabilityService {
           startsAt: { lt: rangeEnd },
           endsAt: { gt: rangeStart },
         },
+      }),
+      // Business-level hours — used as fallback when staff has no custom rules.
+      this.prisma.businessHours.findMany({ where: { businessId } }),
+      // Business closures (holidays/vacation) block slots for everyone.
+      this.prisma.businessClosure.findMany({
+        where: { businessId, startsAt: { lt: rangeEnd }, endsAt: { gt: rangeStart } },
       }),
     ]);
 
@@ -98,15 +106,22 @@ export class AvailabilityService {
       ];
     }
 
-    // Honest default: a staff with NO configured availability rules is treated as
-    // open during standard hours (every day, 9–5) so an owner can book right away
-    // before they've set up a schedule — instead of "no availability" on a brand
-    // new business. Any explicitly configured rules always take precedence.
+    // Business closures block all booking slots regardless of individual schedule.
+    effectiveTimeOffs = [
+      ...effectiveTimeOffs,
+      ...bizClosures.map((c) => ({ id: `closure-${c.id}`, staffId, reason: c.reason ?? null, createdAt: c.createdAt, startsAt: c.startsAt, endsAt: c.endsAt } as TimeOff)),
+    ];
+
+    // Rule priority: staff-specific rules > business hours > hardcoded 9-5 default.
+    // This lets a sole proprietor set business hours once; when they hire staff,
+    // each provider can override with their own schedule without touching the default.
     const effectiveRules: AvailabilityRule[] = rules.length > 0
       ? rules
-      : [0, 1, 2, 3, 4, 5, 6].map((d) => ({
-          id: `default-${staffId}-${d}`, staffId, dayOfWeek: d, startTime: '09:00', endTime: '17:00',
-        }));
+      : bizHours.length > 0
+        ? bizHours.map((h) => ({ id: `biz-${h.id}`, staffId, dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }))
+        : [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+            id: `default-${staffId}-${d}`, staffId, dayOfWeek: d, startTime: '09:00', endTime: '17:00',
+          }));
 
     const slots: TimeSlot[] = [];
     

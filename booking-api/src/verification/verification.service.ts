@@ -149,7 +149,7 @@ export class VerificationService {
       this.prisma.business.count({ where: { suspectedDuplicateOfId: { not: null }, duplicateReviewedAt: null } }),
     ]);
 
-    const planCounts = { FREE: 0, BASIC: 0, PRO: 0 };
+    const planCounts: Record<string, number> = { FREE: 0, BASIC: 0, PRO: 0, UNLIMITED: 0 };
     for (const row of businessesByPlan) planCounts[row.plan] = row._count._all;
 
     const verificationCounts = { UNVERIFIED: 0, PENDING: 0, VERIFIED: 0, REJECTED: 0 };

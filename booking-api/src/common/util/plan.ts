@@ -9,7 +9,7 @@ export function featuresUnlocked(): boolean {
 
 // The plan to use when deciding whether a FEATURE is available. Treats everyone
 // as PRO while unlocked; otherwise the business's real plan.
-export function effectivePlan(plan?: string | null): 'FREE' | 'BASIC' | 'PRO' {
-  if (featuresUnlocked()) return 'PRO';
-  return (plan as 'FREE' | 'BASIC' | 'PRO') ?? 'FREE';
+export function effectivePlan(plan?: string | null): 'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED' {
+  if (featuresUnlocked()) return 'UNLIMITED';
+  return (plan as 'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED') ?? 'FREE';
 }

@@ -13,7 +13,7 @@ export interface AppointmentWithRelations {
   endsAt: Date;
   client: { name: string; email: string | null; phone?: string | null };
   service: { name: string };
-  business?: { plan: 'FREE' | 'BASIC' | 'PRO'; notificationSettings?: unknown };
+  business?: { plan: 'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED'; notificationSettings?: unknown };
 }
 
 type NotificationKey =

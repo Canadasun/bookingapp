@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Copy } from "lucide-react";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -12,46 +12,41 @@ import { cn } from "@/lib/utils";
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-interface Rule { dayOfWeek: number; startTime: string; endTime: string; enabled: boolean }
-interface TimeOff { id: string; startsAt: string; endsAt: string; reason?: string }
+interface HourRule { dayOfWeek: number; startTime: string; endTime: string; enabled: boolean }
+interface Closure  { id: string; startsAt: string; endsAt: string; reason?: string }
 
 export default function HoursPage() {
   const user  = getUser();
   const bizId = user?.businessId ?? "";
-  // Owner is always represented by their own staffId in the scheduling engine.
-  const staffId = user?.staffId ?? "";
 
-  const [rules, setRules] = useState<Rule[]>(
+  const [rules, setRules] = useState<HourRule[]>(
     DAYS.map((_, i) => ({ dayOfWeek: i, startTime: "09:00", endTime: "17:00", enabled: i >= 1 && i <= 5 }))
   );
-  const [timeOffs, setTimeOffs] = useState<TimeOff[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [toForm, setToForm] = useState({ startsAt: "", endsAt: "", reason: "" });
+  const [closures, setClosures] = useState<Closure[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [toForm,   setToForm]   = useState({ startsAt: "", endsAt: "", reason: "" });
   const [toSaving, setToSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!bizId || !staffId) { setLoading(false); return; }
+    if (!bizId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [s, tos] = await Promise.all([
-        api.staff.get(bizId, staffId),
-        api.staff.getTimeOffs(bizId, staffId),
-      ]);
-      if (s.availabilityRules?.length) {
+      const data = await api.business.getHours(bizId);
+      if (data.hours.length > 0) {
         setRules(DAYS.map((_, i) => {
-          const r = s.availabilityRules!.find((x) => x.dayOfWeek === i);
-          return { dayOfWeek: i, startTime: r?.startTime ?? "09:00", endTime: r?.endTime ?? "17:00", enabled: !!r };
+          const h = data.hours.find((x: { dayOfWeek: number; startTime: string; endTime: string }) => x.dayOfWeek === i);
+          return { dayOfWeek: i, startTime: h?.startTime ?? "09:00", endTime: h?.endTime ?? "17:00", enabled: !!h };
         }));
       }
-      setTimeOffs(tos);
+      setClosures(data.closures);
     } catch { toast.error("Could not load hours"); }
     finally { setLoading(false); }
-  }, [bizId, staffId]);
+  }, [bizId]);
 
   useEffect(() => { load(); }, [load]);
 
-  function setRule(i: number, patch: Partial<Rule>) {
+  function setRule(i: number, patch: Partial<HourRule>) {
     setRules((r) => r.map((x, j) => j === i ? { ...x, ...patch } : x));
   }
 
@@ -63,50 +58,39 @@ export default function HoursPage() {
   }
 
   async function save() {
-    if (!bizId || !staffId) return;
+    if (!bizId) return;
     setSaving(true);
     try {
-      await api.staff.setAvailability(
-        bizId, staffId,
-        rules.filter((r) => r.enabled).map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime }))
-      );
+      await api.business.setHours(bizId, rules.filter((r) => r.enabled).map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })));
       toast.success("Business hours saved");
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
     finally { setSaving(false); }
   }
 
-  async function addTimeOff() {
+  async function addClosure() {
     if (!toForm.startsAt || !toForm.endsAt) { toast.error("Start and end are required"); return; }
-    if (!bizId || !staffId) return;
+    if (!bizId) return;
     setToSaving(true);
     try {
-      await api.staff.addTimeOff(bizId, staffId, {
+      const c = await api.business.addClosure(bizId, {
         startsAt: new Date(toForm.startsAt).toISOString(),
-        endsAt: new Date(toForm.endsAt).toISOString(),
-        reason: toForm.reason || undefined,
+        endsAt:   new Date(toForm.endsAt).toISOString(),
+        reason:   toForm.reason || undefined,
       });
-      toast.success("Time off added — that period will show as unavailable to clients");
+      setClosures((prev) => [...prev, c]);
       setToForm({ startsAt: "", endsAt: "", reason: "" });
-      load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not add time off"); }
+      toast.success("Closure saved — clients won't see slots during this period");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save closure"); }
     finally { setToSaving(false); }
   }
 
-  async function removeTimeOff(id: string) {
-    if (!bizId || !staffId) return;
+  async function removeClosure(id: string) {
+    if (!bizId) return;
     try {
-      await api.staff.deleteTimeOff(bizId, staffId, id);
-      setTimeOffs((t) => t.filter((x) => x.id !== id));
-      toast.success("Removed");
-    } catch { toast.error("Could not remove"); }
-  }
-
-  if (!staffId) {
-    return (
-      <div className="max-w-xl mx-auto pt-10 text-center">
-        <p className="text-gray-500 text-sm">Your account doesn&apos;t have a schedule profile yet. Sign out and back in, or contact support.</p>
-      </div>
-    );
+      await api.business.removeClosure(bizId, id);
+      setClosures((prev) => prev.filter((c) => c.id !== id));
+      toast.success("Closure removed");
+    } catch { toast.error("Could not remove closure"); }
   }
 
   return (
@@ -120,100 +104,103 @@ export default function HoursPage() {
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <p className="text-sm font-semibold text-gray-900">Weekly schedule</p>
-          <button
-            type="button"
-            onClick={copyMonToWeekdays}
-            className="flex items-center gap-1.5 text-xs font-medium text-violet-600 hover:underline"
-          >
+          <button type="button" onClick={copyMonToWeekdays}
+            className="flex items-center gap-1.5 text-xs font-medium text-violet-600 hover:underline">
             <Copy className="w-3.5 h-3.5" /> Copy Mon → Tue–Fri
           </button>
         </div>
         <div className="px-5 pb-5 space-y-3">
           {loading ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Loading…</p>
+            <p className="text-sm text-gray-400 py-6 text-center">Loading…</p>
           ) : rules.map((rule, i) => (
             <div key={i} className="flex items-center gap-3">
               <input
                 type="checkbox"
+                id={`day-${i}`}
                 checked={rule.enabled}
                 onChange={(e) => setRule(i, { enabled: e.target.checked })}
                 className="accent-violet-600 w-4 h-4 shrink-0 cursor-pointer"
               />
-              <span className={cn("w-9 text-sm font-semibold shrink-0", rule.enabled ? "text-gray-800" : "text-gray-300")}>
+              <label htmlFor={`day-${i}`}
+                className={cn("w-10 text-sm font-semibold shrink-0 cursor-pointer select-none",
+                  rule.enabled ? "text-gray-800" : "text-gray-300")}>
                 {SHORT[i]}
-              </span>
+              </label>
               {rule.enabled ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="time"
-                    value={rule.startTime}
-                    onChange={(e) => setRule(i, { startTime: e.target.value })}
-                    className="w-28 text-sm"
-                  />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input type="time" value={rule.startTime} className="w-28 text-sm"
+                    onChange={(e) => setRule(i, { startTime: e.target.value })} />
                   <span className="text-gray-400 text-sm">–</span>
-                  <Input
-                    type="time"
-                    value={rule.endTime}
-                    onChange={(e) => setRule(i, { endTime: e.target.value })}
-                    className="w-28 text-sm"
-                  />
+                  <Input type="time" value={rule.endTime} className="w-28 text-sm"
+                    onChange={(e) => setRule(i, { endTime: e.target.value })} />
+                  <span className="text-xs text-gray-400">
+                    {(() => {
+                      const [sh, sm] = rule.startTime.split(":").map(Number);
+                      const [eh, em] = rule.endTime.split(":").map(Number);
+                      const mins = (eh * 60 + em) - (sh * 60 + sm);
+                      if (mins <= 0) return "";
+                      const h = Math.floor(mins / 60), m = mins % 60;
+                      return `${h > 0 ? `${h}h ` : ""}${m > 0 ? `${m}m` : ""}`;
+                    })()}
+                  </span>
                 </div>
               ) : (
                 <span className="text-sm text-gray-300">Closed</span>
               )}
             </div>
           ))}
-          <Button onClick={save} loading={saving} size="md" className="mt-2">
-            Save hours
-          </Button>
+          <div className="pt-2">
+            <Button onClick={save} loading={saving} size="md">Save hours</Button>
+          </div>
         </div>
       </div>
 
       {/* Closures / time off */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="px-5 pt-5 pb-3">
+        <div className="px-5 pt-5 pb-1">
           <p className="text-sm font-semibold text-gray-900">Closures &amp; time off</p>
-          <p className="text-xs text-gray-400 mt-0.5">Block out dates when you&apos;re closed — holidays, vacations, or anything else. Clients won&apos;t see booking slots during these periods.</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Block out dates when you&apos;re closed — holidays, vacations, or anything else.
+            No booking slots will appear to clients during these periods.
+          </p>
         </div>
-        <div className="px-5 pb-5 space-y-4">
+        <div className="px-5 pb-5 space-y-4 mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
-              <Input type="datetime-local" value={toForm.startsAt} onChange={(e) => setToForm((p) => ({ ...p, startsAt: e.target.value }))} />
+              <Input type="datetime-local" value={toForm.startsAt}
+                onChange={(e) => setToForm((p) => ({ ...p, startsAt: e.target.value }))} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
-              <Input type="datetime-local" value={toForm.endsAt} onChange={(e) => setToForm((p) => ({ ...p, endsAt: e.target.value }))} />
+              <Input type="datetime-local" value={toForm.endsAt}
+                onChange={(e) => setToForm((p) => ({ ...p, endsAt: e.target.value }))} />
             </div>
           </div>
-          <Input
-            placeholder="Reason (optional — e.g. Holiday, Vacation)"
+          <Input placeholder="Reason (optional — e.g. Holiday, Vacation)"
             value={toForm.reason}
-            onChange={(e) => setToForm((p) => ({ ...p, reason: e.target.value }))}
-          />
-          <Button size="sm" variant="secondary" onClick={addTimeOff} loading={toSaving}>
-            + Add closure
+            onChange={(e) => setToForm((p) => ({ ...p, reason: e.target.value }))} />
+          <Button size="sm" variant="secondary" onClick={addClosure} loading={toSaving}
+            className="flex items-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Add closure
           </Button>
 
-          {timeOffs.length > 0 && (
+          {closures.length > 0 && (
             <div className="space-y-2 pt-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Upcoming closures</p>
-              {timeOffs.map((to) => (
-                <div key={to.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3">
-                  <div>
+              {closures.map((c) => (
+                <div key={c.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 gap-3">
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-800">
-                      {new Date(to.startsAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
+                      {new Date(c.startsAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
                       {" — "}
-                      {new Date(to.endsAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
+                      {new Date(c.endsAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
                     </p>
-                    {to.reason && <p className="text-xs text-gray-500 mt-0.5">{to.reason}</p>}
+                    {c.reason && <p className="text-xs text-gray-500 mt-0.5">{c.reason}</p>}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeTimeOff(to.id)}
-                    className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded"
-                  >
-                    ✕
+                  <button type="button" onClick={() => removeClosure(c.id)}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded shrink-0">
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}

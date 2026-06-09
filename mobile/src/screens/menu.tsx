@@ -21,7 +21,7 @@ import { Pill, PriceTag, VerifiedPill, SwipeToDelete } from '../components';
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations'
-  | 'promo-codes' | 'memberships' | 'soon';
+  | 'promo-codes' | 'memberships' | 'hours' | 'soon';
 
 // Plan tiers mirror the web billing page. Display-only on mobile for now — every
 // business is on Pro during testing; paid switching gets wired up after testing.
@@ -131,6 +131,15 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [promoEditor, setPromoEditor] = useState<{ id?:string; code:string; discountType:'PERCENT'|'FLAT'; discountValue:string; maxUsages:string; expiresAt:string }|null>(null);
   const [membershipPlans, setMembershipPlans] = useState<any[]|null>(null);
   const [membershipMembers, setMembershipMembers] = useState<any[]|null>(null);
+  const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const [hourRules, setHourRules] = useState<Array<{ dayOfWeek:number; startTime:string; endTime:string; enabled:boolean }>>(
+    [0,1,2,3,4,5,6].map(d=>({ dayOfWeek:d, startTime:'09:00', endTime:'17:00', enabled: d>=1&&d<=5 }))
+  );
+  const [closures, setClosures] = useState<Array<{ id:string; startsAt:string; endsAt:string; reason?:string }>>([]);
+  const [hoursLoaded, setHoursLoaded] = useState(false);
+  const [hoursSaving, setHoursSaving] = useState(false);
+  const [closureForm, setClosureForm] = useState({ startsAt:'', endsAt:'', reason:'' });
+  const [closureSaving, setClosureSaving] = useState(false);
   const [availabilityEditor, setAvailabilityEditor] = useState<{
     staffId:string;
     name:string;
@@ -968,6 +977,18 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'invoices' && !invoices) { setLoading(true); setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`)); }
       else if (v === 'resources') { setLoading(true); setResources(await api<Resource[]>(`/businesses/${bizId()}/resources`)); }
       else if (v === 'locations') { setLoading(true); setLocations(await api<Location[]>(`/businesses/${bizId()}/locations`)); }
+      else if (v === 'hours') {
+        setLoading(true);
+        const data = await api<{ hours: any[]; closures: any[] }>(`/businesses/${bizId()}/hours`);
+        if (data.hours.length > 0) {
+          setHourRules([0,1,2,3,4,5,6].map(d => {
+            const h = data.hours.find((x:any) => x.dayOfWeek === d);
+            return { dayOfWeek:d, startTime:h?.startTime??'09:00', endTime:h?.endTime??'17:00', enabled:!!h };
+          }));
+        }
+        setClosures(data.closures);
+        setHoursLoaded(true);
+      }
       else if (v === 'promo-codes') { setLoading(true); setPromoCodes(await api<any[]>(`/businesses/${bizId()}/promo-codes`)); }
       else if (v === 'memberships') {
         setLoading(true);
@@ -2543,6 +2564,157 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
+  if (view === 'hours') {
+    function setHourRule(i: number, patch: Partial<typeof hourRules[0]>) {
+      setHourRules(r => r.map((x, j) => j === i ? {...x, ...patch} : x));
+    }
+    function copyMonToWeekdays() {
+      const mon = hourRules[1];
+      if (!mon.enabled) { Alert.alert('Monday off','Enable Monday first to copy from it.'); return; }
+      setHourRules(r => r.map((x,i) => i>=1&&i<=5 ? {...x, startTime:mon.startTime, endTime:mon.endTime, enabled:true} : x));
+    }
+    async function saveHours() {
+      setHoursSaving(true);
+      try {
+        const enabled = hourRules.filter(r=>r.enabled).map(({dayOfWeek,startTime,endTime})=>({dayOfWeek,startTime,endTime}));
+        await api(`/businesses/${bizId()}/hours`, { method:'POST', body: JSON.stringify({ hours: enabled }) });
+        Alert.alert('Saved','Business hours updated.');
+      } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not save.'); }
+      finally { setHoursSaving(false); }
+    }
+    async function addClosure() {
+      if (!closureForm.startsAt || !closureForm.endsAt) { Alert.alert('Missing','Enter start and end dates.'); return; }
+      setClosureSaving(true);
+      try {
+        const c = await api<{ id:string; startsAt:string; endsAt:string; reason?:string }>(`/businesses/${bizId()}/closures`, {
+          method:'POST',
+          body: JSON.stringify({ startsAt: new Date(closureForm.startsAt).toISOString(), endsAt: new Date(closureForm.endsAt).toISOString(), reason: closureForm.reason||undefined }),
+        });
+        setClosures(prev=>[...prev, c]);
+        setClosureForm({ startsAt:'', endsAt:'', reason:'' });
+      } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not add closure.'); }
+      finally { setClosureSaving(false); }
+    }
+    async function removeClosure(id: string) {
+      try {
+        await api(`/businesses/${bizId()}/closures/${id}`, { method:'DELETE' });
+        setClosures(prev=>prev.filter(c=>c.id!==id));
+      } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not remove.'); }
+    }
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <Text style={[s.headerTitle,{ flex:1 }]}>Business Hours</Text>
+        </View>
+        {loading && !hoursLoaded ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {/* Weekly schedule */}
+            <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <Text style={ms.cardLabel}>WEEKLY SCHEDULE</Text>
+              <TouchableOpacity onPress={copyMonToWeekdays}>
+                <Text style={{ color:BRAND, fontSize:12, fontWeight:'600' }}>Copy Mon → Tue–Fri</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={ms.card}>
+              {hourRules.map((rule, i)=>(
+                <View key={i} style={[{ flexDirection:'row', alignItems:'center', gap:10, paddingVertical:8 }, i>0&&{ borderTopWidth:1, borderColor:GRAY_100 }]}>
+                  <Switch
+                    value={rule.enabled}
+                    onValueChange={v=>setHourRule(i,{enabled:v})}
+                    trackColor={{ false:GRAY_200, true:BRAND_LT }}
+                    thumbColor={rule.enabled?BRAND:GRAY_400}
+                  />
+                  <Text style={[{ width:36, fontSize:13, fontWeight:'700' }, rule.enabled?{ color:GRAY_900 }:{ color:GRAY_400 }]}>
+                    {DAYS_SHORT[i]}
+                  </Text>
+                  {rule.enabled ? (
+                    <View style={{ flex:1, flexDirection:'row', alignItems:'center', gap:6 }}>
+                      <TextInput
+                        style={[s.input,{ flex:1, textAlign:'center', padding:8 }]}
+                        value={rule.startTime}
+                        onChangeText={v=>setHourRule(i,{startTime:v})}
+                        placeholder="09:00"
+                        placeholderTextColor={GRAY_400}
+                        keyboardType="numbers-and-punctuation"
+                      />
+                      <Text style={{ color:GRAY_400, fontSize:13 }}>–</Text>
+                      <TextInput
+                        style={[s.input,{ flex:1, textAlign:'center', padding:8 }]}
+                        value={rule.endTime}
+                        onChangeText={v=>setHourRule(i,{endTime:v})}
+                        placeholder="17:00"
+                        placeholderTextColor={GRAY_400}
+                        keyboardType="numbers-and-punctuation"
+                      />
+                    </View>
+                  ) : (
+                    <Text style={{ color:GRAY_400, fontSize:13 }}>Closed</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[s.btnPrimary, { marginTop:12, opacity:hoursSaving?0.5:1 }]}
+              disabled={hoursSaving}
+              onPress={saveHours}>
+              <Text style={s.btnPrimaryText}>{hoursSaving?'Saving…':'Save hours'}</Text>
+            </TouchableOpacity>
+
+            {/* Closures */}
+            <Text style={[ms.cardLabel,{ marginTop:24, marginBottom:8 }]}>CLOSURES & TIME OFF</Text>
+            <View style={ms.card}>
+              <Text style={ms.rowMeta}>Enter start date/time and end date/time in format: YYYY-MM-DDTHH:MM</Text>
+              {([
+                { k:'startsAt' as const, label:'From (YYYY-MM-DDTHH:MM)' },
+                { k:'endsAt'   as const, label:'To (YYYY-MM-DDTHH:MM)'   },
+                { k:'reason'   as const, label:'Reason (optional)'         },
+              ]).map(({k,label})=>(
+                <View key={k} style={{ marginTop:10 }}>
+                  <Text style={{ fontSize:11, color:GRAY_500, marginBottom:3 }}>{label}</Text>
+                  <TextInput
+                    style={s.input}
+                    value={closureForm[k]}
+                    onChangeText={v=>setClosureForm(p=>({...p,[k]:v}))}
+                    placeholder={k==='reason'?'Holiday, Vacation…':'2026-12-25T00:00'}
+                    placeholderTextColor={GRAY_400}
+                  />
+                </View>
+              ))}
+              <TouchableOpacity
+                style={[ms.methodChip,{ marginTop:12, opacity:closureSaving?0.5:1 }]}
+                disabled={closureSaving}
+                onPress={addClosure}>
+                <Text style={ms.methodChipText}>{closureSaving?'Adding…':'+ Add closure'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {closures.length > 0 && (
+              <>
+                <Text style={[ms.cardLabel,{ marginTop:16, marginBottom:6 }]}>UPCOMING CLOSURES</Text>
+                {closures.map((c,i,arr)=>(
+                  <View key={c.id} style={[ms.row, i<arr.length-1&&{ borderBottomWidth:1, borderColor:GRAY_100 }]}>
+                    <View style={{ flex:1 }}>
+                      <Text style={ms.rowTitle}>
+                        {new Date(c.startsAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'})}
+                        {' — '}
+                        {new Date(c.endsAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'})}
+                      </Text>
+                      {c.reason && <Text style={ms.rowMeta}>{c.reason}</Text>}
+                    </View>
+                    <TouchableOpacity onPress={()=>removeClosure(c.id)} style={{ padding:8 }}>
+                      <Ionicons name="close-circle-outline" size={20} color="#EF4444"/>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
+            )}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   if (view === 'promo-codes') {
     async function savePromoCode() {
       if (!promoEditor) return;
@@ -2994,6 +3166,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Items & Services', icon:'pricetags-outline',       onPress:()=>open('services') },
     { label:'Locations',        icon:'location-outline',        onPress:()=>open('locations') },
     { label:'Rooms & Resources',icon:'business-outline',        onPress:()=>open('resources'), badge:'New' },
+    { label:'Business Hours',    icon:'time-outline',            onPress:()=>open('hours') },
     { label:'Online Booking',   icon:'globe-outline',           onPress:()=>open('booking') },
     { label:'Waitlist',         icon:'hourglass-outline',       onPress:()=>open('waitlist') },
     { label:'Tasks',            icon:'checkbox-outline',        onPress:()=>open('tasks') },
