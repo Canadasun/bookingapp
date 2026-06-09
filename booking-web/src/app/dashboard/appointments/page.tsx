@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   format, isToday, isThisWeek,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
@@ -810,10 +811,11 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
   );
 }
 
-export default function AppointmentsPage() {
+function AppointmentsPage() {
   const user = getUser();
   const isStaff = user?.role === "STAFF";
   const bizId = user?.businessId ?? "";
+  const searchParams = useSearchParams();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -828,7 +830,12 @@ export default function AppointmentsPage() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [showBlock, setShowBlock] = useState(false);
-  const [showNewApt, setShowNewApt] = useState(false);
+  const [showNewApt, setShowNewApt] = useState(() => false);
+
+  // Auto-open the new appointment modal when redirected with ?new=1
+  useEffect(() => {
+    if (searchParams.get("new") === "1") setShowNewApt(true);
+  }, [searchParams]);
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string }; locationId?: string | null }[]>([]);
   const [allStaffFull, setAllStaffFull] = useState<{ availabilityRules?: AvailabilityRule[] }[]>([]);
 
@@ -1124,5 +1131,13 @@ export default function AppointmentsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function AppointmentsPageWrapper() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <AppointmentsPage />
+    </Suspense>
   );
 }

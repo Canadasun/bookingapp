@@ -321,7 +321,7 @@ export default function CheckoutPage() {
               )}
 
               <button
-                onClick={() => router.push("/dashboard/appointments")}
+                onClick={() => router.push("/dashboard/appointments?new=1")}
                 className="flex items-center gap-2 text-sm text-violet-600 font-medium hover:underline mt-2">
                 <Plus className="w-4 h-4" /> New appointment
               </button>
