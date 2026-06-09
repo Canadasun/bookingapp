@@ -9,7 +9,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
-const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO']), referralCode: z.string().trim().max(40).optional() });
+const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO', 'UNLIMITED']), referralCode: z.string().trim().max(40).optional() });
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()

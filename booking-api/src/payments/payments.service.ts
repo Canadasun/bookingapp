@@ -430,15 +430,16 @@ export class PaymentsService {
   }
 
   // ── SaaS subscription billing ────────────────────────────────────────────────
-  private priceIdForPlan(plan: 'BASIC' | 'PRO'): string | null {
-    const key = plan === 'BASIC' ? 'STRIPE_PRICE_BASIC' : 'STRIPE_PRICE_PRO';
-    return this.configService.get<string>(key) || null;
+  private priceIdForPlan(plan: 'BASIC' | 'PRO' | 'UNLIMITED'): string | null {
+    const keyMap = { BASIC: 'STRIPE_PRICE_BASIC', PRO: 'STRIPE_PRICE_PRO', UNLIMITED: 'STRIPE_PRICE_UNLIMITED' };
+    return this.configService.get<string>(keyMap[plan]) || null;
   }
 
   private planForPriceId(priceId?: string | null): PlanTier {
     if (!priceId) return 'FREE';
     if (priceId === this.configService.get<string>('STRIPE_PRICE_BASIC')) return 'BASIC';
     if (priceId === this.configService.get<string>('STRIPE_PRICE_PRO')) return 'PRO';
+    if (priceId === this.configService.get<string>('STRIPE_PRICE_UNLIMITED')) return 'UNLIMITED';
     return 'FREE';
   }
 
@@ -524,7 +525,7 @@ export class PaymentsService {
   }
 
   // Owner — start a Stripe Checkout session to subscribe to a paid plan.
-  async createSubscriptionCheckout(businessId: string, plan: 'BASIC' | 'PRO', referralCode?: string) {
+  async createSubscriptionCheckout(businessId: string, plan: 'BASIC' | 'PRO' | 'UNLIMITED', referralCode?: string) {
     const priceId = this.priceIdForPlan(plan);
     if (!priceId) throw new BadRequestException(`The ${plan} plan is not available for purchase yet.`);
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });

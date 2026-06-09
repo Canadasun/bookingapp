@@ -339,7 +339,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Business Logo/Name — Clicking leads to settings.
             Tapping it on mobile previously dumped owners onto "/", which reads as a
             sign-out. Keep them in the dashboard. */}
-        <Link href="/dashboard/settings" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Business settings">
+        <Link href="/dashboard" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Home">
           {biz?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={biz.logoUrl} alt="" className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />

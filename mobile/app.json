@@ -24,6 +24,7 @@
       }
     },
     "android": {
+      "packageName": "com.pulseappointments.app",
       "adaptiveIcon": {
         "backgroundColor": "#E9A23C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
