@@ -131,6 +131,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [promoEditor, setPromoEditor] = useState<{ id?:string; code:string; discountType:'PERCENT'|'FLAT'; discountValue:string; maxUsages:string; expiresAt:string }|null>(null);
   const [membershipPlans, setMembershipPlans] = useState<any[]|null>(null);
   const [membershipMembers, setMembershipMembers] = useState<any[]|null>(null);
+  const [membershipPlanEditor, setMembershipPlanEditor] = useState<{ id?:string; name:string; priceMonthly:string; description:string }|null>(null);
+  const [membershipPlanSaving, setMembershipPlanSaving] = useState(false);
+  const [staffInviteEditor, setStaffInviteEditor] = useState<{ name:string; email:string }|null>(null);
+  const [staffInviteSaving, setStaffInviteSaving] = useState(false);
+  const [staffInviteResult, setStaffInviteResult] = useState<{ email:string; tempPassword:string }|null>(null);
+  const [changePwEditor, setChangePwEditor] = useState<{ current:string; next:string; confirm:string }|null>(null);
+  const [changePwSaving, setChangePwSaving] = useState(false);
   const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const [hourRules, setHourRules] = useState<Array<{ dayOfWeek:number; startTime:string; endTime:string; enabled:boolean }>>(
     [0,1,2,3,4,5,6].map(d=>({ dayOfWeek:d, startTime:'09:00', endTime:'17:00', enabled: d>=1&&d<=5 }))
@@ -1169,8 +1176,70 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           ))}
           {staff && staff.length===0 && <Text style={ms.empty}>No team members yet.</Text>}
           <Text style={[ms.empty,{ marginTop:4 }]}>Use Hours for weekly recurring availability and Time off for one-off blocked time.</Text>
+          <TouchableOpacity style={[s.btnPrimary,{ marginTop:16, marginBottom:8 }]} onPress={()=>setStaffInviteEditor({ name:'', email:'' })}>
+            <Text style={s.btnPrimaryText}>Invite team member</Text>
+          </TouchableOpacity>
         </ScrollView>
       )}
+      {/* Staff invite modal */}
+      <Modal visible={!!staffInviteEditor} animationType="slide" onRequestClose={()=>setStaffInviteEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setStaffInviteEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Invite team member</Text>
+          </View>
+          <ScrollView contentContainerStyle={s.listContent}>
+            <Text style={s.fieldLabel}>Full name</Text>
+            <TextInput style={s.input} placeholder="Jane Smith" placeholderTextColor={GRAY_400}
+              value={staffInviteEditor?.name??''} onChangeText={name=>setStaffInviteEditor(e=>e&&({...e,name}))}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>Email address</Text>
+            <TextInput style={s.input} placeholder="jane@example.com" placeholderTextColor={GRAY_400}
+              autoCapitalize="none" keyboardType="email-address"
+              value={staffInviteEditor?.email??''} onChangeText={email=>setStaffInviteEditor(e=>e&&({...e,email}))}/>
+            <Text style={[s.fieldHint,{ marginTop:8 }]}>A temporary password will be shown after creating the account. Share it with your team member so they can sign in and change it.</Text>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:20 }]} disabled={staffInviteSaving||!staffInviteEditor?.name.trim()||!staffInviteEditor?.email.trim()}
+              onPress={async()=>{
+                if (!staffInviteEditor) return;
+                setStaffInviteSaving(true);
+                try {
+                  const res = await api<{ staff:any; tempPassword:string }>(`/businesses/${bizId()}/staff/invite`, {
+                    method:'POST', body: JSON.stringify({ name:staffInviteEditor.name.trim(), email:staffInviteEditor.email.trim() }),
+                  });
+                  setStaff(prev=>[...(prev??[]), res.staff]);
+                  setStaffInviteEditor(null);
+                  setStaffInviteResult({ email:staffInviteEditor.email.trim(), tempPassword:res.tempPassword });
+                } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not invite team member.'); }
+                finally { setStaffInviteSaving(false); }
+              }}>
+              <Text style={s.btnPrimaryText}>{staffInviteSaving ? 'Inviting…' : 'Create account'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+      {/* Staff invite result — show temp password */}
+      <Modal visible={!!staffInviteResult} animationType="slide" onRequestClose={()=>setStaffInviteResult(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <Text style={s.headerTitle}>Team member invited</Text>
+          </View>
+          <ScrollView contentContainerStyle={[s.listContent,{ alignItems:'center', paddingTop:32 }]}>
+            <Ionicons name="checkmark-circle" size={56} color={BRAND}/>
+            <Text style={[ms.rowTitle,{ marginTop:16, textAlign:'center' }]}>Account created for {staffInviteResult?.email}</Text>
+            <Text style={[ms.rowMeta,{ marginTop:8, textAlign:'center' }]}>Share this temporary password. They can change it after signing in.</Text>
+            <View style={[ms.card,{ marginTop:20, width:'100%', alignItems:'center' }]}>
+              <Text style={{ fontFamily:'monospace', fontSize:20, fontWeight:'700', color:GRAY_900, letterSpacing:2 }}>{staffInviteResult?.tempPassword}</Text>
+            </View>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:24, width:'100%' }]} onPress={()=>{
+              Share.share({ message:`Your Pulse login:\nEmail: ${staffInviteResult?.email}\nTemp password: ${staffInviteResult?.tempPassword}\n\nSign in at ${WEB_URL}/login` });
+            }}>
+              <Text style={s.btnPrimaryText}>Share credentials</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.btnSecondary,{ marginTop:10, width:'100%' }]} onPress={()=>setStaffInviteResult(null)}>
+              <Text style={s.btnSecondaryText}>Done</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
       <Modal visible={!!timeOffEditor} animationType="slide" onRequestClose={()=>setTimeOffEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
@@ -2862,15 +2931,33 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <Text style={ms.rowMeta}>MRR / mo</Text>
               </View>
             </View>
-            <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>PLANS</Text>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop:18, marginBottom:6, marginHorizontal:2 }}>
+              <Text style={ms.cardLabel}>PLANS</Text>
+              <TouchableOpacity onPress={()=>setMembershipPlanEditor({ name:'', priceMonthly:'', description:'' })}>
+                <Text style={{ fontSize:13, color:BRAND, fontWeight:'600' }}>+ New plan</Text>
+              </TouchableOpacity>
+            </View>
             {(!membershipPlans || membershipPlans.length===0) ? (
-              <Text style={[ms.empty,{ marginLeft:2 }]}>No plans yet — create them on the web dashboard.</Text>
+              <Text style={[ms.empty,{ marginLeft:2 }]}>No plans yet. Tap + New plan to create one.</Text>
             ) : membershipPlans.map((p,i,arr)=>(
               <View key={p.id} style={[ms.row, i<arr.length-1&&{ borderBottomWidth:1, borderColor:GRAY_100 }]}>
                 <View style={{ flex:1 }}>
                   <Text style={ms.rowTitle}>{p.name}</Text>
-                  <Text style={ms.rowMeta}>${(p.priceMonthly/100).toFixed(0)}/mo · {!p.active && 'Inactive'}</Text>
+                  <Text style={ms.rowMeta}>${(p.priceMonthly/100).toFixed(0)}/mo{!p.active ? ' · Inactive' : ''}</Text>
                 </View>
+                <TouchableOpacity onPress={()=>setMembershipPlanEditor({ id:p.id, name:p.name, priceMonthly:String((p.priceMonthly/100).toFixed(2)), description:p.description??'' })} style={{ padding:8 }}>
+                  <Ionicons name="pencil-outline" size={17} color={GRAY_500}/>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={async()=>{
+                  Alert.alert('Delete plan',`Delete "${p.name}"? This cannot be undone.`,[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:async()=>{
+                    try {
+                      await api(`/businesses/${bizId()}/memberships/plans/${p.id}`, { method:'DELETE' });
+                      setMembershipPlans(prev=>(prev??[]).filter(x=>x.id!==p.id));
+                    } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete.'); }
+                  }}]);
+                }} style={{ padding:8 }}>
+                  <Ionicons name="trash-outline" size={17} color="#EF4444"/>
+                </TouchableOpacity>
               </View>
             ))}
             <Text style={[ms.cardLabel,{ marginTop:18, marginBottom:6, marginLeft:2 }]}>ACTIVE MEMBERS</Text>
@@ -2889,6 +2976,47 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             ))}
           </ScrollView>
         )}
+        {/* Membership plan create / edit modal */}
+        <Modal visible={!!membershipPlanEditor} animationType="slide" onRequestClose={()=>setMembershipPlanEditor(null)}>
+          <SafeAreaView style={s.screen}>
+            <View style={s.header}>
+              <TouchableOpacity onPress={()=>setMembershipPlanEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <Text style={s.headerTitle}>{membershipPlanEditor?.id ? 'Edit plan' : 'New plan'}</Text>
+            </View>
+            <ScrollView contentContainerStyle={s.listContent}>
+              <Text style={s.fieldLabel}>Plan name</Text>
+              <TextInput style={s.input} placeholder="e.g. Monthly VIP" placeholderTextColor={GRAY_400}
+                value={membershipPlanEditor?.name??''} onChangeText={name=>setMembershipPlanEditor(e=>e&&({...e,name}))}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Monthly price ($)</Text>
+              <TextInput style={s.input} placeholder="29.99" placeholderTextColor={GRAY_400} keyboardType="decimal-pad"
+                value={membershipPlanEditor?.priceMonthly??''} onChangeText={priceMonthly=>setMembershipPlanEditor(e=>e&&({...e,priceMonthly}))}/>
+              <Text style={[s.fieldLabel,{ marginTop:12 }]}>Description (optional)</Text>
+              <TextInput style={[s.input,{ height:72, textAlignVertical:'top' }]} multiline placeholder="What's included…" placeholderTextColor={GRAY_400}
+                value={membershipPlanEditor?.description??''} onChangeText={description=>setMembershipPlanEditor(e=>e&&({...e,description}))}/>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:20 }]} disabled={membershipPlanSaving||!membershipPlanEditor?.name.trim()||!membershipPlanEditor?.priceMonthly}
+                onPress={async()=>{
+                  if (!membershipPlanEditor) return;
+                  const price = parseFloat(membershipPlanEditor.priceMonthly);
+                  if (!price || price<=0) { Alert.alert('Invalid price','Enter a valid monthly price.'); return; }
+                  setMembershipPlanSaving(true);
+                  try {
+                    const payload = { name:membershipPlanEditor.name.trim(), description:membershipPlanEditor.description.trim()||undefined, priceMonthly:Math.round(price*100) };
+                    if (membershipPlanEditor.id) {
+                      const updated = await api<any>(`/businesses/${bizId()}/memberships/plans/${membershipPlanEditor.id}`, { method:'PATCH', body:JSON.stringify(payload) });
+                      setMembershipPlans(prev=>(prev??[]).map(x=>x.id===membershipPlanEditor.id?updated:x));
+                    } else {
+                      const created = await api<any>(`/businesses/${bizId()}/memberships/plans`, { method:'POST', body:JSON.stringify(payload) });
+                      setMembershipPlans(prev=>[...(prev??[]), created]);
+                    }
+                    setMembershipPlanEditor(null);
+                  } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not save plan.'); }
+                  finally { setMembershipPlanSaving(false); }
+                }}>
+                <Text style={s.btnPrimaryText}>{membershipPlanSaving ? 'Saving…' : 'Save plan'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -3004,6 +3132,14 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           </View>
 
           <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>SECURITY</Text>
+          <TouchableOpacity style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom:8 }]}
+            onPress={()=>setChangePwEditor({ current:'', next:'', confirm:'' })}>
+            <View>
+              <Text style={ms.cardValue}>Change password</Text>
+              <Text style={[ms.rowMeta,{ marginTop:2 }]}>Update your account password.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={GRAY_400}/>
+          </TouchableOpacity>
           <View style={ms.card}>
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
               <View style={{ flex:1, paddingRight:12 }}>
@@ -3099,6 +3235,41 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Text style={[ms.empty,{ marginTop:8 }]}>Advanced business settings, billing, and delivery-log controls are available on the web dashboard.</Text>
         </ScrollView>
       )}
+      {/* Change password modal */}
+      <Modal visible={!!changePwEditor} animationType="slide" onRequestClose={()=>setChangePwEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setChangePwEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Change password</Text>
+          </View>
+          <ScrollView contentContainerStyle={s.listContent}>
+            <Text style={s.fieldLabel}>Current password</Text>
+            <TextInput style={s.input} secureTextEntry placeholder="••••••••" placeholderTextColor={GRAY_400}
+              value={changePwEditor?.current??''} onChangeText={current=>setChangePwEditor(e=>e&&({...e,current}))}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>New password</Text>
+            <TextInput style={s.input} secureTextEntry placeholder="Min 8 characters" placeholderTextColor={GRAY_400}
+              value={changePwEditor?.next??''} onChangeText={next=>setChangePwEditor(e=>e&&({...e,next}))}/>
+            <Text style={[s.fieldLabel,{ marginTop:12 }]}>Confirm new password</Text>
+            <TextInput style={s.input} secureTextEntry placeholder="Repeat new password" placeholderTextColor={GRAY_400}
+              value={changePwEditor?.confirm??''} onChangeText={confirm=>setChangePwEditor(e=>e&&({...e,confirm}))}/>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:20 }]} disabled={changePwSaving}
+              onPress={async()=>{
+                if (!changePwEditor) return;
+                if (changePwEditor.next.length < 8) { Alert.alert('Too short','New password must be at least 8 characters.'); return; }
+                if (changePwEditor.next !== changePwEditor.confirm) { Alert.alert('Mismatch','New passwords do not match.'); return; }
+                setChangePwSaving(true);
+                try {
+                  await api('/auth/change-password', { method:'PATCH', body: JSON.stringify({ currentPassword:changePwEditor.current, newPassword:changePwEditor.next }) });
+                  setChangePwEditor(null);
+                  Alert.alert('Password updated','Your password has been changed successfully.');
+                } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not change password.'); }
+                finally { setChangePwSaving(false); }
+              }}>
+              <Text style={s.btnPrimaryText}>{changePwSaving ? 'Saving…' : 'Update password'}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
       <Modal visible={!!settingsEditor} animationType="slide" onRequestClose={()=>setSettingsEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>

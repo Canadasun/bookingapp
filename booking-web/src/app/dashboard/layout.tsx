@@ -41,6 +41,7 @@ const OWNER_NAV: NavItem[] = [
     children: [
       { group: "Operations" },
       { href: "/dashboard/staff",        label: "Staff" },
+      { href: "/dashboard/resources",    label: "Resources" },
       { href: "/dashboard/tasks",        label: "Tasks" },
       { href: "/dashboard/followups",    label: "Follow-ups" },
       { href: "/dashboard/waitlist",     label: "Waitlist" },
