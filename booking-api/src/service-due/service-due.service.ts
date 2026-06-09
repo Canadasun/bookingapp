@@ -120,4 +120,11 @@ export class ServiceDueService {
     if (!d) throw new NotFoundException('Follow-up not found');
     return this.prisma.serviceDue.update({ where: { id }, data: { status: 'CANCELLED' }, include: dueInclude });
   }
+
+  async deletePolicy(businessId: string, id: string) {
+    const policy = await this.prisma.followUpPolicy.findFirst({ where: { id, businessId }, select: { id: true } });
+    if (!policy) throw new NotFoundException('Follow-up policy not found');
+    await this.prisma.serviceDue.updateMany({ where: { policyId: id, status: { not: 'CANCELLED' } }, data: { status: 'CANCELLED', policyId: null } });
+    return this.prisma.followUpPolicy.delete({ where: { id } });
+  }
 }

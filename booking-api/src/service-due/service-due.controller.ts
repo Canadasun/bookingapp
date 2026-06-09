@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { ServiceDueService } from './service-due.service';
@@ -70,6 +70,12 @@ export class ServiceDueController {
   updatePolicy(@Param('businessId') businessId: string, @Param('id') id: string, @Body(new ZodValidationPipe(PolicySchema.partial())) dto: Partial<z.infer<typeof PolicySchema>>, @CurrentUser() user: AuthUser) {
     this.assert(user, businessId);
     return this.svc.updatePolicy(businessId, id, dto);
+  }
+
+  @Delete('policies/:id')
+  deletePolicy(@Param('businessId') businessId: string, @Param('id') id: string, @CurrentUser() user: AuthUser) {
+    this.assert(user, businessId);
+    return this.svc.deletePolicy(businessId, id);
   }
 
   @Post()

@@ -81,6 +81,11 @@ export default function FollowupsPage() {
       toast.success("Follow-up policy created"); load(true);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not create policy"); }
   }
+  async function deletePolicy(id: string, name: string) {
+    if (!confirm(`Delete policy "${name}"? This will also cancel any scheduled follow-ups using it.`)) return;
+    try { await api.serviceDue.deletePolicy(bizId, id); toast.success("Policy deleted"); load(true); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete policy"); }
+  }
 
   const due = items.filter((i) => i.status === "DUE");
   const scheduled = items.filter((i) => i.status === "SCHEDULED");
@@ -125,7 +130,19 @@ export default function FollowupsPage() {
         <Input value={policy.subject} onChange={(e)=>setPolicy(p=>({...p,subject:e.target.value}))} placeholder="Message subject" />
         <textarea className="min-h-20 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" maxLength={2000} value={policy.body} onChange={(e)=>setPolicy(p=>({...p,body:e.target.value}))} />
         <Button size="sm" onClick={createPolicy}>Add policy</Button>
-        {policies.length > 0 && <div className="flex flex-wrap gap-2 pt-1">{policies.map(p=><span key={p.id} className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">{p.name} · {p.delayDays} days</span>)}</div>}
+        {policies.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {policies.map(pol => (
+              <span key={pol.id} className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
+                {pol.name} · {pol.delayDays} days
+                <button type="button" onClick={() => deletePolicy(pol.id, pol.name)}
+                  className="ml-0.5 rounded-full text-violet-400 hover:text-red-500 transition-colors" title="Delete policy">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Summary */}

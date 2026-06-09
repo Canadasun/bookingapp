@@ -119,8 +119,12 @@ function CalendarScreen() {
   async function syncCalendar(id:string) {
     setActing(true);
     try {
-      await api(`/calendar-sync/${id}`, { method:'POST' });
-      Alert.alert('Calendar sync queued', 'This appointment was sent to the calendar sync service.');
+      const res = await api<{ success: boolean; googleSynced: boolean }>(`/calendar-sync/${id}`, { method:'POST' });
+      if (res.googleSynced) {
+        Alert.alert('Synced to Google Calendar', 'This appointment has been added to your Google Calendar.');
+      } else {
+        Alert.alert('Google Calendar not connected', "This appointment was saved, but Google Calendar isn't connected. Go to Settings → Calendar to link your account, or use the iCal feed to subscribe.");
+      }
     } catch(e) {
       Alert.alert('Sync failed', e instanceof Error ? e.message : 'Please try again.');
     } finally { setActing(false); }
@@ -429,7 +433,7 @@ function CalendarScreen() {
               {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>noShow(selected.id)}><Text style={s.btnSecondaryText}>No-show &amp; charge fee</Text></TouchableOpacity>}
               <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openEdit(selected)}><Text style={s.btnSecondaryText}>Edit details</Text></TouchableOpacity>
               {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openReschedule(selected)}><Text style={s.btnSecondaryText}>Reschedule</Text></TouchableOpacity>}
-              {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>syncCalendar(selected.id)}><Text style={s.btnSecondaryText}>Sync calendar</Text></TouchableOpacity>}
+              {['PENDING','CONFIRMED'].includes(selected.status) && user?.role === 'OWNER' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>syncCalendar(selected.id)}><Text style={s.btnSecondaryText}>Sync calendar</Text></TouchableOpacity>}
               {['PENDING','CONFIRMED'].includes(selected.status) && (
                 <TouchableOpacity style={s.btnDanger} disabled={acting} onPress={()=>cancel(selected.id)}><Text style={s.btnDangerText}>Cancel</Text></TouchableOpacity>
               )}

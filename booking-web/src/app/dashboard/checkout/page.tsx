@@ -32,6 +32,7 @@ export default function CheckoutPage() {
   const [allServices, setAllServices]     = useState<Service[]>([]);
   const [allStaffList, setAllStaffList]   = useState<StaffMember[]>([]);
   const [staffList, setStaffList]         = useState<StaffMember[]>([]);
+  const [locations, setLocations]         = useState<{ id: string; name: string }[]>([]);
   const [slots, setSlots]                 = useState<BookingSlot[]>([]);
 
   const [clientSearch, setClientSearch]   = useState("");
@@ -63,6 +64,7 @@ export default function CheckoutPage() {
     api.business.get(bizId).then(setBiz).catch(() => {});
     api.services.listAll(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
     api.staff.listAll(bizId).then((all) => setAllStaffList(all.filter((st) => st.active))).catch(() => {});
+    api.locations.list(bizId).then((locs) => setLocations(locs.filter((l) => l.active))).catch(() => {});
   }, [bizId]);
 
   // "Book again" deep-link from the Clients page (?client=<id>): pre-select that
@@ -400,34 +402,44 @@ export default function CheckoutPage() {
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-300" />
               </button>
-              {staffList.map((st) => (
-                <button key={st.id} onClick={() => { setSelectedStaff(st); setStep("datetime"); }}
-                  className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
-                    (selectedStaff as StaffMember)?.id === st.id ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
-                  <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
-                    {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm text-gray-900">{st.user.name} <span className="font-normal text-gray-400">({salonName})</span></p>
-                    {st.bio && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{st.bio}</p>}
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
-                </button>
-              ))}
-              {staffList.length === 0 && allStaffList.map((st) => (
-                <button key={st.id} onClick={() => { setSelectedStaff(st); setStep("datetime"); }}
-                  className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
-                    (selectedStaff as StaffMember)?.id === st.id ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
-                  <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
-                    {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm text-gray-900">{st.user.name} <span className="font-normal text-gray-400">({salonName})</span></p>
-                    <p className="text-xs text-amber-600 mt-0.5">Owner override provider</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
-                </button>
-              ))}
+              {staffList.map((st) => {
+                const loc = st.locationId ? locations.find((l) => l.id === st.locationId) : null;
+                return (
+                  <button key={st.id} onClick={() => { setSelectedStaff(st); setStep("datetime"); }}
+                    className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                      (selectedStaff as StaffMember)?.id === st.id ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
+                    <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
+                      {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {loc ? loc.name : salonName}
+                        {st.bio ? ` · ${st.bio}` : ""}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                  </button>
+                );
+              })}
+              {staffList.length === 0 && allStaffList.map((st) => {
+                const loc = st.locationId ? locations.find((l) => l.id === st.locationId) : null;
+                return (
+                  <button key={st.id} onClick={() => { setSelectedStaff(st); setStep("datetime"); }}
+                    className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                      (selectedStaff as StaffMember)?.id === st.id ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
+                    <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
+                      {st.user.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{loc ? loc.name : salonName}</p>
+                      <p className="text-xs text-amber-600 mt-0.5">Owner override provider</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

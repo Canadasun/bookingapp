@@ -721,6 +721,8 @@ export const api = {
       req<Array<{ id: string; name: string; serviceId?: string | null; trigger: string; delayDays: number; subject: string; body: string; enabled: boolean; service?: { name: string } | null }>>(`/businesses/${businessId}/service-due/policies`),
     createPolicy: (businessId: string, data: { name: string; serviceId?: string | null; trigger: "COMPLETED" | "MANUAL"; delayDays: number; subject: string; body: string; enabled?: boolean }) =>
       req<unknown>(`/businesses/${businessId}/service-due/policies`, { method: "POST", body: JSON.stringify(data) }),
+    deletePolicy: (businessId: string, id: string) =>
+      req<unknown>(`/businesses/${businessId}/service-due/policies/${id}`, { method: "DELETE" }),
   },
 
   tasks: {

@@ -319,7 +319,7 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
 // just name + phone/email, then picks service, provider, date and time.
 function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   bizId: string;
-  staffList: { id: string; user: { name: string } }[];
+  staffList: { id: string; user: { name: string }; locationId?: string | null }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -335,17 +335,32 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   const [time, setTime] = useState(nextHour);
   const [notes, setNotes] = useState("");
   const [services, setServices] = useState<Service[]>([]);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [locationFilter, setLocationFilter] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const filteredStaff = locationFilter
+    ? staffList.filter((s) => s.locationId === locationFilter)
+    : staffList;
 
   useEffect(() => {
     if (!bizId) return;
-    api.services.listAll(bizId)
-      .then((list) => {
-        setServices(list);
-        if (list.length > 0) setServiceId(list[0].id);
-      })
-      .catch(() => {});
+    Promise.all([
+      api.services.listAll(bizId),
+      api.locations.list(bizId),
+    ]).then(([svcList, locList]) => {
+      setServices(svcList);
+      if (svcList.length > 0) setServiceId(svcList[0].id);
+      setLocations(locList.filter((l) => l.active));
+    }).catch(() => {});
   }, [bizId]);
+
+  // When location filter changes, reset staffId to first matching staff
+  useEffect(() => {
+    const first = filteredStaff[0]?.id ?? "";
+    setStaffId(first);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationFilter]);
 
   async function submit() {
     const trimName = clientName.trim();
@@ -415,13 +430,28 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
             </select>
           </div>
 
+          {/* Location filter (only shown when business has multiple locations) */}
+          {locations.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
+                <option value="">All locations</option>
+                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+          )}
+
           {/* Staff */}
           {staffList.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Staff member <span className="text-red-500">*</span></label>
               <select value={staffId} onChange={(e) => setStaffId(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
-                {staffList.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
+                {filteredStaff.length === 0
+                  ? <option value="">No staff at this location</option>
+                  : filteredStaff.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)
+                }
               </select>
             </div>
           )}
@@ -799,7 +829,7 @@ export default function AppointmentsPage() {
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [showBlock, setShowBlock] = useState(false);
   const [showNewApt, setShowNewApt] = useState(false);
-  const [staffList, setStaffList] = useState<{ id: string; user: { name: string } }[]>([]);
+  const [staffList, setStaffList] = useState<{ id: string; user: { name: string }; locationId?: string | null }[]>([]);
   const [allStaffFull, setAllStaffFull] = useState<{ availabilityRules?: AvailabilityRule[] }[]>([]);
 
   useEffect(() => {

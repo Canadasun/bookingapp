@@ -553,7 +553,7 @@ function SettingsPage() {
                 <Field label="Contact email">
                   <Input type="email" value={(form.email as string) ?? ""} onChange={(e) => f("email", e.target.value)} />
                 </Field>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Phone">
                     <Input type="tel" placeholder="+1 (416) 555-0123" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
                   </Field>
@@ -564,7 +564,7 @@ function SettingsPage() {
                     </select>
                   </Field>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Address">
                     <Input value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
                   </Field>
@@ -699,9 +699,9 @@ function SettingsPage() {
                 {!cal ? (
                   <p className="text-sm text-gray-400">Loading…</p>
                 ) : !cal.configured ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-900">Not available yet</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Google Calendar sync isn’t enabled on the server. Contact support to turn it on.</p>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                    <p className="text-sm font-semibold text-blue-900">Google Calendar not configured</p>
+                    <p className="text-xs text-blue-700 mt-0.5">Google Calendar sync requires server credentials that aren’t set up yet. Use the iCal feed below — it works with Google Calendar, Apple Calendar, Outlook, and any app that supports webcal subscriptions.</p>
                   </div>
                 ) : (
                   <div className="rounded-xl border border-gray-100 bg-white p-4 flex items-center justify-between gap-4">
@@ -729,13 +729,15 @@ function SettingsPage() {
                 )}
 
                 {/* iCal feed — works regardless of Google sync status */}
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <div className={cn("rounded-xl border p-4", cal?.configured ? "border-gray-100 bg-gray-50" : "border-violet-200 bg-violet-50")}>
                   <div className="flex items-start gap-3">
-                    <Download className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+                    <Download className={cn("w-4 h-4 mt-0.5 shrink-0", cal?.configured ? "text-gray-500" : "text-violet-600")} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800">iCal feed (fallback)</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Subscribe to your appointments in any calendar app — Apple Calendar, Outlook, or any webcal-compatible app. Works even without Google Calendar connected. Confirmation emails also include a .ics calendar invite.
+                      <p className={cn("text-sm font-semibold", cal?.configured ? "text-gray-800" : "text-violet-900")}>
+                        iCal feed{!cal?.configured ? " — recommended" : ""}
+                      </p>
+                      <p className={cn("text-xs mt-0.5", cal?.configured ? "text-gray-400" : "text-violet-700")}>
+                        Subscribe to your appointments in any calendar app — Google Calendar, Apple Calendar, Outlook, or any webcal-compatible app. Works without any extra setup. Confirmation emails also include a .ics calendar invite.
                       </p>
                       <a
                         href={api.calendarSync.icalFeedUrl()}
@@ -909,7 +911,7 @@ function SettingsPage() {
                         onChange={(e) => bf("intro", e.target.value)}
                         placeholder="Tell clients what to expect before they book." />
                     </Field>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Field label="SEO title">
                         <Input value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
                       </Field>
@@ -984,7 +986,7 @@ function SettingsPage() {
                       <p className="text-sm font-medium text-gray-700">Add location</p>
                       <Input placeholder="Location name (e.g. Downtown)" value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} />
                       <Input placeholder="Address (optional)" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} />
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <Input placeholder="+1 (416) 555-0123" type="tel" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} />
                         <select value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
                           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
