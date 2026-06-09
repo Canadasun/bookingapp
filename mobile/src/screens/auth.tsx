@@ -232,6 +232,7 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
           name: name.trim(), email: email.trim().toLowerCase(), password, role:'OWNER',
           businessName: businessName.trim(),
           privacyConsentAccepted: true,
+          consentVersion: '2026-06-08',
           ...(normalizedPhone ? { businessPhone: normalizedPhone } : {}),
           ...(tz ? { timezone: tz } : {}),
         }),

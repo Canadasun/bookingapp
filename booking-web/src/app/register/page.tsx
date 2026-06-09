@@ -45,6 +45,7 @@ export default function RegisterPage() {
           name: form.name.trim(), email, password: form.password, role: "OWNER",
           businessName: form.businessName.trim(),
           privacyConsentAccepted: true,
+          consentVersion: "2026-06-08",
           ...(form.phone.trim() ? { businessPhone: form.phone.trim() } : {}),
         }),
       });
