@@ -16,6 +16,7 @@ export class AuthController {
   constructor(private authService: AuthService, private prisma: PrismaService) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   register(@Body(new ZodValidationPipe(RegisterSchema)) dto: RegisterDto, @Req() req: Request) {
     const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
     return this.authService.register(dto, { ip: fwd || req.ip });
@@ -23,6 +24,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   login(@Body(new ZodValidationPipe(LoginSchema)) dto: LoginDto, @Req() req: Request) {
     // The web proxies login server-side, so it forwards the real client UA/IP via
     // x-client-user-agent / x-forwarded-for; mobile hits us directly.
@@ -101,6 +103,7 @@ export class AuthController {
   // exists). Throttled to blunt enumeration / email-bombing.
   @Post('forgot-password')
   @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   forgotPassword(@Body(new ZodValidationPipe(ForgotPasswordSchema)) dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
@@ -108,6 +111,7 @@ export class AuthController {
   // Public — complete the reset with the emailed token.
   @Post('reset-password')
   @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   resetPassword(@Body(new ZodValidationPipe(ResetPasswordSchema)) dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }

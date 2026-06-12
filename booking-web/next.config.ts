@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         destination: "/support",
         permanent: true,
       },
+      // Legacy favicon path — browsers request /favicon.ico directly.
+      {
+        source: "/favicon.ico",
+        destination: "/icon",
+        permanent: false,
+      },
     ];
   },
   async rewrites() {
