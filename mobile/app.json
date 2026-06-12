@@ -61,7 +61,8 @@
             "networkSecurityConfig": "./network-security-config.xml"
           }
         }
-      ]
+      ],
+      "./plugins/withPrivacyManifest"
     ],
     "extra": {
       "eas": {

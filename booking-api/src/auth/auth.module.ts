@@ -6,12 +6,13 @@ import { AuthService } from './auth.service';
 import { AuthLockService } from './auth-lock.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
+import { TenantGuard } from './guards/tenant.guard';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), NotificationsModule],
   controllers: [AuthController],
-  providers: [AuthService, AuthLockService, JwtStrategy, JwtRefreshStrategy],
-  exports: [AuthService, AuthLockService],
+  providers: [AuthService, AuthLockService, JwtStrategy, JwtRefreshStrategy, TenantGuard],
+  exports: [AuthService, AuthLockService, TenantGuard],
 })
 export class AuthModule {}

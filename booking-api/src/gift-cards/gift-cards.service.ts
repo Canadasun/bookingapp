@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -76,27 +77,42 @@ export class GiftCardsService {
   }
 
   async redeem(businessId: string, dto: RedeemGiftCardDto) {
-    const card = await this.prisma.giftCard.findFirst({
-      where: { businessId, code: dto.code.trim().toUpperCase() },
-    });
-    if (!card) throw new NotFoundException('No gift card found for that code');
-    if (card.status === 'VOID') throw new BadRequestException('This gift card has been voided');
-    if (card.expiresAt && card.expiresAt < new Date()) throw new BadRequestException('This gift card has expired');
-    if (card.balanceCents <= 0) throw new BadRequestException('This gift card has no balance left');
-    if (dto.amountCents > card.balanceCents) {
-      throw new BadRequestException(`Only ${(card.balanceCents / 100).toFixed(2)} remaining on this card`);
-    }
-
-    const newBalance = card.balanceCents - dto.amountCents;
-    const [, updated] = await this.prisma.$transaction([
-      this.prisma.giftCardRedemption.create({
-        data: { giftCardId: card.id, amountCents: dto.amountCents, appointmentId: dto.appointmentId },
-      }),
-      this.prisma.giftCard.update({
-        where: { id: card.id },
-        data: { balanceCents: newBalance, status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE' },
-      }),
-    ]);
+    // SERIALIZABLE isolation ensures two concurrent redemptions cannot both
+    // read the same balance and both deduct from it. Postgres will abort one
+    // with a serialization error (P2034) if the reads/writes conflict.
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        // Re-read inside the transaction — this is the read that Postgres
+        // tracks for serialization conflict detection.
+        const card = await tx.giftCard.findFirst({
+          where: { businessId, code: dto.code.trim().toUpperCase() },
+        });
+        if (!card) throw new NotFoundException('No gift card found for that code');
+        if (card.status === 'VOID') throw new BadRequestException('This gift card has been voided');
+        if (card.expiresAt && card.expiresAt < new Date())
+          throw new BadRequestException('This gift card has expired');
+        if (card.balanceCents <= 0)
+          throw new BadRequestException('This gift card has no balance left');
+        if (dto.amountCents > card.balanceCents) {
+          throw new BadRequestException(
+            `Only ${(card.balanceCents / 100).toFixed(2)} remaining on this card`,
+          );
+        }
+        const newBalance = card.balanceCents - dto.amountCents;
+        await tx.giftCardRedemption.create({
+          data: {
+            giftCardId: card.id,
+            amountCents: dto.amountCents,
+            appointmentId: dto.appointmentId,
+          },
+        });
+        return tx.giftCard.update({
+          where: { id: card.id },
+          data: { balanceCents: newBalance, status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE' },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return { redeemedCents: dto.amountCents, balanceCents: updated.balanceCents, status: updated.status };
   }
 
