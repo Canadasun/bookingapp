@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
         destination: "https://www.pulseappointments.com/:path*",
         permanent: true,
       },
+      // /contact is a well-known alias; forward permanently to the support page.
+      {
+        source: "/contact",
+        destination: "/support",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {

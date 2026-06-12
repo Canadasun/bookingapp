@@ -4,7 +4,7 @@ const SITE_URL = "https://www.pulseappointments.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  return ["", "/login", "/register", "/book", "/terms", "/privacy"].map((path) => ({
+  return ["", "/login", "/register", "/book", "/terms", "/privacy", "/support", "/accessibility", "/status"].map((path) => ({
     url: `${SITE_URL}${path}`,
     lastModified: now,
     changeFrequency: "weekly" as const,
