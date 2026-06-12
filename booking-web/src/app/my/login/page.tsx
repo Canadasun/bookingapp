@@ -149,7 +149,7 @@ function LoginForm() {
 
 export default function ClientLoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/book" className="inline-flex items-center gap-2">
@@ -173,6 +173,6 @@ export default function ClientLoginPage() {
           <Link href="/login" className="text-violet-500 hover:underline">Sign in to your account</Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

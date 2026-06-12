@@ -74,7 +74,7 @@ function RegisterForm() {
   const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
@@ -135,7 +135,7 @@ function RegisterForm() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }
 

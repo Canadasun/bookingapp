@@ -450,7 +450,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       </nav>
       )}
 
-      <div className="max-w-2xl mx-auto px-5 py-8">
+      <main id="main-content" className="max-w-2xl mx-auto px-5 py-8">
         {/* Prestige: verified businesses get a trust strip that reassures clients */}
         {biz?.verificationStatus === "VERIFIED" && step !== 4 && !slotTaken && (
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 px-3 py-2">
@@ -792,7 +792,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                                 <Clock className="w-5 h-5 text-violet-600" />
                               </div>
                               <div>
-                                <p className="text-sm font-bold text-gray-900">Fully booked on this day</p>
+                                <h3 className="text-sm font-bold text-gray-900">Fully booked on this day</h3>
                                 <p className="text-xs text-gray-500 mt-0.5">Join the waitlist and we&apos;ll email you the instant a spot opens — or try another date.</p>
                               </div>
                             </div>
@@ -1016,7 +1016,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         <p className="text-center text-xs text-gray-400 mt-4">
           Powered by <span className="text-violet-500 font-medium">Pulse</span>
         </p>
-      </div>
+      </main>
     </div>
   );
 }

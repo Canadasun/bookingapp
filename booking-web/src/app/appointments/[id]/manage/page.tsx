@@ -89,7 +89,7 @@ export default function ManageAppointmentPage() {
   const canReschedule = canManage && isBefore(new Date(), changeCutoff);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <main className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Appointment</h1>
@@ -119,7 +119,7 @@ export default function ManageAppointmentPage() {
                 <div className="flex items-start gap-3">
                   <Scissors className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Service</p>
+                    <p className="text-xs text-gray-600 font-medium uppercase tracking-wider">Service</p>
                     <p className="text-gray-900 font-semibold">{appointment.service.name}</p>
                     <p className="text-sm text-gray-500">{appointment.service.durationMinutes} minutes</p>
                   </div>
@@ -127,7 +127,7 @@ export default function ManageAppointmentPage() {
                 <div className="flex items-start gap-3">
                   <User className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Salon</p>
+                    <p className="text-xs text-gray-600 font-medium uppercase tracking-wider">Salon</p>
                     <p className="text-gray-900 font-semibold">{appointment.business.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{appointment.staff.user.name}</p>
                   </div>
@@ -137,14 +137,14 @@ export default function ManageAppointmentPage() {
                 <div className="flex items-start gap-3">
                   <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Date</p>
+                    <p className="text-xs text-gray-600 font-medium uppercase tracking-wider">Date</p>
                     <p className="text-gray-900 font-semibold">{format(new Date(appointment.startsAt), 'EEEE, MMMM do')}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Time</p>
+                    <p className="text-xs text-gray-600 font-medium uppercase tracking-wider">Time</p>
                     <p className="text-gray-900 font-semibold">{format(new Date(appointment.startsAt), 'h:mm a')}</p>
                   </div>
                 </div>
@@ -230,11 +230,11 @@ export default function ManageAppointmentPage() {
         </div>
 
         <div className="text-center">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-600">
             Need help? Contact {appointment.business.name}.
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

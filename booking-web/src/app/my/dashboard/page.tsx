@@ -154,7 +154,7 @@ export default function ClientDashboard() {
               <Calendar className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-900 leading-none">My Bookings</p>
+              <span className="text-sm font-bold text-gray-900 leading-none">My Bookings</span>
               <p className="text-xs text-gray-400 mt-0.5">{user.name}</p>
             </div>
           </div>
@@ -175,13 +175,13 @@ export default function ClientDashboard() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-5 py-6 space-y-5">
+      <main className="max-w-2xl mx-auto px-5 py-6 space-y-5">
 
         {/* Book new CTA */}
         <Link href="/book"
           className="flex items-center justify-between bg-violet-600 text-white rounded-2xl p-5 hover:bg-violet-700 transition-colors group">
           <div>
-            <p className="font-bold text-lg leading-tight">Book an appointment</p>
+            <span className="font-bold text-lg leading-tight">Book an appointment</span>
             <p className="text-violet-200 text-sm mt-0.5">Browse services and pick a time</p>
           </div>
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
@@ -301,7 +301,7 @@ export default function ClientDashboard() {
 
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
