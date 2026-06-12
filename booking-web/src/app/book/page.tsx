@@ -5,7 +5,7 @@ import { Calendar, Building2, ShieldCheck } from "lucide-react";
 
 export default function BookEntryPage() {
   return (
-    <div className="min-h-screen bg-[#F8F9FA] px-5 py-10">
+    <main className="min-h-screen bg-[#F8F9FA] px-5 py-10">
       <div className="mx-auto max-w-xl">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600">
@@ -46,6 +46,6 @@ export default function BookEntryPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
@@ -72,6 +72,6 @@ export default function ForgotPasswordPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }

@@ -26,7 +26,7 @@ export default function VerifyEmailPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+    <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <Card className="w-full max-w-sm">
         <CardContent className="p-8 text-center">
           {state === "loading" && (
@@ -57,6 +57,6 @@ export default function VerifyEmailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

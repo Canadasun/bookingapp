@@ -40,7 +40,7 @@ export default function ReviewPage({ params }: { params: Promise<{ appointmentId
   if (!apt) return <div className="min-h-screen flex items-center justify-center p-6 text-center"><p className="text-gray-500">This review link is no longer valid.</p></div>;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
+    <main className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         {done ? (
           <div className="text-center py-6">
@@ -66,6 +66,6 @@ export default function ReviewPage({ params }: { params: Promise<{ appointmentId
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

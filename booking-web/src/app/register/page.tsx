@@ -81,7 +81,7 @@ export default function RegisterPage() {
   const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); if (k === "email") setEmailExists(false); };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center brand-shell px-4 py-10">
+    <main className="min-h-screen flex flex-col items-center justify-center brand-shell px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
@@ -164,6 +164,6 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </main>
   );
 }
