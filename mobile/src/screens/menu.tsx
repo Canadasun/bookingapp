@@ -1011,7 +1011,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const Head = ({ title }: { title:string }) => (
     <View style={[s.header, view!=='menu' && { flexDirection:'row', alignItems:'center' }]}>
       {view !== 'menu' && (
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
       )}
       <Text style={s.headerTitle}>{title}</Text>
     </View>
@@ -1021,9 +1022,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'services') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Services</Text>
-        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1', priceType:preferredPriceType })}>
+        <TouchableOpacity onPress={()=>setServiceEditor({ name:'', durationMinutes:'30', price:'0.00', active:true, capacity:'1', priceType:preferredPriceType })}
+          accessibilityRole="button" accessibilityLabel="Add new service">
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -1053,7 +1056,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 active: sv.active,
                 capacity: String(sv.capacity ?? 1),
                 priceType: (sv.priceType as any) ?? 'FLAT',
-              })}>
+              })}
+              accessibilityRole="button" accessibilityLabel={`Edit ${sv.name}`}>
                 <View style={[ms.dot,{ backgroundColor: sv.color || BRAND }]}/>
                 <View style={{ flex:1 }}>
                   <Text style={ms.rowTitle}>{sv.name}</Text>
@@ -1074,7 +1078,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!serviceEditor} animationType="slide" onRequestClose={()=>setServiceEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setServiceEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setServiceEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>{serviceEditor?.id ? 'Edit service' : 'New service'}</Text>
           </View>
           {serviceEditor && (
@@ -1103,7 +1108,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   const on = serviceEditor.priceType===val;
                   return (
                     <TouchableOpacity key={val} onPress={()=>setServiceEditor({...serviceEditor, priceType:val})}
-                      style={[s.slotBtn, on && s.slotBtnActive, { flex:1, alignItems:'center' }]}>
+                      style={[s.slotBtn, on && s.slotBtnActive, { flex:1, alignItems:'center' }]}
+                      accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: on }}>
                       <Text style={[s.slotText, on && s.slotTextActive]}>{label}</Text>
                     </TouchableOpacity>
                   );
@@ -1119,7 +1125,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <Text style={ms.rowTitle}>Active</Text>
                 <Switch value={serviceEditor.active} onValueChange={active=>setServiceEditor({...serviceEditor,active})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
               </View>
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:14 }]} onPress={saveService}><Text style={s.btnPrimaryText}>Save service</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:14 }]} onPress={saveService}
+                accessibilityRole="button" accessibilityLabel="Save service"><Text style={s.btnPrimaryText}>Save service</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -1138,7 +1145,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   squeezed by the action buttons; actions sit on a second row. */}
               <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
                 {uploadUri(st.avatarUrl)
-                  ? <Image source={{ uri: uploadUri(st.avatarUrl)! }} style={s.avatarImg} contentFit="cover"/>
+                  ? <Image source={{ uri: uploadUri(st.avatarUrl)! }} style={s.avatarImg} contentFit="cover"
+                      accessible={true} accessibilityLabel={`${st.user.name} profile photo`}/>
                   : <View style={s.avatar}><Text style={{ color:BRAND, fontWeight:'700' }}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>}
                 <View style={{ flex:1, minWidth:0 }}>
                   <Text style={ms.rowTitle} numberOfLines={1}>{st.user.name}</Text>
@@ -1157,17 +1165,21 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   startsAt: '',
                   endsAt: '',
                   reason: '',
-                })}>
+                })}
+                  accessibilityRole="button" accessibilityLabel={`Add time off for ${st.user.name}`}>
                   <Text style={ms.smallActionText}>Time off</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openAvailabilityEditor(st)}>
+                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openAvailabilityEditor(st)}
+                  accessibilityRole="button" accessibilityLabel={`Edit hours for ${st.user.name}`}>
                   <Text style={ms.smallActionText}>Hours</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openStaffServices(st)}>
+                <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>openStaffServices(st)}
+                  accessibilityRole="button" accessibilityLabel={`Edit services for ${st.user.name}`}>
                   <Text style={ms.smallActionText}>Services</Text>
                 </TouchableOpacity>
                 {(locations ?? []).length > 0 && (
-                  <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>setStaffLocationEditor({ staffId:st.id, name:st.user.name, locationId:st.locationId??'' })}>
+                  <TouchableOpacity style={[ms.smallAction,{ flex:1, alignItems:'center' }]} onPress={()=>setStaffLocationEditor({ staffId:st.id, name:st.user.name, locationId:st.locationId??'' })}
+                    accessibilityRole="button" accessibilityLabel={`Assign location for ${st.user.name}`}>
                     <Text style={ms.smallActionText}>Location</Text>
                   </TouchableOpacity>
                 )}
@@ -1176,7 +1188,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           ))}
           {staff && staff.length===0 && <Text style={ms.empty}>No team members yet.</Text>}
           <Text style={[ms.empty,{ marginTop:4 }]}>Use Hours for weekly recurring availability and Time off for one-off blocked time.</Text>
-          <TouchableOpacity style={[s.btnPrimary,{ marginTop:16, marginBottom:8 }]} onPress={()=>setStaffInviteEditor({ name:'', email:'' })}>
+          <TouchableOpacity style={[s.btnPrimary,{ marginTop:16, marginBottom:8 }]} onPress={()=>setStaffInviteEditor({ name:'', email:'' })}
+            accessibilityRole="button" accessibilityLabel="Invite team member">
             <Text style={s.btnPrimaryText}>Invite team member</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1185,7 +1198,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!staffInviteEditor} animationType="slide" onRequestClose={()=>setStaffInviteEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setStaffInviteEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setStaffInviteEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Invite team member</Text>
           </View>
           <ScrollView contentContainerStyle={s.listContent}>
@@ -1198,6 +1212,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               value={staffInviteEditor?.email??''} onChangeText={email=>setStaffInviteEditor(e=>e&&({...e,email}))}/>
             <Text style={[s.fieldHint,{ marginTop:8 }]}>A temporary password will be shown after creating the account. Share it with your team member so they can sign in and change it.</Text>
             <TouchableOpacity style={[s.btnPrimary,{ marginTop:20 }]} disabled={staffInviteSaving||!staffInviteEditor?.name.trim()||!staffInviteEditor?.email.trim()}
+              accessibilityRole="button" accessibilityLabel="Create account"
               onPress={async()=>{
                 if (!staffInviteEditor) return;
                 setStaffInviteSaving(true);
@@ -1224,17 +1239,20 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           </View>
           <ScrollView contentContainerStyle={[s.listContent,{ alignItems:'center', paddingTop:32 }]}>
             <Ionicons name="checkmark-circle" size={56} color={BRAND}/>
-            <Text style={[ms.rowTitle,{ marginTop:16, textAlign:'center' }]}>Account created for {staffInviteResult?.email}</Text>
+            <Text style={[ms.rowTitle,{ marginTop:16, textAlign:'center' }]} accessibilityLiveRegion="polite">Account created for {staffInviteResult?.email}</Text>
             <Text style={[ms.rowMeta,{ marginTop:8, textAlign:'center' }]}>Share this temporary password. They can change it after signing in.</Text>
             <View style={[ms.card,{ marginTop:20, width:'100%', alignItems:'center' }]}>
               <Text style={{ fontFamily:'monospace', fontSize:20, fontWeight:'700', color:GRAY_900, letterSpacing:2 }}>{staffInviteResult?.tempPassword}</Text>
             </View>
-            <TouchableOpacity style={[s.btnPrimary,{ marginTop:24, width:'100%' }]} onPress={()=>{
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:24, width:'100%' }]}
+              accessibilityRole="button" accessibilityLabel="Share credentials"
+              onPress={()=>{
               Share.share({ message:`Your Pulse login:\nEmail: ${staffInviteResult?.email}\nTemp password: ${staffInviteResult?.tempPassword}\n\nSign in at ${WEB_URL}/login` });
             }}>
               <Text style={s.btnPrimaryText}>Share credentials</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.btnSecondary,{ marginTop:10, width:'100%' }]} onPress={()=>setStaffInviteResult(null)}>
+            <TouchableOpacity style={[s.btnSecondary,{ marginTop:10, width:'100%' }]} onPress={()=>setStaffInviteResult(null)}
+              accessibilityRole="button" accessibilityLabel="Done">
               <Text style={s.btnSecondaryText}>Done</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -1243,7 +1261,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!timeOffEditor} animationType="slide" onRequestClose={()=>setTimeOffEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setTimeOffEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setTimeOffEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Add time off</Text>
           </View>
           {timeOffEditor && (
@@ -1258,7 +1277,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Reason</Text>
               <TextInput style={s.input} placeholder="Optional" placeholderTextColor={GRAY_400}
                 value={timeOffEditor.reason} onChangeText={reason=>setTimeOffEditor({...timeOffEditor,reason})}/>
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveTimeOff}><Text style={s.btnPrimaryText}>Save time off</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveTimeOff}
+                accessibilityRole="button" accessibilityLabel="Save time off"><Text style={s.btnPrimaryText}>Save time off</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -1266,7 +1286,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!availabilityEditor} animationType="slide" onRequestClose={()=>setAvailabilityEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setAvailabilityEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setAvailabilityEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Weekly hours</Text>
           </View>
           {availabilityEditor && (
@@ -1324,7 +1345,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </View>
                 );
               })}
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveAvailability}>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveAvailability}
+                accessibilityRole="button" accessibilityLabel="Save weekly hours">
                 <Text style={s.btnPrimaryText}>Save weekly hours</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1334,7 +1356,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!staffServiceEditor} animationType="slide" onRequestClose={()=>setStaffServiceEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setStaffServiceEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setStaffServiceEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Staff services</Text>
           </View>
           {staffServiceEditor && (
@@ -1344,6 +1367,9 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 const selected = staffServiceEditor.serviceIds.includes(sv.id);
                 return (
                   <TouchableOpacity key={sv.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={selected ? `Remove ${sv.name}` : `Add ${sv.name}`}
+                    accessibilityState={{ selected }}
                     onPress={()=>setStaffServiceEditor({
                       ...staffServiceEditor,
                       serviceIds: selected
@@ -1359,7 +1385,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </TouchableOpacity>
                 );
               })}
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffServices}>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffServices}
+                accessibilityRole="button" accessibilityLabel="Save services">
                 <Text style={s.btnPrimaryText}>Save services</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1369,7 +1396,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!staffLocationEditor} animationType="slide" onRequestClose={()=>setStaffLocationEditor(undefined)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setStaffLocationEditor(undefined)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setStaffLocationEditor(undefined)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Assign location</Text>
           </View>
           {staffLocationEditor && (
@@ -1377,6 +1405,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={ms.cardLabel}>{staffLocationEditor.name}</Text>
               <TouchableOpacity
                 style={[ms.row, !staffLocationEditor.locationId && { borderColor:BRAND, backgroundColor:BRAND_LT }]}
+                accessibilityRole="button" accessibilityLabel="Any / unassigned location"
+                accessibilityState={{ selected: !staffLocationEditor.locationId }}
                 onPress={()=>setStaffLocationEditor({...staffLocationEditor, locationId:''})}>
                 <View style={[ms.dot,{ backgroundColor: !staffLocationEditor.locationId ? BRAND : GRAY_200 }]}/>
                 <Text style={ms.rowTitle}>Any / unassigned</Text>
@@ -1386,6 +1416,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 const selected = staffLocationEditor.locationId === l.id;
                 return (
                   <TouchableOpacity key={l.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]}
+                    accessibilityRole="button" accessibilityLabel={l.name}
+                    accessibilityState={{ selected }}
                     onPress={()=>setStaffLocationEditor({...staffLocationEditor, locationId:l.id})}>
                     <View style={[ms.dot,{ backgroundColor: selected ? BRAND : GRAY_200 }]}/>
                     <View style={{ flex:1 }}>
@@ -1396,7 +1428,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </TouchableOpacity>
                 );
               })}
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffLocation}>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:8 }]} onPress={saveStaffLocation}
+                accessibilityRole="button" accessibilityLabel="Save location">
                 <Text style={s.btnPrimaryText}>Save location</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1409,9 +1442,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'offers') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Offers</Text>
-        <TouchableOpacity onPress={()=>openOfferEditor()}>
+        <TouchableOpacity onPress={()=>openOfferEditor()}
+          accessibilityRole="button" accessibilityLabel="Add new offer">
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -1425,8 +1460,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   {!!of.discount && <View style={[ms.dealChip,{ alignSelf:'flex-start', marginTop:5 }]}><Text style={ms.dealChipText}>{of.discount}</Text></View>}
                 </View>
                 <View style={{ flexDirection:'row', gap:8 }}>
-                  <TouchableOpacity style={ms.smallAction} onPress={()=>openOfferEditor(of)}><Ionicons name="create-outline" size={16} color={BRAND}/></TouchableOpacity>
-                  <TouchableOpacity style={ms.smallAction} onPress={()=>removeOffer(of)}><Ionicons name="trash-outline" size={16} color="#DC2626"/></TouchableOpacity>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>openOfferEditor(of)} accessibilityRole="button" accessibilityLabel="Edit offer"><Ionicons name="create-outline" size={16} color={BRAND}/></TouchableOpacity>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>removeOffer(of)} accessibilityRole="button" accessibilityLabel="Delete offer"><Ionicons name="trash-outline" size={16} color="#DC2626"/></TouchableOpacity>
                 </View>
               </View>
               {!!of.description && <Text style={ms.rowMeta}>{of.description}</Text>}
@@ -1439,7 +1474,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!offerEditor} animationType="slide" onRequestClose={()=>setOfferEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setOfferEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setOfferEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>{offerEditor?.id ? 'Edit offer' : 'New offer'}</Text>
           </View>
           {offerEditor && (
@@ -1452,7 +1488,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <TextInput style={s.input} value={offerEditor.discount} placeholder="20% off" placeholderTextColor={GRAY_400} onChangeText={discount=>setOfferEditor({...offerEditor,discount})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Expires</Text>
               <TextInput style={s.input} value={offerEditor.expiresAt} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400} onChangeText={expiresAt=>setOfferEditor({...offerEditor,expiresAt})}/>
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveOffer}><Text style={s.btnPrimaryText}>Save offer</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveOffer}
+                accessibilityRole="button" accessibilityLabel="Save offer"><Text style={s.btnPrimaryText}>Save offer</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -1476,11 +1513,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               </View>
               </View>
               <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8 }}>
-                {!!w.phone && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`tel:${w.phone}`)}><Text style={ms.smallActionText}>Call</Text></TouchableOpacity>}
-                {!!w.email && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}`)}><Text style={ms.smallActionText}>Email</Text></TouchableOpacity>}
-                <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}?subject=${encodeURIComponent('A spot is available')}`)}><Text style={ms.smallActionText}>Notify</Text></TouchableOpacity>
-                <TouchableOpacity style={ms.smallAction} onPress={()=>{ nav.navigate('Calendar', { screen: 'Book' }); }}><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
-                <TouchableOpacity style={ms.smallAction} onPress={()=>removeWaitlistEntry(w.id)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Remove</Text></TouchableOpacity>
+                {!!w.phone && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`tel:${w.phone}`)} accessibilityRole="button" accessibilityLabel={`Call ${w.name}`}><Text style={ms.smallActionText}>Call</Text></TouchableOpacity>}
+                {!!w.email && <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}`)} accessibilityRole="button" accessibilityLabel={`Email ${w.name}`}><Text style={ms.smallActionText}>Email</Text></TouchableOpacity>}
+                <TouchableOpacity style={ms.smallAction} onPress={()=>Linking.openURL(`mailto:${w.email}?subject=${encodeURIComponent('A spot is available')}`)} accessibilityRole="button" accessibilityLabel={`Notify ${w.name} of available spot`}><Text style={ms.smallActionText}>Notify</Text></TouchableOpacity>
+                <TouchableOpacity style={ms.smallAction} onPress={()=>{ nav.navigate('Calendar', { screen: 'Book' }); }} accessibilityRole="button" accessibilityLabel="Book appointment"><Text style={ms.smallActionText}>Book</Text></TouchableOpacity>
+                <TouchableOpacity style={ms.smallAction} onPress={()=>removeWaitlistEntry(w.id)} accessibilityRole="button" accessibilityLabel={`Remove ${w.name} from waitlist`}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Remove</Text></TouchableOpacity>
               </View>
             </View>
           ))}
@@ -1526,9 +1563,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'marketing') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Marketing</Text>
-        <TouchableOpacity onPress={openCampaignComposer}>
+        <TouchableOpacity onPress={openCampaignComposer}
+          accessibilityRole="button" accessibilityLabel="Add new campaign">
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -1550,8 +1589,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               </Text>
               {c.status === 'DRAFT' && (
                 <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
-                  <TouchableOpacity style={ms.smallAction} onPress={()=>sendCampaign(c)}><Text style={ms.smallActionText}>Send</Text></TouchableOpacity>
-                  <TouchableOpacity style={ms.smallAction} onPress={()=>removeCampaign(c)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>sendCampaign(c)} accessibilityRole="button" accessibilityLabel="Send campaign"><Text style={ms.smallActionText}>Send</Text></TouchableOpacity>
+                  <TouchableOpacity style={ms.smallAction} onPress={()=>removeCampaign(c)} accessibilityRole="button" accessibilityLabel="Delete campaign"><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
                 </View>
               )}
             </View>
@@ -1562,7 +1601,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!campaignEditor} animationType="slide" onRequestClose={()=>setCampaignEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setCampaignEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setCampaignEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>New campaign</Text>
           </View>
           {campaignEditor && (
@@ -1572,7 +1612,9 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Channel</Text>
               <View style={{ flexDirection:'row', gap:8 }}>
                 {(['EMAIL','SMS'] as const).map(ch => (
-                  <TouchableOpacity key={ch} style={[ms.methodChip, campaignEditor.channel === ch && ms.methodChipOn]} onPress={()=>updateCampaignAudience({ channel:ch })}>
+                  <TouchableOpacity key={ch} style={[ms.methodChip, campaignEditor.channel === ch && ms.methodChipOn]} onPress={()=>updateCampaignAudience({ channel:ch })}
+                    accessibilityRole="button" accessibilityLabel={ch === 'EMAIL' ? 'Email channel' : 'SMS channel'}
+                    accessibilityState={{ selected: campaignEditor.channel === ch }}>
                     <Text style={[ms.methodChipText, campaignEditor.channel === ch && { color:BRAND }]}>{ch === 'EMAIL' ? 'Email' : 'Text'}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1580,12 +1622,14 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Audience</Text>
               <View style={{ flexDirection:'row', gap:8 }}>
                 {campaignAudiences.map(a => (
-                  <TouchableOpacity key={a.value} style={[ms.methodChip, campaignEditor.audience === a.value && ms.methodChipOn]} onPress={()=>updateCampaignAudience({ audience:a.value })}>
+                  <TouchableOpacity key={a.value} style={[ms.methodChip, campaignEditor.audience === a.value && ms.methodChipOn]} onPress={()=>updateCampaignAudience({ audience:a.value })}
+                    accessibilityRole="button" accessibilityLabel={a.label}
+                    accessibilityState={{ selected: campaignEditor.audience === a.value }}>
                     <Text style={[ms.methodChipText, campaignEditor.audience === a.value && { color:BRAND }]}>{a.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={[ms.rowMeta,{ marginTop:8 }]}>{campaignEditor.count === null ? 'Counting recipients...' : `${campaignEditor.count} recipient${campaignEditor.count === 1 ? '' : 's'}`}</Text>
+              <Text style={[ms.rowMeta,{ marginTop:8 }]} accessibilityLiveRegion="polite">{campaignEditor.count === null ? 'Counting recipients...' : `${campaignEditor.count} recipient${campaignEditor.count === 1 ? '' : 's'}`}</Text>
               {campaignEditor.channel === 'EMAIL' && (
                 <>
                   <Text style={[s.fieldLabel,{ marginTop:12 }]}>Subject</Text>
@@ -1596,8 +1640,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <TextInput style={[s.input,{ minHeight:130, textAlignVertical:'top' }]} multiline value={campaignEditor.body} placeholder="Hi {name}, ..." placeholderTextColor={GRAY_400} onChangeText={body=>setCampaignEditor({...campaignEditor,body})}/>
               <Text style={s.fieldHint}>Use {'{name}'} and {'{business}'} as merge tags.</Text>
               <View style={{ flexDirection:'row', gap:10, marginTop:18 }}>
-                <TouchableOpacity style={[s.btnSecondary,{ flex:1 }]} onPress={()=>saveCampaign(false)}><Text style={s.btnSecondaryText}>Save draft</Text></TouchableOpacity>
-                <TouchableOpacity style={[s.btnPrimary,{ flex:1 }]} onPress={()=>saveCampaign(true)} disabled={campaignEditor.count === 0}><Text style={s.btnPrimaryText}>Send now</Text></TouchableOpacity>
+                <TouchableOpacity style={[s.btnSecondary,{ flex:1 }]} onPress={()=>saveCampaign(false)} accessibilityRole="button" accessibilityLabel="Save draft"><Text style={s.btnSecondaryText}>Save draft</Text></TouchableOpacity>
+                <TouchableOpacity style={[s.btnPrimary,{ flex:1 }]} onPress={()=>saveCampaign(true)} disabled={campaignEditor.count === 0} accessibilityRole="button" accessibilityLabel="Send campaign now"><Text style={s.btnPrimaryText}>Send now</Text></TouchableOpacity>
               </View>
             </ScrollView>
           )}
@@ -1609,11 +1653,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'giftcards') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Gift cards</Text>
         <View style={{ flexDirection:'row', gap:12 }}>
-          <TouchableOpacity onPress={()=>setGiftMode('redeem')}><Ionicons name="ticket-outline" size={23} color={BRAND}/></TouchableOpacity>
-          <TouchableOpacity onPress={()=>setGiftMode('issue')}><Ionicons name="add" size={24} color={BRAND}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>setGiftMode('redeem')} accessibilityRole="button" accessibilityLabel="Redeem gift card"><Ionicons name="ticket-outline" size={23} color={BRAND}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>setGiftMode('issue')} accessibilityRole="button" accessibilityLabel="Issue gift card"><Ionicons name="add" size={24} color={BRAND}/></TouchableOpacity>
         </View>
       </View>
       {loading ? <Loader/> : (
@@ -1634,7 +1679,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 {g.recipientName ? `For ${g.recipientName} · ` : ''}of ${(g.initialCents/100).toFixed(2)} issued
               </Text>
               {g.status === 'ACTIVE' && (
-                <TouchableOpacity style={[ms.smallAction,{ alignSelf:'flex-start', marginTop:10 }]} onPress={()=>voidGiftCard(g)}>
+                <TouchableOpacity style={[ms.smallAction,{ alignSelf:'flex-start', marginTop:10 }]} onPress={()=>voidGiftCard(g)}
+                  accessibilityRole="button" accessibilityLabel={`Void gift card ${g.code}`}>
                   <Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Void</Text>
                 </TouchableOpacity>
               )}
@@ -1646,7 +1692,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={giftMode === 'issue'} animationType="slide" onRequestClose={()=>setGiftMode(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setGiftMode(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setGiftMode(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Issue gift card</Text>
           </View>
           <ScrollView contentContainerStyle={s.listContent}>
@@ -1658,14 +1705,15 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <TextInput style={s.input} value={giftIssue.recipientEmail} keyboardType="email-address" autoCapitalize="none" placeholder="Optional" placeholderTextColor={GRAY_400} onChangeText={recipientEmail=>setGiftIssue({...giftIssue,recipientEmail})}/>
             <Text style={[s.fieldLabel,{ marginTop:12 }]}>Message</Text>
             <TextInput style={[s.input,{ minHeight:86, textAlignVertical:'top' }]} multiline value={giftIssue.message} placeholder="Optional" placeholderTextColor={GRAY_400} onChangeText={message=>setGiftIssue({...giftIssue,message})}/>
-            <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={issueGiftCard}><Text style={s.btnPrimaryText}>Issue gift card</Text></TouchableOpacity>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={issueGiftCard} accessibilityRole="button" accessibilityLabel="Issue gift card"><Text style={s.btnPrimaryText}>Issue gift card</Text></TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </Modal>
       <Modal visible={giftMode === 'redeem'} animationType="slide" onRequestClose={()=>setGiftMode(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setGiftMode(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setGiftMode(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Redeem gift card</Text>
           </View>
           <ScrollView contentContainerStyle={s.listContent}>
@@ -1673,7 +1721,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <TextInput style={s.input} value={giftRedeem.code} autoCapitalize="characters" placeholder="GIFT-XXXX" placeholderTextColor={GRAY_400} onChangeText={code=>setGiftRedeem({...giftRedeem,code:code.toUpperCase()})}/>
             <Text style={[s.fieldLabel,{ marginTop:12 }]}>Amount</Text>
             <TextInput style={s.input} value={giftRedeem.amount} keyboardType="decimal-pad" onChangeText={amount=>setGiftRedeem({...giftRedeem,amount})}/>
-            <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={redeemGiftCard}><Text style={s.btnPrimaryText}>Redeem</Text></TouchableOpacity>
+            <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={redeemGiftCard} accessibilityRole="button" accessibilityLabel="Redeem gift card"><Text style={s.btnPrimaryText}>Redeem</Text></TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -1683,14 +1731,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'packages') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
         <Text style={s.headerTitle}>Packages</Text>
         {packageTab === 'products' ? (
-          <TouchableOpacity onPress={()=>setPackageEditor({ name:'', serviceId:'', credits:'5', price:'' })}>
+          <TouchableOpacity onPress={()=>setPackageEditor({ name:'', serviceId:'', credits:'5', price:'' })}
+            accessibilityRole="button" accessibilityLabel="Add new package">
             <Ionicons name="add" size={24} color={BRAND}/>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={()=>setPackageIssue({ client:null, search:'', packageId:'', results:[] })}>
+          <TouchableOpacity onPress={()=>setPackageIssue({ client:null, search:'', packageId:'', results:[] })}
+            accessibilityRole="button" accessibilityLabel="Issue package">
             <Ionicons name="add" size={24} color={BRAND}/>
           </TouchableOpacity>
         )}
@@ -1699,7 +1750,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={[ms.card,{ flexDirection:'row', gap:8 }]}>
             {(['products','issued'] as const).map(tab => (
-              <TouchableOpacity key={tab} style={[ms.methodChip, packageTab === tab && ms.methodChipOn]} onPress={()=>setPackageTab(tab)}>
+              <TouchableOpacity key={tab} style={[ms.methodChip, packageTab === tab && ms.methodChipOn]} onPress={()=>setPackageTab(tab)}
+                accessibilityRole="button"
+                accessibilityLabel={tab === 'products' ? 'Products' : 'Issued'}
+                accessibilityState={{ selected: packageTab === tab }}>
                 <Text style={[ms.methodChipText, packageTab === tab && { color:BRAND }]}>{tab === 'products' ? 'Products' : 'Issued'}</Text>
               </TouchableOpacity>
             ))}
@@ -1715,7 +1769,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </View>
                   <View style={{ alignItems:'flex-end' }}>
                     <PriceTag cents={p.priceCents}/>
-                    <TouchableOpacity style={{ marginTop:6 }} onPress={()=>removePackageProduct(p)}>
+                    <TouchableOpacity style={{ marginTop:6 }} onPress={()=>removePackageProduct(p)}
+                      accessibilityRole="button" accessibilityLabel={`Delete package ${p.name}`}>
                       <Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text>
                     </TouchableOpacity>
                   </View>
@@ -1737,8 +1792,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </View>
                   {cp.status === 'ACTIVE' && (
                     <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
-                      <TouchableOpacity style={ms.smallAction} onPress={()=>redeemIssuedPackage(cp)}><Text style={ms.smallActionText}>Use credit</Text></TouchableOpacity>
-                      <TouchableOpacity style={ms.smallAction} onPress={()=>voidIssuedPackage(cp)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Void</Text></TouchableOpacity>
+                      <TouchableOpacity style={ms.smallAction} onPress={()=>redeemIssuedPackage(cp)} accessibilityRole="button" accessibilityLabel="Use one credit"><Text style={ms.smallActionText}>Use credit</Text></TouchableOpacity>
+                      <TouchableOpacity style={ms.smallAction} onPress={()=>voidIssuedPackage(cp)} accessibilityRole="button" accessibilityLabel="Void issued package"><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Void</Text></TouchableOpacity>
                     </View>
                   )}
                 </View>
@@ -1751,7 +1806,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!packageEditor} animationType="slide" onRequestClose={()=>setPackageEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setPackageEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setPackageEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>New package</Text>
           </View>
           {packageEditor && (
@@ -1764,19 +1820,24 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <TextInput style={s.input} value={packageEditor.price} keyboardType="decimal-pad" placeholder="200.00" placeholderTextColor={GRAY_400} onChangeText={price=>setPackageEditor({...packageEditor,price})}/>
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Service</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:8 }}>
-                <TouchableOpacity style={[dst.chip, !packageEditor.serviceId && dst.chipOn, { marginRight:8 }]} onPress={()=>setPackageEditor({...packageEditor,serviceId:''})}>
+                <TouchableOpacity style={[dst.chip, !packageEditor.serviceId && dst.chipOn, { marginRight:8 }]} onPress={()=>setPackageEditor({...packageEditor,serviceId:''})}
+                  accessibilityRole="button" accessibilityLabel="Any service"
+                  accessibilityState={{ selected: !packageEditor.serviceId }}>
                   <Text style={[dst.chipDow, !packageEditor.serviceId && dst.chipTextOn]}>Any</Text>
                 </TouchableOpacity>
                 {(services ?? []).map(sv => {
                   const selected = packageEditor.serviceId === sv.id;
                   return (
-                    <TouchableOpacity key={sv.id} style={[dst.chip, selected && dst.chipOn, { marginRight:8 }]} onPress={()=>setPackageEditor({...packageEditor,serviceId:sv.id})}>
+                    <TouchableOpacity key={sv.id} style={[dst.chip, selected && dst.chipOn, { marginRight:8 }]} onPress={()=>setPackageEditor({...packageEditor,serviceId:sv.id})}
+                      accessibilityRole="button" accessibilityLabel={sv.name}
+                      accessibilityState={{ selected }}>
                       <Text style={[dst.chipDow, selected && dst.chipTextOn]}>{sv.name}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </ScrollView>
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={savePackageProduct}><Text style={s.btnPrimaryText}>Create package</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={savePackageProduct}
+                accessibilityRole="button" accessibilityLabel="Create package"><Text style={s.btnPrimaryText}>Create package</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -1784,7 +1845,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!packageIssue} animationType="slide" onRequestClose={()=>setPackageIssue(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setPackageIssue(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setPackageIssue(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Issue package</Text>
           </View>
           {packageIssue && (
@@ -1796,13 +1858,14 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                     <Text style={ms.rowTitle}>{packageIssue.client.name}</Text>
                     <Text style={ms.rowMeta}>{packageIssue.client.email}</Text>
                   </View>
-                  <TouchableOpacity onPress={()=>setPackageIssue({...packageIssue,client:null,search:'',results:[]})}><Text style={[ms.smallActionText,{ color:BRAND }]}>Change</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>setPackageIssue({...packageIssue,client:null,search:'',results:[]})} accessibilityRole="button" accessibilityLabel="Change selected client"><Text style={[ms.smallActionText,{ color:BRAND }]}>Change</Text></TouchableOpacity>
                 </View>
               ) : (
                 <>
                   <TextInput style={s.input} value={packageIssue.search} placeholder="Search name or email" placeholderTextColor={GRAY_400} onChangeText={searchPackageClients}/>
                   {packageIssue.results.map(c => (
-                    <TouchableOpacity key={c.id} style={ms.row} onPress={()=>setPackageIssue({...packageIssue,client:c,search:c.name,results:[]})}>
+                    <TouchableOpacity key={c.id} style={ms.row} onPress={()=>setPackageIssue({...packageIssue,client:c,search:c.name,results:[]})}
+                      accessibilityRole="button" accessibilityLabel={`Select client ${c.name}`}>
                       <View style={s.avatar}><Text style={s.avatarText}>{c.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
                       <View style={{ flex:1 }}>
                         <Text style={ms.rowTitle}>{c.name}</Text>
@@ -1816,7 +1879,9 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               {(packages ?? []).filter(p => p.active !== false).map(p => {
                 const selected = packageIssue.packageId === p.id;
                 return (
-                  <TouchableOpacity key={p.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]} onPress={()=>setPackageIssue({...packageIssue,packageId:p.id})}>
+                  <TouchableOpacity key={p.id} style={[ms.row, selected && { borderColor:BRAND, backgroundColor:BRAND_LT }]} onPress={()=>setPackageIssue({...packageIssue,packageId:p.id})}
+                    accessibilityRole="button" accessibilityLabel={`Select package ${p.name}`}
+                    accessibilityState={{ selected }}>
                     <View style={[ms.dot,{ backgroundColor:BRAND }]}/>
                     <View style={{ flex:1 }}>
                       <Text style={ms.rowTitle}>{p.name}</Text>
@@ -1827,7 +1892,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 );
               })}
               {packages && packages.length===0 && <Text style={ms.empty}>Create a package product first.</Text>}
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={issuePackageToClient}><Text style={s.btnPrimaryText}>Issue package</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={issuePackageToClient}
+                accessibilityRole="button" accessibilityLabel="Issue package to client"><Text style={s.btnPrimaryText}>Issue package</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -1844,7 +1910,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       const overdue = !!due && t.status !== 'DONE' && due.getTime() < Date.now();
       return (
         <View key={t.id} style={ms.row}>
-          <TouchableOpacity onPress={()=>toggleTask(t)} style={[ms.checkCircle, t.status === 'DONE' && ms.checkCircleOn]}>
+          <TouchableOpacity onPress={()=>toggleTask(t)} style={[ms.checkCircle, t.status === 'DONE' && ms.checkCircleOn]}
+            accessibilityRole="button" accessibilityLabel={t.status === 'DONE' ? `Mark ${t.title} as open` : `Mark ${t.title} as done`}>
             {t.status === 'DONE' && <Ionicons name="checkmark" size={14} color="#fff"/>}
           </TouchableOpacity>
           <View style={{ flex:1 }}>
@@ -1854,7 +1921,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             </Text>
           </View>
           {isOwner && (
-            <TouchableOpacity style={ms.iconAction} onPress={()=>removeTask(t)}>
+            <TouchableOpacity style={ms.iconAction} onPress={()=>removeTask(t)}
+              accessibilityRole="button" accessibilityLabel="Delete task">
               <Ionicons name="trash-outline" size={18} color="#DC2626"/>
             </TouchableOpacity>
           )}
@@ -1864,10 +1932,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.header}>
-          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+            accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={s.headerTitle}>Tasks</Text>
           {isOwner && (
-            <TouchableOpacity onPress={()=>setTaskEditor({ title:'', staffId:'', dueAt:'', notes:'' })}>
+            <TouchableOpacity onPress={()=>setTaskEditor({ title:'', staffId:'', dueAt:'', notes:'' })}
+              accessibilityRole="button" accessibilityLabel="Add new task">
               <Ionicons name="add" size={24} color={BRAND}/>
             </TouchableOpacity>
           )}
@@ -1883,7 +1953,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <Modal visible={!!taskEditor} animationType="slide" onRequestClose={()=>setTaskEditor(null)}>
           <SafeAreaView style={s.screen}>
             <View style={s.header}>
-              <TouchableOpacity onPress={()=>setTaskEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <TouchableOpacity onPress={()=>setTaskEditor(null)} style={{ marginRight:6 }}
+                accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
               <Text style={s.headerTitle}>New task</Text>
             </View>
             {taskEditor && (
@@ -1892,13 +1963,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <TextInput style={s.input} value={taskEditor.title} placeholder="Restock products, call client..." placeholderTextColor={GRAY_400} onChangeText={title=>setTaskEditor({...taskEditor,title})}/>
                 <Text style={[s.fieldLabel,{ marginTop:12 }]}>Assign to</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:8 }}>
-                  <TouchableOpacity style={[dst.chip, !taskEditor.staffId && dst.chipOn, { marginRight:8 }]} onPress={()=>setTaskEditor({...taskEditor,staffId:''})}>
+                  <TouchableOpacity style={[dst.chip, !taskEditor.staffId && dst.chipOn, { marginRight:8 }]} onPress={()=>setTaskEditor({...taskEditor,staffId:''})}
+                    accessibilityRole="button" accessibilityLabel="Assign to anyone"
+                    accessibilityState={{ selected: !taskEditor.staffId }}>
                     <Text style={[dst.chipDow, !taskEditor.staffId && dst.chipTextOn]}>Any</Text>
                   </TouchableOpacity>
                   {(staff ?? []).map(st => {
                     const selected = taskEditor.staffId === st.id;
                     return (
-                      <TouchableOpacity key={st.id} style={[dst.chip, selected && dst.chipOn, { marginRight:8 }]} onPress={()=>setTaskEditor({...taskEditor,staffId:st.id})}>
+                      <TouchableOpacity key={st.id} style={[dst.chip, selected && dst.chipOn, { marginRight:8 }]} onPress={()=>setTaskEditor({...taskEditor,staffId:st.id})}
+                        accessibilityRole="button" accessibilityLabel={`Assign to ${st.user.name}`}
+                        accessibilityState={{ selected }}>
                         <Text style={[dst.chipDow, selected && dst.chipTextOn]}>{st.user.name}</Text>
                       </TouchableOpacity>
                     );
@@ -1908,7 +1983,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <TextInput style={s.input} value={taskEditor.dueAt} placeholder="2026-06-05 14:00" placeholderTextColor={GRAY_400} onChangeText={dueAt=>setTaskEditor({...taskEditor,dueAt})}/>
                 <Text style={[s.fieldLabel,{ marginTop:12 }]}>Notes</Text>
                 <TextInput style={[s.input,{ minHeight:86, textAlignVertical:'top' }]} multiline value={taskEditor.notes} placeholder="Optional details" placeholderTextColor={GRAY_400} onChangeText={notes=>setTaskEditor({...taskEditor,notes})}/>
-                <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveTask}><Text style={s.btnPrimaryText}>Add task</Text></TouchableOpacity>
+                <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveTask}
+                  accessibilityRole="button" accessibilityLabel="Add task"><Text style={s.btnPrimaryText}>Add task</Text></TouchableOpacity>
               </ScrollView>
             )}
           </SafeAreaView>
@@ -1931,9 +2007,9 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         </View>
         {isDue && followupSnoozing !== it.id && (
           <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:12 }}>
-            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>approveFollowup(it)}><Text style={ms.smallActionText}>Approve</Text></TouchableOpacity>
-            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>setFollowupSnoozing(it.id)}><Text style={ms.smallActionText}>Reschedule</Text></TouchableOpacity>
-            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>cancelFollowup(it)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Stop</Text></TouchableOpacity>
+            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>approveFollowup(it)} accessibilityRole="button" accessibilityLabel="Approve follow-up invite"><Text style={ms.smallActionText}>Approve</Text></TouchableOpacity>
+            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>setFollowupSnoozing(it.id)} accessibilityRole="button" accessibilityLabel="Reschedule follow-up"><Text style={ms.smallActionText}>Reschedule</Text></TouchableOpacity>
+            <TouchableOpacity disabled={followupBusy===it.id} style={ms.smallAction} onPress={()=>cancelFollowup(it)} accessibilityRole="button" accessibilityLabel="Stop follow-up reminders"><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Stop</Text></TouchableOpacity>
           </View>
         )}
         {followupSnoozing === it.id && (
@@ -1980,10 +2056,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <View style={ms.card}>
               <Text style={[ms.rowMeta,{ color:BRAND }]} numberOfLines={2}>{bookingUrl}</Text>
               <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
-                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Linking.openURL(bookingUrl)}>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Linking.openURL(bookingUrl)}
+                  accessibilityRole="button" accessibilityLabel="Open booking page">
                   <Text style={ms.methodChipText}>Open</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: bookingUrl })}>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: bookingUrl })}
+                  accessibilityRole="button" accessibilityLabel="Share booking link">
                   <Text style={ms.methodChipText}>Share link</Text>
                 </TouchableOpacity>
               </View>
@@ -2002,7 +2080,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               { label:'Reviews', icon:'star-outline' as const, v:'reviews' as MoreView },
               { label:'Offers', icon:'pricetag-outline' as const, v:'offers' as MoreView },
             ].map((r,i,arr)=>(
-              <TouchableOpacity key={r.label} style={[s.menuRow, i<arr.length-1&&s.menuRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
+              <TouchableOpacity key={r.label} style={[s.menuRow, i<arr.length-1&&s.menuRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}
+                accessibilityRole="button" accessibilityLabel={r.label}>
                 <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
                 <Text style={s.menuLabel}>{r.label}</Text>
                 <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
@@ -2145,7 +2224,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:2 }]}>{new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} · {fmtTime(p.createdAt)}</Text>
                   {p.refundedCents > 0 && <Text style={[ms.rowMeta,{ color:'#B45309', marginTop:2 }]}>Refunded ${(p.refundedCents/100).toFixed(2)}</Text>}
                   {refundable && (
-                    <TouchableOpacity style={[ms.methodChip,{ marginTop:10 }]} onPress={()=>refundPayment(p)}>
+                    <TouchableOpacity style={[ms.methodChip,{ marginTop:10 }]} onPress={()=>refundPayment(p)}
+                      accessibilityRole="button" accessibilityLabel="Refund payment">
                       <Text style={ms.methodChipText}>Refund</Text>
                     </TouchableOpacity>
                   )}
@@ -2167,7 +2247,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <Head title="Invoices"/>
         {loading ? <Loader/> : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
-            <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setInvoiceEditor({ items:[{ description:'', quantity:'1', unit:'0.00' }], notes:'' })}>
+            <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setInvoiceEditor({ items:[{ description:'', quantity:'1', unit:'0.00' }], notes:'' })}
+              accessibilityRole="button" accessibilityLabel="Add new invoice">
               <Text style={s.btnPrimaryText}>New invoice</Text>
             </TouchableOpacity>
             {(invoices ?? []).map(inv => {
@@ -2180,10 +2261,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   </View>
                   <Text style={[ms.rowMeta,{ marginTop:2 }]}>{inv.client?.name ?? 'No client'} · {new Date(inv.createdAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' })}</Text>
                   <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:10 }}>
-                    {inv.status==='DRAFT' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'SENT')}><Text style={ms.smallActionText}>Mark sent</Text></TouchableOpacity>}
-                    {inv.status!=='PAID' && inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'PAID')}><Text style={ms.smallActionText}>Mark paid</Text></TouchableOpacity>}
-                    {inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'VOID')}><Text style={ms.smallActionText}>Void</Text></TouchableOpacity>}
-                    <TouchableOpacity style={ms.smallAction} onPress={()=>deleteInvoice(inv.id)}><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
+                    {inv.status==='DRAFT' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'SENT')} accessibilityRole="button" accessibilityLabel="Mark invoice sent"><Text style={ms.smallActionText}>Mark sent</Text></TouchableOpacity>}
+                    {inv.status!=='PAID' && inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'PAID')} accessibilityRole="button" accessibilityLabel="Mark invoice paid"><Text style={ms.smallActionText}>Mark paid</Text></TouchableOpacity>}
+                    {inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'VOID')} accessibilityRole="button" accessibilityLabel="Void invoice"><Text style={ms.smallActionText}>Void</Text></TouchableOpacity>}
+                    <TouchableOpacity style={ms.smallAction} onPress={()=>deleteInvoice(inv.id)} accessibilityRole="button" accessibilityLabel="Delete invoice"><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
                   </View>
                 </View>
               );
@@ -2194,7 +2275,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <Modal visible={!!invoiceEditor} animationType="slide" onRequestClose={()=>setInvoiceEditor(null)}>
           <SafeAreaView style={s.screen}>
             <View style={s.header}>
-              <TouchableOpacity onPress={()=>setInvoiceEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <TouchableOpacity onPress={()=>setInvoiceEditor(null)} style={{ marginRight:6 }}
+                accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
               <Text style={s.headerTitle}>New invoice</Text>
             </View>
             {invoiceEditor && (
@@ -2216,21 +2298,24 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                           onChangeText={v=>setInvoiceEditor(e=>e?{ ...e, items:e.items.map((x,i)=>i===idx?{ ...x, unit:v }:x) }:e)}/>
                       </View>
                       {invoiceEditor.items.length>1 && (
-                        <TouchableOpacity style={{ padding:10 }} onPress={()=>setInvoiceEditor(e=>e?{ ...e, items:e.items.filter((_,i)=>i!==idx) }:e)}>
+                        <TouchableOpacity style={{ padding:10 }} onPress={()=>setInvoiceEditor(e=>e?{ ...e, items:e.items.filter((_,i)=>i!==idx) }:e)}
+                          accessibilityRole="button" accessibilityLabel="Delete line item">
                           <Ionicons name="trash-outline" size={20} color="#DC2626"/>
                         </TouchableOpacity>
                       )}
                     </View>
                   </View>
                 ))}
-                <TouchableOpacity style={[ms.smallAction,{ alignSelf:'flex-start', marginBottom:14 }]} onPress={()=>setInvoiceEditor(e=>e?{ ...e, items:[...e.items, { description:'', quantity:'1', unit:'0.00' }] }:e)}>
+                <TouchableOpacity style={[ms.smallAction,{ alignSelf:'flex-start', marginBottom:14 }]} onPress={()=>setInvoiceEditor(e=>e?{ ...e, items:[...e.items, { description:'', quantity:'1', unit:'0.00' }] }:e)}
+                  accessibilityRole="button" accessibilityLabel="Add line item">
                   <Text style={ms.smallActionText}>+ Add line</Text>
                 </TouchableOpacity>
                 <Text style={[ms.rowMeta,{ color:BRAND, marginBottom:14 }]}>Subtotal: ${subtotal.toFixed(2)} (tax added per your settings)</Text>
                 <Text style={s.fieldLabel}>Notes (optional)</Text>
                 <TextInput style={[s.input,{ minHeight:70, textAlignVertical:'top' }]} multiline value={invoiceEditor.notes}
                   onChangeText={v=>setInvoiceEditor(e=>e?{ ...e, notes:v }:e)}/>
-                <TouchableOpacity style={[s.btnPrimary,{ marginTop:14 }]} onPress={saveInvoice}><Text style={s.btnPrimaryText}>Create invoice</Text></TouchableOpacity>
+                <TouchableOpacity style={[s.btnPrimary,{ marginTop:14 }]} onPress={saveInvoice}
+                  accessibilityRole="button" accessibilityLabel="Create invoice"><Text style={s.btnPrimaryText}>Create invoice</Text></TouchableOpacity>
               </ScrollView>
             )}
           </SafeAreaView>
@@ -2250,7 +2335,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             { label:'Marketing', icon:'megaphone-outline' as const, v:'marketing' as MoreView },
             { label:'Team', icon:'people-outline' as const, v:'staff' as MoreView },
           ].map((r,i,arr)=>(
-            <TouchableOpacity key={r.label} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}>
+            <TouchableOpacity key={r.label} style={[ms.notifRow, i<arr.length-1&&ms.notifRowBorder]} onPress={()=>open(r.v)} activeOpacity={0.7}
+              accessibilityRole="button" accessibilityLabel={r.label}>
               <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
                 <Ionicons name={r.icon} size={20} color={BRAND}/>
                 <Text style={ms.rowTitle}>{r.label}</Text>
@@ -2371,11 +2457,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'locations') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle}>Locations</Text>
-        <TouchableOpacity onPress={()=>setLocationEditor({ name:'', address:'', phone:'', timezone:'', active:true })}>
+        <TouchableOpacity onPress={()=>setLocationEditor({ name:'', address:'', phone:'', timezone:'', active:true })}
+          accessibilityRole="button" accessibilityLabel="Add new location">
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -2416,6 +2504,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <View style={{ flexDirection:'row', gap:4 }}>
                     <TouchableOpacity
                       onPress={()=>toggleLocation(l)}
+                      accessibilityRole="button"
+                      accessibilityLabel={l.active ? `Deactivate ${l.name}` : `Activate ${l.name}`}
                       style={{
                         paddingHorizontal:10, paddingVertical:4, borderRadius:12, borderWidth:1,
                         borderColor: l.active ? '#a7f3d0' : GRAY_200,
@@ -2427,11 +2517,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={()=>setLocationEditor({ id:l.id, name:l.name, address:l.address??'', phone:formatPhoneDisplay(l.phone), timezone:l.timezone??'', active:l.active })}
+                      accessibilityRole="button" accessibilityLabel="Edit location"
                       style={{ padding:6, borderRadius:8, backgroundColor:GRAY_50 }}>
                       <Ionicons name="pencil-outline" size={15} color={GRAY_500}/>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={()=>deleteLocation(l)}
+                      accessibilityRole="button" accessibilityLabel="Delete location"
                       style={{ padding:6, borderRadius:8, backgroundColor:'#fff0f0' }}>
                       <Ionicons name="trash-outline" size={15} color="#ef4444"/>
                     </TouchableOpacity>
@@ -2443,7 +2535,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
           <TouchableOpacity
             style={[s.btnPrimary, { marginTop:16 }]}
-            onPress={()=>setLocationEditor({ name:'', address:'', phone:'', timezone:'', active:true })}>
+            onPress={()=>setLocationEditor({ name:'', address:'', phone:'', timezone:'', active:true })}
+            accessibilityRole="button" accessibilityLabel="Add new location">
             <Text style={s.btnPrimaryText}>+ Add location</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -2452,7 +2545,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!locationEditor} animationType="slide" onRequestClose={()=>setLocationEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setLocationEditor(null)} style={{ marginRight:6 }}>
+            <TouchableOpacity onPress={()=>setLocationEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={GRAY_700}/>
             </TouchableOpacity>
             <Text style={s.headerTitle}>{locationEditor?.id ? 'Edit location' : 'New location'}</Text>
@@ -2502,6 +2596,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <TouchableOpacity
                   style={[s.btnPrimary, { marginTop:24, opacity: locationSaving || !locationEditor.name.trim() ? 0.5 : 1 }]}
                   disabled={locationSaving || !locationEditor.name.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel={locationEditor.id ? 'Save location changes' : 'Add location'}
                   onPress={saveLocation}>
                   <Text style={s.btnPrimaryText}>{locationSaving ? 'Saving…' : (locationEditor.id ? 'Save changes' : 'Add location')}</Text>
                 </TouchableOpacity>
@@ -2516,11 +2612,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   if (view === 'resources') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+          accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle}>Rooms &amp; Resources</Text>
-        <TouchableOpacity onPress={()=>setResourceEditor({ name:'' })}>
+        <TouchableOpacity onPress={()=>setResourceEditor({ name:'' })}
+          accessibilityRole="button" accessibilityLabel="Add new resource">
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -2560,6 +2658,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <View style={{ flexDirection:'row', gap:4 }}>
                     <TouchableOpacity
                       onPress={()=>toggleResource(r)}
+                      accessibilityRole="button"
+                      accessibilityLabel={r.active ? `Deactivate ${r.name}` : `Activate ${r.name}`}
                       style={{
                         paddingHorizontal:10, paddingVertical:4, borderRadius:12, borderWidth:1,
                         borderColor: r.active ? '#a7f3d0' : GRAY_200,
@@ -2571,11 +2671,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={()=>setResourceEditor({ id:r.id, name:r.name })}
+                      accessibilityRole="button" accessibilityLabel="Edit resource"
                       style={{ padding:6, borderRadius:8, backgroundColor:GRAY_50 }}>
                       <Ionicons name="pencil-outline" size={15} color={GRAY_500}/>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={()=>deleteResource(r)}
+                      accessibilityRole="button" accessibilityLabel="Delete resource"
                       style={{ padding:6, borderRadius:8, backgroundColor:'#fff0f0' }}>
                       <Ionicons name="trash-outline" size={15} color="#ef4444"/>
                     </TouchableOpacity>
@@ -2587,7 +2689,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
           <TouchableOpacity
             style={[s.btnPrimary, { marginTop:16 }]}
-            onPress={()=>setResourceEditor({ name:'' })}>
+            onPress={()=>setResourceEditor({ name:'' })}
+            accessibilityRole="button" accessibilityLabel="Add new resource">
             <Text style={s.btnPrimaryText}>+ Add resource</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -2597,7 +2700,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!resourceEditor} animationType="slide" onRequestClose={()=>setResourceEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setResourceEditor(null)} style={{ marginRight:6 }}>
+            <TouchableOpacity onPress={()=>setResourceEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={GRAY_700}/>
             </TouchableOpacity>
             <Text style={s.headerTitle}>{resourceEditor?.id ? 'Edit resource' : 'New resource'}</Text>
@@ -2622,6 +2726,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <TouchableOpacity
                   style={[s.btnPrimary, { marginTop:24, opacity: resourceSaving || !resourceEditor.name.trim() ? 0.5 : 1 }]}
                   disabled={resourceSaving || !resourceEditor.name.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel={resourceEditor.id ? 'Save resource changes' : 'Add resource'}
                   onPress={saveResource}>
                   <Text style={s.btnPrimaryText}>{resourceSaving ? 'Saving…' : (resourceEditor.id ? 'Save changes' : 'Add resource')}</Text>
                 </TouchableOpacity>
@@ -2673,7 +2779,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
-          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+            accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={[s.headerTitle,{ flex:1 }]}>Business Hours</Text>
         </View>
         {loading && !hoursLoaded ? <Loader/> : (
@@ -2681,7 +2788,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             {/* Weekly schedule */}
             <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <Text style={ms.cardLabel}>WEEKLY SCHEDULE</Text>
-              <TouchableOpacity onPress={copyMonToWeekdays}>
+              <TouchableOpacity onPress={copyMonToWeekdays}
+                accessibilityRole="button" accessibilityLabel="Copy Monday hours to Tuesday through Friday">
                 <Text style={{ color:BRAND, fontSize:12, fontWeight:'600' }}>Copy Mon → Tue–Fri</Text>
               </TouchableOpacity>
             </View>
@@ -2726,6 +2834,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <TouchableOpacity
               style={[s.btnPrimary, { marginTop:12, opacity:hoursSaving?0.5:1 }]}
               disabled={hoursSaving}
+              accessibilityRole="button" accessibilityLabel="Save business hours"
               onPress={saveHours}>
               <Text style={s.btnPrimaryText}>{hoursSaving?'Saving…':'Save hours'}</Text>
             </TouchableOpacity>
@@ -2753,6 +2862,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <TouchableOpacity
                 style={[ms.methodChip,{ marginTop:12, opacity:closureSaving?0.5:1 }]}
                 disabled={closureSaving}
+                accessibilityRole="button" accessibilityLabel="Add closure"
                 onPress={addClosure}>
                 <Text style={ms.methodChipText}>{closureSaving?'Adding…':'+ Add closure'}</Text>
               </TouchableOpacity>
@@ -2771,7 +2881,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                       </Text>
                       {c.reason && <Text style={ms.rowMeta}>{c.reason}</Text>}
                     </View>
-                    <TouchableOpacity onPress={()=>removeClosure(c.id)} style={{ padding:8 }}>
+                    <TouchableOpacity onPress={()=>removeClosure(c.id)} style={{ padding:8 }}
+                      accessibilityRole="button" accessibilityLabel="Delete closure">
                       <Ionicons name="close-circle-outline" size={20} color="#EF4444"/>
                     </TouchableOpacity>
                   </View>
@@ -2822,9 +2933,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
-          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+            accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={[s.headerTitle,{ flex:1 }]}>Promo Codes</Text>
-          <TouchableOpacity onPress={()=>setPromoEditor({ code:'', discountType:'PERCENT', discountValue:'10', maxUsages:'', expiresAt:'' })}>
+          <TouchableOpacity onPress={()=>setPromoEditor({ code:'', discountType:'PERCENT', discountValue:'10', maxUsages:'', expiresAt:'' })}
+            accessibilityRole="button" accessibilityLabel="Add new promo code">
             <Ionicons name="add" size={24} color={BRAND}/>
           </TouchableOpacity>
         </View>
@@ -2837,7 +2950,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               </View>
             ) : promoCodes.map((pc,i,arr)=>(
               <TouchableOpacity key={pc.id} style={[ms.row, i<arr.length-1&&{ borderBottomWidth:1, borderColor:GRAY_100 }]}
-                onPress={()=>setPromoEditor({ id:pc.id, code:pc.code, discountType:pc.discountType, discountValue:String(pc.discountValue), maxUsages:pc.maxUsages?String(pc.maxUsages):'', expiresAt:pc.expiresAt?pc.expiresAt.slice(0,10):'' })}>
+                onPress={()=>setPromoEditor({ id:pc.id, code:pc.code, discountType:pc.discountType, discountValue:String(pc.discountValue), maxUsages:pc.maxUsages?String(pc.maxUsages):'', expiresAt:pc.expiresAt?pc.expiresAt.slice(0,10):'' })}
+                accessibilityRole="button" accessibilityLabel={`Edit promo code ${pc.code}`}>
                 <View style={{ flex:1 }}>
                   <Text style={ms.rowTitle}>{pc.code}</Text>
                   <Text style={ms.rowMeta}>
@@ -2846,7 +2960,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                     {!pc.active && ' · Inactive'}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={()=>deletePromoCode(pc.id)} style={{ padding:8 }}>
+                <TouchableOpacity onPress={()=>deletePromoCode(pc.id)} style={{ padding:8 }}
+                  accessibilityRole="button" accessibilityLabel="Delete promo code">
                   <Ionicons name="trash-outline" size={18} color="#EF4444"/>
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -2856,7 +2971,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <Modal visible={!!promoEditor} animationType="slide" presentationStyle="formSheet" onRequestClose={()=>setPromoEditor(null)}>
           <SafeAreaView style={s.screen}>
             <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
-              <TouchableOpacity onPress={()=>setPromoEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <TouchableOpacity onPress={()=>setPromoEditor(null)} style={{ marginRight:6 }}
+                accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
               <Text style={s.headerTitle}>{promoEditor?.id ? 'Edit code' : 'New promo code'}</Text>
             </View>
             <KeyboardAvoidingView style={{ flex:1 }} behavior={Platform.OS==='ios'?'padding':'height'}>
@@ -2882,12 +2998,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <View style={{ flexDirection:'row', gap:8, marginBottom:16 }}>
                   {(['PERCENT','FLAT'] as const).map(t=>(
                     <TouchableOpacity key={t} onPress={()=>setPromoEditor(p=>p?({...p,discountType:t}):p)}
-                      style={[s.slotBtn, promoEditor?.discountType===t&&s.slotBtnActive]}>
+                      style={[s.slotBtn, promoEditor?.discountType===t&&s.slotBtnActive]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t==='PERCENT'?'Percent':'Flat dollar'}
+                      accessibilityState={{ selected: promoEditor?.discountType===t }}>
                       <Text style={[s.slotText, promoEditor?.discountType===t&&s.slotTextActive]}>{t==='PERCENT'?'Percent':'Flat $'}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity style={s.btnPrimary} onPress={savePromoCode}>
+                <TouchableOpacity style={s.btnPrimary} onPress={savePromoCode}
+                  accessibilityRole="button"
+                  accessibilityLabel={promoEditor?.id ? 'Save promo code changes' : 'Create promo code'}>
                   <Text style={s.btnPrimaryText}>{promoEditor?.id ? 'Save changes' : 'Create code'}</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -2915,7 +3036,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={[s.header,{ flexDirection:'row', alignItems:'center' }]}>
-          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
+          <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
+            accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={s.headerTitle}>Memberships</Text>
         </View>
         {loading ? <Loader/> : (
@@ -2933,7 +3055,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             </View>
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginTop:18, marginBottom:6, marginHorizontal:2 }}>
               <Text style={ms.cardLabel}>PLANS</Text>
-              <TouchableOpacity onPress={()=>setMembershipPlanEditor({ name:'', priceMonthly:'', description:'' })}>
+              <TouchableOpacity onPress={()=>setMembershipPlanEditor({ name:'', priceMonthly:'', description:'' })}
+                accessibilityRole="button" accessibilityLabel="Add new membership plan">
                 <Text style={{ fontSize:13, color:BRAND, fontWeight:'600' }}>+ New plan</Text>
               </TouchableOpacity>
             </View>
@@ -2945,7 +3068,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <Text style={ms.rowTitle}>{p.name}</Text>
                   <Text style={ms.rowMeta}>${(p.priceMonthly/100).toFixed(0)}/mo{!p.active ? ' · Inactive' : ''}</Text>
                 </View>
-                <TouchableOpacity onPress={()=>setMembershipPlanEditor({ id:p.id, name:p.name, priceMonthly:String((p.priceMonthly/100).toFixed(2)), description:p.description??'' })} style={{ padding:8 }}>
+                <TouchableOpacity onPress={()=>setMembershipPlanEditor({ id:p.id, name:p.name, priceMonthly:String((p.priceMonthly/100).toFixed(2)), description:p.description??'' })} style={{ padding:8 }}
+                  accessibilityRole="button" accessibilityLabel="Edit plan">
                   <Ionicons name="pencil-outline" size={17} color={GRAY_500}/>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={async()=>{
@@ -2955,7 +3079,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                       setMembershipPlans(prev=>(prev??[]).filter(x=>x.id!==p.id));
                     } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete.'); }
                   }}]);
-                }} style={{ padding:8 }}>
+                }} style={{ padding:8 }}
+                  accessibilityRole="button" accessibilityLabel="Delete plan">
                   <Ionicons name="trash-outline" size={17} color="#EF4444"/>
                 </TouchableOpacity>
               </View>
@@ -2969,7 +3094,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <Text style={ms.rowTitle}>{m.client?.name ?? 'Client'}</Text>
                   <Text style={ms.rowMeta}>{(membershipPlans??[]).find(p=>p.id===m.planId)?.name ?? 'Plan'} · renews {m.currentPeriodEnd ? new Date(m.currentPeriodEnd).toLocaleDateString('en-CA') : '—'}</Text>
                 </View>
-                <TouchableOpacity onPress={()=>cancelMembership(m.id)} style={{ padding:8 }}>
+                <TouchableOpacity onPress={()=>cancelMembership(m.id)} style={{ padding:8 }}
+                  accessibilityRole="button" accessibilityLabel="Cancel membership">
                   <Ionicons name="close-circle-outline" size={20} color="#EF4444"/>
                 </TouchableOpacity>
               </View>
@@ -2980,7 +3106,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <Modal visible={!!membershipPlanEditor} animationType="slide" onRequestClose={()=>setMembershipPlanEditor(null)}>
           <SafeAreaView style={s.screen}>
             <View style={s.header}>
-              <TouchableOpacity onPress={()=>setMembershipPlanEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+              <TouchableOpacity onPress={()=>setMembershipPlanEditor(null)} style={{ marginRight:6 }}
+                accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
               <Text style={s.headerTitle}>{membershipPlanEditor?.id ? 'Edit plan' : 'New plan'}</Text>
             </View>
             <ScrollView contentContainerStyle={s.listContent}>
@@ -2994,6 +3121,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <TextInput style={[s.input,{ height:72, textAlignVertical:'top' }]} multiline placeholder="What's included…" placeholderTextColor={GRAY_400}
                 value={membershipPlanEditor?.description??''} onChangeText={description=>setMembershipPlanEditor(e=>e&&({...e,description}))}/>
               <TouchableOpacity style={[s.btnPrimary,{ marginTop:20 }]} disabled={membershipPlanSaving||!membershipPlanEditor?.name.trim()||!membershipPlanEditor?.priceMonthly}
+                accessibilityRole="button"
+                accessibilityLabel={membershipPlanEditor?.id ? 'Save membership plan changes' : 'Save membership plan'}
                 onPress={async()=>{
                   if (!membershipPlanEditor) return;
                   const price = parseFloat(membershipPlanEditor.priceMonthly);
@@ -3040,14 +3169,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <View style={ms.card}>
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
               <Text style={ms.cardLabel}>Business</Text>
-              <TouchableOpacity onPress={pickLogo} disabled={logoBusy}>
+              <TouchableOpacity onPress={pickLogo} disabled={logoBusy}
+                accessibilityRole="button" accessibilityLabel="Change business logo">
                 <Text style={{ fontSize:13, color:BRAND, fontWeight:'600' }}>{logoBusy ? 'Uploading...' : 'Change logo'}</Text>
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection:'row', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-              <TouchableOpacity onPress={pickLogo} disabled={logoBusy}>
+              <TouchableOpacity onPress={pickLogo} disabled={logoBusy}
+                accessibilityRole="button" accessibilityLabel="Change business logo">
                 {biz?.logoUrl ? (
-                  <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={s.bizLogoImg} contentFit="cover"/>
+                  <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={s.bizLogoImg} contentFit="cover"
+                    accessible={true} accessibilityLabel="Business logo"/>
                 ) : (
                   <View style={[s.bizLogoImg, { alignItems:'center', justifyContent:'center' }]}><Ionicons name="image-outline" size={24} color={GRAY_400}/></View>
                 )}
@@ -3091,7 +3223,9 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <Text style={ms.cardLabel}>Deposit required</Text>
             <Text style={ms.cardValue}>{(biz as any)?.requireDeposit ? `Yes · ${(biz as any)?.depositPercent ?? 25}%` : 'No'}</Text>
           </View>
-          <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setSettingsEditor({
+          <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]}
+            accessibilityRole="button" accessibilityLabel="Edit business settings"
+            onPress={()=>setSettingsEditor({
             name: biz?.name ?? '',
             email: biz?.email ?? '',
             phone: formatPhoneDisplay(biz?.phone),
@@ -3108,21 +3242,24 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
           <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>WEB DASHBOARD</Text>
           <View style={ms.card}>
-            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings`)}>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings`)}
+              accessibilityRole="button" accessibilityLabel="Open business settings on web">
               <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
                 <Ionicons name="storefront-outline" size={20} color={BRAND}/>
                 <Text style={ms.rowTitle}>Business settings</Text>
               </View>
               <Ionicons name="open-outline" size={16} color={GRAY_400}/>
             </TouchableOpacity>
-            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings?tab=billing`)}>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings?tab=billing`)}
+              accessibilityRole="button" accessibilityLabel="Open billing and plan on web">
               <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
                 <Ionicons name="card-outline" size={20} color={BRAND}/>
                 <Text style={ms.rowTitle}>Billing and plan</Text>
               </View>
               <Ionicons name="open-outline" size={16} color={GRAY_400}/>
             </TouchableOpacity>
-            <TouchableOpacity style={ms.notifRow} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/notifications`)}>
+            <TouchableOpacity style={ms.notifRow} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/notifications`)}
+              accessibilityRole="button" accessibilityLabel="Open delivery logs on web">
               <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
                 <Ionicons name="notifications-outline" size={20} color={BRAND}/>
                 <Text style={ms.rowTitle}>Delivery logs</Text>
@@ -3133,7 +3270,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
           <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>SECURITY</Text>
           <TouchableOpacity style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom:8 }]}
-            onPress={()=>setChangePwEditor({ current:'', next:'', confirm:'' })}>
+            onPress={()=>setChangePwEditor({ current:'', next:'', confirm:'' })}
+            accessibilityRole="button" accessibilityLabel="Change password">
             <View>
               <Text style={ms.cardValue}>Change password</Text>
               <Text style={[ms.rowMeta,{ marginTop:2 }]}>Update your account password.</Text>
@@ -3158,7 +3296,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
                 {(['EMAIL','SMS'] as const).map(m => (
                   <TouchableOpacity key={m} disabled={twoFASaving} onPress={()=>saveTwoFA(true, m)}
-                    style={[ms.methodChip, twoFAMethod===m && ms.methodChipOn]}>
+                    style={[ms.methodChip, twoFAMethod===m && ms.methodChipOn]}
+                    accessibilityRole="button"
+                    accessibilityLabel={m==='EMAIL'?'Two-factor via Email':'Two-factor via Text message'}
+                    accessibilityState={{ selected: twoFAMethod===m }}>
                     <Text style={[ms.methodChipText, twoFAMethod===m && { color:BRAND }]}>{m==='EMAIL'?'Email':'Text message'}</Text>
                   </TouchableOpacity>
                 ))}
@@ -3189,16 +3330,18 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
           {recoveryCodes && (
             <View style={ms.recoveryBox}>
-              <Text style={ms.recoveryTitle}>Save your recovery codes</Text>
+              <Text style={ms.recoveryTitle} accessibilityLiveRegion="polite">Save your recovery codes</Text>
               <Text style={ms.recoverySub}>Each works once. If you can&apos;t receive your code, enter one of these to sign in. They won&apos;t be shown again.</Text>
               <View style={ms.recoveryGrid}>
                 {recoveryCodes.map(c => <Text key={c} style={ms.recoveryCode}>{c}</Text>)}
               </View>
               <View style={{ flexDirection:'row', gap:8, marginTop:10 }}>
-                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: `Pulse recovery codes:\n${recoveryCodes.join('\n')}` })}>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: `Pulse recovery codes:\n${recoveryCodes.join('\n')}` })}
+                  accessibilityRole="button" accessibilityLabel="Share recovery codes">
                   <Text style={ms.methodChipText}>Share</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>setRecoveryCodes(null)}>
+                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>setRecoveryCodes(null)}
+                  accessibilityRole="button" accessibilityLabel="Dismiss recovery codes, I have saved them">
                   <Text style={ms.methodChipText}>I&apos;ve saved them</Text>
                 </TouchableOpacity>
               </View>
@@ -3219,14 +3362,17 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                     </Text>
                   </View>
                   <TouchableOpacity disabled={acctBusy} onPress={toggleActive}
-                    style={[ms.methodChip, { flex:0, paddingHorizontal:16 }, (biz as any)?.suspended && ms.methodChipOn]}>
+                    style={[ms.methodChip, { flex:0, paddingHorizontal:16 }, (biz as any)?.suspended && ms.methodChipOn]}
+                    accessibilityRole="button"
+                    accessibilityLabel={(biz as any)?.suspended ? 'Reactivate business' : 'Pause business'}>
                     <Text style={[ms.methodChipText, (biz as any)?.suspended && { color:BRAND }]}>{(biz as any)?.suspended ? 'Reactivate' : 'Pause'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
               {/* Kept intentionally quiet — a muted text link, not an advertised
                   red button. The confirm dialog spells out that it's permanent. */}
-              <TouchableOpacity disabled={acctBusy} onPress={confirmDelete} style={{ paddingVertical:16, alignItems:'center' }}>
+              <TouchableOpacity disabled={acctBusy} onPress={confirmDelete} style={{ paddingVertical:16, alignItems:'center' }}
+                accessibilityRole="button" accessibilityLabel="Delete business permanently">
                 <Text style={{ fontSize:12, color:GRAY_400, fontWeight:'400' }}>Delete business</Text>
               </TouchableOpacity>
             </>
@@ -3239,7 +3385,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!changePwEditor} animationType="slide" onRequestClose={()=>setChangePwEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setChangePwEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setChangePwEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Change password</Text>
           </View>
           <ScrollView contentContainerStyle={s.listContent}>
@@ -3253,6 +3400,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <TextInput style={s.input} secureTextEntry placeholder="Repeat new password" placeholderTextColor={GRAY_400}
               value={changePwEditor?.confirm??''} onChangeText={confirm=>setChangePwEditor(e=>e&&({...e,confirm}))}/>
             <TouchableOpacity style={[s.btnPrimary,{ marginTop:20 }]} disabled={changePwSaving}
+              accessibilityRole="button" accessibilityLabel="Update password"
               onPress={async()=>{
                 if (!changePwEditor) return;
                 if (changePwEditor.next.length < 8) { Alert.alert('Too short','New password must be at least 8 characters.'); return; }
@@ -3273,7 +3421,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Modal visible={!!settingsEditor} animationType="slide" onRequestClose={()=>setSettingsEditor(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setSettingsEditor(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setSettingsEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Business settings</Text>
           </View>
           {settingsEditor && (
@@ -3311,7 +3460,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   const on = settingsEditor.requireDeposit === val;
                   return (
                     <TouchableOpacity key={label} onPress={()=>setSettingsEditor({...settingsEditor, requireDeposit: val})}
-                      style={[s.slotBtn, on && s.slotBtnActive, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8 }]}>
+                      style={[s.slotBtn, on && s.slotBtnActive, { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8 }]}
+                      accessibilityRole="button" accessibilityLabel={`Require deposit: ${label}`} accessibilityState={{ selected: on }}>
                       <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={18} color={on ? BRAND : GRAY_400}/>
                       <Text style={[s.slotText, on && s.slotTextActive]}>{label}</Text>
                     </TouchableOpacity>
@@ -3324,7 +3474,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <TextInput style={s.input} value={settingsEditor.depositPercent} keyboardType="number-pad" onChangeText={depositPercent=>setSettingsEditor({...settingsEditor,depositPercent})}/>
                 </>
               )}
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveSettings}><Text style={s.btnPrimaryText}>Save settings</Text></TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} onPress={saveSettings}
+                accessibilityRole="button" accessibilityLabel="Save settings"><Text style={s.btnPrimaryText}>Save settings</Text></TouchableOpacity>
             </ScrollView>
           )}
         </SafeAreaView>
@@ -3360,9 +3511,11 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <View style={s.header}><Text style={s.headerTitle}>Menu</Text></View>
       <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
         {user&&(
-          <TouchableOpacity style={s.profileCard} activeOpacity={0.7} onPress={()=>open('settings')}>
+          <TouchableOpacity style={s.profileCard} activeOpacity={0.7} onPress={()=>open('settings')}
+            accessibilityRole="button" accessibilityLabel="Open settings">
             {biz?.logoUrl ? (
-              <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={s.avatarLg} contentFit="cover"/>
+              <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={s.avatarLg} contentFit="cover"
+                accessible={true} accessibilityLabel="Business logo"/>
             ) : (
               <View style={s.avatarLg}><Text style={s.avatarLgText}>{user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
             )}
@@ -3374,7 +3527,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         )}
         <View style={s.menuCard}>
           {MENU.map((r,i)=>(
-            <TouchableOpacity key={r.label} style={[s.menuRow, i<MENU.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}>
+            <TouchableOpacity key={r.label} style={[s.menuRow, i<MENU.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}
+              accessibilityRole="button" accessibilityLabel={r.label}>
               <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
               <Text style={s.menuLabel}>{r.label}</Text>
               {r.badge && (
@@ -3388,7 +3542,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         </View>
         <TouchableOpacity style={s.logoutBtn} onPress={()=>{
           Alert.alert('Sign out','Are you sure?',[{text:'Cancel',style:'cancel'},{text:'Sign out',style:'destructive',onPress:onLogout}]);
-        }}>
+        }} accessibilityRole="button" accessibilityLabel="Sign out">
           <Ionicons name="log-out-outline" size={18} color="#EF4444" style={{marginRight:8}}/>
           <Text style={{color:'#EF4444',fontWeight:'600',fontSize:15}}>Sign out</Text>
         </TouchableOpacity>

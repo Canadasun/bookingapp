@@ -134,9 +134,9 @@ export default function MessagesPage() {
           ) : loading ? <LoadingSpinner className="py-8" /> :
            threads.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-              <MessageSquare className="w-8 h-8 text-gray-200 mb-2" />
+              <MessageSquare className="w-8 h-8 text-gray-200 mb-2" aria-hidden="true" />
               <p className="text-sm text-gray-400">No messages yet</p>
-              <p className="text-xs text-gray-300 mt-1">Clients can message from their portal</p>
+              <p className="text-xs text-gray-600 mt-1">Clients can message from their portal</p>
             </div>
           ) : threads.map((t) => (
             <button key={t.clientId} onClick={() => openThread(t)}
@@ -235,7 +235,7 @@ export default function MessagesPage() {
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
                     className="flex-1"
                   />
-                  <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()}>
+                  <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()} aria-label="Send message">
                     <Send className="w-4 h-4" />
                   </Button>
               </>

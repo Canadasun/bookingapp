@@ -97,7 +97,7 @@ export default function HoursPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-gray-900">Business hours</h2>
-        <p className="text-sm text-gray-400 mt-0.5">The days and times you&apos;re open. Clients can only book within these windows.</p>
+        <p className="text-sm text-gray-500 mt-0.5">The days and times you&apos;re open. Clients can only book within these windows.</p>
       </div>
 
       {/* Weekly schedule */}
@@ -111,7 +111,7 @@ export default function HoursPage() {
         </div>
         <div className="px-5 pb-5 space-y-3">
           {loading ? (
-            <p className="text-sm text-gray-400 py-6 text-center">Loading…</p>
+            <p className="text-sm text-gray-500 py-6 text-center">Loading…</p>
           ) : rules.map((rule, i) => (
             <div key={i} className="flex items-center gap-3">
               <input
@@ -123,17 +123,17 @@ export default function HoursPage() {
               />
               <label htmlFor={`day-${i}`}
                 className={cn("w-10 text-sm font-semibold shrink-0 cursor-pointer select-none",
-                  rule.enabled ? "text-gray-800" : "text-gray-300")}>
+                  rule.enabled ? "text-gray-800" : "text-gray-400")}>
                 {SHORT[i]}
               </label>
               {rule.enabled ? (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Input type="time" value={rule.startTime} className="w-28 text-sm"
                     onChange={(e) => setRule(i, { startTime: e.target.value })} />
-                  <span className="text-gray-400 text-sm">–</span>
+                  <span className="text-gray-500 text-sm">–</span>
                   <Input type="time" value={rule.endTime} className="w-28 text-sm"
                     onChange={(e) => setRule(i, { endTime: e.target.value })} />
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-500">
                     {(() => {
                       const [sh, sm] = rule.startTime.split(":").map(Number);
                       const [eh, em] = rule.endTime.split(":").map(Number);
@@ -145,7 +145,7 @@ export default function HoursPage() {
                   </span>
                 </div>
               ) : (
-                <span className="text-sm text-gray-300">Closed</span>
+                <span className="text-sm text-gray-500">Closed</span>
               )}
             </div>
           ))}
@@ -159,7 +159,7 @@ export default function HoursPage() {
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="px-5 pt-5 pb-1">
           <p className="text-sm font-semibold text-gray-900">Closures &amp; time off</p>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5">
             Block out dates when you&apos;re closed — holidays, vacations, or anything else.
             No booking slots will appear to clients during these periods.
           </p>
@@ -167,13 +167,13 @@ export default function HoursPage() {
         <div className="px-5 pb-5 space-y-4 mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
-              <Input type="datetime-local" value={toForm.startsAt}
+              <label htmlFor="closure-from" className="block text-xs font-medium text-gray-600 mb-1">From</label>
+              <Input id="closure-from" type="datetime-local" value={toForm.startsAt} aria-required="true"
                 onChange={(e) => setToForm((p) => ({ ...p, startsAt: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
-              <Input type="datetime-local" value={toForm.endsAt}
+              <label htmlFor="closure-to" className="block text-xs font-medium text-gray-600 mb-1">To</label>
+              <Input id="closure-to" type="datetime-local" value={toForm.endsAt} aria-required="true"
                 onChange={(e) => setToForm((p) => ({ ...p, endsAt: e.target.value }))} />
             </div>
           </div>
@@ -187,7 +187,7 @@ export default function HoursPage() {
 
           {closures.length > 0 && (
             <div className="space-y-2 pt-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Upcoming closures</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Upcoming closures</p>
               {closures.map((c) => (
                 <div key={c.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 gap-3">
                   <div className="min-w-0">
@@ -198,8 +198,8 @@ export default function HoursPage() {
                     </p>
                     {c.reason && <p className="text-xs text-gray-500 mt-0.5">{c.reason}</p>}
                   </div>
-                  <button type="button" onClick={() => removeClosure(c.id)}
-                    className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded shrink-0">
+                  <button type="button" onClick={() => removeClosure(c.id)} aria-label="Remove closure"
+                    className="text-gray-500 hover:text-red-500 transition-colors p-1 rounded shrink-0">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

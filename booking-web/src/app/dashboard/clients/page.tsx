@@ -252,7 +252,8 @@ export default function ClientsPage() {
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <Input placeholder="Search by name, email, or phone…" value={search}
-          onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          onChange={(e) => setSearch(e.target.value)} className="pl-9"
+          aria-label="Search by name, email, or phone" />
       </div>
 
       {loadError ? (
@@ -308,19 +309,25 @@ export default function ClientsPage() {
       {/* Client detail drawer */}
       {selected && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setSelected(null)} />
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setSelected(null)} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-drawer-title"
+            onKeyDown={(e) => { if (e.key === 'Escape') setSelected(null) }}
+            tabIndex={-1}
+            className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
+              <h2 id="client-drawer-title" className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
               <div className="flex items-center gap-1.5 shrink-0">
                 <Button size="sm" onClick={rebook} className="gap-1.5">
                   <CalendarPlus className="w-4 h-4" />Book again
                 </Button>
-                <button onClick={startEdit} title="Edit contact"
+                <button onClick={startEdit} title="Edit contact" aria-label="Edit"
                   className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4" /></button>
-                <button onClick={deleteClient} disabled={deletingClient} title="Delete contact"
+                <button onClick={deleteClient} disabled={deletingClient} title="Delete contact" aria-label="Delete client"
                   className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
-                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
+                <button onClick={() => setSelected(null)} aria-label="Close" className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -334,8 +341,9 @@ export default function ClientsPage() {
                     { k: "notes", label: "Notes",        type: "text",  ph: "" },
                   ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                      <Input type={type} placeholder={ph} value={editForm[k]}
+                      <label htmlFor={`edit-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                      <Input id={`edit-${k}`} type={type} placeholder={ph} value={editForm[k]}
+                        aria-required={k === "name" || k === "email" ? "true" : undefined}
                         onChange={(e) => {
                           const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                           setEditForm((p) => ({ ...p, [k]: val }));
@@ -343,10 +351,10 @@ export default function ClientsPage() {
                     </div>
                   ))}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
-                    <Input type="date" value={editForm.birthday ? `2000-${editForm.birthday}` : ""}
+                    <label htmlFor="edit-birthday" className="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
+                    <Input id="edit-birthday" type="date" value={editForm.birthday ? `2000-${editForm.birthday}` : ""}
                       onChange={(e) => setEditForm((p) => ({ ...p, birthday: e.target.value ? e.target.value.slice(5) : "" }))} />
-                    <p className="mt-1 text-xs text-gray-400">Used for an automatic birthday greeting (year is ignored).</p>
+                    <p className="mt-1 text-xs text-gray-500">Used for an automatic birthday greeting (year is ignored).</p>
                   </div>
                   <div className="flex gap-2 pt-1">
                     <Button variant="secondary" className="flex-1" onClick={() => setEditMode(false)}>Cancel</Button>
@@ -396,7 +404,7 @@ export default function ClientsPage() {
 
               {/* Tags */}
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Tags</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
                 <div className="flex flex-wrap items-center gap-2">
                   {(selected.tags ?? []).map((t) => (
                     <span key={t} className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
@@ -411,20 +419,21 @@ export default function ClientsPage() {
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
                     onBlur={addTag}
                     placeholder="+ Add tag"
+                    aria-label="Add tag"
                     className="text-xs px-2 py-1 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-200 w-24" />
                 </div>
               </div>
 
               {selected.notes && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Notes</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
                   <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{selected.notes}</p>
                 </div>
               )}
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Appointment history</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Appointment history</p>
                 {loadingDetail ? <div className="space-y-2 py-2"><SkeletonCard /><SkeletonCard /></div> :
-                  (detail?.appointments?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No appointments yet.</p> : (
+                  (detail?.appointments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No appointments yet.</p> : (
                   <div className="space-y-2">
                     {(detail?.appointments ?? []).map((apt) => (
                       <div key={apt.id} className="flex items-center justify-between py-2 border-b border-gray-100">
@@ -439,8 +448,8 @@ export default function ClientsPage() {
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Payments</p>
-                {(detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No payments recorded.</p> : (
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payments</p>
+                {(detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No payments recorded.</p> : (
                   <div className="space-y-2">
                     {(detail?.payments ?? []).slice(0, 8).map((p) => (
                       <div key={p.id} className="flex items-center justify-between border-b border-gray-100 py-2">
@@ -455,8 +464,8 @@ export default function ClientsPage() {
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Packages</p>
-                {(detail?.packages?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No active packages.</p> : (
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Packages</p>
+                {(detail?.packages?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No active packages.</p> : (
                   <div className="space-y-2">
                     {(detail?.packages ?? []).slice(0, 6).map((pkg) => (
                       <div key={pkg.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
@@ -471,8 +480,8 @@ export default function ClientsPage() {
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Recent messages</p>
-                {(detail?.messages?.length ?? 0) === 0 ? <p className="text-sm text-gray-400">No messages yet.</p> : (
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent messages</p>
+                {(detail?.messages?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No messages yet.</p> : (
                   <div className="space-y-2">
                     {(detail?.messages ?? []).slice(-5).reverse().map((m) => (
                       <div key={m.id} className="rounded-lg bg-gray-50 px-3 py-2">
@@ -491,9 +500,15 @@ export default function ClientsPage() {
       {/* Add client modal */}
       {showAdd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAdd(false)} />
-          <Card className="relative w-full max-w-sm z-10">
-            <CardHeader><CardTitle>Add client</CardTitle></CardHeader>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAdd(false)} aria-hidden="true" />
+          <Card
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-client-modal-title"
+            onKeyDown={(e) => { if (e.key === 'Escape') setShowAdd(false) }}
+            tabIndex={-1}
+            className="relative w-full max-w-sm z-10">
+            <CardHeader><CardTitle id="add-client-modal-title">Add client</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {[
                 { k:"name",  label:"Full name *",   type:"text",  ph:"Jane Doe" },
@@ -502,8 +517,9 @@ export default function ClientsPage() {
                 { k:"notes", label:"Notes",          type:"text",  ph:"Any notes…" },
               ].map(({ k, label, type, ph }) => (
                 <div key={k}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <Input type={type} placeholder={ph} value={form[k as keyof typeof form]}
+                  <label htmlFor={`add-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                  <Input id={`add-${k}`} type={type} placeholder={ph} value={form[k as keyof typeof form]}
+                    aria-required={k === "name" || k === "email" ? "true" : undefined}
                     onChange={(e) => {
                       const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                       setForm((p) => ({ ...p, [k]: val }));

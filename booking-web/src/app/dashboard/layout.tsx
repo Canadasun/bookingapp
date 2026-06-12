@@ -97,7 +97,7 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
           <div className="ml-7 mt-0.5 space-y-0.5">
             {item.children.map((c, index) => {
               if (c.group) {
-                return <p key={`${c.group}-${index}`} className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400 first:pt-1">{c.group}</p>;
+                return <p key={`${c.group}-${index}`} className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 first:pt-1">{c.group}</p>;
               }
               if (!c.href || !c.label) return null;
               return (
@@ -175,22 +175,23 @@ function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[];
           <Search className="h-4 w-4 text-gray-400" />
           <input
             autoFocus
+            aria-label="Search pages"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
             placeholder="Jump to a page..."
             className="h-8 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-gray-400"
           />
-          <kbd className="hidden rounded-md border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 sm:inline">Esc</kbd>
+          <kbd className="hidden rounded-md border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 sm:inline">Esc</kbd>
         </div>
         <div className="max-h-80 overflow-y-auto p-2">
           {items.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-gray-400">No matching pages</p>
+            <p className="px-3 py-8 text-center text-sm text-gray-500">No matching pages</p>
           ) : items.map((item) => (
             <button key={item.href} onClick={() => go(item.href)}
               className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700">
               <span>{item.label}</span>
-              <span className="text-xs text-gray-300">{item.href.replace("/dashboard", "") || "/"}</span>
+              <span className="text-xs text-gray-600">{item.href.replace("/dashboard", "") || "/"}</span>
             </button>
           ))}
         </div>
@@ -343,7 +344,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Link href="/dashboard" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Home">
           {biz?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={biz.logoUrl} alt="" className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />
+            <img src={biz.logoUrl} alt="Business logo" className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />
           ) : (
             <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4 text-white" />
@@ -367,12 +368,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="w-8 h-8 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
                 {avatar
                   // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                  ? <img src={avatar} alt={`${user.name} profile photo`} className="w-full h-full object-cover" />
                   : user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
-                <p className="text-xs text-gray-400 capitalize">{user.role.toLowerCase()}</p>
+                <p className="text-xs text-gray-500 capitalize">{user.role.toLowerCase()}</p>
               </div>
             </Link>
           )}
@@ -412,7 +413,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 lg:inline-flex">
               <Search className="h-4 w-4" />
               <span>Search</span>
-              <kbd className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400">⌘K</kbd>
+              <kbd className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">⌘K</kbd>
             </button>
             <Link href="/dashboard/notifications"
               className="relative p-2 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors text-amber-700"
@@ -440,7 +441,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs">
                   {avatar
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                    ? <img src={avatar} alt={`${user.name} profile photo`} className="w-full h-full object-cover" />
                     : user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <span className="hidden sm:inline text-sm font-medium text-gray-700">{user.name}</span>
@@ -450,7 +451,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         <EmailVerificationBanner user={user} />
-        <main className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
+        <main id="main-content" className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
       </div>
     </div>
   );

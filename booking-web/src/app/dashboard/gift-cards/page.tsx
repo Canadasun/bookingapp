@@ -81,7 +81,7 @@ export default function GiftCardsPage() {
                       <Gift className="w-4 h-4 text-violet-500 shrink-0" />
                       <button onClick={() => copy(c.code)} className="font-mono font-semibold text-gray-900 hover:text-violet-600 inline-flex items-center gap-1.5">
                         {c.code}
-                        {copied === c.code ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-gray-300" />}
+                        {copied === c.code ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-gray-400" />}
                       </button>
                       <StatusPill status={c.status} />
                     </div>

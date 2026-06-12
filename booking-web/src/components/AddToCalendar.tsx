@@ -88,6 +88,9 @@ export function AddToCalendar(props: Props) {
     <div className="relative inline-block">
       <button
         onClick={() => setOpen((o) => !o)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Add to Calendar"
         className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-violet-700 border border-violet-200 rounded-xl hover:bg-violet-50 transition-colors">
         <CalendarPlus className="w-4 h-4" />
         Add to Calendar
@@ -96,8 +99,15 @@ export function AddToCalendar(props: Props) {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 mt-1.5 w-52 bg-white rounded-xl border border-gray-100 shadow-lg z-20 overflow-hidden">
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-to-calendar-title"
+            onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+            className="absolute left-0 mt-1.5 w-52 bg-white rounded-xl border border-gray-100 shadow-lg z-20 overflow-hidden"
+          >
+            <span id="add-to-calendar-title" className="sr-only">Add to Calendar options</span>
             {options.map((o) => (
               <a
                 key={o.label}
@@ -105,9 +115,10 @@ export function AddToCalendar(props: Props) {
                 target={o.external ? "_blank" : undefined}
                 rel={o.external ? "noopener noreferrer" : undefined}
                 download={!o.external ? true : undefined}
+                aria-label={`Add to ${o.label}`}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700 transition-colors border-b border-gray-50 last:border-0">
-                <span className="text-base">{o.icon}</span>
+                <span className="text-base" aria-hidden="true">{o.icon}</span>
                 {o.label}
               </a>
             ))}

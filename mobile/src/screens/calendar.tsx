@@ -273,18 +273,22 @@ function CalendarScreen() {
     <SafeAreaView style={s.screen}>
       {/* Top bar: ⋯ (left) · Month ▾ (center) · + (right) */}
       <View style={cal.topbar}>
-        <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Menu')} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+        <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Menu')} hitSlop={{top:8,bottom:8,left:8,right:8}}
+          accessibilityRole="button" accessibilityLabel="Open menu">
           {biz?.logoUrl ? (
-            <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={{ width:28, height:28, borderRadius:8 }} contentFit="cover"/>
+            <Image source={{ uri: uploadUri(biz.logoUrl)! }} style={{ width:28, height:28, borderRadius:8 }} contentFit="cover"
+              accessible={true} accessibilityLabel="Business logo"/>
           ) : (
             <Ionicons name="person-circle-outline" size={28} color={GRAY_700}/>
           )}
         </TouchableOpacity>
-        <TouchableOpacity style={cal.monthWrap} activeOpacity={0.7} onPress={()=>{ setRefreshing(true); load(true); }}>
+        <TouchableOpacity style={cal.monthWrap} activeOpacity={0.7} onPress={()=>{ setRefreshing(true); load(true); }}
+          accessibilityRole="button" accessibilityLabel="Refresh calendar">
           <Text style={cal.monthText}>{monthLabel}</Text>
           <Ionicons name="chevron-down" size={16} color={GRAY_700} style={{marginLeft:4}}/>
         </TouchableOpacity>
-        <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Book')} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+        <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Book')} hitSlop={{top:8,bottom:8,left:8,right:8}}
+          accessibilityRole="button" accessibilityLabel="Add new appointment">
           <Ionicons name="add" size={26} color={BRAND}/>
         </TouchableOpacity>
       </View>
@@ -292,18 +296,23 @@ function CalendarScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
         {(['ALL','PENDING','CONFIRMED','COMPLETED','CANCELLED','NO_SHOW'] as const).map(status => (
           <TouchableOpacity key={status} onPress={()=>setStatusFilter(status)}
-            style={[cal.filterChip, statusFilter===status && cal.filterChipOn]}>
+            style={[cal.filterChip, statusFilter===status && cal.filterChipOn]}
+            accessibilityRole="button"
+            accessibilityLabel={STATUS_LABEL[status] ?? status}
+            accessibilityState={{ selected: statusFilter===status }}>
             <Text style={[cal.filterText, statusFilter===status && cal.filterTextOn]}>{STATUS_LABEL[status] ?? status}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
       {multiProvider && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
-          <TouchableOpacity onPress={()=>setStaffFilter('ALL')} style={[cal.filterChip, staffFilter==='ALL' && cal.filterChipOn]}>
+          <TouchableOpacity onPress={()=>setStaffFilter('ALL')} style={[cal.filterChip, staffFilter==='ALL' && cal.filterChipOn]}
+            accessibilityRole="button" accessibilityLabel="Everyone" accessibilityState={{ selected: staffFilter==='ALL' }}>
             <Text style={[cal.filterText, staffFilter==='ALL' && cal.filterTextOn]}>Everyone</Text>
           </TouchableOpacity>
           {staffOptions.map(([id,name]) => (
-            <TouchableOpacity key={id} onPress={()=>setStaffFilter(id)} style={[cal.filterChip, staffFilter===id && cal.filterChipOn]}>
+            <TouchableOpacity key={id} onPress={()=>setStaffFilter(id)} style={[cal.filterChip, staffFilter===id && cal.filterChipOn]}
+              accessibilityRole="button" accessibilityLabel={name} accessibilityState={{ selected: staffFilter===id }}>
               <Text style={[cal.filterText, staffFilter===id && cal.filterTextOn]}>{name}</Text>
             </TouchableOpacity>
           ))}
@@ -313,7 +322,8 @@ function CalendarScreen() {
       {/* Calendar date strip — tap a day to focus it; dot = has appointments */}
       <View style={cal.stripWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16 }}>
-          <TouchableOpacity onPress={()=>setDayFilter(null)} style={[cal.allDay, dayFilter===null && cal.allDayOn]}>
+          <TouchableOpacity onPress={()=>setDayFilter(null)} style={[cal.allDay, dayFilter===null && cal.allDayOn]}
+            accessibilityRole="button" accessibilityLabel="All days" accessibilityState={{ selected: dayFilter===null }}>
             <Ionicons name="albums-outline" size={16} color={dayFilter===null ? '#fff' : GRAY_500}/>
             <Text style={[cal.allDayText, dayFilter===null && { color:'#fff' }]}>All</Text>
           </TouchableOpacity>
@@ -321,7 +331,10 @@ function CalendarScreen() {
             const on = dayFilter === key;
             const isToday = key === TODAY_KEY;
             return (
-              <TouchableOpacity key={key} onPress={()=>setDayFilter(on ? null : key)} style={[cal.dayCell, on && cal.dayCellOn]}>
+              <TouchableOpacity key={key} onPress={()=>setDayFilter(on ? null : key)} style={[cal.dayCell, on && cal.dayCellOn]}
+                accessibilityRole="button"
+                accessibilityLabel={`${date.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}, ${count} appointment${count===1?'':'s'}`}
+                accessibilityState={{ selected: on }}>
                 <Text style={[cal.dayDow, on && { color:'#fff' }, !on && isToday && { color:BRAND }]}>
                   {date.toLocaleDateString('en-US',{ weekday:'short' }).toUpperCase()}
                 </Text>
@@ -352,10 +365,10 @@ function CalendarScreen() {
           const d = new Date(a.startsAt);
           const color = STATUS_COLOR[a.status] ?? GRAY_200;
           return (
-            <TouchableOpacity 
-              style={[cal.aptRow, { 
+            <TouchableOpacity
+              style={[cal.aptRow, {
                 backgroundColor: '#fff',
-                borderLeftWidth: 4, 
+                borderLeftWidth: 4,
                 borderLeftColor: color,
                 marginHorizontal: 10,
                 marginVertical: 2,
@@ -365,11 +378,13 @@ function CalendarScreen() {
                 shadowRadius: 3,
                 shadowOffset: { width: 0, height: 1 },
                 elevation: 1,
-                borderBottomWidth: 0, 
+                borderBottomWidth: 0,
                 paddingVertical: 6, // super compact
-              }]} 
-              activeOpacity={0.6} 
+              }]}
+              activeOpacity={0.6}
               onPress={()=>setSelected(a)}
+              accessibilityRole="button"
+              accessibilityLabel={`${a.client.name}, ${a.service.name} at ${fmtTime(d)}`}
             >
               <View style={{flex:1}}>
                 <Text style={cal.aptClient}>{a.client.name}</Text>
@@ -389,7 +404,8 @@ function CalendarScreen() {
 
       {/* Detail modal */}
       {selected && (
-        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={()=>setSelected(null)}>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={()=>setSelected(null)}
+          accessibilityRole="button" accessibilityLabel="Close appointment details">
           <TouchableOpacity style={s.sheet} activeOpacity={1} onPress={()=>{}}>
             <View style={s.sheetHandle}/>
             <Text style={s.sheetTitle}>Appointment</Text>
@@ -414,7 +430,8 @@ function CalendarScreen() {
                 <View style={{flex:1, alignItems:'flex-end'}}>
                   <Text style={s.detailValue}>{v}</Text>
                   {l==='Location' && v!=='—' && (
-                    <TouchableOpacity onPress={()=>Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`)}>
+                    <TouchableOpacity onPress={()=>Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`)}
+                      accessibilityRole="button" accessibilityLabel="Open location in Maps">
                       <Text style={{fontSize:11, color:BRAND, fontWeight:'600', marginTop:2}}>Open in Maps</Text>
                     </TouchableOpacity>
                   )}
@@ -428,16 +445,16 @@ function CalendarScreen() {
             )}
 
             <View style={s.sheetActions}>
-              {selected.status==='PENDING' && <TouchableOpacity style={s.btnPrimary} disabled={acting} onPress={()=>confirm(selected.id)}><Text style={s.btnPrimaryText}>Confirm</Text></TouchableOpacity>}
-              {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>complete(selected.id)}><Text style={s.btnSecondaryText}>Mark completed</Text></TouchableOpacity>}
-              {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>noShow(selected.id)}><Text style={s.btnSecondaryText}>No-show &amp; charge fee</Text></TouchableOpacity>}
-              <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openEdit(selected)}><Text style={s.btnSecondaryText}>Edit details</Text></TouchableOpacity>
-              {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openReschedule(selected)}><Text style={s.btnSecondaryText}>Reschedule</Text></TouchableOpacity>}
-              {['PENDING','CONFIRMED'].includes(selected.status) && user?.role === 'OWNER' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>syncCalendar(selected.id)}><Text style={s.btnSecondaryText}>Sync calendar</Text></TouchableOpacity>}
+              {selected.status==='PENDING' && <TouchableOpacity style={s.btnPrimary} disabled={acting} onPress={()=>confirm(selected.id)} accessibilityRole="button" accessibilityLabel="Confirm appointment"><Text style={s.btnPrimaryText}>Confirm</Text></TouchableOpacity>}
+              {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>complete(selected.id)} accessibilityRole="button" accessibilityLabel="Mark completed"><Text style={s.btnSecondaryText}>Mark completed</Text></TouchableOpacity>}
+              {selected.status==='CONFIRMED' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>noShow(selected.id)} accessibilityRole="button" accessibilityLabel="No-show and charge fee"><Text style={s.btnSecondaryText}>No-show &amp; charge fee</Text></TouchableOpacity>}
+              <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openEdit(selected)} accessibilityRole="button" accessibilityLabel="Edit details"><Text style={s.btnSecondaryText}>Edit details</Text></TouchableOpacity>
+              {['PENDING','CONFIRMED'].includes(selected.status) && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>openReschedule(selected)} accessibilityRole="button" accessibilityLabel="Reschedule appointment"><Text style={s.btnSecondaryText}>Reschedule</Text></TouchableOpacity>}
+              {['PENDING','CONFIRMED'].includes(selected.status) && user?.role === 'OWNER' && <TouchableOpacity style={s.btnSecondary} disabled={acting} onPress={()=>syncCalendar(selected.id)} accessibilityRole="button" accessibilityLabel="Sync calendar"><Text style={s.btnSecondaryText}>Sync calendar</Text></TouchableOpacity>}
               {['PENDING','CONFIRMED'].includes(selected.status) && (
-                <TouchableOpacity style={s.btnDanger} disabled={acting} onPress={()=>cancel(selected.id)}><Text style={s.btnDangerText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={s.btnDanger} disabled={acting} onPress={()=>cancel(selected.id)} accessibilityRole="button" accessibilityLabel="Cancel appointment"><Text style={s.btnDangerText}>Cancel</Text></TouchableOpacity>
               )}
-              <TouchableOpacity style={s.btnGhost} onPress={()=>setSelected(null)}><Text style={s.btnGhostText}>Close</Text></TouchableOpacity>
+              <TouchableOpacity style={s.btnGhost} onPress={()=>setSelected(null)} accessibilityRole="button" accessibilityLabel="Close"><Text style={s.btnGhostText}>Close</Text></TouchableOpacity>
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -446,7 +463,8 @@ function CalendarScreen() {
       <Modal visible={!!reschedule} animationType="slide" onRequestClose={()=>setReschedule(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setReschedule(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setReschedule(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Reschedule</Text>
           </View>
           {reschedule && (
@@ -456,7 +474,10 @@ function CalendarScreen() {
               <Text style={[s.fieldLabel,{ marginTop:16 }]}>Date</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingVertical:8 }}>
                 {Array.from({ length:21 }, (_,i) => { const d = new Date(); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); }).map(d => (
-                  <TouchableOpacity key={d} style={[s.datePill, reschedule.date===d && s.datePillActive]} onPress={()=>loadRescheduleSlots(reschedule.appointment, d)}>
+                  <TouchableOpacity key={d} style={[s.datePill, reschedule.date===d && s.datePillActive]} onPress={()=>loadRescheduleSlots(reschedule.appointment, d)}
+                    accessibilityRole="button"
+                    accessibilityLabel={new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}
+                    accessibilityState={{ selected: reschedule.date===d }}>
                     <Text style={[s.datePillDay, reschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').toLocaleDateString('en-US',{ weekday:'short' })}</Text>
                     <Text style={[s.datePillNum, reschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').getDate()}</Text>
                   </TouchableOpacity>
@@ -465,7 +486,8 @@ function CalendarScreen() {
               {reschedule.loading ? <ActivityIndicator color={BRAND} style={{ marginTop:20 }}/> : (
                 <View style={s.slotGrid}>
                   {reschedule.slots.map(sl => (
-                    <TouchableOpacity key={sl.startsAt} style={s.slotBtn} disabled={acting} onPress={()=>saveReschedule(sl.startsAt)}>
+                    <TouchableOpacity key={sl.startsAt} style={s.slotBtn} disabled={acting} onPress={()=>saveReschedule(sl.startsAt)}
+                      accessibilityRole="button" accessibilityLabel={fmtTime(sl.startsAt)}>
                       <Text style={s.slotText}>{fmtTime(sl.startsAt)}</Text>
                     </TouchableOpacity>
                   ))}
@@ -480,7 +502,8 @@ function CalendarScreen() {
       <Modal visible={!!editAppt} animationType="slide" onRequestClose={()=>setEditAppt(null)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setEditAppt(null)} style={{ marginRight:6 }}><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <TouchableOpacity onPress={()=>setEditAppt(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
             <Text style={s.headerTitle}>Edit appointment</Text>
           </View>
           {editAppt && (
@@ -505,7 +528,8 @@ function CalendarScreen() {
                 <Switch value={editAppt.notifyClient} onValueChange={notifyClient=>setEditAppt({...editAppt,notifyClient})} trackColor={{ true: BRAND, false: GRAY_200 }} thumbColor="#fff"/>
               </View>
 
-              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} disabled={acting} onPress={saveAppointmentEdit}>
+              <TouchableOpacity style={[s.btnPrimary,{ marginTop:18 }]} disabled={acting} onPress={saveAppointmentEdit}
+                accessibilityRole="button" accessibilityLabel="Save changes">
                 {acting ? <ActivityIndicator color="#fff"/> : <Text style={s.btnPrimaryText}>Save changes</Text>}
               </TouchableOpacity>
             </ScrollView>

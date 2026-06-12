@@ -89,7 +89,7 @@ function CheckoutScreen() {
         <View style={co.receiptWrap}>
           <View style={co.receiptCheck}><Ionicons name="checkmark" size={40} color="#fff"/></View>
           <Text style={co.receiptAmount}>${(receipt.amountCents/100).toFixed(2)}</Text>
-          <Text style={co.receiptPaid}>Payment received</Text>
+          <Text style={co.receiptPaid} accessibilityLiveRegion="polite">Payment received</Text>
 
           <View style={co.receiptCard}>
             {[
@@ -105,7 +105,8 @@ function CheckoutScreen() {
             ))}
           </View>
 
-          <TouchableOpacity style={[s.btnPrimary,{ marginTop:24, alignSelf:'stretch' }]} onPress={reset}>
+          <TouchableOpacity style={[s.btnPrimary,{ marginTop:24, alignSelf:'stretch' }]} onPress={reset}
+            accessibilityRole="button" accessibilityLabel="New sale">
             <Text style={s.btnPrimaryText}>New sale</Text>
           </TouchableOpacity>
         </View>
@@ -127,19 +128,21 @@ function CheckoutScreen() {
       <View style={co.pad}>
         {keys.map(k => {
           if (k==='note') return (
-            <TouchableOpacity key={k} style={co.key} onPress={()=>{
+            <TouchableOpacity key={k} style={co.key} accessibilityRole="button" accessibilityLabel="Add a note" onPress={()=>{
               Alert.prompt?.('Add a note', 'What is this charge for?', (t)=>{ chargeKey.current = null; setNote((t||'').slice(0,80)); }, 'plain-text', note);
             }}>
               <Ionicons name="create-outline" size={22} color={GRAY_500}/>
             </TouchableOpacity>
           );
           if (k==='back') return (
-            <TouchableOpacity key={k} style={co.key} onPress={back} onLongPress={()=>setDigits('')}>
+            <TouchableOpacity key={k} style={co.key} onPress={back} onLongPress={()=>setDigits('')}
+              accessibilityRole="button" accessibilityLabel="Delete last digit">
               <Ionicons name="backspace-outline" size={24} color={GRAY_700}/>
             </TouchableOpacity>
           );
           return (
-            <TouchableOpacity key={k} style={co.key} onPress={()=>pressDigit(k)} activeOpacity={0.6}>
+            <TouchableOpacity key={k} style={co.key} onPress={()=>pressDigit(k)} activeOpacity={0.6}
+              accessibilityRole="button" accessibilityLabel={`${k}`}>
               <Text style={co.keyText}>{k}</Text>
             </TouchableOpacity>
           );
@@ -152,7 +155,10 @@ function CheckoutScreen() {
           <Text style={co.tipLabel}>Tip</Text>
           {[0,15,18,20].map(p => (
             <TouchableOpacity key={p} onPress={()=>{ chargeKey.current = null; setTipPct(p); }}
-              style={[co.tipChip, tipPct===p && co.tipChipOn]}>
+              style={[co.tipChip, tipPct===p && co.tipChipOn]}
+              accessibilityRole="button"
+              accessibilityLabel={p===0?'No tip':`${p}% tip`}
+              accessibilityState={{ selected: tipPct===p }}>
               <Text style={[co.tipChipText, tipPct===p && { color:'#fff' }]}>{p===0?'None':`${p}%`}</Text>
             </TouchableOpacity>
           ))}
@@ -166,7 +172,9 @@ function CheckoutScreen() {
         style={[co.chargeBtn, (cents<50||loading) && { opacity:0.4 }]}
         disabled={cents<50||loading}
         onPress={charge}
-        activeOpacity={0.85}>
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Charge payment">
         {loading
           ? <ActivityIndicator color="#fff"/>
           : <Text style={co.chargeBtnText}>Charge ${(totalCents/100).toFixed(2)}</Text>}

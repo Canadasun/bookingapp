@@ -208,7 +208,7 @@ export default function StaffPage() {
         </button>
         {showLocations && (
           <div className="px-4 pb-4 border-t border-gray-50 pt-3 space-y-3">
-            <p className="text-xs text-gray-400">Add branches, then assign each staff member to one. Clients booking a location only see that location&apos;s providers. Single-location businesses can leave this empty.</p>
+            <p className="text-xs text-gray-600">Add branches, then assign each staff member to one. Clients booking a location only see that location&apos;s providers. Single-location businesses can leave this empty.</p>
             {locations.map((l) => {
               const staffCount = staff.filter((s) => s.locationId === l.id).length;
               return (
@@ -226,8 +226,8 @@ export default function StaffPage() {
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => openEditLocation(l)} className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" title="Edit"><Pencil className="w-3.5 h-3.5"/></button>
-                    <button onClick={() => removeLocation(l)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
+                    <button onClick={() => openEditLocation(l)} className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" aria-label="Edit"><Pencil className="w-3.5 h-3.5"/></button>
+                    <button onClick={() => removeLocation(l)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
                   </div>
                 </div>
               );
@@ -245,16 +245,23 @@ export default function StaffPage() {
 
       {/* Location edit modal */}
       {editingLocation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="location-modal-title"
+          tabIndex={-1}
+          onKeyDown={(e) => e.key === "Escape" && setEditingLocation(null)}
+        >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingLocation(null)} />
           <Card className="relative w-full max-w-sm z-10">
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">Edit location</h3>
+              <h3 id="location-modal-title" className="font-semibold text-gray-900">Edit location</h3>
             </div>
             <CardContent className="space-y-3 pt-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
-                <Input value={locForm.name} onChange={(e) => setLocForm((p) => ({ ...p, name: e.target.value }))} placeholder="Downtown" />
+                <Input autoFocus value={locForm.name} onChange={(e) => setLocForm((p) => ({ ...p, name: e.target.value }))} placeholder="Downtown" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
@@ -271,6 +278,7 @@ export default function StaffPage() {
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
                 <span className="text-sm text-gray-700">Active</span>
                 <button type="button" onClick={() => setLocForm((p) => ({ ...p, active: !p.active }))}
+                  aria-label="Toggle active"
                   className={cn("relative w-9 h-5 rounded-full transition-colors shrink-0", locForm.active ? "bg-violet-600" : "bg-gray-200")}>
                   <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform", locForm.active ? "translate-x-4" : "translate-x-0.5")} />
                 </button>
@@ -297,7 +305,7 @@ export default function StaffPage() {
                 <div className="w-10 h-10 rounded-full bg-violet-100 overflow-hidden flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">
                   {s.avatarUrl
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={s.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ? <img src={s.avatarUrl} alt={`${s.user.name} profile photo`} className="w-full h-full object-cover" />
                     : initials(s.user.name)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -328,12 +336,12 @@ export default function StaffPage() {
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Link href={`/dashboard/staff/${s.id}`}><Button size="sm" variant="ghost" className="text-xs">Schedule</Button></Link>
-                  <button onClick={() => openEdit(s)} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4"/></button>
+                  <button onClick={() => openEdit(s)} aria-label="Edit" className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4"/></button>
                   {s.active
-                    ? <button onClick={() => deactivate(s)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Deactivate"><UserX className="w-4 h-4"/></button>
-                    : <button onClick={() => reactivate(s)} className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors" title="Reactivate"><Check className="w-4 h-4"/></button>
+                    ? <button onClick={() => deactivate(s)} aria-label="Deactivate" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"><UserX className="w-4 h-4"/></button>
+                    : <button onClick={() => reactivate(s)} aria-label="Reactivate" className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors"><Check className="w-4 h-4"/></button>
                   }
-                  <button onClick={() => removeStaff(s)} className="p-2 text-gray-400 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors" title="Delete provider"><Trash2 className="w-4 h-4"/></button>
+                  <button onClick={() => removeStaff(s)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4"/></button>
                 </div>
               </CardContent>
             </Card>
@@ -342,16 +350,23 @@ export default function StaffPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="staff-modal-title"
+          tabIndex={-1}
+          onKeyDown={(e) => e.key === "Escape" && setShowModal(false)}
+        >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <Card className="relative w-full max-w-md z-10 max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900">{editing ? `Edit ${editing.user.name}` : "Add staff member"}</h3>
+              <h3 id="staff-modal-title" className="font-semibold text-gray-900">{editing ? `Edit ${editing.user.name}` : "Add staff member"}</h3>
             </div>
             <CardContent className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full name *</label>
-                <Input placeholder="Jane Smith" value={form.name} disabled={!!editing} onChange={(e) => setForm((p) => ({...p,name:e.target.value}))}/>
+                <Input autoFocus placeholder="Jane Smith" value={form.name} disabled={!!editing} onChange={(e) => setForm((p) => ({...p,name:e.target.value}))}/>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
@@ -368,13 +383,13 @@ export default function StaffPage() {
               </div>
               {locations.filter((l) => l.active).length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
-                  <select value={form.locationId} onChange={(e) => setForm((p) => ({ ...p, locationId: e.target.value }))}
+                  <label htmlFor="staff-location" className="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                  <select id="staff-location" value={form.locationId} onChange={(e) => setForm((p) => ({ ...p, locationId: e.target.value }))}
                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                     <option value="">— Any / unassigned —</option>
                     {locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
-                  <p className="mt-1 text-xs text-gray-400">Clients booking this location only see providers assigned to it.</p>
+                  <p className="mt-1 text-xs text-gray-600">Clients booking this location only see providers assigned to it.</p>
                 </div>
               )}
               <div>
@@ -389,6 +404,8 @@ export default function StaffPage() {
                     const on = form.permissions.includes(p.key);
                     return (
                       <button key={p.key} type="button"
+                        aria-label={`Toggle ${p.label}`}
+                        aria-pressed={on}
                         onClick={() => setForm((f) => ({ ...f, permissions: on ? f.permissions.filter((x) => x !== p.key) : [...f.permissions, p.key] }))}
                         className={cn("flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition-colors",
                           on ? "border-violet-200 bg-violet-50" : "border-gray-200 hover:bg-gray-50")}>

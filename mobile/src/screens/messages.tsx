@@ -100,11 +100,13 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   if (selected) return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>{setSelected(null);loadThreads();}} style={{marginRight:12}}>
+        <TouchableOpacity onPress={()=>{setSelected(null);loadThreads();}} style={{marginRight:12}}
+          accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{selected.name}</Text>
-        <TouchableOpacity onPress={async()=>{await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:true})});setSelected(null);loadThreads();}}><Text style={{color:'#DC2626',fontWeight:'700'}}>Archive</Text></TouchableOpacity>
+        <TouchableOpacity onPress={async()=>{await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:true})});setSelected(null);loadThreads();}}
+          accessibilityRole="button" accessibilityLabel="Archive conversation"><Text style={{color:'#DC2626',fontWeight:'700'}}>Archive</Text></TouchableOpacity>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={Platform.OS==='ios'?88:0}>
         <ScrollView ref={scrollRef} contentContainerStyle={{padding:16}} showsVerticalScrollIndicator={false}>
@@ -121,7 +123,8 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
               <TextInput style={s.composeInput} placeholder="Type a message…" placeholderTextColor={GRAY_400}
                 value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={send}/>
               <TouchableOpacity style={[s.sendBtn, (!reply.trim()||sending)&&{opacity:0.4}]}
-                disabled={!reply.trim()||sending} onPress={send}>
+                disabled={!reply.trim()||sending} onPress={send}
+                accessibilityRole="button" accessibilityLabel="Send message">
                 <Ionicons name="send" size={18} color="#fff"/>
               </TouchableOpacity>
           </>
@@ -134,12 +137,15 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     <SafeAreaView style={s.screen}>
       <View style={s.header}><Text style={s.headerTitle}>Messages</Text></View>
       <View style={{flexDirection:'row',gap:8,paddingHorizontal:16,paddingBottom:8}}>
-        {(['all','unread','archived'] as const).map(value=><TouchableOpacity key={value} onPress={()=>setFilter(value)} style={[cal.filterChip,filter===value&&cal.filterChipOn]}><Text style={[cal.filterText,filter===value&&cal.filterTextOn]}>{value}</Text></TouchableOpacity>)}
+        {(['all','unread','archived'] as const).map(value=><TouchableOpacity key={value} onPress={()=>setFilter(value)} style={[cal.filterChip,filter===value&&cal.filterChipOn]} accessibilityRole="button" accessibilityLabel={value} accessibilityState={{ selected: filter===value }}><Text style={[cal.filterText,filter===value&&cal.filterTextOn]}>{value}</Text></TouchableOpacity>)}
       </View>
       <View style={{ flexDirection:'row', gap:6, marginBottom:8, paddingHorizontal:16 }}>
         {(['ALL','IN_APP','SMS'] as const).map(c => (
           <TouchableOpacity key={c} onPress={()=>setChannel(c)}
-            style={[ms.methodChip, channel===c && ms.methodChipOn]}>
+            style={[ms.methodChip, channel===c && ms.methodChipOn]}
+            accessibilityRole="button"
+            accessibilityLabel={c==='ALL'?'All':c==='IN_APP'?'In-app':'SMS'}
+            accessibilityState={{ selected: channel===c }}>
             <Text style={[ms.methodChipText, channel===c && {color:BRAND}]}>
               {c==='ALL'?'All':c==='IN_APP'?'In-app':'SMS'}
             </Text>
@@ -155,7 +161,9 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
           showsVerticalScrollIndicator={false}
           renderItem={({item:t})=>(
             <TouchableOpacity style={[s.card, t.unreadCount>0 && { borderColor:'#FCA5A5', backgroundColor:'#FEF2F2' }]} activeOpacity={0.7}
-              onPress={()=>openThread({id:t.clientId,...t.client})}>
+              onPress={()=>openThread({id:t.clientId,...t.client})}
+              accessibilityRole="button"
+              accessibilityLabel={`Open conversation with ${t.client.name}`}>
               <View style={s.avatar}><Text style={s.avatarText}>{t.client.name.slice(0,2).toUpperCase()}</Text></View>
               <View style={{flex:1}}>
                 <View style={s.row}>

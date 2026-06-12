@@ -67,18 +67,18 @@ export default function WaitlistPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{e.name}</p>
                   <p className="text-sm text-gray-500 truncate">{e.email}{e.phone ? ` · ${e.phone}` : ""}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Joined {format(new Date(e.createdAt), "MMM d")}
-                    {e.desiredDate ? ` · prefers ${format(new Date(e.desiredDate), "MMM d")}` : ""}
+                  <p className=”text-xs text-gray-500 mt-0.5”>
+                    Joined {format(new Date(e.createdAt), “MMM d”)}
+                    {e.desiredDate ? ` · prefers ${format(new Date(e.desiredDate), “MMM d”)}` : “”}
                   </p>
-                  {e.notes ? <p className="text-xs text-gray-400 mt-0.5 italic">“{e.notes}”</p> : null}
+                  {e.notes ? <p className=”text-xs text-gray-500 mt-0.5 italic”>”{e.notes}”</p> : null}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {e.phone && <a href={`tel:${e.phone}`} className="text-gray-400 hover:text-emerald-600 p-2" title="Call"><Phone className="w-4 h-4" /></a>}
-                  <a href={`mailto:${e.email}`} className="text-gray-400 hover:text-violet-600 p-2" title="Email"><Mail className="w-4 h-4" /></a>
-                  <a href={`mailto:${e.email}?subject=${encodeURIComponent("A booking spot is available")}&body=${encodeURIComponent(`Hi ${e.name}, a spot may be available. Reply to this email or book online if the time works for you.`)}`} className="text-gray-400 hover:text-blue-600 p-2" title="Notify"><Send className="w-4 h-4" /></a>
-                  <Link href="/dashboard/appointments" className="text-gray-400 hover:text-violet-600 p-2" title="Book"><CalendarPlus className="w-4 h-4" /></Link>
-                  <button onClick={() => remove(e.id)} className="text-gray-400 hover:text-red-600 p-2" title="Remove"><Trash2 className="w-4 h-4" /></button>
+                  {e.phone && <a href={`tel:${e.phone}`} className="text-gray-400 hover:text-emerald-600 p-2" title="Call" aria-label="Call client"><Phone className="w-4 h-4" /></a>}
+                  <a href={`mailto:${e.email}`} className="text-gray-400 hover:text-violet-600 p-2" title="Email" aria-label="Email client"><Mail className="w-4 h-4" /></a>
+                  <a href={`mailto:${e.email}?subject=${encodeURIComponent("A booking spot is available")}&body=${encodeURIComponent(`Hi ${e.name}, a spot may be available. Reply to this email or book online if the time works for you.`)}`} className="text-gray-400 hover:text-blue-600 p-2" title="Notify" aria-label="Notify client"><Send className="w-4 h-4" /></a>
+                  <Link href="/dashboard/appointments" className="text-gray-400 hover:text-violet-600 p-2" title="Book" aria-label="Book appointment"><CalendarPlus className="w-4 h-4" /></Link>
+                  <button onClick={() => remove(e.id)} className="text-gray-400 hover:text-red-600 p-2" title="Remove" aria-label="Remove from waitlist"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </CardContent>
             </Card>

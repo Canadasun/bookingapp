@@ -39,7 +39,7 @@ export function ImageUpload({ value, kind, onChange, shape = "square", documents
       <div className={`w-16 h-16 ${radius} border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0`}>
         {value && !documents
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={value} alt="" className="w-full h-full object-cover" />
+          ? <img src={value} alt="Uploaded image" className="w-full h-full object-cover" />
           : <Upload className="w-5 h-5 text-gray-300" />}
       </div>
       <div className="flex items-center gap-2">

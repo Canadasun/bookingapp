@@ -137,7 +137,7 @@ function LoginForm() {
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
         <div className="relative">
           <Input type={showPw ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
-          <button type="button" onClick={() => setShowPw((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={() => setShowPw((p) => !p)} aria-label={showPw ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
@@ -158,19 +158,19 @@ export default function ClientLoginPage() {
             </div>
             <span className="text-2xl font-bold text-gray-900">My Bookings</span>
           </Link>
-          <p className="text-gray-400 mt-2 text-sm">Sign in to manage your appointments</p>
+          <p className="text-gray-600 mt-2 text-sm">Sign in to manage your appointments</p>
         </div>
         <Card>
           <CardContent className="pt-6">
             <Suspense><LoginForm /></Suspense>
-            <p className="text-center text-xs text-gray-300 mt-5">
-              <Link href="/my/register" className="hover:text-gray-400 transition-colors">Create account</Link>
+            <p className="text-center text-xs text-gray-600 mt-5">
+              <Link href="/my/register" className="hover:text-gray-700 transition-colors">Create account</Link>
             </p>
           </CardContent>
         </Card>
         <p className="text-center text-xs text-gray-400 mt-4">
           Business owner?{" "}
-          <Link href="/login" className="text-violet-500 hover:underline">Sign in here</Link>
+          <Link href="/login" className="text-violet-500 hover:underline">Sign in to your account</Link>
         </p>
       </div>
     </div>

@@ -74,7 +74,7 @@ export default function OffersPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Offers &amp; Promotions</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Visible to clients in their portal</p>
+          <p className="text-sm text-gray-600 mt-0.5">Visible to clients in their portal</p>
         </div>
         <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4" />New offer</Button>
       </div>
@@ -109,10 +109,10 @@ export default function OffersPage() {
                   )}
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => openEdit(o)} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50">
+                  <button onClick={() => openEdit(o)} aria-label="Edit" className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => remove(o.id)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+                  <button onClick={() => remove(o.id)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -123,20 +123,28 @@ export default function OffersPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="offer-modal-title"
+          tabIndex={-1}
+          onKeyDown={(e) => e.key === "Escape" && setShowModal(false)}
+        >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <Card className="relative w-full max-w-md z-10">
-            <CardHeader><CardTitle>{editing ? "Edit offer" : "New offer"}</CardTitle></CardHeader>
+            <CardHeader><CardTitle id="offer-modal-title">{editing ? "Edit offer" : "New offer"}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {[
                 { k: "title",       label: "Title *",              type: "text",     ph: "e.g. Halloween Special" },
                 { k: "description", label: "Description *",        type: "text",     ph: "What's included?" },
                 { k: "discount",    label: "Discount label",       type: "text",     ph: "e.g. 20% off, $10 off" },
                 { k: "expiresAt",   label: "Expires (optional)",   type: "datetime-local", ph: "" },
-              ].map(({ k, label, type, ph }) => (
+              ].map(({ k, label, type, ph }, index) => (
                 <div key={k}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
                   <Input type={type} placeholder={ph} value={form[k as keyof typeof form]}
+                    autoFocus={index === 0}
                     onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))} />
                 </div>
               ))}

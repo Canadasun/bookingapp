@@ -25,7 +25,7 @@ export default function Error({
           An unexpected error occurred. Your data is safe.
         </p>
         {error?.message && (
-          <p className="text-xs text-gray-400 font-mono bg-gray-50 rounded-lg px-3 py-2 mb-6 break-words">
+          <p className="text-xs text-gray-600 font-mono bg-gray-50 rounded-lg px-3 py-2 mb-6 break-words">
             {error.message}
           </p>
         )}
@@ -42,7 +42,7 @@ export default function Error({
           </button>
         </div>
         {error?.digest && (
-          <p className="text-xs text-gray-300 mt-5">Error ID: {error.digest}</p>
+          <p className="text-xs text-gray-600 mt-5">Error ID: {error.digest}</p>
         )}
       </div>
     </div>

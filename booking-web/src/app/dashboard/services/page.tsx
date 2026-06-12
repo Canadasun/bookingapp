@@ -110,12 +110,19 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="service-modal-title"
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      tabIndex={-1}
+    >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <Card className="relative w-full max-w-md z-10 max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-900">{editing ? "Edit service" : "New service"}</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+          <h3 id="service-modal-title" className="text-base font-semibold text-gray-900">{editing ? "Edit service" : "New service"}</h3>
+          <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <CardContent className="space-y-4 pt-4">
 
@@ -146,21 +153,23 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <select
+                  aria-label="Duration hours"
                   value={Math.floor(Number(form.durationMinutes || 0) / 60)}
                   onChange={e => f("durationMinutes", String(Number(e.target.value) * 60 + (Number(form.durationMinutes || 0) % 60)))}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                   {HOUR_OPTS.map(h => <option key={h} value={h}>{h} hour{h === 1 ? "" : "s"}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-gray-400">Hours</p>
+                <p className="mt-1 text-xs text-gray-600">Hours</p>
               </div>
               <div>
                 <select
+                  aria-label="Duration minutes"
                   value={Number(form.durationMinutes || 0) % 60}
                   onChange={e => f("durationMinutes", String(Math.floor(Number(form.durationMinutes || 0) / 60) * 60 + Number(e.target.value)))}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                   {MIN_OPTS.map(m => <option key={m} value={m}>{String(m).padStart(2, "0")} min</option>)}
                 </select>
-                <p className="mt-1 text-xs text-gray-400">Minutes</p>
+                <p className="mt-1 text-xs text-gray-600">Minutes</p>
               </div>
             </div>
             <p className="mt-1.5 text-xs text-violet-600 font-medium">Total: {fmtDurationLong(Number(form.durationMinutes || 0))}</p>
@@ -188,7 +197,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-gray-600">
               Use starting at when the final amount may change after seeing the client, pet, or job.
             </p>
           </div>
@@ -214,7 +223,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
                 <option value="">— None —</option>
                 {resources.filter(r => r.active).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
-              <p className="mt-1 text-xs text-gray-400">If set, the slot is blocked whenever this resource is already in use.</p>
+              <p className="mt-1 text-xs text-gray-600">If set, the slot is blocked whenever this resource is already in use.</p>
             </div>
           )}
 
@@ -223,6 +232,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
             <div className="flex gap-2 flex-wrap">
               {COLORS.map(c => (
                 <button key={c} onClick={() => f("color", c)}
+                  aria-label={`Select color ${c}${form.color === c ? " (selected)" : ""}`}
+                  aria-pressed={form.color === c}
                   className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
                   style={{ background: c, outline: form.color === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}>
                   {form.color === c && <Check className="w-3 h-3 text-white" />}
@@ -275,12 +286,19 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="category-modal-title"
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      tabIndex={-1}
+    >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <Card className="relative w-full max-w-sm z-10">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-900">{editing ? "Edit category" : "New category"}</h3>
-          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+          <h3 id="category-modal-title" className="text-base font-semibold text-gray-900">{editing ? "Edit category" : "New category"}</h3>
+          <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <CardContent className="space-y-4 pt-4">
           <div>
@@ -296,6 +314,8 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
             <div className="flex gap-2 flex-wrap">
               {CAT_COLORS.map(c => (
                 <button key={c} onClick={() => setColor(c)}
+                  aria-label={`Select color ${c}${color === c ? " (selected)" : ""}`}
+                  aria-pressed={color === c}
                   className="w-7 h-7 rounded-full flex items-center justify-center"
                   style={{ background: c, outline: color === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}>
                   {color === c && <Check className="w-3 h-3 text-white" />}
@@ -451,7 +471,7 @@ export default function ServicesPage() {
           </button>
           {showResources && (
             <div className="border-t border-gray-50">
-              <p className="text-xs text-gray-400 px-4 pt-3 pb-2">
+              <p className="text-xs text-gray-600 px-4 pt-3 pb-2">
                 Shared rooms, chairs, or equipment. Assign one to a service and the slot is blocked whenever that resource is already in use.
               </p>
 
@@ -492,7 +512,7 @@ export default function ServicesPage() {
                               {r.name}
                             </span>
                             {usedBy.length > 0 && (
-                              <span className="ml-2 text-xs text-gray-400">
+                              <span className="ml-2 text-xs text-gray-500">
                                 {usedBy.length} service{usedBy.length !== 1 ? "s" : ""}
                               </span>
                             )}
@@ -534,7 +554,7 @@ export default function ServicesPage() {
               )}
 
               {resources.length === 0 && (
-                <p className="px-4 pb-3 text-xs text-gray-400">No resources yet. Add one below.</p>
+                <p className="px-4 pb-3 text-xs text-gray-600">No resources yet. Add one below.</p>
               )}
 
               {/* Add new resource */}

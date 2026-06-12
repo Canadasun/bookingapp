@@ -236,7 +236,7 @@ export default function ClientDashboard() {
               upcoming.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                    <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" aria-hidden="true" />
                     <p className="text-sm font-medium text-gray-500">No upcoming appointments</p>
                     <Link href="/book" className="text-violet-600 text-sm hover:underline mt-2 inline-block font-medium">
                       Book your first appointment →
@@ -260,9 +260,9 @@ export default function ClientDashboard() {
               offers.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <Tag className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                    <Tag className="w-10 h-10 text-gray-200 mx-auto mb-3" aria-hidden="true" />
                     <p className="text-sm text-gray-400">No active offers right now</p>
-                    <p className="text-xs text-gray-300 mt-1">Check back soon!</p>
+                    <p className="text-xs text-gray-500 mt-1">Check back soon!</p>
                   </CardContent>
                 </Card>
               ) : offers.map((o) => (

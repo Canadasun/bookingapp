@@ -125,7 +125,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-300 mt-8">Thank you for your business · Powered by Pulse</p>
+        <p className="text-center text-xs text-gray-500 mt-8">Thank you for your business · Powered by Pulse</p>
       </div>
     </div>
   );

@@ -64,9 +64,12 @@ export function SwipeToDelete({ children, onDelete, label = 'Delete' }: { childr
       ref={ref}
       overshootRight={false}
       rightThreshold={40}
+      accessibilityHint="Swipe left to delete"
       renderRightActions={() => (
         <TouchableOpacity
           onPress={() => { ref.current?.close(); onDelete(); }}
+          accessibilityRole="button"
+          accessibilityLabel="Delete"
           style={{ width:84, backgroundColor:'#DC2626', borderRadius:14, alignItems:'center', justifyContent:'center', marginBottom:10, marginLeft:8 }}>
           <Ionicons name="trash-outline" size={20} color="#fff"/>
           <Text style={{ color:'#fff', fontSize:12, fontWeight:'700', marginTop:3 }}>{label}</Text>

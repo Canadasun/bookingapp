@@ -63,12 +63,18 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="apt-drawer-title"
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+        tabIndex={-1}
+        className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">Appointment details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <h2 id="apt-drawer-title" className="text-lg font-bold text-gray-900">Appointment details</h2>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
 
         {/* Content */}
@@ -106,7 +112,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
 
           {/* Client */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Client</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Client</p>
             <p className="font-semibold text-gray-900">{apt.client.name}</p>
             <p className="text-sm text-gray-500">{apt.client.email}</p>
             {apt.client.phone && <p className="text-sm text-gray-500">{formatPhoneDisplay(apt.client.phone)}</p>}
@@ -115,7 +121,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Notes */}
           {apt.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Notes</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
               <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{apt.notes}</p>
             </div>
           )}
@@ -123,7 +129,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Intake / consultation answers */}
           {apt.intakeAnswers && apt.intakeAnswers.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Intake form</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Intake form</p>
               <div className="space-y-2">
                 {apt.intakeAnswers.map((a, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg px-3 py-2">
@@ -147,6 +153,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {showCancelForm && (
             <div className="space-y-2">
               <Input placeholder="Reason for cancellation (optional)" value={cancelReason}
+                aria-label="Reason for cancellation (optional)"
                 onChange={(e) => setCancelReason(e.target.value)} />
               {feeEligible && (
                 <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -172,11 +179,11 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {showEditForm && (
             <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Edit booking</p>
-              <Input value={edit.clientName} onChange={(e) => setEdit((p) => ({ ...p, clientName: e.target.value }))} placeholder="Client name" />
-              <Input type="email" value={edit.clientEmail} onChange={(e) => setEdit((p) => ({ ...p, clientEmail: e.target.value }))} placeholder="Client email" />
-              <Input value={edit.clientPhone} onChange={(e) => setEdit((p) => ({ ...p, clientPhone: e.target.value }))} placeholder="Client phone" />
-              <Input type="datetime-local" value={edit.startsAt} onChange={(e) => setEdit((p) => ({ ...p, startsAt: e.target.value }))} />
-              <Input value={edit.notes} onChange={(e) => setEdit((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" />
+              <Input value={edit.clientName} onChange={(e) => setEdit((p) => ({ ...p, clientName: e.target.value }))} placeholder="Client name" aria-label="Client name" />
+              <Input type="email" value={edit.clientEmail} onChange={(e) => setEdit((p) => ({ ...p, clientEmail: e.target.value }))} placeholder="Client email" aria-label="Client email" />
+              <Input value={edit.clientPhone} onChange={(e) => setEdit((p) => ({ ...p, clientPhone: e.target.value }))} placeholder="Client phone" aria-label="Client phone" />
+              <Input type="datetime-local" value={edit.startsAt} onChange={(e) => setEdit((p) => ({ ...p, startsAt: e.target.value }))} aria-label="Appointment date and time" />
+              <Input value={edit.notes} onChange={(e) => setEdit((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" aria-label="Notes" />
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -277,7 +284,7 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
       </div>
       <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-100">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-400">{d}</div>
+          <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-500">{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7">
@@ -292,7 +299,7 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
               onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); setDragOverKey(null); if (id) onReschedule(id, k); }}
               className={cn("min-h-[96px] border-b border-r border-gray-50 p-1.5 transition-colors", !inMonth && "bg-gray-50/40", dragOverKey === k && "bg-violet-50 ring-1 ring-inset ring-violet-300")}>
               <div className={cn("text-xs mb-1 inline-flex items-center justify-center w-6 h-6 rounded-full",
-                isToday(day) ? "bg-violet-600 text-white font-bold" : inMonth ? "text-gray-700" : "text-gray-300")}>
+                isToday(day) ? "bg-violet-600 text-white font-bold" : inMonth ? "text-gray-700" : "text-gray-600")}>
                 {format(day, "d")}
               </div>
               <div className="space-y-0.5">
@@ -305,7 +312,7 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
                     <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "h:mm a")} {a.client.name}</span>
                   </button>
                 ))}
-                {list.length > 3 && <p className="px-1 text-[10px] text-gray-400">+{list.length - 3} more</p>}
+                {list.length > 3 && <p className="px-1 text-[10px] text-gray-500">+{list.length - 3} more</p>}
               </div>
             </div>
           );
@@ -396,34 +403,41 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" aria-hidden="true">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-apt-modal-title"
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+        tabIndex={-1}
+        aria-hidden="false"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <p className="text-base font-semibold text-gray-900">New appointment</p>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+          <p id="new-apt-modal-title" className="text-base font-semibold text-gray-900">New appointment</p>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="space-y-3">
           {/* Client */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Client name <span className="text-red-500">*</span></label>
-            <Input placeholder="Jane Smith" value={clientName} onChange={(e) => setClientName(e.target.value)} />
+            <label htmlFor="new-apt-client-name" className="block text-sm font-medium text-gray-700 mb-1">Client name <span className="text-red-500">*</span></label>
+            <Input id="new-apt-client-name" placeholder="Jane Smith" value={clientName} onChange={(e) => setClientName(e.target.value)} aria-required="true" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <Input type="tel" placeholder="(555) 123-4567" value={phone}
+            <label htmlFor="new-apt-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <Input id="new-apt-phone" type="tel" placeholder="(555) 123-4567" value={phone}
               onChange={(e) => setPhone(formatPhoneInput(e.target.value))} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <Input type="email" placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label htmlFor="new-apt-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <Input id="new-apt-email" type="email" placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <p className="text-xs text-gray-400 -mt-1">At least one of phone or email is required.</p>
+          <p className="text-xs text-gray-500 -mt-1">At least one of phone or email is required.</p>
 
           {/* Service */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Service <span className="text-red-500">*</span></label>
-            <select value={serviceId} onChange={(e) => setServiceId(e.target.value)}
+            <label htmlFor="new-apt-service" className="block text-sm font-medium text-gray-700 mb-1">Service <span className="text-red-500">*</span></label>
+            <select id="new-apt-service" value={serviceId} onChange={(e) => setServiceId(e.target.value)} aria-required="true"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
               {services.length === 0 && <option value="">Loading…</option>}
               {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -433,8 +447,8 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
           {/* Location filter (only shown when business has multiple locations) */}
           {locations.length > 1 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-              <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}
+              <label htmlFor="new-apt-location" className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <select id="new-apt-location" value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
                 <option value="">All locations</option>
                 {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -445,8 +459,8 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
           {/* Staff */}
           {staffList.length > 1 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Staff member <span className="text-red-500">*</span></label>
-              <select value={staffId} onChange={(e) => setStaffId(e.target.value)}
+              <label htmlFor="new-apt-staff" className="block text-sm font-medium text-gray-700 mb-1">Staff member <span className="text-red-500">*</span></label>
+              <select id="new-apt-staff" value={staffId} onChange={(e) => setStaffId(e.target.value)} aria-required="true"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
                 {filteredStaff.length === 0
                   ? <option value="">No staff at this location</option>
@@ -459,19 +473,19 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
           {/* Date & time */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <label htmlFor="new-apt-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <Input id="new-apt-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-required="true" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              <label htmlFor="new-apt-time" className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <Input id="new-apt-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-required="true" />
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <Input placeholder="Any notes for this appointment…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <label htmlFor="new-apt-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <Input id="new-apt-notes" placeholder="Any notes for this appointment…" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
           <Button className="w-full mt-1" loading={busy} onClick={submit}>Book appointment</Button>
@@ -535,48 +549,54 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="block-time-modal-title"
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+        tabIndex={-1}
+        className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <CalendarOff className="w-4 h-4 text-violet-600" />
-            <p className="text-sm font-semibold text-gray-900">Block time</p>
+            <p id="block-time-modal-title" className="text-sm font-semibold text-gray-900">Block time</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-3">
           {staffList.length > 1 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
-              <select value={staffId} onChange={(e) => setStaffId(e.target.value)}
+              <label htmlFor="block-provider" className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+              <select id="block-provider" value={staffId} onChange={(e) => setStaffId(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
                 {staffList.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
               </select>
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <Input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} />
+            <label htmlFor="block-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <Input id="block-date" type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} aria-required="true" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-              <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+              <label htmlFor="block-from" className="block text-sm font-medium text-gray-700 mb-1">From</label>
+              <Input id="block-from" type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-required="true" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-              <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+              <label htmlFor="block-to" className="block text-sm font-medium text-gray-700 mb-1">To</label>
+              <Input id="block-to" type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-required="true" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-            <Input placeholder="Lunch, holiday, personal…" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <label htmlFor="block-reason" className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+            <Input id="block-reason" placeholder="Lunch, holiday, personal…" value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
           <Button className="w-full" loading={busy} onClick={save}>Block this time</Button>
 
           {upcoming.length > 0 && (
             <div className="pt-2">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Upcoming blocks</p>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Upcoming blocks</p>
               <div className="space-y-1 max-h-40 overflow-y-auto">
                 {upcoming.map((b) => (
                   <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
@@ -584,7 +604,7 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
                       <p className="text-xs font-medium text-gray-700 truncate">
                         {format(new Date(b.startsAt), "EEE, MMM d · h:mm a")}–{format(new Date(b.endsAt), "h:mm a")}
                       </p>
-                      {b.reason && <p className="text-[11px] text-gray-400 truncate">{b.reason}</p>}
+                      {b.reason && <p className="text-[11px] text-gray-500 truncate">{b.reason}</p>}
                     </div>
                     <button onClick={() => remove(b.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0" aria-label="Remove block">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -691,7 +711,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
             "flex-1 text-center py-2 border-l border-gray-50",
             isSameDay(day, new Date()) && "bg-violet-50",
           )}>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{format(day, "EEE")}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{format(day, "EEE")}</p>
             <p className={cn("text-sm font-bold", isSameDay(day, new Date()) ? "text-violet-700" : "text-gray-700")}>{format(day, "d")}</p>
           </div>
         ))}
@@ -704,7 +724,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
           <div className="w-12 shrink-0 relative">
             {hours.map((h) => (
               <div key={h} style={{ position: "absolute", top: `${(h - GRID_START) * ROW_H - 8}px`, right: "4px" }}
-                className="text-[10px] text-gray-400 text-right w-10">
+                className="text-[10px] text-gray-500 text-right w-10">
                 {format(new Date(2000, 0, 1, h), "ha")}
               </div>
             ))}
@@ -798,7 +818,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
                 {/* Closed label */}
                 {!isOpen && bizHours.size > 0 && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest rotate-[-90deg]">Closed</span>
+                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest rotate-[-90deg]">Closed</span>
                   </div>
                 )}
               </div>
@@ -1010,6 +1030,7 @@ function AppointmentsPage() {
 
         <div className="flex items-center gap-1">
           <button onClick={() => { setShowSearch(s => !s); if (showSearch) setSearch(""); }}
+            aria-label="Filter"
             className={cn("p-2 rounded-xl border transition-colors", showSearch ? "bg-violet-50 border-violet-200 text-violet-600" : "border-gray-200 text-gray-400 hover:text-gray-600")}>
             <Search className="w-4 h-4" />
           </button>
@@ -1081,7 +1102,7 @@ function AppointmentsPage() {
             <div key={name} className="rounded-2xl border border-gray-100 bg-white shadow-sm">
               <div className="border-b border-gray-50 px-4 py-3">
                 <p className="text-sm font-semibold text-gray-900">{name}</p>
-                <p className="text-xs text-gray-400">{rows.length} appointment{rows.length === 1 ? "" : "s"}</p>
+                <p className="text-xs text-gray-500">{rows.length} appointment{rows.length === 1 ? "" : "s"}</p>
               </div>
               <div className="max-h-[520px] divide-y divide-gray-50 overflow-y-auto">
                 {rows.map((apt) => (
@@ -1114,7 +1135,7 @@ function AppointmentsPage() {
                     {format(new Date(apt.startsAt), "EEE, MMM d · h:mm a")} - {format(new Date(apt.endsAt), "h:mm a")}
                   </p>
                 </div>
-                <div className="text-xs text-gray-400 shrink-0">{formatPrice(apt.totalPriceCents || apt.service.priceCents)}</div>
+                <div className="text-xs text-gray-500 shrink-0">{formatPrice(apt.totalPriceCents || apt.service.priceCents)}</div>
               </div>
             </Card>
           ))}

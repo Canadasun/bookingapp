@@ -80,24 +80,24 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
             <>
               <Text style={[s.fieldLabel,{marginTop:12}]}>Recovery code</Text>
               <TextInput style={[s.input,{textAlign:'center',letterSpacing:2,fontSize:18}]} placeholder="xxxxx-xxxxx" placeholderTextColor={GRAY_400}
-                autoCapitalize="none" autoCorrect={false} value={recovery} onChangeText={(t)=>setRecovery(t.trim())} onSubmitEditing={verify} autoFocus/>
+                autoCapitalize="none" autoCorrect={false} value={recovery} onChangeText={(t)=>setRecovery(t.trim())} onSubmitEditing={verify} autoFocus accessibilityLabel="Recovery code"/>
             </>
           ) : (
             <>
               <Text style={[s.fieldLabel,{marginTop:12}]}>Verification code</Text>
               <TextInput style={[s.input,{textAlign:'center',letterSpacing:8,fontSize:20}]} placeholder="123456" placeholderTextColor={GRAY_400}
-                keyboardType="number-pad" value={code} onChangeText={(t)=>setCode(t.replace(/\D/g,'').slice(0,6))} onSubmitEditing={verify} autoFocus/>
+                keyboardType="number-pad" value={code} onChangeText={(t)=>setCode(t.replace(/\D/g,'').slice(0,6))} onSubmitEditing={verify} autoFocus accessibilityLabel="Verification code"/>
             </>
           )}
 
-          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||(recoveryMode?recovery.trim().length<4:code.trim().length<4)} onPress={verify}>
+          <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||(recoveryMode?recovery.trim().length<4:code.trim().length<4)} onPress={verify} accessibilityRole="button" accessibilityLabel="Sign in">
             {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Verify &amp; sign in</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={()=>setRecoveryMode(m=>!m)}>
+          <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={()=>setRecoveryMode(m=>!m)} accessibilityRole="button" accessibilityLabel={recoveryMode ? 'Use the code we sent instead' : 'Use a recovery code'}>
             <Text style={s.authSwitchLink}>{recoveryMode ? 'Use the code we sent instead' : 'Lost access? Use a recovery code'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={{ alignSelf:'center', marginTop:12 }} onPress={()=>{setChallenge(null);setCode('');setRecovery('');setRecoveryMode(false);}}>
+          <TouchableOpacity style={{ alignSelf:'center', marginTop:12 }} onPress={()=>{setChallenge(null);setCode('');setRecovery('');setRecoveryMode(false);}} accessibilityRole="button" accessibilityLabel="Go back">
             <Text style={s.authSwitchLink}>← Back to sign in</Text>
           </TouchableOpacity>
         </KeyboardAvoidingView>
@@ -117,28 +117,28 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
 
         <Text style={s.fieldLabel}>Email</Text>
         <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
-          keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail}/>
+          keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} accessibilityLabel="Email address"/>
 
         <Text style={[s.fieldLabel,{marginTop:12}]}>Password</Text>
         <View style={{position:'relative'}}>
           <TextInput style={s.input} placeholder="Password" placeholderTextColor={GRAY_400}
-            secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={login}/>
-          <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)}>
+            secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={login} accessibilityLabel="Password"/>
+          <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)} accessibilityRole="button" accessibilityLabel={showPw ? 'Hide password' : 'Show password'}>
             <Ionicons name={showPw?'eye-off-outline':'eye-outline'} size={18} color={GRAY_400}/>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={{ alignSelf:'flex-end', marginTop:8 }} onPress={onForgot}>
+        <TouchableOpacity style={{ alignSelf:'flex-end', marginTop:8 }} onPress={onForgot} accessibilityRole="button" accessibilityLabel="Forgot password">
           <Text style={s.authSwitchLink}>Forgot password?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={loading||!email||!password} onPress={login}>
+        <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={loading||!email||!password} onPress={login} accessibilityRole="button" accessibilityLabel="Sign in">
           {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Sign in</Text>}
         </TouchableOpacity>
 
         <View style={s.authSwitch}>
           <Text style={s.authSwitchText}>New here? </Text>
-          <TouchableOpacity onPress={onRegister}>
+          <TouchableOpacity onPress={onRegister} accessibilityRole="button" accessibilityLabel="Create account">
             <Text style={s.authSwitchLink}>Create your business</Text>
           </TouchableOpacity>
         </View>
@@ -176,7 +176,7 @@ function ForgotPasswordScreen({ onBack }: { onBack:()=>void }) {
         {sent ? (
           <>
             <Text style={s.loginSub}>If an account exists for {email.trim()}, we’ve emailed a reset link. It expires in 30 minutes.</Text>
-            <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={onBack}>
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to sign in">
               <Text style={s.btnPrimaryText}>Back to sign in</Text>
             </TouchableOpacity>
           </>
@@ -185,13 +185,13 @@ function ForgotPasswordScreen({ onBack }: { onBack:()=>void }) {
             <Text style={s.loginSub}>Enter your email and we’ll send you a reset link.</Text>
             <Text style={s.fieldLabel}>Email</Text>
             <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
-              keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} onSubmitEditing={submit}/>
-            <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||!email} onPress={submit}>
+              keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} onSubmitEditing={submit} accessibilityLabel="Email address"/>
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||!email} onPress={submit} accessibilityRole="button" accessibilityLabel="Send reset link">
               {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Send reset link</Text>}
             </TouchableOpacity>
             <View style={s.authSwitch}>
               <Text style={s.authSwitchText}>Remembered it? </Text>
-              <TouchableOpacity onPress={onBack}><Text style={s.authSwitchLink}>Sign in</Text></TouchableOpacity>
+              <TouchableOpacity onPress={onBack} accessibilityRole="button" accessibilityLabel="Sign in"><Text style={s.authSwitchLink}>Sign in</Text></TouchableOpacity>
             </View>
           </>
         )}
@@ -256,49 +256,53 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
 
           <Text style={s.fieldLabel}>Your name</Text>
           <TextInput style={s.input} placeholder="Jane Doe" placeholderTextColor={GRAY_400}
-            autoCapitalize="words" value={name} onChangeText={setName}/>
+            autoCapitalize="words" value={name} onChangeText={setName} accessibilityLabel="Full name"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Business name</Text>
           <TextInput style={s.input} placeholder="Jane’s Salon" placeholderTextColor={GRAY_400}
-            autoCapitalize="words" value={businessName} onChangeText={setBizName}/>
+            autoCapitalize="words" value={businessName} onChangeText={setBizName} accessibilityLabel="Business name"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Email</Text>
           <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
-            keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail}/>
+            keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} accessibilityLabel="Email address"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Business phone (optional)</Text>
           <TextInput style={s.input} placeholder="+1 (416) 555-0123" placeholderTextColor={GRAY_400}
             keyboardType="phone-pad" value={phone} onChangeText={text=>setPhone(formatPhoneInput(text))}
-            onBlur={()=>{ const np=normalizePhoneClient(phone); if(np) setPhone(np); }}/>
+            onBlur={()=>{ const np=normalizePhoneClient(phone); if(np) setPhone(np); }} accessibilityLabel="Business phone number"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Password</Text>
-          <View style={{position:'relative'}}>
+          <View style={{position:’relative’}}>
             <TextInput style={s.input} placeholder="At least 8 characters" placeholderTextColor={GRAY_400}
-              secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={submit}/>
-            <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)}>
-              <Ionicons name={showPw?'eye-off-outline':'eye-outline'} size={18} color={GRAY_400}/>
+              secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={submit} accessibilityLabel="Password"/>
+            <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)} accessibilityRole="button" accessibilityLabel={showPw ? ‘Hide password’ : ‘Show password’}>
+              <Ionicons name={showPw?’eye-off-outline’:’eye-outline’} size={18} color={GRAY_400}/>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={[s.policyCheck,{marginTop:18}]} activeOpacity={0.7} onPress={()=>setTerms(t=>!t)}>
+          <TouchableOpacity style={[s.policyCheck,{marginTop:18}]} activeOpacity={0.7} onPress={()=>setTerms(t=>!t)}
+            accessibilityRole="checkbox"
+            accessibilityLabel="Accept Terms of Service and Privacy Policy"
+            accessibilityState={{ checked: terms }}
+            accessibilityHint="Required to complete booking">
             <View style={[s.checkbox, terms&&s.checkboxActive]}>
               {terms&&<Ionicons name="checkmark" size={12} color="#fff"/>}
             </View>
             <Text style={s.policyCheckText}>
-              I agree to the{' '}
+              I agree to the{‘ ‘}
               <Text style={s.authSwitchLink} onPress={()=>Linking.openURL(`${WEB_URL}/terms`)}>Terms of Service</Text>
-              {' '}&amp;{' '}
+              {‘ ‘}&amp;{‘ ‘}
               <Text style={s.authSwitchLink} onPress={()=>Linking.openURL(`${WEB_URL}/privacy`)}>Privacy Policy</Text>
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[s.btnPrimary,{marginTop:18, opacity:terms?1:0.6}]} disabled={loading} onPress={submit}>
+          <TouchableOpacity style={[s.btnPrimary,{marginTop:18, opacity:terms?1:0.6}]} disabled={loading} onPress={submit} accessibilityRole="button" accessibilityLabel="Create account">
             {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Create account</Text>}
           </TouchableOpacity>
 
           <View style={s.authSwitch}>
             <Text style={s.authSwitchText}>Already have an account? </Text>
-            <TouchableOpacity onPress={onBack}>
+            <TouchableOpacity onPress={onBack} accessibilityRole="button" accessibilityLabel="Sign in">
               <Text style={s.authSwitchLink}>Sign in</Text>
             </TouchableOpacity>
           </View>
@@ -339,17 +343,17 @@ function ChangePasswordScreen({ onDone }: { onDone:()=>void }) {
 
         <Text style={s.fieldLabel}>Current password</Text>
         <TextInput style={s.input} placeholder="Current / temporary password" placeholderTextColor={GRAY_400}
-          secureTextEntry value={current} onChangeText={setCurrent}/>
+          secureTextEntry value={current} onChangeText={setCurrent} accessibilityLabel="Current password"/>
 
         <Text style={[s.fieldLabel,{marginTop:12}]}>New password</Text>
         <TextInput style={s.input} placeholder="At least 8 characters" placeholderTextColor={GRAY_400}
-          secureTextEntry value={next} onChangeText={setNext}/>
+          secureTextEntry value={next} onChangeText={setNext} accessibilityLabel="New password"/>
 
         <Text style={[s.fieldLabel,{marginTop:12}]}>Confirm new password</Text>
         <TextInput style={s.input} placeholder="Re-enter new password" placeholderTextColor={GRAY_400}
-          secureTextEntry value={confirm} onChangeText={setConfirm} onSubmitEditing={submit}/>
+          secureTextEntry value={confirm} onChangeText={setConfirm} onSubmitEditing={submit} accessibilityLabel="Confirm new password"/>
 
-        <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||!current||!next||!confirm} onPress={submit}>
+        <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||!current||!next||!confirm} onPress={submit} accessibilityRole="button" accessibilityLabel="Update password">
           {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Update password</Text>}
         </TouchableOpacity>
       </KeyboardAvoidingView>
@@ -514,7 +518,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
         <Text style={s.headerTitle}>Verify email</Text>
-        <TouchableOpacity onPress={onLogout}><Text style={s.authSwitchLink}>Sign out</Text></TouchableOpacity>
+        <TouchableOpacity onPress={onLogout} accessibilityRole="button" accessibilityLabel="Sign out"><Text style={s.authSwitchLink}>Sign out</Text></TouchableOpacity>
       </View>
       <View style={[s.center,{ padding:28 }]}>
         <Ionicons name="mail-unread-outline" size={44} color={BRAND}/>
@@ -522,7 +526,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
         <Text style={[s.loginSub,{ textAlign:'center', marginBottom:0 }]}>
           {user?.email ? `Verify ${user.email} to see your bookings and messages.` : 'Verify your email to see your bookings and messages.'}
         </Text>
-        <TouchableOpacity style={[s.btnPrimary,{ marginTop:22, alignSelf:'stretch' }]} onPress={resendVerification}>
+        <TouchableOpacity style={[s.btnPrimary,{ marginTop:22, alignSelf:'stretch' }]} onPress={resendVerification} accessibilityRole="button" accessibilityLabel="Resend verification email">
           <Text style={s.btnPrimaryText}>Resend verification</Text>
         </TouchableOpacity>
       </View>
@@ -532,7 +536,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
   if (selectedThread) return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>setSelectedThread(null)} style={{ marginRight:12 }}>
+        <TouchableOpacity onPress={()=>setSelectedThread(null)} style={{ marginRight:12 }} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{selectedThread.businessName}</Text>
@@ -550,9 +554,9 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
         </ScrollView>
         <View style={s.composeRow}>
           <TextInput style={s.composeInput} placeholder="Type a message..." placeholderTextColor={GRAY_400}
-            value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={sendClientMessage}/>
+            value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={sendClientMessage} accessibilityLabel="Message"/>
           <TouchableOpacity style={[s.sendBtn, (!reply.trim() || sending) && { opacity:0.4 }]}
-            disabled={!reply.trim() || sending} onPress={sendClientMessage}>
+            disabled={!reply.trim() || sending} onPress={sendClientMessage} accessibilityRole="button" accessibilityLabel="Send">
             <Ionicons name="send" size={18} color="#fff"/>
           </TouchableOpacity>
         </View>
@@ -566,7 +570,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.header}>
-          <TouchableOpacity onPress={()=>setSelectedAppointment(null)} style={{ marginRight:12 }}>
+          <TouchableOpacity onPress={()=>setSelectedAppointment(null)} style={{ marginRight:12 }} accessibilityRole="button" accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
           </TouchableOpacity>
           <Text style={s.headerTitle}>Booking</Text>
@@ -582,23 +586,23 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
             </View>
           </View>
           <View style={ms.card}>
-            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>openManage(a)}>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>openManage(a)} accessibilityRole="button" accessibilityLabel="Open manage link">
               <Text style={ms.rowTitle}>Open manage link</Text><Ionicons name="open-outline" size={16} color={GRAY_400}/>
             </TouchableOpacity>
             {upcoming && (
-              <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rescheduleClientAppointment(a)}>
+              <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rescheduleClientAppointment(a)} accessibilityRole="button" accessibilityLabel="Reschedule appointment">
                 <Text style={ms.rowTitle}>Reschedule</Text><Ionicons name="calendar-outline" size={16} color={GRAY_400}/>
               </TouchableOpacity>
             )}
             {upcoming && (
-              <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>cancelClientAppointment(a)}>
+              <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>cancelClientAppointment(a)} accessibilityRole="button" accessibilityLabel="Cancel appointment">
                 <Text style={[ms.rowTitle,{ color:'#DC2626' }]}>Cancel appointment</Text><Ionicons name="close-circle-outline" size={16} color="#DC2626"/>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rebook(a)}>
+            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rebook(a)} accessibilityRole="button" accessibilityLabel="Book again">
               <Text style={ms.rowTitle}>Book again</Text><Ionicons name="repeat-outline" size={16} color={GRAY_400}/>
             </TouchableOpacity>
-            <TouchableOpacity style={ms.notifRow} onPress={()=>review(a)}>
+            <TouchableOpacity style={ms.notifRow} onPress={()=>review(a)} accessibilityRole="button" accessibilityLabel="Leave a review">
               <Text style={ms.rowTitle}>Leave a review</Text><Ionicons name="star-outline" size={16} color={GRAY_400}/>
             </TouchableOpacity>
           </View>
@@ -612,7 +616,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.header}>
-          <TouchableOpacity onPress={()=>setClientReschedule(null)} style={{ marginRight:12 }}>
+          <TouchableOpacity onPress={()=>setClientReschedule(null)} style={{ marginRight:12 }} accessibilityRole="button" accessibilityLabel="Go back">
             <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
           </TouchableOpacity>
           <Text style={s.headerTitle}>Reschedule</Text>
@@ -623,7 +627,10 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
           <Text style={[s.fieldLabel,{ marginTop:16 }]}>Date</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingVertical:8 }}>
             {Array.from({ length:21 }, (_,i) => { const d = new Date(); d.setDate(d.getDate()+i); return d.toISOString().slice(0,10); }).map(d => (
-              <TouchableOpacity key={d} style={[s.datePill, clientReschedule.date===d && s.datePillActive]} onPress={()=>loadClientRescheduleSlots(a, d)}>
+              <TouchableOpacity key={d} style={[s.datePill, clientReschedule.date===d && s.datePillActive]} onPress={()=>loadClientRescheduleSlots(a, d)}
+                accessibilityRole="button"
+                accessibilityLabel={`Select date ${d}`}
+                accessibilityState={{ selected: clientReschedule.date===d }}>
                 <Text style={[s.datePillDay, clientReschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').toLocaleDateString('en-US',{ weekday:'short' })}</Text>
                 <Text style={[s.datePillNum, clientReschedule.date===d && { color:'#fff' }]}>{new Date(d+'T00:00:00').getDate()}</Text>
               </TouchableOpacity>
@@ -632,7 +639,9 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
           {clientReschedule.loading ? <ActivityIndicator color={BRAND} style={{ marginTop:20 }}/> : (
             <View style={s.slotGrid}>
               {clientReschedule.slots.map(sl => (
-                <TouchableOpacity key={sl.startsAt} style={s.slotBtn} onPress={()=>saveClientReschedule(sl.startsAt)}>
+                <TouchableOpacity key={sl.startsAt} style={s.slotBtn} onPress={()=>saveClientReschedule(sl.startsAt)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select time ${fmtTime(sl.startsAt)}`}>
                   <Text style={s.slotText}>{fmtTime(sl.startsAt)}</Text>
                 </TouchableOpacity>
               ))}
@@ -654,12 +663,15 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
         <Text style={s.headerTitle}>My account</Text>
-        <TouchableOpacity onPress={onLogout}><Ionicons name="log-out-outline" size={22} color="#EF4444"/></TouchableOpacity>
+        <TouchableOpacity onPress={onLogout} accessibilityRole="button" accessibilityLabel="Sign out"><Ionicons name="log-out-outline" size={22} color="#EF4444"/></TouchableOpacity>
       </View>
       <View style={{ flexDirection:'row', gap:8, paddingHorizontal:16, paddingTop:12 }}>
         {tabs.map(t => (
           <TouchableOpacity key={t.id} onPress={()=>setTab(t.id)}
-            style={[ms.methodChip, tab===t.id && ms.methodChipOn, { flex:1, flexDirection:'row', gap:6, justifyContent:'center' }]}>
+            style={[ms.methodChip, tab===t.id && ms.methodChipOn, { flex:1, flexDirection:'row', gap:6, justifyContent:'center' }]}
+            accessibilityRole="button"
+            accessibilityLabel={t.label}
+            accessibilityState={{ selected: tab===t.id }}>
             <Ionicons name={t.icon} size={16} color={tab===t.id ? BRAND : GRAY_500}/>
             <Text style={[ms.methodChipText, tab===t.id && { color:BRAND }]}>{t.label}</Text>
           </TouchableOpacity>
@@ -675,7 +687,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
           {tab === 'bookings' && (
             <>
               {appointments.map(a => (
-                <TouchableOpacity key={a.id} style={s.card} onPress={()=>setSelectedAppointment(a)}>
+                <TouchableOpacity key={a.id} style={s.card} onPress={()=>setSelectedAppointment(a)} accessibilityRole="button" accessibilityLabel={`${a.service.name} at ${a.business.name}`}>
                   <View style={[s.dot,{ backgroundColor: STATUS_COLOR[a.status] ?? GRAY_400 }]}/>
                   <View style={s.cardBody}>
                     <Text style={s.clientName}>{a.service.name}</Text>
@@ -694,7 +706,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
               {threads.map(t => {
                 const last = t.messages[t.messages.length - 1];
                 return (
-                  <TouchableOpacity key={`${t.businessId}:${t.clientId}`} style={s.card} onPress={()=>setSelectedThread(t)}>
+                  <TouchableOpacity key={`${t.businessId}:${t.clientId}`} style={s.card} onPress={()=>setSelectedThread(t)} accessibilityRole="button" accessibilityLabel={`Message thread with ${t.businessName}`}>
                     <View style={s.avatar}><Text style={s.avatarText}>{t.businessName.slice(0,2).toUpperCase()}</Text></View>
                     <View style={s.cardBody}>
                       <Text style={s.clientName}>{t.businessName}</Text>

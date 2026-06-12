@@ -54,15 +54,22 @@ export function ClientMergeModal({ bizId, onClose, onMerged }: { bizId: string; 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="client-merge-modal-title"
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      tabIndex={-1}
+    >
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div className="relative z-10 w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="sticky top-0 bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-violet-600" />
-            <p className="text-sm font-semibold text-gray-900">Merge duplicate clients</p>
+            <p id="client-merge-modal-title" className="text-sm font-semibold text-gray-900">Merge duplicate clients</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-5">
@@ -79,8 +86,13 @@ export function ClientMergeModal({ bizId, onClose, onMerged }: { bizId: string; 
                 {grp.clients.map((c) => (
                   <label key={c.id} className={cn("flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors",
                     choice[i]?.primaryId === c.id ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:bg-gray-50")}>
-                    <input type="radio" className="mt-1 accent-violet-600" checked={choice[i]?.primaryId === c.id}
-                      onChange={() => setChoice((p) => ({ ...p, [i]: { primaryId: c.id, name: p[i]?.name ?? c.name } }))} />
+                    <input
+                      type="radio"
+                      className="mt-1 accent-violet-600"
+                      aria-label={`Select ${c.name} as primary client`}
+                      checked={choice[i]?.primaryId === c.id}
+                      onChange={() => setChoice((p) => ({ ...p, [i]: { primaryId: c.id, name: p[i]?.name ?? c.name } }))}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
                       <p className="text-xs text-gray-500 truncate">{c.email}{c.phone ? ` · ${c.phone}` : ""}</p>
@@ -93,8 +105,8 @@ export function ClientMergeModal({ bizId, onClose, onMerged }: { bizId: string; 
                 <label className="block text-xs font-medium text-gray-600 mb-1">Keep this name</label>
                 <Input value={choice[i]?.name ?? ""} onChange={(e) => setChoice((p) => ({ ...p, [i]: { primaryId: p[i]?.primaryId ?? grp.clients[0].id, name: e.target.value } }))} />
               </div>
-              <p className="text-[11px] text-gray-400 mt-2">All bookings, payments, messages and follow-ups move onto the selected record; the others are deleted.</p>
-              <Button size="sm" className="mt-3 w-full" loading={busy === i} onClick={() => merge(i)}>
+              <p className="text-[11px] text-gray-600 mt-2">All bookings, payments, messages and follow-ups move onto the selected record; the others are deleted.</p>
+              <Button size="sm" className="mt-3 w-full" aria-label={`Merge ${grp.clients.length} duplicate client records into one`} loading={busy === i} onClick={() => merge(i)}>
                 Merge {grp.clients.length} into one
               </Button>
             </div>

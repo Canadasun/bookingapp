@@ -428,7 +428,7 @@ function SettingsPage() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-400 mt-0.5">Manage your business profile and booking preferences</p>
+        <p className="text-sm text-gray-600 mt-0.5">Manage your business profile and booking preferences</p>
       </div>
 
       {/* Duplicate account warning */}
@@ -491,7 +491,7 @@ function SettingsPage() {
               <div className="p-6 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Business profile</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">This information appears on your booking page.</p>
+                  <p className="text-xs text-gray-600 mt-0.5">This information appears on your booking page.</p>
                 </div>
                 <hr className="border-gray-100" />
 
@@ -562,7 +562,8 @@ function SettingsPage() {
                     <Input type="tel" placeholder="+1 (416) 555-0123" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
                   </Field>
                   <Field label="Timezone">
-                    <select value={(form.timezone as string) ?? "America/New_York"} onChange={(e) => f("timezone", e.target.value)}
+                    <label htmlFor="biz-timezone" className="sr-only">Timezone</label>
+                    <select id="biz-timezone" value={(form.timezone as string) ?? "America/New_York"} onChange={(e) => f("timezone", e.target.value)}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                       {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}
                     </select>
@@ -573,7 +574,8 @@ function SettingsPage() {
                     <Input value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
                   </Field>
                   <Field label="Currency">
-                    <select value={(form.currency as string) ?? "CAD"} onChange={(e) => f("currency", e.target.value)}
+                    <label htmlFor="biz-currency" className="sr-only">Currency</label>
+                    <select id="biz-currency" value={(form.currency as string) ?? "CAD"} onChange={(e) => f("currency", e.target.value)}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                       <option value="CAD">CAD — Canadian dollar (CA$)</option>
                       <option value="USD">USD — US dollar ($)</option>
@@ -680,6 +682,7 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Clients can move appointments from their secure manage link when outside your policy window.</p>
                   </div>
                   <button type="button" onClick={() => f("allowClientReschedule", !form.allowClientReschedule)}
+                    aria-label="Toggle client self-reschedule"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.allowClientReschedule ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.allowClientReschedule ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -799,6 +802,7 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online. Basic+</p>
                   </div>
                   <button type="button" onClick={() => isPaid ? f("requireDeposit", !form.requireDeposit) : promptUpgrade("BASIC", "Deposits")}
+                    aria-label="Toggle require deposit at booking"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.requireDeposit ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.requireDeposit ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -819,6 +823,7 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Ask every client to save a card with Stripe at booking (no upfront charge) so you can collect deposits/no-show/late-cancel fees later. Basic+</p>
                   </div>
                   <button type="button" onClick={() => isPaid ? f("collectCardOnFile", !form.collectCardOnFile) : promptUpgrade("BASIC", "Card on file")}
+                    aria-label="Toggle collect a card on file"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.collectCardOnFile ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.collectCardOnFile ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -856,6 +861,7 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Basic+ businesses can charge a client manually from checkout for fees, balances, or add-ons.</p>
                   </div>
                   <button type="button" onClick={() => isPaid ? toast.success("Manual charges are available on your plan") : promptUpgrade("BASIC", "Manual charges")}
+                    aria-label="Toggle manual charges"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", isPaid ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", isPaid ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -877,7 +883,7 @@ function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2 bg-white border border-violet-200 rounded-xl px-4 py-3">
                     <code className="text-sm text-violet-600 flex-1 truncate">{bookingUrl}</code>
-                    <button type="button" onClick={copyUrl} className="text-gray-400 hover:text-violet-600 transition-colors shrink-0">
+                    <button type="button" onClick={copyUrl} aria-label="Copy booking URL" className="text-gray-400 hover:text-violet-600 transition-colors shrink-0">
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
@@ -920,7 +926,7 @@ function SettingsPage() {
                   <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It uses your public business ID instead of an email-derived slug.</p>
                   <div className="flex items-start gap-2 bg-gray-900 rounded-xl px-4 py-3">
                     <code className="text-xs text-gray-100 flex-1 break-all font-mono">{embedSnippet}</code>
-                    <button type="button" onClick={copyEmbed} className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
+                    <button type="button" onClick={copyEmbed} aria-label="Copy embed snippet" className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
                       {embedCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
@@ -1031,7 +1037,8 @@ function SettingsPage() {
                       <Input placeholder="Address (optional)" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <Input placeholder="+1 (416) 555-0123" type="tel" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} />
-                        <select value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
+                        <label htmlFor="loc-timezone" className="sr-only">Location timezone</label>
+                        <select id="loc-timezone" value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
                           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
                           <option value="">Same timezone as business</option>
                           {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}

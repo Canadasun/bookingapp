@@ -211,7 +211,7 @@ function BookScreen() {
   return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
-        <TouchableOpacity onPress={()=>nav.goBack()} style={{marginRight:6}} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+        <TouchableOpacity onPress={()=>nav.goBack()} style={{marginRight:6}} hitSlop={{top:8,bottom:8,left:8,right:8}} accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle}>Book appointment</Text>
@@ -260,7 +260,10 @@ function BookScreen() {
                     return (
                       <TouchableOpacity key={sv.id} activeOpacity={0.7}
                         style={[s.card, sel && {borderColor:BRAND,backgroundColor:BRAND_LT}]}
-                        onPress={()=>toggleSvc(sv)}>
+                        onPress={()=>toggleSvc(sv)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select ${sv.name}, ${totalPrice([sv])}`}
+                        accessibilityState={{ selected: sel }}>
                         <View style={[s.svcDot,{backgroundColor:sv.color}]}/>
                         <View style={{flex:1}}>
                           <Text style={[s.clientName, sel&&{color:BRAND}]}>{sv.name}</Text>
@@ -282,17 +285,18 @@ function BookScreen() {
                 <Text style={s.cartText}>{selectedSvcs.length} service{selectedSvcs.length>1?'s':''} · {totalDuration(selectedSvcs)} · {totalPrice(selectedSvcs)}</Text>
               </View>
             )}
-            <TouchableOpacity style={[s.btnPrimary,{marginTop:16,opacity:selectedSvcs.length===0?0.4:1}]} disabled={selectedSvcs.length===0} onPress={goToStaff}>
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:16,opacity:selectedSvcs.length===0?0.4:1}]} disabled={selectedSvcs.length===0} onPress={goToStaff} accessibilityRole="button" accessibilityLabel="Continue">
               <Text style={s.btnPrimaryText}>Continue</Text>
             </TouchableOpacity>
           </>}
 
           {/* ── Staff ──────────────────────────────────────────────── */}
           {step==='staff' && <>
-            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('service')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
+            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('service')} accessibilityRole="button" accessibilityLabel="Go back"><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Choose a provider</Text>
             <TouchableOpacity style={[s.card, staff==='any'&&{borderColor:BRAND,backgroundColor:BRAND_LT}]}
-              activeOpacity={0.7} disabled={staffList.length===0} onPress={()=>{setStaff('any');setStep('date');}}>
+              activeOpacity={0.7} disabled={staffList.length===0} onPress={()=>{setStaff('any');setStep('date');}}
+              accessibilityRole="button" accessibilityLabel="Select Any available" accessibilityState={{ selected: staff==='any' }}>
               <View style={[s.avatar,{backgroundColor:GRAY_100}]}><Text style={{fontSize:18}}>✨</Text></View>
               <View style={{flex:1}}>
                 <Text style={s.clientName}>Any available</Text>
@@ -303,7 +307,10 @@ function BookScreen() {
             {staffList.length===0&&<Text style={[s.emptyText,{marginTop:8}]}>No staff available for selected services</Text>}
             {staffList.map(st=>(
               <TouchableOpacity key={st.id} style={[s.card, (staff&&staff!=='any'&&(staff as Staff).id===st.id)&&{borderColor:BRAND,backgroundColor:BRAND_LT}]}
-                activeOpacity={0.7} onPress={()=>{setStaff(st);setStep('date');}}>
+                activeOpacity={0.7} onPress={()=>{setStaff(st);setStep('date');}}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${st.user.name}`}
+                accessibilityState={{ selected: !!(staff&&staff!=='any'&&(staff as Staff).id===st.id) }}>
                 <View style={s.avatar}><Text style={s.avatarText}>{st.user.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</Text></View>
                 <View style={{flex:1}}>
                   <Text style={s.clientName}>{st.user.name}</Text>
@@ -316,7 +323,7 @@ function BookScreen() {
 
           {/* ── Date strip ─────────────────────────────────────────── */}
           {step==='date' && <>
-            <TouchableOpacity style={s.backBtn} onPress={()=>setStep(showStaffStep ? 'staff' : 'service')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
+            <TouchableOpacity style={s.backBtn} onPress={()=>setStep(showStaffStep ? 'staff' : 'service')} accessibilityRole="button" accessibilityLabel="Go back"><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Pick a date</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom:16}}>
               {dateStrip.map(d=>{
@@ -325,7 +332,10 @@ function BookScreen() {
                 return (
                   <TouchableOpacity key={d} activeOpacity={0.7}
                     style={[s.datePill, sel&&s.datePillActive]}
-                    onPress={()=>pickDate(d)}>
+                    onPress={()=>pickDate(d)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Select date ${d}`}
+                    accessibilityState={{ selected: sel }}>
                     <Text style={[s.datePillDay, sel&&{color:'#fff'}]}>{day}</Text>
                     <Text style={[s.datePillNum, sel&&{color:'#fff'}]}>{num}</Text>
                   </TouchableOpacity>
@@ -337,7 +347,7 @@ function BookScreen() {
 
           {/* ── Time slots ─────────────────────────────────────────── */}
           {step==='time' && <>
-            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('date')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
+            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('date')} accessibilityRole="button" accessibilityLabel="Go back"><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <Text style={s.stepLabel}>Available times</Text>
             <Text style={[s.sub,{marginBottom:12}]}>{new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</Text>
             <View style={[s.policyBox,{ marginBottom:14 }]}>
@@ -346,28 +356,31 @@ function BookScreen() {
               <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:10, marginTop:14, marginBottom:4 }}>
                 {/* Hour */}
                 <View style={{ alignItems:'center' }}>
-                  <TouchableOpacity onPress={()=>setManualHour(h=>h===12?1:h+1)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-up" size={20} color={GRAY_500}/></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>setManualHour(h=>h===12?1:h+1)} hitSlop={{top:6,bottom:6,left:10,right:10}} accessibilityRole="button" accessibilityLabel="Increase time" accessibilityHint="Double tap to change time"><Ionicons name="chevron-up" size={20} color={GRAY_500}/></TouchableOpacity>
                   <Text style={{ fontSize:28, fontWeight:'800', color:GRAY_900, marginVertical:2, minWidth:46, textAlign:'center' }}>{String(manualHour).padStart(2,'0')}</Text>
-                  <TouchableOpacity onPress={()=>setManualHour(h=>h===1?12:h-1)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-down" size={20} color={GRAY_500}/></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>setManualHour(h=>h===1?12:h-1)} hitSlop={{top:6,bottom:6,left:10,right:10}} accessibilityRole="button" accessibilityLabel="Decrease time" accessibilityHint="Double tap to change time"><Ionicons name="chevron-down" size={20} color={GRAY_500}/></TouchableOpacity>
                 </View>
                 <Text style={{ fontSize:28, fontWeight:'800', color:GRAY_400 }}>:</Text>
                 {/* Minute (5-min steps) */}
                 <View style={{ alignItems:'center' }}>
-                  <TouchableOpacity onPress={()=>setManualMin(m=>(m+5)%60)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-up" size={20} color={GRAY_500}/></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>setManualMin(m=>(m+5)%60)} hitSlop={{top:6,bottom:6,left:10,right:10}} accessibilityRole="button" accessibilityLabel="Increase time" accessibilityHint="Double tap to change time"><Ionicons name="chevron-up" size={20} color={GRAY_500}/></TouchableOpacity>
                   <Text style={{ fontSize:28, fontWeight:'800', color:GRAY_900, marginVertical:2, minWidth:46, textAlign:'center' }}>{String(manualMin).padStart(2,'0')}</Text>
-                  <TouchableOpacity onPress={()=>setManualMin(m=>(m+55)%60)} hitSlop={{top:6,bottom:6,left:10,right:10}}><Ionicons name="chevron-down" size={20} color={GRAY_500}/></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>setManualMin(m=>(m+55)%60)} hitSlop={{top:6,bottom:6,left:10,right:10}} accessibilityRole="button" accessibilityLabel="Decrease time" accessibilityHint="Double tap to change time"><Ionicons name="chevron-down" size={20} color={GRAY_500}/></TouchableOpacity>
                 </View>
                 {/* AM / PM */}
                 <View style={{ gap:6, marginLeft:8 }}>
                   {(['AM','PM'] as const).map(mer => (
                     <TouchableOpacity key={mer} onPress={()=>setManualMeridiem(mer)}
-                      style={[s.slotBtn, manualMeridiem===mer && s.slotBtnActive, { paddingVertical:6, paddingHorizontal:14 }]}>
+                      style={[s.slotBtn, manualMeridiem===mer && s.slotBtnActive, { paddingVertical:6, paddingHorizontal:14 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${mer} frequency`}
+                      accessibilityState={{ selected: manualMeridiem===mer }}>
                       <Text style={[s.slotText, manualMeridiem===mer && s.slotTextActive]}>{mer}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
-              <TouchableOpacity style={[s.btnSecondary,{ marginTop:12 }]} onPress={()=>{ setCustomStartsAt(manualStartsAt()); setOverrideCalendar(true); setSlot(null); setStep('details'); }}>
+              <TouchableOpacity style={[s.btnSecondary,{ marginTop:12 }]} onPress={()=>{ setCustomStartsAt(manualStartsAt()); setOverrideCalendar(true); setSlot(null); setStep('details'); }} accessibilityRole="button" accessibilityLabel={`Use ${manualLabel}`}>
                 <Text style={s.btnSecondaryText}>Use {manualLabel}</Text>
               </TouchableOpacity>
             </View>
@@ -377,28 +390,34 @@ function BookScreen() {
                 <Ionicons name="time-outline" size={28} color={GRAY_400}/>
                 <Text style={[ms.rowTitle,{ marginTop:8, textAlign:'center' }]}>Fully booked on this day</Text>
                 <Text style={[ms.empty,{ textAlign:'center', marginTop:4 }]}>Join the waitlist and we'll contact you when a spot opens.</Text>
-                <TouchableOpacity style={[s.btnPrimary,{ marginTop:12, paddingHorizontal:24 }]} onPress={()=>setWlPrompt(true)}>
+                <TouchableOpacity style={[s.btnPrimary,{ marginTop:12, paddingHorizontal:24 }]} onPress={()=>setWlPrompt(true)} accessibilityRole="button" accessibilityLabel="Join Waitlist">
                   <Text style={s.btnPrimaryText}>Join Waitlist</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={s.slotGrid}>
-                {slots.map(sl=>(
-                  <TouchableOpacity key={`${sl.staffId ?? 'staff'}-${sl.startsAt}`} style={[s.slotBtn, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotBtnActive]}
-                    onPress={()=>{setSlot(sl);setStep('details');}}>
-                    <Text style={[s.slotText, slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId&&s.slotTextActive]}>
-                      {fmtTime(sl.startsAtLocal)}
-                    </Text>
-                    {showStaffStep && sl.staffName && <Text style={[s.sub,{fontSize:10,textAlign:'center',marginTop:2}]} numberOfLines={1}>{sl.staffName}</Text>}
-                  </TouchableOpacity>
-                ))}
+                {slots.map(sl=>{
+                  const slotSelected = slot?.startsAt===sl.startsAt&&slot?.staffId===sl.staffId;
+                  return (
+                    <TouchableOpacity key={`${sl.staffId ?? 'staff'}-${sl.startsAt}`} style={[s.slotBtn, slotSelected&&s.slotBtnActive]}
+                      onPress={()=>{setSlot(sl);setStep('details');}}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select time ${fmtTime(sl.startsAtLocal)}`}
+                      accessibilityState={{ selected: slotSelected }}>
+                      <Text style={[s.slotText, slotSelected&&s.slotTextActive]}>
+                        {fmtTime(sl.startsAtLocal)}
+                      </Text>
+                      {showStaffStep && sl.staffName && <Text style={[s.sub,{fontSize:10,textAlign:'center',marginTop:2}]} numberOfLines={1}>{sl.staffName}</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </>}
 
           {/* ── Details + Policy ───────────────────────────────────── */}
           {step==='details' && <>
-            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('time')}><Text style={s.backText}>← Back</Text></TouchableOpacity>
+            <TouchableOpacity style={s.backBtn} onPress={()=>setStep('time')} accessibilityRole="button" accessibilityLabel="Go back"><Text style={s.backText}>← Back</Text></TouchableOpacity>
             <View style={s.summaryBox}>
               <Text style={s.summaryTitle}>{selectedSvcs.map(s=>s.name).join(' + ')}</Text>
               <Text style={s.summarySub}>
@@ -407,14 +426,15 @@ function BookScreen() {
               <Text style={[s.summarySub,{marginTop:4}]}>{totalDuration(selectedSvcs)} · {totalPrice(selectedSvcs)}</Text>
             </View>
             {[
-              {k:'name',   label:'Full name *',    type:'default' as const,       ph:'Jane Doe'},
-              {k:'email',  label:'Email',            type:'email-address' as const, ph:'you@example.com'},
-              {k:'phone',  label:'Phone',            type:'phone-pad' as const,     ph:'+1 (416) 555-0123'},
-            ].map(({k,label,type,ph})=>(
+              {k:'name',   label:'Full name *',    type:'default' as const,       ph:'Jane Doe',            a11yLabel:'Full name'},
+              {k:'email',  label:'Email',            type:'email-address' as const, ph:'you@example.com',     a11yLabel:'Email address'},
+              {k:'phone',  label:'Phone',            type:'phone-pad' as const,     ph:'+1 (416) 555-0123',   a11yLabel:'Phone number'},
+            ].map(({k,label,type,ph,a11yLabel})=>(
               <View key={k} style={{marginBottom:12}}>
                 <Text style={s.fieldLabel}>{label}</Text>
                 <TextInput style={s.input} placeholder={ph} placeholderTextColor={GRAY_400}
                   keyboardType={type} autoCapitalize={k==='name'?'words':'none'}
+                  accessibilityLabel={a11yLabel}
                   value={form[k as keyof typeof form]}
                   onChangeText={k==='phone' ? (text=>setForm(p=>({...p,phone:formatPhoneInput(text)}))) : (v=>setForm(p=>({...p,[k]:v})))}
                   onBlur={k==='phone'?()=>{ const np=normalizePhoneClient(form.phone); if(np) setForm(p=>({...p,phone:np})); }:undefined}/>
@@ -428,7 +448,10 @@ function BookScreen() {
                 const on = (freq===null && !repeat) || (repeat?.frequency===freq);
                 return (
                   <TouchableOpacity key={label} onPress={()=>setRepeat(freq===null ? null : { frequency:freq, count: repeat?.count ?? 4 })}
-                    style={[s.slotBtn, on && s.slotBtnActive]}>
+                    style={[s.slotBtn, on && s.slotBtnActive]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${label} frequency`}
+                    accessibilityState={{ selected: on }}>
                     <Text style={[s.slotText, on && s.slotTextActive]}>{label}</Text>
                   </TouchableOpacity>
                 );
@@ -437,9 +460,9 @@ function BookScreen() {
             {repeat && (
               <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginBottom:14 }}>
                 <Text style={[s.fieldLabel,{ marginBottom:0 }]}>Times</Text>
-                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.max(1,r.count-1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>−</Text></TouchableOpacity>
+                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.max(1,r.count-1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]} accessibilityRole="button" accessibilityLabel="Decrease time"><Text style={s.slotText}>−</Text></TouchableOpacity>
                 <Text style={{ fontSize:18, fontWeight:'800', color:GRAY_900, minWidth:28, textAlign:'center' }}>{repeat.count}</Text>
-                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.min(12,r.count+1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]}><Text style={s.slotText}>+</Text></TouchableOpacity>
+                <TouchableOpacity onPress={()=>setRepeat(r=>r?{...r,count:Math.min(12,r.count+1)}:r)} style={[s.slotBtn,{ paddingHorizontal:16 }]} accessibilityRole="button" accessibilityLabel="Increase time"><Text style={s.slotText}>+</Text></TouchableOpacity>
               </View>
             )}
             {/* How did you hear about us */}
@@ -447,7 +470,10 @@ function BookScreen() {
             <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginBottom:14 }}>
               {(['Instagram','TikTok','Google','Facebook','Referral','Walk-in','Returning','Other'] as const).map(src=>(
                 <TouchableOpacity key={src} onPress={()=>setReferralSource(s=>s===src?'':src)}
-                  style={[s.slotBtn, referralSource===src&&s.slotBtnActive]}>
+                  style={[s.slotBtn, referralSource===src&&s.slotBtnActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={src}
+                  accessibilityState={{ selected: referralSource===src }}>
                   <Text style={[s.slotText, referralSource===src&&s.slotTextActive]}>{src}</Text>
                 </TouchableOpacity>
               ))}
@@ -456,14 +482,18 @@ function BookScreen() {
             <View style={s.policyBox}>
               <Text style={s.policyTitle}>Cancellation Policy</Text>
               <Text style={s.policyText}>Appointments cancelled within 24 hours may be subject to a cancellation fee. No-shows may be charged a fee. Please contact us at least 24 hours in advance if you need to cancel or reschedule.</Text>
-              <TouchableOpacity style={s.policyCheck} activeOpacity={0.7} onPress={()=>setPolicyAccepted(p=>!p)}>
+              <TouchableOpacity style={s.policyCheck} activeOpacity={0.7} onPress={()=>setPolicyAccepted(p=>!p)}
+                accessibilityRole="checkbox"
+                accessibilityLabel="Accept booking policy"
+                accessibilityState={{ checked: policyAccepted }}
+                accessibilityHint="Required to complete booking">
                 <View style={[s.checkbox, policyAccepted&&s.checkboxActive]}>
                   {policyAccepted&&<Ionicons name="checkmark" size={12} color="#fff"/>}
                 </View>
                 <Text style={s.policyCheckText}>I agree to the cancellation policy</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={[s.btnPrimary,{opacity:loading||!policyAccepted?0.5:1}]} disabled={loading||!policyAccepted} onPress={book}>
+            <TouchableOpacity style={[s.btnPrimary,{opacity:loading||!policyAccepted?0.5:1}]} disabled={loading||!policyAccepted} onPress={book} accessibilityRole="button" accessibilityLabel="Book appointment">
               <Text style={s.btnPrimaryText}>{loading?'Booking…':(repeat?`Confirm ${repeat.count}-visit series`:'Confirm booking')}</Text>
             </TouchableOpacity>
           </>}
@@ -475,10 +505,10 @@ function BookScreen() {
               <Text style={s.doneTitle}>You're booked!</Text>
               <Text style={s.doneSub}>Confirmation sent to {form.email || form.phone}</Text>
               <Text style={s.doneRef}>Ref #{bookedId.slice(-8).toUpperCase()}</Text>
-              <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={reset}>
+              <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={reset} accessibilityRole="button" accessibilityLabel="Book another appointment">
                 <Text style={s.btnPrimaryText}>Book another</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.btnGhost,{marginTop:4}]} onPress={()=>nav.goBack()}>
+              <TouchableOpacity style={[s.btnGhost,{marginTop:4}]} onPress={()=>nav.goBack()} accessibilityRole="button" accessibilityLabel="Back to calendar">
                 <Text style={s.btnGhostText}>Back to calendar</Text>
               </TouchableOpacity>
             </View>
@@ -489,14 +519,14 @@ function BookScreen() {
       <Modal visible={wlPrompt} animationType="slide" onRequestClose={()=>setWlPrompt(false)}>
         <SafeAreaView style={s.screen}>
           <View style={s.header}>
-            <TouchableOpacity onPress={()=>setWlPrompt(false)} style={{marginRight:6}}>
+            <TouchableOpacity onPress={()=>setWlPrompt(false)} style={{marginRight:6}} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={GRAY_700}/>
             </TouchableOpacity>
             <Text style={s.headerTitle}>Join Waitlist</Text>
           </View>
           <ScrollView contentContainerStyle={s.listContent}>
             <Text style={ms.empty}>We'll notify you the moment a spot opens up.</Text>
-            <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={wlSaving} onPress={async()=>{
+            <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={wlSaving} accessibilityRole="button" accessibilityLabel="Notify me when a spot opens" onPress={async()=>{
               setWlSaving(true);
               try {
                 await api(`/businesses/${bizId()}/waitlist`, { method:'POST', body: JSON.stringify({
