@@ -67,11 +67,11 @@ export default function WaitlistPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{e.name}</p>
                   <p className="text-sm text-gray-500 truncate">{e.email}{e.phone ? ` · ${e.phone}` : ""}</p>
-                  <p className=”text-xs text-gray-500 mt-0.5”>
-                    Joined {format(new Date(e.createdAt), “MMM d”)}
-                    {e.desiredDate ? ` · prefers ${format(new Date(e.desiredDate), “MMM d”)}` : “”}
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Joined {format(new Date(e.createdAt), "MMM d")}
+                    {e.desiredDate ? ` · prefers ${format(new Date(e.desiredDate), "MMM d")}` : ""}
                   </p>
-                  {e.notes ? <p className=”text-xs text-gray-500 mt-0.5 italic”>”{e.notes}”</p> : null}
+                  {e.notes ? <p className="text-xs text-gray-500 mt-0.5 italic">&ldquo;{e.notes}&rdquo;</p> : null}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {e.phone && <a href={`tel:${e.phone}`} className="text-gray-400 hover:text-emerald-600 p-2" title="Call" aria-label="Call client"><Phone className="w-4 h-4" /></a>}
