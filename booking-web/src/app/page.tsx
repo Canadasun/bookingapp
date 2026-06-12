@@ -169,7 +169,7 @@ export default async function LandingPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-ink mb-3">Everything your schedule needs</h2>
-            <p className="text-slate-500 max-w-md mx-auto">Built for solo professionals — hair, lash, brow, skin, nails, and every appointment in between.</p>
+            <p className="text-slate-500 max-w-md mx-auto">Built for small businesses, solo professionals, and growing teams — from pet groomers to beauty, wellness, and every appointment-based service in between.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {features.map(({ icon: Icon, title, desc }) => (
