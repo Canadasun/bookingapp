@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // Keep private/app areas out of search results.
-      disallow: ["/dashboard", "/my", "/change-password", "/proxy"],
+      disallow: ["/dashboard", "/admin", "/my", "/change-password", "/proxy", "/monitoring"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };
