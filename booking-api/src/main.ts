@@ -22,6 +22,9 @@ async function bootstrap() {
   // Without it req.rawBody is undefined and every webhook fails the signature check.
   const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
+  // Trust Railway's / any reverse-proxy's X-Forwarded-For so req.ip reflects
+  // the real client IP — required for per-IP rate limiting to work correctly.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(helmet());
   app.setGlobalPrefix('api');
   // Drain connections + run onModuleDestroy (Prisma disconnect, BullMQ workers)
