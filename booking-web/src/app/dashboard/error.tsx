@@ -26,7 +26,7 @@ export default function DashboardError({
         <p className="text-sm text-gray-500 mb-6">
           This page encountered an error. Other parts of your dashboard are unaffected.
         </p>
-        {error?.message && (
+        {error?.message && process.env.NODE_ENV !== "production" && (
           <p className="text-xs text-gray-400 font-mono bg-gray-50 rounded-lg px-3 py-2 mb-6 break-words">
             {error.message}
           </p>

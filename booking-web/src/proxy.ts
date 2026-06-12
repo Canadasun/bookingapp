@@ -11,18 +11,43 @@ const MAIN_DOMAIN  = process.env.NEXT_PUBLIC_WEB_URL
   ? new URL(process.env.NEXT_PUBLIC_WEB_URL).hostname
   : '';
 
-// Decode the user from the base64-encoded `booking_user` cookie (set at login).
-function userFromCookie(req: NextRequest): { role?: string; mustResetPassword?: boolean } | null {
+const COOKIE_SECRET = process.env.COOKIE_SIGN_SECRET ?? '';
+
+// Decode the user from the booking_user cookie, verifying its HMAC signature
+// when COOKIE_SIGN_SECRET is configured. Uses the Web Crypto API (Edge-compatible).
+async function userFromCookie(req: NextRequest): Promise<{ role?: string; mustResetPassword?: boolean } | null> {
   const raw = req.cookies.get("booking_user")?.value;
   if (!raw) return null;
   try {
-    return JSON.parse(atob(decodeURIComponent(raw)));
+    let payload = raw;
+    if (COOKIE_SECRET) {
+      const dot = raw.lastIndexOf('.');
+      if (dot === -1) return null;
+      const data = raw.slice(0, dot);
+      const sig  = raw.slice(dot + 1);
+      // base64url → Uint8Array
+      const sigBytes = Uint8Array.from(
+        atob(sig.replace(/-/g, '+').replace(/_/g, '/')),
+        (c) => c.charCodeAt(0),
+      );
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(COOKIE_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['verify'],
+      );
+      const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(data));
+      if (!valid) return null;
+      payload = data;
+    }
+    return JSON.parse(atob(decodeURIComponent(payload)));
   } catch {
     return null;
   }
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Subdomain routing: when ADMIN_DOMAIN is provisioned, /admin/* must be
@@ -47,7 +72,7 @@ export function proxy(req: NextRequest) {
   // it on the next API call. Gating on the access cookie alone bounced people to
   // login every 15 minutes; gate on either so navigation stays smooth.
   const authed = !!(req.cookies.get("booking_token")?.value || req.cookies.get("booking_refresh")?.value);
-  const user = userFromCookie(req);
+  const user = await userFromCookie(req);
 
   // Forced first-login password reset: until the flag clears, keep the user on
   // /change-password and out of the dashboard area.

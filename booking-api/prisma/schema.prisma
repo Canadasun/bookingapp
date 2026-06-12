@@ -498,6 +498,7 @@ model OtpChallenge {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 model Staff {
@@ -880,6 +881,7 @@ model Appointment {
   @@index([staffId, startsAt, endsAt])
   @@index([recurringGroupId])
   @@index([locationId])
+  @@index([businessId, status])
 }
 
 model NotificationLog {

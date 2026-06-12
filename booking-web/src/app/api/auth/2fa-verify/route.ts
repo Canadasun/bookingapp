@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
+import { signCookieValue } from "@/lib/cookie-sign";
 
 const API = apiBase();
 
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
-  res.cookies.set("booking_user", Buffer.from(JSON.stringify(data.user)).toString("base64"), {
+  res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(data.user)).toString("base64")), {
     httpOnly: false,
     secure,
     sameSite: "lax",

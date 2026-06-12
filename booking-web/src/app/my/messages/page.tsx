@@ -41,7 +41,7 @@ export default function ClientMessagesPage() {
 
   useEffect(() => { 
     load(); 
-    const timer = setInterval(load, 10000);
+    const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, [load]);
 

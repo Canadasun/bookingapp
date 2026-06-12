@@ -25,7 +25,7 @@ export default function Error({
         <p className="text-sm text-gray-500 mb-2">
           An unexpected error occurred. Your data is safe.
         </p>
-        {error?.message && (
+        {error?.message && process.env.NODE_ENV !== "production" && (
           <p className="text-xs text-gray-600 font-mono bg-gray-50 rounded-lg px-3 py-2 mb-6 break-words">
             {error.message}
           </p>

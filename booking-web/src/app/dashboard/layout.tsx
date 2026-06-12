@@ -280,7 +280,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     refreshUnreadMessages();
-    const interval = window.setInterval(refreshUnreadMessages, 15_000);
+    const interval = window.setInterval(refreshUnreadMessages, 30_000);
     const onVisibility = () => { if (document.visibilityState === "visible") refreshUnreadMessages(); };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
