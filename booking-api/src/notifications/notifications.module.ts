@@ -8,7 +8,8 @@ import { NotificationProcessor } from './notifications.processor';
     BullModule.registerQueue({
       name: NOTIFICATION_QUEUE,
       defaultJobOptions: {
-        attempts: 1,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
         removeOnComplete: { age: 60 * 60 * 24, count: 1000 },
         removeOnFail: { age: 60 * 60 * 24 * 14, count: 1000 },
       },

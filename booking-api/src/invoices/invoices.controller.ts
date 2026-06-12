@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { InvoicesService } from './invoices.service';
 import {
@@ -8,33 +8,25 @@ import {
 } from './dto/invoice.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('invoices')
 @ApiBearerAuth()
 @Controller('businesses/:businessId/invoices')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
 @RequirePermissions('VIEW_MONEY')
 export class InvoicesController {
   constructor(private invoices: InvoicesService) {}
 
-  private assertBusiness(user: { role: string; businessId: string | null }, businessId: string) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
-  }
-
   @Get()
-  list(@Param('businessId') businessId: string, @CurrentUser() user: { role: string; businessId: string | null }) {
-    this.assertBusiness(user, businessId);
+  list(@Param('businessId') businessId: string) {
     return this.invoices.list(businessId);
   }
 
   @Get(':id')
-  get(@Param('businessId') businessId: string, @Param('id') id: string, @CurrentUser() user: { role: string; businessId: string | null }) {
-    this.assertBusiness(user, businessId);
+  get(@Param('businessId') businessId: string, @Param('id') id: string) {
     return this.invoices.get(id, businessId);
   }
 
@@ -42,9 +34,7 @@ export class InvoicesController {
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateInvoiceSchema)) dto: CreateInvoiceDto,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    this.assertBusiness(user, businessId);
     return this.invoices.create(businessId, dto);
   }
 
@@ -53,9 +43,7 @@ export class InvoicesController {
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateInvoiceSchema)) dto: UpdateInvoiceDto,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    this.assertBusiness(user, businessId);
     return this.invoices.update(id, businessId, dto);
   }
 
@@ -64,9 +52,7 @@ export class InvoicesController {
     @Param('businessId') businessId: string,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateInvoiceStatusSchema)) dto: UpdateInvoiceStatusDto,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    this.assertBusiness(user, businessId);
     return this.invoices.updateStatus(id, businessId, dto);
   }
 
@@ -74,15 +60,12 @@ export class InvoicesController {
   sendByEmail(
     @Param('businessId') businessId: string,
     @Param('id') id: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    this.assertBusiness(user, businessId);
     return this.invoices.sendByEmail(id, businessId);
   }
 
   @Delete(':id')
-  remove(@Param('businessId') businessId: string, @Param('id') id: string, @CurrentUser() user: { role: string; businessId: string | null }) {
-    this.assertBusiness(user, businessId);
+  remove(@Param('businessId') businessId: string, @Param('id') id: string) {
     return this.invoices.remove(id, businessId);
   }
 }

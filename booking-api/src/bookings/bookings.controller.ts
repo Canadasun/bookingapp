@@ -14,6 +14,7 @@ import {
 } from './dto/appointment.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('bookings')
@@ -83,16 +84,13 @@ export class BookingsController {
   constructor(private appointmentService: BookingsService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   findAll(
     @Param('businessId') businessId: string,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.findAll(
       businessId,
       page ? parseInt(page, 10) : 1,
@@ -102,15 +100,11 @@ export class BookingsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   findOne(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.findOne(id, businessId);
   }
 
@@ -129,87 +123,67 @@ export class BookingsController {
   // ownership-checked, so it skips approval: created CONFIRMED, and the client
   // gets a confirmation immediately.
   @Post('manual')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   createManual(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,
-    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: dto.allowOverride === true });
   }
 
   // Owner/staff-initiated recurring series (dashboard). Creates N confirmed
   // occurrences; conflicting ones are skipped and reported.
   @Post('recurring')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   @Throttle({ default: { limit: 15, ttl: 60000 } })
   createRecurring(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateRecurringSchema)) dto: CreateRecurringDto,
-    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.createRecurring(businessId, dto, { confirmed: true });
   }
 
   @Patch(':id/confirm')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   confirm(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.confirm(id, businessId, user.id);
   }
 
   @Patch(':id/reschedule')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   reschedule(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.reschedule(id, dto, businessId, { userId: user.id });
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   updateDetails(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(UpdateAppointmentSchema)) dto: UpdateAppointmentDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.updateDetails(id, dto, businessId, user.id);
   }
 
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   updateStatus(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(StatusSchema)) dto: StatusDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.appointmentService.updateStatus(id, dto, businessId, true, user.id);
   }
 }

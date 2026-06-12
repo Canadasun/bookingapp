@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException, Res, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Res, HttpCode } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientsService } from './clients.service';
 import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto } from './dto/client.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 
 @ApiTags('clients')
 @ApiBearerAuth()
@@ -14,17 +14,13 @@ export class ClientsController {
   constructor(private clientService: ClientsService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   findAll(
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.clientService.findAll(
       businessId, search,
       page ? parseInt(page, 10) : 1,
@@ -39,13 +35,11 @@ export class ClientsController {
 
   // CSV export — before :id so the literal path isn't consumed as a param
   @Get('export-csv')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   async exportCsv(
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Res() res: Response,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) throw new ForbiddenException();
     const clients = await this.clientService.exportAll(businessId);
     const header = 'Name,Email,Phone,Tags,Notes,Birthday,Created\n';
     const rows = clients.map(c =>
@@ -59,64 +53,47 @@ export class ClientsController {
   // CSV import — bulk upsert clients from uploaded CSV
   @Post('import-csv')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   importCsv(
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Body() body: { rows: Array<{ name: string; email?: string; phone?: string; tags?: string; notes?: string }> },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) throw new ForbiddenException();
     return this.clientService.bulkImport(businessId, body.rows);
   }
 
   // Declared before @Get(':id') so "duplicates" isn't swallowed as a client id.
   @Get('duplicates')
-  @UseGuards(JwtAuthGuard)
-  duplicates(@Param('businessId') businessId: string, @CurrentUser() user: { role: string; businessId: string | null }) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  duplicates(@Param('businessId') businessId: string) {
     return this.clientService.findDuplicates(businessId);
   }
 
   @Post('merge')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   merge(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(MergeClientsSchema)) dto: MergeClientsDto,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.clientService.merge(businessId, dto.primaryId, dto.dupeIds, {
       name: dto.name, email: dto.email, phone: dto.phone,
     });
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   findOne(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.clientService.findOne(id, businessId);
   }
 
   @Get(':id/bookings')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   getHistory(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.clientService.getAppointmentHistory(id, businessId);
   }
 
@@ -130,29 +107,21 @@ export class ClientsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   update(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(UpdateClientSchema)) dto: UpdateClientDto,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.clientService.update(id, dto, businessId);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   remove(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.clientService.remove(id, businessId);
   }
 }

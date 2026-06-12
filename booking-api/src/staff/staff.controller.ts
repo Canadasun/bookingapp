@@ -11,6 +11,7 @@ import {
 } from './dto/staff.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -32,14 +33,8 @@ export class StaffController {
 
   @Get('all')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  findAllIncludingInactive(
-    @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
-  ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  findAllIncludingInactive(@Param('businessId') businessId: string) {
     return this.staffService.findAllIncludingInactive(businessId);
   }
 
@@ -47,15 +42,11 @@ export class StaffController {
   // the business. The public booking flow uses GET /staff (names only).
   @Get(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   findOne(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.findOne(id, businessId);
   }
 
@@ -68,7 +59,7 @@ export class StaffController {
   // password (returned once). Replaces the old public /auth/register staff path.
   @Post('invite')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   invite(
     @Param('businessId') businessId: string,
@@ -81,16 +72,12 @@ export class StaffController {
   // Owner/Admin only — and only within their own business.
   @Post()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   create(
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(CreateStaffSchema)) dto: CreateStaffDto,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.create(businessId, dto);
   }
 
@@ -98,7 +85,7 @@ export class StaffController {
   // owners/admins may change another member's permissions (no privilege escalation).
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
   @RequirePermissions('MANAGE_STAFF')
   update(
     @Param('id') id: string,
@@ -106,9 +93,6 @@ export class StaffController {
     @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(UpdateStaffSchema)) dto: UpdateStaffDto,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     if (dto.permissions !== undefined && user.role !== 'OWNER' && user.role !== 'ADMIN') {
       throw new ForbiddenException('Only owners can change staff permissions');
     }
@@ -117,77 +101,57 @@ export class StaffController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   remove(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Body() body: { force?: boolean },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.remove(id, businessId, { force: body?.force === true });
   }
 
   @Post(':id/services')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
   @RequirePermissions('MANAGE_STAFF')
   assignServices(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(AssignServicesSchema)) dto: AssignServicesDto,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.assignServices(id, dto, businessId);
   }
 
   @Post(':id/availability')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   setAvailability(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(z.array(AvailabilityRuleSchema))) rules: AvailabilityRuleDto[],
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.setAvailabilityRules(id, rules, businessId);
   }
 
   @Post(':id/time-off')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   createTimeOff(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
     @Body(new ZodValidationPipe(TimeOffSchema)) dto: TimeOffDto,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.createTimeOff(id, dto, businessId);
   }
 
   @Delete(':id/time-off/:timeOffId')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard)
   deleteTimeOff(
     @Param('timeOffId') timeOffId: string,
     @Param('businessId') businessId: string,
-    @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
     return this.staffService.deleteTimeOff(timeOffId, businessId);
   }
 }
