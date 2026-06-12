@@ -1,13 +1,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Calendar, Bell, CreditCard, Clock, Star, Shield, Sparkles } from "lucide-react";
-import { LandingAuthCta, LandingResources, LandingSolutions, LandingHeroCta, LandingBottomCta, LandingFooterLinks } from "@/components/LandingClient";
+import { Calendar, Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap } from "lucide-react";
+import {
+  LandingAuthCta,
+  LandingHeroCta,
+  LandingBottomCta,
+  LandingFooterLinks,
+  LandingResources,
+  LandingSolutions,
+} from "@/components/LandingClient";
 
-// Decode the role from the (non-HttpOnly) booking_user cookie, server-side, so a
-// signed-in user gets their dedicated home with no flash of the marketing page.
-// `authed` falls back to the session token/refresh cookies: on mobile the readable
-// booking_user cookie can briefly drop while the httpOnly session cookies survive —
-// without this an owner who taps "home" would be shown the signed-out marketing page.
 async function sessionInfo(): Promise<{ role?: string; authed: boolean }> {
   const jar = await cookies();
   const authed = !!(jar.get("booking_token")?.value || jar.get("booking_refresh")?.value || jar.get("booking_user")?.value);
@@ -21,21 +23,31 @@ async function sessionInfo(): Promise<{ role?: string; authed: boolean }> {
   return { role, authed };
 }
 
-const features = [
-  { icon: Clock,       title: "24/7 Online Booking",       desc: "Clients book appointments any time — no phone tag, no back-and-forth." },
-  { icon: Bell,        title: "Automated Reminders",        desc: "Email and SMS reminders reduce no-shows by up to 80%." },
-  { icon: CreditCard,  title: "Secure Deposits",            desc: "Collect deposits at booking to protect your time and revenue." },
+const steps = [
+  { num: "01", title: "Add your services", desc: "Set up your services, pricing, and availability in under 5 minutes." },
+  { num: "02", title: "Share your link", desc: "Put your booking link in your Instagram bio, Google profile, or website." },
+  { num: "03", title: "Get booked", desc: "Clients book themselves around the clock. You just show up and do the work." },
 ];
 
-const stats = [
-  { value: "10k+", label: "Businesses" },
-  { value: "2M+",  label: "Appointments booked" },
-  { value: "80%",  label: "Reduction in no-shows" },
+const features = [
+  {
+    icon: Clock,
+    title: "24/7 Online Booking",
+    desc: "No more phone tag. Clients book, reschedule, and cancel on their own time.",
+  },
+  {
+    icon: Bell,
+    title: "Automated Reminders",
+    desc: "Email and SMS reminders go out automatically. No-shows drop by up to 80%.",
+  },
+  {
+    icon: CreditCard,
+    title: "Deposits & Protection",
+    desc: "Collect a deposit at booking. Your time is protected even when plans change.",
+  },
 ];
 
 export default async function LandingPage() {
-  // Signed-in users should land in their working area. Keep "/" as marketing only
-  // so owners/staff are never routed through a separate logged-in home page.
   const { role, authed } = await sessionInfo();
   if (role === "ADMIN") redirect("/admin");
   if (role === "CLIENT") redirect("/my/dashboard");
@@ -43,125 +55,152 @@ export default async function LandingPage() {
 
   return (
     <div className="flex flex-col min-h-screen brand-shell">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-white/82 backdrop-blur-xl border-b border-[#E9DDCB]">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
+
+      {/* ── Nav ── */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#E9DDCB]">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-200">
+              <Calendar className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-bold text-ink">Pulse</span>
+            <span className="text-base font-bold text-ink tracking-tight">Pulse</span>
           </div>
           <LandingAuthCta />
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* ── Hero ── */}
       <section className="relative overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6 py-24 lg:py-28 grid lg:grid-cols-[1.05fr_0.95fr] gap-12 items-center">
-          <div>
-          <div className="inline-flex items-center gap-2 bg-white/80 border border-violet-200 text-violet-800 text-sm font-semibold px-4 py-1.5 rounded-full mb-8 shadow-sm">
-            <Star className="w-4 h-4" />
-            Loved by 10,000+ businesses
+        <div className="max-w-3xl mx-auto px-6 pt-20 pb-8 text-center">
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-white/90 border border-[#E9DDCB] text-sm font-semibold text-ink px-4 py-1.5 rounded-full mb-8 shadow-sm">
+            <CheckCircle2 className="w-4 h-4 text-violet-600" />
+            Trusted by 10,000+ professionals
           </div>
-          <h1 className="text-5xl sm:text-6xl font-extrabold text-ink tracking-tight leading-tight mb-6">
-            Pulse
-            <span className="block text-4xl sm:text-5xl mt-2 text-slate-700">booking made</span>{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600">
-              simple
+
+          {/* Headline */}
+          <h1 className="text-5xl sm:text-6xl font-extrabold text-ink tracking-tight leading-[1.08] mb-6">
+            The simplest way<br />
+            to take{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500">
+              bookings
             </span>
           </h1>
-          <p className="text-xl text-slate-600 max-w-2xl mb-10 leading-relaxed">
-            Let your clients book appointments online 24/7. Automated reminders, deposit collection,
-            and a beautiful dashboard — all in one place.
+
+          {/* Subheadline */}
+          <p className="text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">
+            Clients book themselves 24/7. You get reminders, deposits, and a beautiful dashboard — without lifting a finger.
           </p>
+
           <LandingHeroCta />
+        </div>
 
-          {/* Stats */}
-          <div className="mt-16 grid grid-cols-3 gap-4 max-w-lg">
-            {stats.map((s) => (
-              <div key={s.label} className="rounded-2xl bg-white/78 border border-[#E9DDCB] px-4 py-5 shadow-sm">
-                <p className="text-3xl font-bold text-violet-700">{s.value}</p>
-                <p className="text-sm text-slate-600 mt-1">{s.label}</p>
+        {/* Mock UI card */}
+        <div className="max-w-sm mx-auto px-6 pb-24">
+          <div className="brand-panel rounded-[2rem] p-4">
+            <div className="bg-[#19212B] rounded-[1.5rem] p-5 text-white">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <p className="text-[11px] text-white/45 uppercase tracking-widest mb-0.5">Today&apos;s schedule</p>
+                  <p className="text-xl font-bold">3 bookings</p>
+                </div>
+                <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
+                  <Zap className="w-4 h-4" />
+                </div>
               </div>
-            ))}
-          </div>
-          </div>
 
-          <div className="relative">
-            <div className="brand-panel rounded-[2rem] p-5">
-              <div className="rounded-[1.5rem] bg-[#19212B] p-5 text-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div>
-                    <p className="text-sm text-white/55">Today</p>
-                    <p className="text-2xl font-bold">8 appointments</p>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-violet-500 flex items-center justify-center">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="space-y-3 pt-5">
-                  {["Color consultation", "Haircut", "Follow-up"].map((name, i) => (
-                    <div key={name} className="flex items-center gap-3 rounded-2xl bg-white/8 border border-white/10 p-4">
-                      <div className="w-12 text-sm font-semibold text-violet-200">{["9:30", "11:00", "2:15"][i]}</div>
-                      <div className="h-10 w-1 rounded-full bg-violet-400" />
-                      <div className="flex-1">
-                        <p className="font-semibold">{name}</p>
-                        <p className="text-sm text-white/55">{["Maya Chen", "Amara Lee", "Jordan Smith"][i]}</p>
-                      </div>
-                      <span className="rounded-full bg-[#E6F4F3] px-3 py-1 text-xs font-bold text-[#0F6468]">Confirmed</span>
+              {/* Appointment cards */}
+              <div className="space-y-2.5">
+                {[
+                  { time: "10:00", name: "Amara Lee", service: "Lash lift & tint", color: "bg-violet-400" },
+                  { time: "1:30",  name: "Jordan Kim", service: "Brow lamination", color: "bg-amber-400" },
+                  { time: "3:15",  name: "Maya Chen",  service: "Facial + gua sha", color: "bg-teal-400" },
+                ].map(({ time, name, service, color }) => (
+                  <div key={name} className="flex items-center gap-3 bg-white/[0.07] rounded-2xl px-4 py-3">
+                    <p className="text-xs font-bold text-white/50 w-10 shrink-0">{time}</p>
+                    <div className={`w-1 h-8 rounded-full ${color} shrink-0`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-tight">{name}</p>
+                      <p className="text-xs text-white/45 truncate">{service}</p>
                     </div>
-                  ))}
-                </div>
+                    <span className="ml-auto rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-white/70 shrink-0">
+                      Confirmed
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* New booking pill */}
+              <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 text-sm font-semibold">
+                <Calendar className="w-4 h-4" /> New booking just arrived
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Logged-in owners: account-aware setup shortcuts + business solutions */}
+      {/* ── Logged-in owner shortcuts ── */}
       <LandingResources />
       <LandingSolutions />
 
-      {/* Features */}
-      <section className="py-24 bg-white/72 border-y border-[#E9DDCB]">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* ── How it works ── */}
+      <section className="py-24 bg-white/60 border-y border-[#E9DDCB]">
+        <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-ink mb-4">
-              Everything you need to run your schedule
-            </h2>
-            <p className="text-slate-500 max-w-xl mx-auto">
-              Built for solo professionals — pet groomers, lash &amp; brow artists, hair stylists, estheticians, and the appointments you keep coming back for.
-            </p>
+            <h2 className="text-3xl font-bold text-ink mb-3">Up and running in minutes</h2>
+            <p className="text-slate-500 max-w-md mx-auto">No training required. No complicated setup. Just your services, your link, and your clients.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="p-8 rounded-2xl bg-white border border-[#E9DDCB] hover:shadow-xl hover:shadow-violet-100 transition-shadow">
-                <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center mb-5">
-                  <Icon className="w-6 h-6 text-violet-700" />
-                </div>
-                <h3 className="text-lg font-semibold text-ink mb-2">{title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
+          <div className="grid md:grid-cols-3 gap-6">
+            {steps.map(({ num, title, desc }) => (
+              <div key={num} className="relative bg-white rounded-2xl border border-[#E9DDCB] p-7 shadow-sm">
+                <p className="text-4xl font-black text-violet-100 mb-4 leading-none">{num}</p>
+                <h3 className="text-base font-bold text-ink mb-2">{title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Band */}
+      {/* ── Features ── */}
+      <section className="py-24">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-ink mb-3">Everything your schedule needs</h2>
+            <p className="text-slate-500 max-w-md mx-auto">Built for solo professionals — hair, lash, brow, skin, nails, and every appointment in between.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {features.map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="bg-white rounded-2xl border border-[#E9DDCB] p-7 hover:shadow-lg hover:shadow-amber-100 transition-shadow">
+                <div className="w-11 h-11 rounded-xl bg-violet-100 flex items-center justify-center mb-5">
+                  <Icon className="w-5 h-5 text-violet-700" />
+                </div>
+                <h3 className="text-base font-bold text-ink mb-2">{title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA Band ── */}
       <section className="py-20 bg-[#19212B]">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <Shield className="w-10 h-10 text-violet-300 mx-auto mb-4" />
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <div className="w-10 h-10 rounded-2xl bg-violet-600 flex items-center justify-center mx-auto mb-6">
+            <ArrowRight className="w-5 h-5 text-white" />
+          </div>
           <LandingBottomCta />
         </div>
       </section>
 
-      {/* Footer */}
+      {/* ── Footer ── */}
       <footer className="py-8 border-t border-[#E9DDCB] bg-white/80">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-slate-500">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-slate-400">
             <Calendar className="w-4 h-4" />
-            <span className="text-sm">© {new Date().getFullYear()} Pulse</span>
+            <span className="text-sm">© {new Date().getFullYear()} Pulse Appointments</span>
           </div>
           <LandingFooterLinks />
         </div>
