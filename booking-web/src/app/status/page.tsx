@@ -8,7 +8,7 @@ export const metadata = {
 
 // Redirect to the external status dashboard after a short delay.
 // Replace the href below with your BetterStack / Statuspage URL when provisioned.
-const STATUS_PAGE_URL = "https://status.pulseappointments.com";
+const STATUS_PAGE_URL = "https://pulse-appointments.betteruptime.com";
 
 export default function StatusPage() {
   return (
