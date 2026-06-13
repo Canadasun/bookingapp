@@ -13,8 +13,8 @@ COPY . .
 # pass the ARG (e.g. if the service variable hasn't been set yet).
 ARG NEXT_PUBLIC_BUSINESS_SLUG
 ARG NEXT_PUBLIC_BUSINESS_ID
-ARG API_INTERNAL_URL=https://bookingapp-production-32f8.up.railway.app
-ARG NEXT_PUBLIC_API_URL=https://bookingapp-production-32f8.up.railway.app
+ARG API_INTERNAL_URL=https://api.pulseappointments.com
+ARG NEXT_PUBLIC_API_URL=https://api.pulseappointments.com
 ENV NEXT_PUBLIC_BUSINESS_SLUG=$NEXT_PUBLIC_BUSINESS_SLUG
 ENV NEXT_PUBLIC_BUSINESS_ID=$NEXT_PUBLIC_BUSINESS_ID
 ENV API_INTERNAL_URL=$API_INTERNAL_URL
