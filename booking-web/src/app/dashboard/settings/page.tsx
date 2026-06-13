@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore – react-qr-code ships types but they're not resolved via "exports"; works fine at runtime
@@ -149,9 +149,16 @@ function SettingsPage() {
   const [form, setForm]       = useState<Partial<Business>>({});
 
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
+
+  // Sync section ↔ URL so refresh stays on the same tab.
+  function goSection(s: Section) {
+    setSection(s);
+    router.replace(`/dashboard/settings?tab=${s}`, { scroll: false });
+  }
 
   // Two-factor: seeded from the session, updated optimistically on toggle.
   const [twoFA, setTwoFA] = useState<boolean>(user?.twoFactorEnabled ?? false);
@@ -274,13 +281,12 @@ function SettingsPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const p = params.get("calendar");
-    if (p === "connected") { toast.success("Google Calendar connected — bookings will sync automatically."); loadCal(); setSection("calendar"); window.history.replaceState({}, "", "/dashboard/settings?tab=calendar"); }
+    if (p === "connected") { toast.success("Google Calendar connected — bookings will sync automatically."); loadCal(); goSection("calendar"); }
     else if (p === "error") {
       const reason = params.get("reason") ?? "";
       const msg = reason.startsWith("google_denied") ? "Google Calendar access was denied. You can try again." : reason === "missing_code" ? "The connection was interrupted. Please try again." : `Could not connect Google Calendar${reason ? `: ${reason}` : ""}.`;
       toast.error(msg);
-      setSection("calendar");
-      window.history.replaceState({}, "", "/dashboard/settings?tab=calendar");
+      goSection("calendar");
     }
   }, []);
   async function connectCal() {
@@ -310,7 +316,7 @@ function SettingsPage() {
     if (connect === "success") {
       loadConnect();
       toast.success("Stripe account connected successfully — you can now accept payouts.");
-      setSection("payouts");
+      goSection("payouts");
     } else if (connect === "refresh") {
       // Auto-restart onboarding
       api.connect.onboard().then(({ url }) => window.location.assign(url)).catch((e) => toast.error(e instanceof Error ? e.message : "Could not resume Stripe onboarding"));
@@ -392,7 +398,15 @@ function SettingsPage() {
       const updated = await api.business.update(bizId, payload);
       setBiz(updated);
       setForm({ ...updated, phone: formatPhoneDisplay(updated.phone) });
-      toast.success("Settings saved");
+      // If plan limits stripped a payment setting the user tried to enable, tell them.
+      const planStripped =
+        (payload.requireDeposit && !updated.requireDeposit) ||
+        (payload.collectCardOnFile && !updated.collectCardOnFile);
+      if (planStripped) {
+        toast.error("Deposits and card-on-file require a Basic or Pro plan. Upgrade your plan to enable these features.", { duration: 6000 });
+      } else {
+        toast.success("Settings saved");
+      }
     }
     catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
     finally { setSaving(false); }
@@ -423,7 +437,7 @@ function SettingsPage() {
   const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED";
   function promptUpgrade(target: "BASIC" | "PRO", feature: string) {
     toast.info(`${feature} requires ${target === "BASIC" ? "Basic or Pro" : "Pro"}.`);
-    setSection("billing");
+    goSection("billing");
   }
   function copyEmbed() {
     navigator.clipboard.writeText(embedSnippet);
@@ -457,7 +471,7 @@ function SettingsPage() {
         <div className="md:hidden mb-4 -mx-4 px-4 overflow-x-auto">
           <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
             {SECTIONS.map((s) => (
-              <button key={s.id} onClick={() => setSection(s.id)}
+              <button key={s.id} onClick={() => goSection(s.id)}
                 className={cn("flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors",
                   section === s.id ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>
                 <s.icon className="w-4 h-4" />
@@ -471,7 +485,7 @@ function SettingsPage() {
         <aside className="hidden md:block w-56 shrink-0">
           <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {SECTIONS.map(({ id, label, icon: Icon, desc }) => (
-              <button key={id} onClick={() => setSection(id)}
+              <button key={id} onClick={() => goSection(id)}
                 className={cn(
                   "w-full flex items-start gap-3 px-4 py-3.5 text-left border-b border-gray-50 last:border-0 transition-colors group",
                   section === id ? "bg-violet-50" : "hover:bg-gray-50",
@@ -1067,7 +1081,7 @@ function SettingsPage() {
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <p className="text-sm font-semibold text-amber-900">Multi-location requires Basic or Pro</p>
                     <p className="text-xs text-amber-700 mt-1">Upgrade to manage multiple branches, each with their own staff and calendar, under one Pulse account — without needing separate logins per location.</p>
-                    <button type="button" onClick={() => { setSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
+                    <button type="button" onClick={() => { goSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
                   </div>
                 ) : (
                   <>
@@ -1382,7 +1396,7 @@ function SettingsPage() {
                           ))}
                         </div>
                       ) : (
-                        <button type="button" onClick={() => setSection("billing")}
+                        <button type="button" onClick={() => goSection("billing")}
                           className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1 hover:bg-violet-50 transition-colors shrink-0">
                           Upgrade to Pro
                         </button>
