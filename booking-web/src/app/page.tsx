@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Calendar, Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap } from "lucide-react";
+import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap } from "lucide-react";
 import {
   LandingAuthCta,
   LandingHeroCta,
@@ -63,10 +63,9 @@ export default async function LandingPage() {
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#E9DDCB]">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-200">
-              <Calendar className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-base font-bold text-ink tracking-tight">Pulse</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
+            <span className="text-base font-bold text-ink tracking-tight">Pulse Booking</span>
           </div>
           <LandingAuthCta />
         </div>
@@ -137,7 +136,7 @@ export default async function LandingPage() {
 
               {/* New booking pill */}
               <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-violet-600 py-3 text-sm font-semibold">
-                <Calendar className="w-4 h-4" /> New booking just arrived
+                <Bell className="w-4 h-4" /> New booking just arrived
               </div>
             </div>
           </div>
@@ -202,7 +201,8 @@ export default async function LandingPage() {
       <footer className="py-8 border-t border-[#E9DDCB] bg-white/80">
         <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-slate-400">
-            <Calendar className="w-4 h-4" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-icon.png" alt="" className="w-4 h-4 object-contain opacity-60" aria-hidden="true" />
             <span className="text-sm">© {new Date().getFullYear()} Pulse Appointments</span>
           </div>
           <LandingFooterLinks />

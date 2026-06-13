@@ -346,9 +346,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             // eslint-disable-next-line @next/next/no-img-element
             <img src={biz.logoUrl} alt="Business logo" className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />
           ) : (
-            <div className="w-9 h-9 rounded-xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center shrink-0">
-              <Calendar className="w-4 h-4 text-white" />
-            </div>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/logo-icon.png" alt="Pulse" className="w-9 h-9 object-contain rounded-xl shrink-0" />
           )}
           <span className="font-bold text-ink tracking-tight truncate">{biz?.name ?? "Pulse"}</span>
         </Link>

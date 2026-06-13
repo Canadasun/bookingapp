@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calendar, MessageCircle, Building2, Mail, ExternalLink, Clock, HelpCircle } from "lucide-react";
+import { MessageCircle, Building2, Mail, ExternalLink, Clock, HelpCircle } from "lucide-react";
 
 export const metadata = { title: "Support — Pulse" };
 
@@ -8,8 +8,9 @@ export default function SupportPage() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <Link href="/" className="inline-flex items-center gap-2 mb-10">
-          <Calendar className="w-8 h-8 text-violet-600" />
-          <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
+          <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse Booking</span>
         </Link>
 
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">

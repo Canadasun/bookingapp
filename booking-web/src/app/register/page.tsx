@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,11 +84,9 @@ export default function RegisterPage() {
     <main className="min-h-screen flex flex-col items-center justify-center brand-shell px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <span className="w-11 h-11 rounded-2xl bg-violet-600 shadow-lg shadow-violet-200 flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-white" />
-            </span>
-            <span className="text-2xl font-bold text-ink">Pulse</span>
+          <Link href="/" className="inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Pulse Booking" className="w-20 h-auto mx-auto" />
           </Link>
           <p className="text-slate-600 mt-3 text-sm">Create your business account</p>
         </div>

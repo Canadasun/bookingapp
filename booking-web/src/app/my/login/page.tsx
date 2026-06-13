@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,11 +152,9 @@ export default function ClientLoginPage() {
     <main className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <Link href="/book" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-gray-900">My Bookings</span>
+          <Link href="/book" className="inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Pulse Booking" className="w-20 h-auto mx-auto" />
           </Link>
           <p className="text-gray-600 mt-2 text-sm">Sign in to manage your appointments</p>
         </div>

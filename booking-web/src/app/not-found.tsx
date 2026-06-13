@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Calendar, Compass } from "lucide-react";
+import { Compass } from "lucide-react";
 
 export const metadata = { title: "Page Not Found — Pulse" };
 
@@ -20,7 +20,7 @@ export default function NotFound() {
             href="/"
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-colors"
           >
-            <Calendar className="w-4 h-4" /> Go to Pulse
+            Go to Pulse
           </Link>
           <Link
             href="/support"
