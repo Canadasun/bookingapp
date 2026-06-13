@@ -64,7 +64,6 @@ export function SwipeToDelete({ children, onDelete, label = 'Delete' }: { childr
       ref={ref}
       overshootRight={false}
       rightThreshold={40}
-      accessibilityHint="Swipe left to delete"
       renderRightActions={() => (
         <TouchableOpacity
           onPress={() => { ref.current?.close(); onDelete(); }}

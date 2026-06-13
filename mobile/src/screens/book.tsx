@@ -132,7 +132,7 @@ function BookScreen() {
   }
 
   async function book() {
-    if (form.name.trim().length < 2){ Alert.alert('Name required','Enter the client’s full name.'); return; }
+    if (form.name.trim().length < 2){ Alert.alert('Name required',"Enter the client's full name."); return; }
     if (!form.email.trim() && !form.phone.trim()){ Alert.alert('Contact required','Enter an email address or phone number.'); return; }
     if (form.email.trim() && !/\S+@\S+\.\S+/.test(form.email.trim())) { Alert.alert('Check email','Enter a valid email address or leave it blank.'); return; }
     // Phone is optional, but if given it must be a complete number so SMS can send.

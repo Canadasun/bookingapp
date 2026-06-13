@@ -11,7 +11,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
+        "EXPO_PUBLIC_API_BASE": "https://api.pulseappointments.com/api",
         "EXPO_PUBLIC_BUSINESS_ID": "cmq97dv500001gx4xrk9ry7qr",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tf7dZ9z1GKcmZ4GbDoVxKN4jm1xnJZpIRaoLCXWCig0ROD8GDPFvbCWErt1CervOVPPD3WijlaTa5WWOmu4yBjU00WcYa7RZ9"
       }
@@ -19,7 +19,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://bookingapp-production-32f8.up.railway.app/api",
+        "EXPO_PUBLIC_API_BASE": "https://api.pulseappointments.com/api",
         "EXPO_PUBLIC_BUSINESS_ID": "cmq97dv500001gx4xrk9ry7qr",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51Tf7dV5NgcwP5mlOfTNiNCYXLDR3tixmk1WuJRlWzfqcq2bEhnYsbAbe9wleQFzOngjoKKs5us2qtpkciNNIULJX00OyERS5JM"
       }

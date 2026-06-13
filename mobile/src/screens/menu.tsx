@@ -2194,7 +2194,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 <Text style={[ms.cardValue,{ marginTop:0 }]}>{st.value}</Text>
               </View>
             ))}
-            <Text style={[ms.empty,{ marginTop:8 }]}>Detailed reports &amp; exports live on the web dashboard.</Text>
+            <Text style={[ms.empty,{ marginTop:8 }]}>Detailed reports & exports live on the web dashboard.</Text>
           </ScrollView>
         )}
       </SafeAreaView>
@@ -2616,7 +2616,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           accessibilityRole="button" accessibilityLabel="Go back">
           <Ionicons name="chevron-back" size={24} color={GRAY_700}/>
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Rooms &amp; Resources</Text>
+        <Text style={s.headerTitle}>Rooms & Resources</Text>
         <TouchableOpacity onPress={()=>setResourceEditor({ name:'' })}
           accessibilityRole="button" accessibilityLabel="Add new resource">
           <Ionicons name="add" size={24} color={BRAND}/>

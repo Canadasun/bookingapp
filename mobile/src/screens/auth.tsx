@@ -91,7 +91,7 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
           )}
 
           <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} disabled={loading||(recoveryMode?recovery.trim().length<4:code.trim().length<4)} onPress={verify} accessibilityRole="button" accessibilityLabel="Sign in">
-            {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Verify &amp; sign in</Text>}
+            {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Verify & sign in</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity style={{ alignSelf:'center', marginTop:16 }} onPress={()=>setRecoveryMode(m=>!m)} accessibilityRole="button" accessibilityLabel={recoveryMode ? 'Use the code we sent instead' : 'Use a recovery code'}>
@@ -175,14 +175,14 @@ function ForgotPasswordScreen({ onBack }: { onBack:()=>void }) {
         <Text style={s.loginTitle}>Reset password</Text>
         {sent ? (
           <>
-            <Text style={s.loginSub}>If an account exists for {email.trim()}, we’ve emailed a reset link. It expires in 30 minutes.</Text>
+            <Text style={s.loginSub}>If an account exists for {email.trim()}, we've emailed a reset link. It expires in 30 minutes.</Text>
             <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to sign in">
               <Text style={s.btnPrimaryText}>Back to sign in</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text style={s.loginSub}>Enter your email and we’ll send you a reset link.</Text>
+            <Text style={s.loginSub}>Enter your email and we'll send you a reset link.</Text>
             <Text style={s.fieldLabel}>Email</Text>
             <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
               keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} onSubmitEditing={submit} accessibilityLabel="Email address"/>
@@ -252,14 +252,14 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
             <Text style={s.logoText}>Pulse</Text>
           </View>
           <Text style={s.loginTitle}>Create your business</Text>
-          <Text style={s.loginSub}>Set up your account — you’ll add services and staff next.</Text>
+          <Text style={s.loginSub}>Set up your account — you'll add services and staff next.</Text>
 
           <Text style={s.fieldLabel}>Your name</Text>
           <TextInput style={s.input} placeholder="Jane Doe" placeholderTextColor={GRAY_400}
             autoCapitalize="words" value={name} onChangeText={setName} accessibilityLabel="Full name"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Business name</Text>
-          <TextInput style={s.input} placeholder="Jane’s Salon" placeholderTextColor={GRAY_400}
+          <TextInput style={s.input} placeholder="Jane's Salon" placeholderTextColor={GRAY_400}
             autoCapitalize="words" value={businessName} onChangeText={setBizName} accessibilityLabel="Business name"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Email</Text>
@@ -272,11 +272,11 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
             onBlur={()=>{ const np=normalizePhoneClient(phone); if(np) setPhone(np); }} accessibilityLabel="Business phone number"/>
 
           <Text style={[s.fieldLabel,{marginTop:12}]}>Password</Text>
-          <View style={{position:’relative’}}>
+          <View style={{position:'relative'}}>
             <TextInput style={s.input} placeholder="At least 8 characters" placeholderTextColor={GRAY_400}
               secureTextEntry={!showPw} value={password} onChangeText={setPassword} onSubmitEditing={submit} accessibilityLabel="Password"/>
-            <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)} accessibilityRole="button" accessibilityLabel={showPw ? ‘Hide password’ : ‘Show password’}>
-              <Ionicons name={showPw?’eye-off-outline’:’eye-outline’} size={18} color={GRAY_400}/>
+            <TouchableOpacity style={s.pwToggle} onPress={()=>setShowPw(p=>!p)} accessibilityRole="button" accessibilityLabel={showPw ? 'Hide password' : 'Show password'}>
+              <Ionicons name={showPw?'eye-off-outline':'eye-outline'} size={18} color={GRAY_400}/>
             </TouchableOpacity>
           </View>
 
@@ -289,9 +289,9 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
               {terms&&<Ionicons name="checkmark" size={12} color="#fff"/>}
             </View>
             <Text style={s.policyCheckText}>
-              I agree to the{‘ ‘}
+              I agree to the{' '}
               <Text style={s.authSwitchLink} onPress={()=>Linking.openURL(`${WEB_URL}/terms`)}>Terms of Service</Text>
-              {‘ ‘}&amp;{‘ ‘}
+              {' & '}
               <Text style={s.authSwitchLink} onPress={()=>Linking.openURL(`${WEB_URL}/privacy`)}>Privacy Policy</Text>
             </Text>
           </TouchableOpacity>
