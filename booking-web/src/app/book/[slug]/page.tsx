@@ -142,6 +142,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string } | null>(null);
   const [clientMatched, setClientMatched]   = useState(false);
   const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
+  const [cardSaved, setCardSaved]           = useState(false); // setup intent completed — card on file
   const [wl, setWl]                         = useState({ name: "", email: "" });
   const [wlSaving, setWlSaving]             = useState(false);
   const [wlDone, setWlDone]                 = useState(false);
@@ -300,16 +301,17 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       // If the business requires a deposit / card-on-file, collect it before
       // showing the confirmation. Otherwise (default) go straight to success.
       const requiresDeposit = !!biz?.requireDeposit;
+      const requiresCard = !!biz?.collectCardOnFile;
       const intent = await api.payments.bookingIntent(apt.id, bizId).catch((e) => {
-        if (requiresDeposit) {
+        if (requiresDeposit || requiresCard) {
           throw e;
         }
         return null;
       });
       if (intent?.required && intent.clientSecret && intent.publishableKey) {
         setPayInfo(intent);
-      } else if (requiresDeposit || intent?.required) {
-        toast.error("This booking requires a deposit, but payment is not available. Please contact the business.");
+      } else if (requiresDeposit || requiresCard || intent?.required) {
+        toast.error("Payment is required for this booking but could not be set up. Please contact the business.");
       } else {
         setStep(4);
       }
@@ -391,7 +393,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   if (payInfo && booking) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <BookingPayment info={payInfo} onPaid={() => { setPayInfo(null); setStep(4); }} />
+        <BookingPayment info={payInfo} onPaid={() => { if (payInfo?.mode === "setup") setCardSaved(true); setPayInfo(null); setStep(4); }} />
       </div>
     </div>
   );
@@ -579,6 +581,12 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             <p className="text-center text-xs text-gray-400 mt-2">
               We&apos;ve emailed your confirmation with a link to manage this booking.
             </p>
+            {cardSaved && (
+              <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-3 text-left">
+                <p className="text-xs font-semibold text-gray-700 mb-0.5">Card on file</p>
+                <p className="text-xs text-gray-500">Your card has been securely saved with Stripe for no-show/cancellation protection. You can remove it anytime from your <a href="/my/dashboard" className="text-violet-600 font-medium hover:underline">client portal</a>.</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

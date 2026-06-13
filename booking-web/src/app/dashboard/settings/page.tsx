@@ -820,6 +820,9 @@ function SettingsPage() {
                 </div>
 
                 <hr className="border-gray-100" />
+                {isPaid && (
+                  <p className="text-xs text-gray-400 -mt-1">Enable the toggles below, then click <span className="font-semibold text-gray-600">Save changes</span> at the bottom of this page.</p>
+                )}
                 {!isPaid && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                     <p className="font-semibold">Payments require Basic+</p>
@@ -892,16 +895,14 @@ function SettingsPage() {
                     </Field>
                   </div>
                 </div>
-                <div className={cn("flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50")}>
+                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Manual charges</p>
                     <p className="text-xs text-gray-400 mt-0.5">Basic+ businesses can charge a client manually from checkout for fees, balances, or add-ons.</p>
                   </div>
-                  <button type="button" onClick={() => isPaid ? toast.success("Manual charges are available on your plan") : promptUpgrade("BASIC", "Manual charges")}
-                    aria-label="Toggle manual charges"
-                    className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", isPaid ? "bg-violet-600" : "bg-gray-200")}>
-                    <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", isPaid ? "translate-x-6" : "translate-x-1")} />
-                  </button>
+                  <span className={cn("shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full", isPaid ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500")}>
+                    {isPaid ? "Available" : "Basic+"}
+                  </span>
                 </div>
               </div>
             )}

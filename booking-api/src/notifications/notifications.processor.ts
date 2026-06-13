@@ -786,6 +786,7 @@ ${aptDetails(apt)}
           content: Buffer.from(icsContent).toString('base64'),
           content_type: 'text/calendar; method=REQUEST',
         };
+        const hasCardOnFile = !!apt.stripePaymentMethodId;
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
           subject: `Appointment confirmed — ${apt.service.name}`,
@@ -794,6 +795,7 @@ ${aptDetails(apt)}
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment is confirmed.</p>
 ${aptDetails(apt)}
 <p style="margin:0;color:#6B7280;font-size:13px">You'll receive a reminder 24 hours before your appointment. A calendar invite is attached to this email.</p>
+${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 A card is saved on file for this booking (for no-show/cancellation protection). You can remove it anytime from your <a href="${webUrl}/my/dashboard" style="color:#7C3AED">client portal</a>.</p>` : ''}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
           `),
           attachments: [icsAttachment],

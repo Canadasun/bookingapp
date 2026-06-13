@@ -77,8 +77,8 @@ export function BookingPayment({ info, onPaid }: { info: PayInfo; onPaid: () => 
       </h2>
       <p className="text-sm text-gray-500 mb-5">
         {info.mode === "setup"
-          ? "We keep your card on file for the cancellation/no-show policy. You're not charged now."
-          : `A ${fmt(info.amountCents ?? 0, info.currency)} deposit secures your appointment.`}
+          ? "Your card is saved by Stripe for the no-show/cancellation policy — you're not charged now. You can remove it anytime from your client portal."
+          : `A ${fmt(info.amountCents ?? 0, info.currency)} deposit secures your appointment. The remainder is due at your appointment.`}
       </p>
       <Elements stripe={stripePromise} options={{ clientSecret: info.clientSecret, appearance: { theme: "stripe" } }}>
         <PaymentForm info={info} onPaid={onPaid} />
