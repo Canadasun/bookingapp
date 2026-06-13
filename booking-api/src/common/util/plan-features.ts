@@ -2,11 +2,16 @@ import { PlanTier } from '@prisma/client';
 import { featuresUnlocked } from './plan';
 
 export function isPaidPlan(plan: PlanTier | undefined | null) {
-  return featuresUnlocked() || plan === 'BASIC' || plan === 'PRO';
+  return featuresUnlocked() || plan === 'BASIC' || plan === 'PRO' || plan === 'UNLIMITED';
 }
 
 export function isProPlan(plan: PlanTier | undefined | null) {
-  return featuresUnlocked() || plan === 'PRO';
+  return featuresUnlocked() || plan === 'PRO' || plan === 'UNLIMITED';
+}
+
+// UNLIMITED is the only tier that can manage multiple locations.
+export function isUnlimitedPlan(plan: PlanTier | undefined | null) {
+  return featuresUnlocked() || plan === 'UNLIMITED';
 }
 
 export function applyPlanLimits<T extends {

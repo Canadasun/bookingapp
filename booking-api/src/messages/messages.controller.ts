@@ -91,7 +91,15 @@ export class MessagesController {
     }
 
     const msg = await this.svc.send(businessId, clientId, dto.content, false);
-    const sms = await this.svc.maybeSendReplySms(businessId, clientId, dto.content, 'PRO');
+    // FREE: in-app only — no SMS outreach.
+    // BASIC: SMS reply only when the client texted first.
+    // PRO/UNLIMITED: can initiate SMS to any client with a prior booking.
+    const biz = await this.svc.getBusiness(businessId);
+    let sms: { sent: boolean; reason?: string } = { sent: false, reason: 'plan_not_eligible' };
+    if (biz && biz.plan !== 'FREE') {
+      const smsPlan = (biz.plan === 'UNLIMITED' ? 'PRO' : biz.plan) as 'BASIC' | 'PRO';
+      sms = await this.svc.maybeSendReplySms(businessId, clientId, dto.content, smsPlan);
+    }
     return { ...msg, sms };
   }
 

@@ -379,6 +379,10 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     setPolicyAccepted(false); setBooking(null); setSlots([]);
   }
 
+  const brandColor = (biz?.bookingPageSettings as Record<string, unknown> | null)?.brandColor as string ?? '#7C3AED';
+  const hidePouredBy = !!(biz?.bookingPageSettings as Record<string, unknown> | null)?.hidePouredBy;
+  const bookingTagline = (biz?.bookingPageSettings as Record<string, unknown> | null)?.tagline as string ?? '';
+
   if (loadingBiz) return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>;
   if (!biz) return (
     <div className="min-h-screen flex flex-col items-center justify-center p-5 text-center">
@@ -423,6 +427,17 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
   return (
     <div className={isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]"}>
+      {/* Brand colour injection — scoped to booking page only */}
+      <style>{`
+        .bk-cta { background-color: ${brandColor}; }
+        .bk-cta:hover { filter: brightness(0.88); }
+        .bk-cta:disabled { filter: none; opacity: 0.4; }
+        .bk-accent { background-color: ${brandColor}; }
+        .bk-selected { border-color: ${brandColor} !important; background-color: ${brandColor}18 !important; }
+        .bk-selected-text { color: ${brandColor} !important; }
+        .bk-slot-sel { background-color: ${brandColor} !important; border-color: ${brandColor} !important; color: #fff !important; }
+      `}</style>
+
       {/* Nav — hidden in embed mode (the widget lives on the salon's own site) */}
       {!isEmbed && (
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -432,7 +447,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               // eslint-disable-next-line @next/next/no-img-element
               <img src={biz.logoUrl} alt="" className="w-7 h-7 rounded-xl object-cover shrink-0" />
             ) : (
-              <div className="w-7 h-7 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bk-accent">
                 <Calendar className="w-3.5 h-3.5 text-white" />
               </div>
             )}
@@ -573,7 +588,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 Manage booking
               </Link>
               <button onClick={reset}
-                className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
+                className="flex-1 py-3 rounded-xl text-white text-sm font-semibold transition-colors bk-cta">
                 Book another
               </button>
             </div>
@@ -615,6 +630,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 )}
 
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Choose services</h2>
+                {bookingTagline && <p className="text-sm text-gray-500 italic mb-1">{bookingTagline}</p>}
                 <p className="text-sm text-gray-400 mb-4">Select one or more services</p>
 
                 {revStats && revStats.count > 0 && (
@@ -697,7 +713,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   <button
                     onClick={() => { if (multiProvider) { setStep(1); } else { setSelectedStaff(activeStaff[0] ?? "any"); setStep(2); } }}
                     disabled={selectedServices.length === 0}
-                    className="w-full py-3.5 rounded-xl bg-violet-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-violet-700 transition-colors">
+                    className="w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-colors bk-cta">
                     Continue — {selectedServices.length > 0 ? `${selectedServices.length} service${selectedServices.length > 1 ? "s" : ""} · ${fmtPrice(totalCents)}` : "select services"}
                   </button>
                 </div>
@@ -810,7 +826,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                               <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow"
                                 placeholder="you@example.com" type="email" value={wl.email} onChange={(e) => setWl((p) => ({ ...p, email: e.target.value }))} />
                               <button type="button" onClick={joinWaitlist} disabled={wlSaving}
-                                className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl py-3 transition-colors">
+                                className="w-full text-white text-sm font-semibold rounded-xl py-3 transition-colors bk-cta">
                                 {wlSaving ? "Joining…" : "Notify me when a spot opens"}
                               </button>
                             </div>
@@ -1002,7 +1018,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     <button
                       onClick={confirm}
                       disabled={submitting || !policyAccepted}
-                      className="w-full py-4 rounded-xl bg-violet-600 text-white font-semibold text-sm disabled:opacity-40 hover:bg-violet-700 transition-colors">
+                      className="w-full py-4 rounded-xl text-white font-semibold text-sm transition-colors bk-cta">
                       {submitting ? "Booking…" : `Confirm booking · ${fmtPrice(totalCents)}`}
                     </button>
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
@@ -1021,9 +1037,11 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
           </div>
         )}
 
-        <p className="text-center text-xs text-gray-400 mt-4">
-          Powered by <span className="text-violet-500 font-medium">Pulse</span>
-        </p>
+        {!hidePouredBy && (
+          <p className="text-center text-xs text-gray-400 mt-4">
+            Powered by <span className="text-violet-500 font-medium">Pulse</span>
+          </p>
+        )}
       </main>
     </div>
   );

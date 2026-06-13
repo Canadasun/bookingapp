@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type, Eye, EyeOff } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore – react-qr-code ships types but they're not resolved via "exports"; works fine at runtime
 import QRCode from "react-qr-code";
@@ -25,7 +25,7 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
-type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "notifications" | "security" | "billing";
+type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "branding" | "notifications" | "security" | "billing";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
@@ -35,6 +35,7 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: str
   { id: "payments",      label: "Payments & fees",    icon: DollarSign,  desc: "Deposits, no-show fees" },
   { id: "payouts",       label: "Payouts",            icon: Banknote,    desc: "Connect bank account & withdraw" },
   { id: "online",        label: "Online booking",     icon: Globe,       desc: "Booking page link, availability" },
+  { id: "branding",      label: "Branding",           icon: Palette,     desc: "Colors, fonts, and booking page style" },
   { id: "notifications", label: "Notifications",      icon: Bell,        desc: "Emails & SMS sent to clients" },
   { id: "security",      label: "Security",           icon: ShieldCheck, desc: "Two-factor sign-in, password" },
   { id: "billing",       label: "Billing & plan",     icon: CreditCard,  desc: "Subscription plan, upgrade" },
@@ -136,6 +137,29 @@ function IntakeFormEditor({ bizId, initial }: { bizId: string; initial: IntakeQu
       </div>
     </div>
   );
+}
+
+// ── WCAG contrast helpers ─────────────────────────────────────────────────────
+function hexLuminance(hex: string): number {
+  const raw = hex.replace('#', '');
+  if (raw.length !== 6) return 0;
+  const vals = [0, 2, 4].map(i => {
+    const v = parseInt(raw.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * vals[0] + 0.7152 * vals[1] + 0.0722 * vals[2];
+}
+function wcagContrast(hex: string, against: string): number {
+  const l1 = hexLuminance(hex);
+  const l2 = hexLuminance(against);
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+function contrastLabel(ratio: number): { pass: boolean; level: string; color: string } {
+  if (ratio >= 7)   return { pass: true,  level: "AAA",    color: "text-emerald-700" };
+  if (ratio >= 4.5) return { pass: true,  level: "AA",     color: "text-emerald-600" };
+  if (ratio >= 3)   return { pass: false, level: "AA Large", color: "text-amber-600" };
+  return              { pass: false, level: "Fail",   color: "text-red-600" };
 }
 
 function SettingsPage() {
@@ -435,6 +459,7 @@ function SettingsPage() {
   const featuresOpen = process.env.NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false';
   const isPro = featuresOpen || plan === "PRO" || plan === "UNLIMITED";
   const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED";
+  const isUnlimited = featuresOpen || plan === "UNLIMITED";
   function promptUpgrade(target: "BASIC" | "PRO", feature: string) {
     toast.info(`${feature} requires ${target === "BASIC" ? "Basic or Pro" : "Pro"}.`);
     goSection("billing");
@@ -1044,14 +1069,10 @@ function SettingsPage() {
                         onChange={(e) => bf("intro", e.target.value)}
                         placeholder="Tell clients what to expect before they book." />
                     </Field>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Field label="SEO title">
-                        <Input value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
-                      </Field>
-                      <Field label="Brand accent">
-                        <Input value={(bookingSettings.brandColor as string) ?? "#E9A23C"} onChange={(e) => bf("brandColor", e.target.value)} placeholder="#E9A23C" />
-                      </Field>
-                    </div>
+                    <Field label="SEO title">
+                      <Input value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
+                    </Field>
+                    <p className="text-xs text-gray-400">To change your brand colour and font, go to <button type="button" onClick={() => goSection("branding")} className="text-violet-600 hover:underline font-medium">Branding</button>.</p>
                     <Field label="SEO description">
                       <Input value={(bookingSettings.seoDescription as string) ?? ""} onChange={(e) => bf("seoDescription", e.target.value)} placeholder="Book appointments online." />
                     </Field>
@@ -1059,7 +1080,7 @@ function SettingsPage() {
                   <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Live preview</p>
                     <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
-                      <div className="h-10 w-10 rounded-lg" style={{ backgroundColor: String(bookingSettings.brandColor ?? "#E9A23C") }} />
+                      <div className="h-10 w-10 rounded-lg" style={{ backgroundColor: String(bookingSettings.brandColor ?? "#7C3AED") }} />
                       <h4 className="mt-4 text-base font-bold text-gray-900">{String(bookingSettings.headline || `Book with ${biz?.name ?? "us"}`)}</h4>
                       <p className="mt-2 text-xs leading-relaxed text-gray-500">{String(bookingSettings.intro || biz?.cancellationPolicy || "Choose a service, pick a time, and confirm your appointment.")}</p>
                       <div className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700">Services and availability appear below</div>
@@ -1068,6 +1089,221 @@ function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {section === "branding" && (() => {
+              const brandHex = (bookingSettings.brandColor as string) || "#7C3AED";
+              const onWhite = wcagContrast(brandHex, "#ffffff");
+              const onBlack = wcagContrast(brandHex, "#1f2937");
+              const whiteText = wcagContrast("#ffffff", brandHex);
+              const blackText = wcagContrast("#1f2937", brandHex);
+              const bestText  = blackText > whiteText ? "#1f2937" : "#ffffff";
+              const wLabel    = contrastLabel(onWhite);
+              const bLabel    = contrastLabel(onBlack);
+              const btnLabel  = contrastLabel(Math.max(whiteText, blackText));
+              const FONTS = [
+                { id: "default",  label: "Default",  style: "font-sans",   preview: "Aa" },
+                { id: "modern",   label: "Modern",   style: "font-sans tracking-tight", preview: "Aa" },
+                { id: "elegant",  label: "Elegant",  style: "font-serif",  preview: "Aa" },
+                { id: "bold",     label: "Bold",     style: "font-sans font-black", preview: "Aa" },
+              ] as const;
+              const fontVal = (bookingSettings.fontFamily as string) || "default";
+              return (
+                <div className="p-6 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Branding</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Customise how your booking page looks to clients. Changes apply after you save.</p>
+                  </div>
+                  <hr className="border-gray-100" />
+
+                  {/* Brand color + WCAG checker */}
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Palette className="w-4 h-4 text-violet-500" /> Brand colour</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Used for buttons, highlights, and accents on your booking page. Accessible to all plans.</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* Native colour picker — opens OS colour wheel */}
+                      <label className="relative cursor-pointer group">
+                        <div className="w-12 h-12 rounded-xl border-2 border-gray-200 shadow-sm overflow-hidden group-hover:border-violet-400 transition-colors"
+                          style={{ backgroundColor: brandHex }} />
+                        <input type="color" value={brandHex} onChange={(e) => bf("brandColor", e.target.value)}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" aria-label="Pick brand colour" />
+                      </label>
+
+                      {/* Hex text input */}
+                      <div className="flex items-center gap-1.5 border border-gray-200 rounded-xl px-3 py-2 bg-white">
+                        <span className="text-sm text-gray-400 font-mono">#</span>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={brandHex.replace('#', '')}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                            if (v.length === 6) bf("brandColor", `#${v}`);
+                          }}
+                          className="w-20 text-sm font-mono text-gray-800 bg-transparent focus:outline-none uppercase" />
+                      </div>
+
+                      {/* Live button preview */}
+                      <button type="button" className="px-4 py-2 rounded-xl text-sm font-semibold shadow-sm"
+                        style={{ backgroundColor: brandHex, color: bestText }}>
+                        Book now
+                      </button>
+                    </div>
+
+                    {/* WCAG Accessibility panel */}
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
+                      <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Accessibility — WCAG contrast ratios
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-lg bg-white border border-gray-100 p-2.5 text-center">
+                          <p className="text-gray-400 mb-1">Colour on white</p>
+                          <p className="font-bold text-gray-900 tabular-nums">{onWhite.toFixed(1)}:1</p>
+                          <span className={cn("text-[10px] font-semibold", wLabel.color)}>{wLabel.level}</span>
+                        </div>
+                        <div className="rounded-lg bg-white border border-gray-100 p-2.5 text-center">
+                          <p className="text-gray-400 mb-1">Colour on dark</p>
+                          <p className="font-bold text-gray-900 tabular-nums">{onBlack.toFixed(1)}:1</p>
+                          <span className={cn("text-[10px] font-semibold", bLabel.color)}>{bLabel.level}</span>
+                        </div>
+                        <div className="rounded-lg border border-gray-100 p-2.5 text-center"
+                          style={{ backgroundColor: brandHex, color: bestText }}>
+                          <p className="opacity-70 mb-1 text-[10px]">Text on button</p>
+                          <p className="font-bold tabular-nums text-xs">{Math.max(whiteText, blackText).toFixed(1)}:1</p>
+                          <span className={cn("text-[10px] font-semibold", btnLabel.pass ? "opacity-90" : "opacity-90")}>{btnLabel.level}</span>
+                        </div>
+                      </div>
+                      {!btnLabel.pass && (
+                        <p className="text-[11px] text-amber-700 flex items-start gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          This colour may be hard for some clients to read. WCAG AA requires 4.5:1 for normal text. Try a darker or lighter shade.
+                        </p>
+                      )}
+                      {btnLabel.pass && (
+                        <p className="text-[11px] text-emerald-700 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          Good contrast — this colour meets WCAG {btnLabel.level} accessibility standards.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Colour palette quick picks */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">Quick picks (all meet WCAG AA)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: "Violet",  hex: "#7C3AED" },
+                          { label: "Blue",    hex: "#2563EB" },
+                          { label: "Teal",    hex: "#0D9488" },
+                          { label: "Rose",    hex: "#E11D48" },
+                          { label: "Orange",  hex: "#EA580C" },
+                          { label: "Amber",   hex: "#B45309" },
+                          { label: "Emerald", hex: "#059669" },
+                          { label: "Slate",   hex: "#334155" },
+                        ].map(({ label, hex }) => (
+                          <button key={hex} type="button" title={label}
+                            onClick={() => bf("brandColor", hex)}
+                            className={cn("w-7 h-7 rounded-lg shadow-sm border-2 transition-transform hover:scale-110",
+                              brandHex.toLowerCase() === hex.toLowerCase() ? "border-gray-900 scale-110" : "border-transparent")}
+                            style={{ backgroundColor: hex }}
+                            aria-label={`${label} — ${hex}`} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-100" />
+
+                  {/* Tagline */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-800">Tagline</p>
+                    <p className="text-xs text-gray-400">A short phrase shown below your business name on the booking page. All plans.</p>
+                    <input
+                      type="text"
+                      maxLength={80}
+                      value={(bookingSettings.tagline as string) ?? ""}
+                      onChange={(e) => bf("tagline", e.target.value)}
+                      placeholder="e.g. Premium care, every visit."
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-200" />
+                    <p className="text-[11px] text-gray-400 text-right">{((bookingSettings.tagline as string) ?? "").length}/80</p>
+                  </div>
+
+                  <hr className="border-gray-100" />
+
+                  {/* Font selector — Pro+ */}
+                  <div className={cn("space-y-3", !isPro && "opacity-70")}>
+                    <div className="flex items-center gap-2">
+                      <Type className="w-4 h-4 text-violet-500" />
+                      <p className="text-sm font-semibold text-gray-800">Font style</p>
+                      {!isPro && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">Pro+</span>}
+                    </div>
+                    <p className="text-xs text-gray-400">Controls the typeface on your public booking page.</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {FONTS.map((f) => (
+                        <button key={f.id} type="button"
+                          disabled={!isPro}
+                          onClick={() => bf("fontFamily", f.id)}
+                          className={cn("rounded-xl border-2 p-3 text-center transition-all",
+                            fontVal === f.id ? "border-violet-500 bg-violet-50" : "border-gray-100 hover:border-gray-300 bg-white",
+                            !isPro && "cursor-not-allowed")}>
+                          <span className={cn("block text-2xl font-bold leading-tight text-gray-800 mb-1", f.style)}>{f.preview}</span>
+                          <span className="text-[10px] font-medium text-gray-500">{f.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", "Custom fonts")} className="text-xs font-semibold text-violet-600 hover:underline">Upgrade to Pro to unlock fonts</button>}
+                  </div>
+
+                  <hr className="border-gray-100" />
+
+                  {/* Powered by toggle — Unlimited only */}
+                  <div className={cn("flex items-center justify-between p-4 rounded-xl border", isUnlimited ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-75")}>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-800">Remove "Powered by Pulse" watermark</p>
+                        {!isUnlimited && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">Unlimited</span>}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">Hides the Pulse credit line at the bottom of your booking page so clients only see your brand.</p>
+                    </div>
+                    <button type="button"
+                      onClick={() => isUnlimited ? bf("hidePouredBy", !bookingSettings.hidePouredBy) : promptUpgrade("PRO", "Remove Pulse branding")}
+                      aria-label="Toggle remove Powered by Pulse"
+                      className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4",
+                        bookingSettings.hidePouredBy && isUnlimited ? "bg-violet-600" : "bg-gray-200")}>
+                      <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                        bookingSettings.hidePouredBy && isUnlimited ? "translate-x-6" : "translate-x-1")} />
+                    </button>
+                  </div>
+
+                  {/* Live preview */}
+                  <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Booking page preview</p>
+                    <div className="rounded-xl overflow-hidden border border-gray-100">
+                      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100" style={{ backgroundColor: brandHex + "18" }}>
+                        {biz?.logoUrl
+                          ? <img src={biz.logoUrl} alt="" className="w-6 h-6 rounded-lg object-cover shrink-0" />
+                          : <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: brandHex }}>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                            </div>
+                        }
+                        <span className="text-sm font-bold text-gray-900">{biz?.name ?? "Your business"}</span>
+                      </div>
+                      <div className="p-4 bg-gray-50">
+                        {!!bookingSettings.tagline && <p className="text-xs text-gray-500 italic mb-3">{String(bookingSettings.tagline)}</p>}
+                        <p className="text-base font-bold text-gray-900 mb-3">{String(bookingSettings.headline || `Book with ${biz?.name ?? "us"}`)}</p>
+                        <button type="button" className="px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
+                          style={{ backgroundColor: brandHex, color: bestText }}>Continue</button>
+                      </div>
+                    </div>
+                    {!bookingSettings.hidePouredBy && (
+                      <p className="text-center text-[10px] text-gray-400 mt-2">Powered by <span className="text-violet-500 font-medium">Pulse</span></p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {section === "locations" && (
               <div className="p-6 space-y-5">
@@ -1079,15 +1315,15 @@ function SettingsPage() {
 
                 {plan === "FREE" ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-900">Multi-location requires Basic or Pro</p>
+                    <p className="text-sm font-semibold text-amber-900">Multi-location requires Basic or higher</p>
                     <p className="text-xs text-amber-700 mt-1">Upgrade to manage multiple branches, each with their own staff and calendar, under one Pulse account — without needing separate logins per location.</p>
                     <button type="button" onClick={() => { goSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
                   </div>
                 ) : (
                   <>
-                    {plan === "BASIC" && (
+                    {(plan === "BASIC" || plan === "PRO") && (
                       <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-                        <p className="text-xs text-blue-700">Basic supports 1 extra location. Upgrade to Pro for unlimited locations.</p>
+                        <p className="text-xs text-blue-700">Basic and Pro support 1 extra location. Upgrade to <strong>Unlimited</strong> to manage unlimited locations across one account.</p>
                       </div>
                     )}
                     <div className="space-y-2">
@@ -1314,15 +1550,16 @@ function SettingsPage() {
                 <hr className="border-gray-100" />
 
                 {/* Plan capability summary */}
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  {(["FREE", "BASIC", "PRO", "UNLIMITED"] as const).map((p) => (
-                    <div key={p} className={cn("rounded-xl border p-3", plan === p ? "border-violet-300 bg-violet-50" : "border-gray-100 bg-gray-50")}>
-                      <p className={cn("font-semibold mb-1", plan === p ? "text-violet-700" : "text-gray-500")}>{p}{plan === p && " ✓"}</p>
-                      <p className="text-gray-500 leading-relaxed">
-                        {p === "FREE" && "Confirmation\nCancellation\nReschedule"}
-                        {p === "BASIC" && "24h email reminder\nPost-visit follow-up\n+ all Free"}
-                        {p === "PRO" && "72h email reminder\nSMS confirmation\n2h SMS reminder\n+ all Basic"}
-                      </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  {([
+                    { id: "FREE",      label: "Free",      lines: ["In-app messaging only", "Confirmation email", "Cancellation &", "reschedule"] },
+                    { id: "BASIC",     label: "Basic",     lines: ["Receive SMS from clients", "Reply when texted first", "24h email reminder", "+ all Free"] },
+                    { id: "PRO",       label: "Pro",       lines: ["Initiate SMS first", "SMS confirmation", "2h SMS reminder", "72h email reminder", "+ all Basic"] },
+                    { id: "UNLIMITED", label: "Unlimited", lines: ["All Pro features", "Across all locations", "Multi-location inbox"] },
+                  ] as const).map((p) => (
+                    <div key={p.id} className={cn("rounded-xl border p-3", plan === p.id ? "border-violet-300 bg-violet-50" : "border-gray-100 bg-gray-50")}>
+                      <p className={cn("font-semibold mb-1.5", plan === p.id ? "text-violet-700" : "text-gray-500")}>{p.label}{plan === p.id && " ✓"}</p>
+                      <p className="text-gray-500 leading-relaxed whitespace-pre-line text-left">{p.lines.join("\n")}</p>
                     </div>
                   ))}
                 </div>
@@ -1373,7 +1610,15 @@ function SettingsPage() {
                   );
                 })}
 
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">SMS notifications (Pro plan only)</p>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700">
+                  <p className="font-semibold text-blue-800 mb-0.5">Messaging tiers</p>
+                  <p><span className="font-semibold">Free:</span> In-app chat only — no SMS.</p>
+                  <p><span className="font-semibold">Basic:</span> Receive client SMS + reply when they text first.</p>
+                  <p><span className="font-semibold">Pro:</span> Initiate SMS to any client with a booking + automated reminders.</p>
+                  <p><span className="font-semibold">Unlimited:</span> All Pro features across every location.</p>
+                </div>
+
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">SMS notifications (Pro+)</p>
                 {([
                   { key: "smsConfirmation" as const, label: "Booking confirmation SMS", desc: "Text sent immediately when a booking is confirmed" },
                   { key: "smsReminder2h"   as const, label: "2-hour SMS reminder",      desc: "Sent 2 hours before the appointment via Twilio" },
@@ -1385,7 +1630,7 @@ function SettingsPage() {
                         <p className="text-sm font-medium text-gray-700">{label}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                       </div>
-                      {plan === "PRO" ? (
+                      {isPro ? (
                         <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
                           {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
                             <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
@@ -1555,23 +1800,23 @@ function SettingsPage() {
                       cta: "Current plan", disabled: true,
                     },
                     {
-                      id: "BASIC", name: "Basic", price: "$10", period: "/mo",
-                      desc: "Great for growing salons",
+                      id: "BASIC", name: "Basic", price: "$49", period: "/mo",
+                      desc: "Great for growing businesses",
                       recommended: true,
-                      features: ["Everything in Free","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
+                      features: ["Everything in Free","1 extra location","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
                     {
-                      id: "PRO", name: "Pro", price: "$20", period: "/mo",
+                      id: "PRO", name: "Pro", price: "$149", period: "/mo",
                       desc: "Full power for busy businesses",
                       highlight: true,
-                      features: ["Everything in Basic","SMS reminders (2h)","Automatic no-show fees","Late-cancellation fees","Priority support","Analytics"],
+                      features: ["Everything in Basic","1 extra location (same as Basic)","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
                     {
                       id: "UNLIMITED", name: "Unlimited", price: "$80", period: "/mo",
-                      desc: "No limits — for high-volume businesses",
-                      features: ["Everything in Pro","Unlimited staff accounts","Multiple locations","Remove Pulse branding","Dedicated support","Early access to new features"],
+                      desc: "Multi-location — for enterprise businesses",
+                      features: ["Everything in Pro","Unlimited locations","Full SMS across all locations","Remove Pulse branding","Unlimited staff accounts","Dedicated support","Early access to new features"],
                       cta: "Upgrade to Unlimited", disabled: false,
                     },
                   ].map((plan) => (
