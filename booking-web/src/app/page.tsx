@@ -16,7 +16,10 @@ async function sessionInfo(): Promise<{ role?: string; authed: boolean }> {
   const raw = jar.get("booking_user")?.value;
   let role: string | undefined;
   if (raw) {
-    for (const v of [raw, decodeURIComponent(raw)]) {
+    for (let v of [raw, decodeURIComponent(raw)]) {
+      // Strip HMAC signature if present (payload is base64, no dots)
+      const dot = v.lastIndexOf(".");
+      if (dot !== -1) v = v.slice(0, dot);
       try { role = JSON.parse(Buffer.from(v, "base64").toString("utf8"))?.role; break; } catch { /* try next */ }
     }
   }

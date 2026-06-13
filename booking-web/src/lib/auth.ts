@@ -15,7 +15,13 @@ export function getUser(): SessionUser | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|;\s*)booking_user=([^;]+)/);
   if (!match) return null;
-  try { return JSON.parse(atob(decodeURIComponent(match[1]))) as SessionUser; }
+  try {
+    let raw = decodeURIComponent(match[1]);
+    // Strip HMAC signature if present — payload is base64 (no dots), signature is appended after "."
+    const dot = raw.lastIndexOf(".");
+    if (dot !== -1) raw = raw.slice(0, dot);
+    return JSON.parse(atob(raw)) as SessionUser;
+  }
   catch { return null; }
 }
 
