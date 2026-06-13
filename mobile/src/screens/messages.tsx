@@ -105,7 +105,7 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
           <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{selected.name}</Text>
-        <TouchableOpacity onPress={async()=>{await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:true})});setSelected(null);loadThreads();}}
+        <TouchableOpacity onPress={async()=>{try{await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:true})});setSelected(null);loadThreads();}catch(e){Alert.alert('Could not archive',e instanceof Error?e.message:'Please try again.');}}}
           accessibilityRole="button" accessibilityLabel="Archive conversation"><Text style={{color:'#DC2626',fontWeight:'700'}}>Archive</Text></TouchableOpacity>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={Platform.OS==='ios'?88:0}>
