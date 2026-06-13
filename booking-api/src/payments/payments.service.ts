@@ -331,10 +331,11 @@ export class PaymentsService {
         });
         const appointmentId = intent.metadata.appointmentId;
         if (appointmentId) {
-          await this.prisma.appointment.updateMany({
+          const { count } = await this.prisma.appointment.updateMany({
             where: { id: appointmentId, stripePaymentIntentId: intent.id },
             data: { status: 'CANCELLED' },
           });
+          if (count > 0) await this.notifications.sendDepositFailed(appointmentId).catch(() => {});
         }
         break;
       }
@@ -388,13 +389,9 @@ export class PaymentsService {
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription;
         const businessId = sub.metadata?.businessId;
-        if (businessId) {
-          await this.prisma.subscription.updateMany({
-            where: { businessId },
-            data: { status: 'CANCELED', plan: 'FREE', cancelAtPeriodEnd: false },
-          });
-          await this.prisma.business.update({ where: { id: businessId }, data: { plan: 'FREE', planExpiresAt: null } });
-        }
+        // Route through applySubscription so the plan-changed email and WebSocket
+        // event fire automatically (status 'canceled' maps effectivePlan → FREE).
+        if (businessId) await this.applySubscription(businessId, sub);
         break;
       }
       case 'account.updated': {
@@ -423,6 +420,7 @@ export class PaymentsService {
                   context: { accountId: account.id, chargesEnabled: true },
                 },
               }).catch(() => {});
+              await this.notifications.sendConnectApproved(biz.id).catch(() => {});
             }
             // Surface unresolved requirements so the owner knows to take action.
             const pastDue = account.requirements?.past_due ?? [];
@@ -830,6 +828,9 @@ export class PaymentsService {
       kind: 'NO_SHOW_FEE', status: intent.status === 'succeeded' ? 'SUCCEEDED' : 'FAILED',
       description: `No-show fee — ${apt.service.name}`,
     });
+    if (intent.status === 'succeeded') {
+      await this.notifications.sendNoShowFeeCharged(appointmentId, feeCents).catch(() => {});
+    }
     return { charged: intent.status === 'succeeded', feeCents, paymentIntentId: intent.id, status: intent.status };
   }
 
@@ -870,6 +871,9 @@ export class PaymentsService {
         kind: 'LATE_CANCEL_FEE', status: intent.status === 'succeeded' ? 'SUCCEEDED' : 'FAILED',
         description: `Late cancellation fee — ${apt.service.name}`,
       });
+      if (intent.status === 'succeeded') {
+        await this.notifications.sendCancellationFeeCharged(appointmentId, feeCents).catch(() => {});
+      }
       return { charged: intent.status === 'succeeded', feeCents, reason: intent.status };
     } catch {
       return { charged: false, feeCents, reason: 'charge_failed' };

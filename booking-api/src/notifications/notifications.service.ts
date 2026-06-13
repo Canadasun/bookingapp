@@ -70,6 +70,42 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
+  // Alert client that their deposit failed and booking was cancelled.
+  async sendDepositFailed(appointmentId: string) {
+    await this.queue.add('deposit-failed', { appointmentId }, {
+      jobId: `deposit-failed-${appointmentId}`,
+      removeOnComplete: true,
+      attempts: 1,
+    });
+  }
+
+  // Notify client that a no-show fee was charged to their saved card.
+  async sendNoShowFeeCharged(appointmentId: string, feeCents: number) {
+    await this.queue.add('no-show-fee-charged', { appointmentId, feeCents }, {
+      jobId: `no-show-fee-${appointmentId}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
+  // Notify client that a late-cancellation fee was charged to their saved card.
+  async sendCancellationFeeCharged(appointmentId: string, feeCents: number) {
+    await this.queue.add('cancellation-fee-charged', { appointmentId, feeCents }, {
+      jobId: `cancel-fee-${appointmentId}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
+  // Email the owner(s) when their Stripe Connect account is first approved.
+  async sendConnectApproved(businessId: string) {
+    await this.queue.add('connect-approved', { businessId }, {
+      jobId: `connect-approved-${businessId}`,
+      removeOnComplete: true,
+      attempts: 1,
+    });
+  }
+
   // Invite a lapsed/due client to book their next visit (reuses the win-back email).
   async sendRebookNudge(clientId: string) {
     await this.queue.add('rebook-reminder', { clientId }, {

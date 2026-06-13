@@ -186,7 +186,7 @@ export class NotificationProcessor extends WorkerHost {
     const now = new Date();
     const mmdd = `${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
     const paid = await this.prisma.business.findMany({
-      where: { plan: { in: ['BASIC', 'PRO'] } },
+      where: { plan: { in: ['BASIC', 'PRO', 'UNLIMITED'] } },
       select: { id: true },
     });
     const bizIds = paid.map((b) => b.id);
@@ -227,7 +227,7 @@ export class NotificationProcessor extends WorkerHost {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
     const sixMonthsAgo = new Date(Date.now() - 180 * 86_400_000);
     const paid = await this.prisma.business.findMany({
-      where: { plan: { in: ['BASIC', 'PRO'] } },
+      where: { plan: { in: ['BASIC', 'PRO', 'UNLIMITED'] } },
       select: { id: true },
     });
     const bizIds = paid.map((b) => b.id);
@@ -298,6 +298,7 @@ export class NotificationProcessor extends WorkerHost {
     const perks: Record<string, string> = {
       BASIC: 'Deposits, card-on-file, client messaging replies, win-back emails and recurring follow-ups are now unlocked.',
       PRO: 'Everything in Basic, plus automatic no-show & late-cancellation charging, SMS reminders, and 2-way texting with your booked clients.',
+      UNLIMITED: 'Everything in Pro is now active across all your locations. Multi-location management, full SMS reach across every branch, and Pulse branding removal are all enabled.',
       FREE: 'Your subscription was cancelled — your account is back on the Free plan. You can re-subscribe any time.',
     };
     const title = plan === 'FREE' ? 'Your plan was cancelled' : `You're now on the ${plan} plan 🎉`;
@@ -424,7 +425,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
@@ -655,6 +656,95 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
 <a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book now →</a>
 `),
       });
+      return;
+    }
+
+    // Deposit payment failed — booking was auto-cancelled; inform the client.
+    if (job.name === 'deposit-failed') {
+      const apt = await this.prisma.appointment.findUnique({
+        where: { id: job.data.appointmentId! },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+      });
+      if (!apt || !apt.client.email) return;
+      this.currentBusinessId = apt.businessId;
+      const bookUrl = `${baseUrl}/book/${apt.business.slug}`;
+      await this.email.send({
+        to: apt.client.email,
+        subject: `Payment failed — booking cancelled`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Payment failed</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(firstName(apt.client.name))}, unfortunately your deposit payment for <strong>${esc(apt.service.name)}</strong> with <strong>${esc(apt.business.name)}</strong> could not be processed, and your booking has been cancelled.</p>
+${aptDetails(apt)}
+<p style="margin:16px 0 0;color:#6B7280;font-size:13px">Please check your card details and try booking again.</p>
+<a href="${bookUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book again →</a>
+`),
+      }).catch(() => {});
+      return;
+    }
+
+    // No-show fee charged — send a Pulse-branded notice so the client understands the charge.
+    if (job.name === 'no-show-fee-charged') {
+      const apt = await this.prisma.appointment.findUnique({
+        where: { id: job.data.appointmentId! },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+      });
+      if (!apt || !apt.client.email) return;
+      this.currentBusinessId = apt.businessId;
+      const feeCents = job.data.feeCents ?? 0;
+      const feeStr = `$${(feeCents / 100).toFixed(2)}`;
+      await this.email.send({
+        to: apt.client.email,
+        subject: `No-show fee charged — ${apt.service.name}`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">No-show fee of ${esc(feeStr)} charged</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(firstName(apt.client.name))}, a no-show fee has been charged to your card on file because your appointment was not attended and was not cancelled in advance.</p>
+${aptDetails(apt)}
+<p style="margin:16px 0 0;color:#6B7280;font-size:13px">If you have any questions, please contact <strong>${esc(apt.business.name)}</strong> directly.</p>
+`),
+      }).catch(() => {});
+      return;
+    }
+
+    // Late-cancellation fee charged — notify the client with context.
+    if (job.name === 'cancellation-fee-charged') {
+      const apt = await this.prisma.appointment.findUnique({
+        where: { id: job.data.appointmentId! },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+      });
+      if (!apt || !apt.client.email) return;
+      this.currentBusinessId = apt.businessId;
+      const feeCents = job.data.feeCents ?? 0;
+      const feeStr = `$${(feeCents / 100).toFixed(2)}`;
+      await this.email.send({
+        to: apt.client.email,
+        subject: `Late-cancellation fee charged — ${apt.service.name}`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Late-cancellation fee of ${esc(feeStr)} charged</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(firstName(apt.client.name))}, a late-cancellation fee has been applied to your card on file because your appointment was cancelled after the cancellation window set by <strong>${esc(apt.business.name)}</strong>.</p>
+${aptDetails(apt)}
+<p style="margin:16px 0 0;color:#6B7280;font-size:13px">If you believe this was charged in error, please contact <strong>${esc(apt.business.name)}</strong> directly.</p>
+`),
+      }).catch(() => {});
+      return;
+    }
+
+    // Stripe Connect account approved — email the owner so they know they can take payments.
+    if (job.name === 'connect-approved') {
+      const businessId = job.data.businessId!;
+      this.currentBusinessId = businessId;
+      const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+      const dashUrl = `${baseUrl}/dashboard/settings`;
+      for (const o of owners) {
+        await this.email.send({
+          to: o.email,
+          subject: 'Your Stripe account is verified — you can now accept payments 🎉',
+          html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Payments are live! 🎉</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, your Stripe account has been verified by Stripe. You can now accept deposits and card-on-file payments from clients — and payouts will be sent to your connected bank account on your Stripe payout schedule.</p>
+<a href="${dashUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Go to settings →</a>
+`),
+        }).catch(() => {});
+      }
       return;
     }
 
