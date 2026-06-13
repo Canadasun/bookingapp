@@ -19,6 +19,7 @@ export default function ReportsPage() {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [currency, setCurrency] = useState<"CAD" | "USD">("CAD");
+  const [plan, setPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -40,6 +41,7 @@ export default function ReportsPage() {
       setClients(c.data);
       setPayments(p);
       if (b?.currency) setCurrency(b.currency);
+      if (b?.plan) setPlan(b.plan);
     } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load reports"); }
     finally { setLoading(false); }
   }, [bizId]);
@@ -96,6 +98,16 @@ export default function ReportsPage() {
     <div className="text-center py-20">
       <p className="text-red-500 mb-3">{loadError}</p>
       <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+    </div>
+  );
+  if (plan && plan !== "PRO" && plan !== "UNLIMITED") return (
+    <div className="max-w-md mx-auto text-center py-20 px-4">
+      <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
+        <TrendingUp className="w-7 h-7 text-violet-600" />
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Analytics is a Pro feature</h2>
+      <p className="text-sm text-gray-500 mb-6">Upgrade to Pro or Unlimited to access revenue trends, top services, provider performance, and client insights.</p>
+      <a href="/dashboard/settings#billing" className="inline-block bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">Upgrade to Pro →</a>
     </div>
   );
 

@@ -6,6 +6,7 @@ import { ResendEmailProvider } from './providers/email.provider';
 import { TwilioSmsProvider } from './providers/sms.provider';
 import { NOTIFICATION_QUEUE } from './notifications.service';
 import { effectivePlan } from '../common/util/plan';
+import { isProPlan } from '../common/util/plan-features';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { formatInTimeZone } from 'date-fns-tz';
 import { generateICalEvent, generateICalCancellation } from '../calendar-sync/ical.util';
@@ -803,7 +804,7 @@ ${aptDetails(apt)}
     this.currentBusinessId = apt.businessId;
     const clientFirstName = esc(firstName(apt.client.name));
 
-    const smsEnabled = effectivePlan(apt.business.plan) === 'PRO';
+    const smsEnabled = isProPlan(apt.business.plan);
     const settings = apt.business.notificationSettings;
     const shouldSend = (key: NotificationKey) => notificationEnabled(settings, key);
 
@@ -840,7 +841,7 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
           `),
         });
-        if (apt.client.phone) {
+        if (apt.client.phone && smsEnabled) {
           await this.sms.send({
             to: apt.client.phone,
             body: `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
@@ -854,7 +855,7 @@ ${aptDetails(apt)}
           linkUrl: '/dashboard/appointments',
         });
         if (apt.client.email) await this.logNotification(apt.id, 'EMAIL', 'CONFIRMATION', 'SENT');
-        if (apt.client.phone) await this.logNotification(apt.id, 'SMS', 'CONFIRMATION', 'SENT');
+        if (apt.client.phone && smsEnabled) await this.logNotification(apt.id, 'SMS', 'CONFIRMATION', 'SENT');
         break;
       }
 

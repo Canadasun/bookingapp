@@ -27,10 +27,10 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 // Plan tiers mirror the web billing page. Display-only on mobile for now — every
 // business is on Pro during testing; paid switching gets wired up after testing.
 const PLANS = [
-  { id:'FREE',      name:'Free',      price:'$0',   period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page'] },
-  { id:'BASIC',     name:'Basic',     price:'$49',  period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies'] },
-  { id:'PRO',       name:'Pro',       price:'$149', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Analytics'] },
-  { id:'UNLIMITED', name:'Unlimited', price:'$80',  period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support'] },
+  { id:'FREE',      name:'Free',      price:'$0',   period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page','Up to 5 staff members','1 location'] },
+  { id:'BASIC',     name:'Basic',     price:'$49',  period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies','Manual charges','Up to 10 staff members'] },
+  { id:'PRO',       name:'Pro',       price:'$149', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Late-cancellation fees','Analytics & reports','Up to 10 staff members'] },
+  { id:'UNLIMITED', name:'Unlimited', price:'$80',  period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
 ] as const;
 
 import * as ImagePicker from 'expo-image-picker';

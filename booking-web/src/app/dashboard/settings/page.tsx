@@ -1802,21 +1802,21 @@ function SettingsPage() {
                     {
                       id: "FREE", name: "Free", price: "$0", period: "/mo",
                       desc: "Get started with the essentials",
-                      features: ["Unlimited bookings","Client management","Email confirmations","Public booking page","Basic dashboard"],
+                      features: ["Unlimited bookings","Client management","Email confirmations","Public booking page","Basic dashboard","Up to 5 staff members","1 location"],
                       cta: "Current plan", disabled: true,
                     },
                     {
                       id: "BASIC", name: "Basic", price: "$49", period: "/mo",
                       desc: "Great for growing businesses",
                       recommended: true,
-                      features: ["Everything in Free","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
+                      features: ["Everything in Free","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies","Up to 10 staff members"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
                     {
                       id: "PRO", name: "Pro", price: "$149", period: "/mo",
                       desc: "Full power for busy businesses",
                       highlight: true,
-                      features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics"],
+                      features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics & reports","Up to 10 staff members"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
                     {
