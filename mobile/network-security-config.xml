@@ -36,16 +36,11 @@
     </trust-anchors>
   </debug-overrides>
 
-  <!--
-  Optional: uncomment and fill in to add full public-key pinning on the API domain.
-  Get fingerprints with the openssl command shown above.
-
   <domain-config>
     <domain includeSubdomains="true">api.pulseappointments.com</domain>
-    <pin-set expiration="2027-06-01">
-      <pin digest="SHA-256">REPLACE_WITH_PRIMARY_SPKI_HASH=</pin>
-      <pin digest="SHA-256">REPLACE_WITH_BACKUP_SPKI_HASH=</pin>
+    <pin-set expiration="2027-06-13">
+      <pin digest="SHA-256">B+njsJBP1pw/5SOYuRTFRdFP4ZrmaI520QII6e2PaM8=</pin>
+      <pin digest="SHA-256">brzvtCELCIZUo4sD/qPX0ccRtPsd3DY6RfmxpOU9oB4=</pin>
     </pin-set>
   </domain-config>
-  -->
 </network-security-config>
