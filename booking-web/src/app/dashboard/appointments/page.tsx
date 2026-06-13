@@ -330,16 +330,21 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const today = format(new Date(), "yyyy-MM-dd");
-  const nextHour = format(new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000), "HH:mm");
+  const [initialTime] = useState(() => {
+    const now = new Date();
+    return {
+      today: format(now, "yyyy-MM-dd"),
+      nextHour: format(new Date(Math.ceil(now.getTime() / 3_600_000) * 3_600_000), "HH:mm"),
+    };
+  });
 
   const [clientName, setClientName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [staffId, setStaffId] = useState(staffList[0]?.id ?? "");
-  const [date, setDate] = useState(today);
-  const [time, setTime] = useState(nextHour);
+  const [date, setDate] = useState(initialTime.today);
+  const [time, setTime] = useState(initialTime.nextHour);
   const [notes, setNotes] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { format, subMonths, startOfMonth, isAfter } from "date-fns";
 import { TrendingUp, Users, CalendarCheck, XCircle, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
 import { api, Appointment, ClientWithStats, Payment, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";

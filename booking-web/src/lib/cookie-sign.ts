@@ -2,11 +2,15 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 const SECRET = process.env.COOKIE_SIGN_SECRET ?? "";
 
-// Appends an HMAC-SHA256 signature to a cookie value.
-// When COOKIE_SIGN_SECRET is not set, the value is returned unchanged
-// so existing deployments aren't broken until the env var is provisioned.
+// Appends an HMAC-SHA256 signature to a cookie value. Production must never
+// issue an unsigned role/profile cookie because middleware uses it for routing.
 export function signCookieValue(value: string): string {
-  if (!SECRET) return value;
+  if (!SECRET) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("COOKIE_SIGN_SECRET is required in production");
+    }
+    return value;
+  }
   const sig = createHmac("sha256", SECRET).update(value).digest("base64url");
   return `${value}.${sig}`;
 }

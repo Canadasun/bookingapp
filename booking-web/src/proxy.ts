@@ -18,6 +18,7 @@ const COOKIE_SECRET = process.env.COOKIE_SIGN_SECRET ?? '';
 async function userFromCookie(req: NextRequest): Promise<{ role?: string; mustResetPassword?: boolean } | null> {
   const raw = req.cookies.get("booking_user")?.value;
   if (!raw) return null;
+  if (process.env.NODE_ENV === "production" && !COOKIE_SECRET) return null;
   try {
     let payload = raw;
     if (COOKIE_SECRET) {
@@ -103,18 +104,24 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  if (STAFF_PROTECTED.some((p) => pathname.startsWith(p)) && !authed) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+  if (STAFF_PROTECTED.some((p) => pathname.startsWith(p))) {
+    if (!authed) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+    if (user?.role === "CLIENT") return NextResponse.redirect(new URL("/my/dashboard", req.url));
   }
 
-  if (CLIENT_PROTECTED.some((p) => pathname.startsWith(p)) && !authed) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/my/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+  if (CLIENT_PROTECTED.some((p) => pathname.startsWith(p))) {
+    if (!authed) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/my/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
+    if (user?.role && user.role !== "CLIENT") return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   // Already signed in and hitting an auth page → send to the right workspace.

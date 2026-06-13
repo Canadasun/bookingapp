@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useCallback, useRef } from "react";
 import { format } from "date-fns";
-import { Printer, ArrowLeft, Send, Edit2, Check, X, Plus, Trash2, Mail } from "lucide-react";
+import { Printer, ArrowLeft, Edit2, Check, X, Plus, Trash2, Mail } from "lucide-react";
 import Link from "next/link";
 import { api, Invoice, Business, InvoiceCreatePayload } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -183,6 +183,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         <div className="bg-amber-500 px-8 py-7 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             {biz?.logoUrl
+              // eslint-disable-next-line @next/next/no-img-element
               ? <img src={biz.logoUrl} alt="" className="w-14 h-14 rounded-xl object-cover border-2 border-white/30" />
               : <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center text-white font-bold text-xl">
                   {(biz?.name ?? inv.business?.name ?? "B")[0]}

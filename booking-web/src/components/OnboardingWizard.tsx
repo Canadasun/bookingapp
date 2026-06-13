@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, ChevronRight, X } from "lucide-react";
 import { api } from "@/lib/api";
@@ -24,13 +24,7 @@ export function OnboardingWizard() {
   const [dismissed, setDismissed] = useState(true); // start hidden until check is done
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!bizId) return;
-    if (typeof window !== "undefined" && localStorage.getItem(DISMISSED_KEY) === "1") { setLoading(false); return; }
-    check();
-  }, [bizId]);
-
-  async function check() {
+  const check = useCallback(async () => {
     try {
       const [services, staff, biz] = await Promise.all([
         api.services.list(bizId!).catch(() => [] as unknown[]),
@@ -57,7 +51,13 @@ export function OnboardingWizard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [bizId]);
+
+  useEffect(() => {
+    if (!bizId) return;
+    if (typeof window !== "undefined" && localStorage.getItem(DISMISSED_KEY) === "1") { setLoading(false); return; }
+    void check();
+  }, [bizId, check]);
 
   function dismiss() {
     localStorage.setItem(DISMISSED_KEY, "1");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { api, PromoCode } from "@/lib/api";
@@ -17,13 +17,13 @@ export default function PromoCodesPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [form, setForm] = useState({ code: "", discountType: "PERCENT" as "PERCENT" | "FLAT", discountValue: "", maxUsages: "", expiresAt: "" });
 
-  useEffect(() => { if (bizId) load(); }, [bizId]);
-
-  async function load() {
-    try { setCodes(await api.promoCodes.list(bizId!)); }
+  const load = useCallback(async () => {
+    try { setCodes(await api.promoCodes.list(bizId)); }
     catch { toast.error("Could not load promo codes"); }
     finally { setLoading(false); }
-  }
+  }, [bizId]);
+
+  useEffect(() => { if (bizId) void load(); }, [bizId, load]);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();

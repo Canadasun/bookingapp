@@ -4,12 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
 import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
 import { api, Appointment, ClientWithStats, NotificationDelivery, Payment } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
-import { formatPrice, cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 import { getUser } from "@/lib/auth";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 
@@ -67,7 +66,6 @@ export default function OverviewPage() {
   const [waitlistCount, setWaitlistCount] = useState(0);
   const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
   const [verifStatus, setVerifStatus] = useState<string | null>(null);
-  const [biz, setBiz] = useState<{ slug: string; logoUrl?: string } | null>(null);
 
   const user    = getUser();
   const isStaff = user?.role === "STAFF";
@@ -94,9 +92,6 @@ export default function OverviewPage() {
         isStaff ? Promise.resolve([]) : api.waitlist.list(bizId).catch(() => []),
         api.notifications.deliveries({ status: "FAILED", limit: 10 }).catch(() => []),
       ]);
-      if (!isStaff) {
-        api.business.get(bizId).then((b) => setBiz({ slug: b.slug, logoUrl: b.logoUrl })).catch(() => {});
-      }
       const filtered = isStaff && user?.staffId
         ? aptsRes.data.filter((a) => a.staff.id === user.staffId)
         : aptsRes.data;

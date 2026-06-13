@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Building2, Lock, Settings as SettingsIcon, ChevronRight, Mail, Power, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, Business } from "@/lib/api";
-import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,17 +16,6 @@ type Me = {
   id: string; email: string; name: string; phone?: string | null;
   role: string; businessId: string | null; avatarUrl?: string | null;
 };
-
-// Keep the readable session cookie in sync after a profile change so the sidebar
-// / top bar show the new name immediately (it's a non-HttpOnly display cookie).
-function syncSessionName(name: string) {
-  try {
-    const u = getUser();
-    if (!u) return;
-    const next = { ...u, name };
-    document.cookie = `booking_user=${btoa(JSON.stringify(next))}; path=/; max-age=${60 * 60 * 24 * 7}`;
-  } catch { /* best-effort */ }
-}
 
 export default function AccountPage() {
   const [me, setMe] = useState<Me | null>(null);
@@ -88,7 +76,9 @@ export default function AccountPage() {
         avatarUrl: form.avatarUrl,
       });
       setMe(updated);
-      syncSessionName(updated.name);
+      // Refresh regenerates the readable profile cookie from authoritative API
+      // data and preserves its server-side HMAC signature.
+      await fetch("/api/auth/refresh", { method: "POST" });
       toast.success("Profile saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save");

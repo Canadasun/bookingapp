@@ -8,6 +8,7 @@ import {
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
@@ -450,6 +451,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         <EmailVerificationBanner user={user} />
+        {user && !user.twoFactorEnabled && (
+          <div className="flex flex-col gap-2 border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-blue-700" />
+              Protect your business: two-factor sign-in is strongly recommended for owners and staff.
+            </span>
+            <Link href="/dashboard/settings?tab=security" className="shrink-0 font-semibold text-blue-800 underline underline-offset-2 hover:text-blue-950">
+              Turn on two-factor
+            </Link>
+          </div>
+        )}
         <main id="main-content" className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
       </div>
     </div>

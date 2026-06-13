@@ -1,151 +1,149 @@
 import Link from "next/link";
-import { ShieldCheck, Lock, Eye, Share2, Scale, Smartphone, Trash2, Bell } from "lucide-react";
+import { Database, Eye, Lock, Mail, Scale, Share2, ShieldCheck, Trash2 } from "lucide-react";
 
-export const metadata = { title: "Privacy Policy — Pulse" };
+export const metadata = { title: "Privacy Policy | Pulse Appointments" };
+
+const sections = [
+  {
+    icon: Eye,
+    title: "1. Information we collect",
+    content: (
+      <div className="space-y-3">
+        <p><strong>Account and business information:</strong> names, business details, email addresses, phone numbers, locations, staff profiles, login and security settings.</p>
+        <p><strong>Booking and client information:</strong> appointment details, services, notes, intake answers, contact details, preferences, messages, reviews, invoices, and transaction references entered by a business or client.</p>
+        <p><strong>Technical information:</strong> IP address, browser or app type, device information, timezone, login events, cookies, diagnostics, and security logs.</p>
+        <p><strong>Payment information:</strong> Stripe collects card and banking details directly. Pulse receives limited identifiers, status, amount, and transaction records, but does not store complete card numbers or security codes.</p>
+      </div>
+    ),
+  },
+  {
+    icon: Database,
+    title: "2. How we use information",
+    content: (
+      <ul className="list-disc space-y-2 pl-5">
+        <li>Provide accounts, online booking, scheduling, reminders, messaging, payments, reporting, support, and related platform functions.</li>
+        <li>Authenticate users, prevent fraud and abuse, investigate incidents, and protect the platform.</li>
+        <li>Process subscriptions and transactions, maintain financial records, and meet legal obligations.</li>
+        <li>Improve reliability and usability using diagnostics and aggregated information.</li>
+        <li>Send service communications. Marketing email or SMS is sent only where permitted by Canada&apos;s anti-spam legislation, and includes an unsubscribe method where required.</li>
+      </ul>
+    ),
+  },
+  {
+    icon: Scale,
+    title: "3. Business and platform responsibilities",
+    content: (
+      <div className="space-y-3">
+        <p>Pulse operates from Alberta and handles personal information under applicable Canadian privacy laws, including Alberta&apos;s <em>Personal Information Protection Act</em> (PIPA) and, where applicable, the federal <em>Personal Information Protection and Electronic Documents Act</em> (PIPEDA).</p>
+        <p>Businesses using Pulse decide what client information to collect and why. Each business is responsible for its notices, consents, lawful use, staff access, retention requirements, and any industry-specific obligations. Pulse processes that information to provide the services requested by the business.</p>
+        <p>Pulse is not a health-information custodian merely because a business enters appointment or intake information. Regulated providers remain responsible for determining whether health-sector laws apply and for entering any required information-management agreement.</p>
+      </div>
+    ),
+  },
+  {
+    icon: Share2,
+    title: "4. Service providers and disclosure",
+    content: (
+      <div className="space-y-3">
+        <p>We do not sell personal information. We disclose information only as needed to operate Pulse, complete a user&apos;s request, protect rights and safety, complete a business transaction, or comply with law.</p>
+        <p>Providers may include Stripe for payments, Twilio for SMS, Resend for email, Expo and device-platform services for push notifications, Railway and other infrastructure providers for hosting, Sentry for error monitoring, and carefully limited analytics or AI providers where enabled. These providers may process information outside Alberta or Canada, where it may be subject to foreign law.</p>
+        <p>Businesses and their authorized staff can access their own client records. Clients should contact the relevant business first about records controlled by that business.</p>
+      </div>
+    ),
+  },
+  {
+    icon: Lock,
+    title: "5. Security",
+    content: (
+      <div className="space-y-3">
+        <p>We use administrative, technical, and physical safeguards appropriate to the sensitivity of the information, including encrypted network connections, password hashing, access controls, monitoring, backups, and optional two-factor authentication.</p>
+        <p>No internet service can guarantee absolute security. Users must protect credentials, enable two-factor authentication, restrict staff access, and notify us promptly of suspected unauthorized use.</p>
+        <p>Where a privacy breach creates a real risk of significant harm or otherwise requires notice, we will investigate, keep required records, and notify affected people and regulators as required by applicable law.</p>
+      </div>
+    ),
+  },
+  {
+    icon: Trash2,
+    title: "6. Retention, access, and deletion",
+    content: (
+      <div className="space-y-3">
+        <p>We retain information only as long as reasonably needed for the purposes described here, an active account, backup and dispute cycles, fraud prevention, and legal, tax, accounting, or regulatory requirements. Retention periods vary by record type.</p>
+        <p>You may ask to access or correct personal information held by Pulse, withdraw consent where processing depends on consent, or request deletion. Some information cannot be deleted immediately where retention is legally required, needed to complete a transaction, protect legal rights, or contained in secured backups pending normal deletion.</p>
+        <p>Requests may require identity verification. We aim to respond within the period required by applicable law. Client-record requests may be referred to the business that controls those records.</p>
+      </div>
+    ),
+  },
+  {
+    icon: Mail,
+    title: "7. Cookies, communications, and choices",
+    content: (
+      <div className="space-y-3">
+        <p>Pulse uses necessary cookies for authentication, security, preferences, and core operation. Optional analytics are used according to the consent choices presented on the site.</p>
+        <p>Appointment confirmations, receipts, security alerts, and account notices are service messages. You can change optional business notifications in settings, use the unsubscribe link in marketing messages, or contact the sender. Device push notifications can be disabled in device settings.</p>
+      </div>
+    ),
+  },
+];
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        <Link href="/" className="inline-flex items-center gap-2 mb-10">
+    <main className="min-h-screen bg-[#F8F5EF] px-5 py-12 sm:py-16">
+      <div className="mx-auto max-w-4xl">
+        <Link href="/" className="mb-8 inline-flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
-          <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse Booking</span>
+          <img src="/logo-icon.png" alt="Pulse Appointments" className="h-9 w-9 object-contain" />
+          <span className="text-xl font-bold tracking-tight text-slate-950">Pulse Appointments</span>
         </Link>
 
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-violet-600 px-8 py-10 text-white">
-            <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
-            <p className="text-violet-100 text-sm">Last updated: June 8, 2026 · Calgary, Alberta</p>
-          </div>
+        <article className="overflow-hidden rounded-[2rem] border border-amber-900/10 bg-white shadow-xl shadow-amber-950/5">
+          <header className="bg-slate-950 px-7 py-10 text-white sm:px-12">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">Legal</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Privacy Policy</h1>
+            <p className="mt-3 text-sm text-slate-300">Effective June 13, 2026 · Calgary, Alberta, Canada</p>
+          </header>
 
-          <div className="p-8 md:p-12 space-y-10 text-sm text-slate-600 leading-relaxed">
-            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-6 flex gap-4 italic text-slate-500">
-              <ShieldCheck className="w-6 h-6 text-slate-400 shrink-0 mt-0.5" />
-              <p>
-                Pulse is built on a &quot;Privacy First&quot; foundation. We provide the tools for your business, but you control the data. This policy explains our commitment to protecting information for both businesses and their clients.
-              </p>
+          <div className="space-y-10 px-7 py-9 text-sm leading-7 text-slate-600 sm:px-12 sm:py-12">
+            <div className="flex gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+              <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-amber-700" />
+              <p>Pulse Appointments is operated by <strong>Najat S.</strong> This policy explains how Pulse collects, uses, discloses, protects, and retains personal information when businesses and clients use our website, mobile applications, booking pages, and related services.</p>
             </div>
 
+            {sections.map(({ icon: Icon, title, content }) => (
+              <section key={title}>
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-950"><Icon className="h-5 w-5 text-amber-600" />{title}</h2>
+                {content}
+              </section>
+            ))}
+
             <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Scale className="w-5 h-5 text-violet-500" /> 1. Roles &amp; Responsibility (HIA/PIPA)
-              </h2>
+              <h2 className="mb-4 text-lg font-bold text-slate-950">8. Children and international users</h2>
               <div className="space-y-3">
-                <p><strong>Business Owners (Controllers):</strong> You are the &quot;Custodian&quot; or &quot;Controller&quot; of your clients&apos; personal and health information. You are responsible for obtaining necessary consents and complying with Alberta&apos;s <em>Health Information Act</em> (HIA) or <em>Personal Information Protection Act</em> (PIPA).</p>
-                <p><strong>Pulse (Processor):</strong> We act as your &quot;Information Manager&quot; or &quot;Processor.&quot; We only access your data to provide technical support or deliver the services you have authorized (e.g., sending a booking reminder).</p>
+                <p>Business accounts are not intended for anyone under 18. A business may accept bookings for a minor where the parent, guardian, or business has the authority and consent required by law.</p>
+                <p>Users outside Canada understand that information may be processed in Canada and other countries where our providers operate. Local rights may also apply.</p>
               </div>
             </section>
 
             <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Eye className="w-5 h-5 text-violet-500" /> 2. Information We Collect
-              </h2>
+              <h2 className="mb-4 text-lg font-bold text-slate-950">9. Changes and contact</h2>
               <div className="space-y-3">
-                <p><strong>Account Data:</strong> We collect your name, business name, email address, and phone number to manage your account and authenticate your access.</p>
-                <p><strong>Service Data:</strong> This includes appointments, service lists, intake form answers, and client contact details. We process this data solely to provide the booking platform features.</p>
-                <p><strong>Usage Data:</strong> We collect technical data including IP addresses, browser or app version, and device timezone (used to display appointment times accurately in your local time) to improve platform stability and security.</p>
-                <p><strong>Push Notification Tokens:</strong> When you allow push notifications on the Pulse mobile app, we collect a device-specific push notification token issued by Apple (APN) or Google (FCM). This token is stored on our servers, linked to your account, and used solely to deliver booking alerts, client messages, and appointment reminders to your device. We do not use this token for advertising. You can revoke this at any time by disabling Pulse notifications in your device Settings.</p>
-                <p><strong>Biometric Authentication:</strong> The Pulse iOS app offers Face ID or Touch ID as a convenience to unlock the app. Biometric authentication is processed entirely on your device using Apple&apos;s secure operating system APIs. Pulse does not receive, store, or transmit any biometric data.</p>
-                <p><strong>Payment Data:</strong> All payment information (card numbers, banking details) is collected and tokenized directly by Stripe. Pulse never sees or stores raw card numbers or CVVs. We store Stripe customer and account identifiers to associate payments with the correct business or client account.</p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Lock className="w-5 h-5 text-violet-500" /> 3. Data Security &amp; Residency
-              </h2>
-              <div className="space-y-3">
-                <p><strong>Encryption:</strong> All data is encrypted at rest and in transit using industry-standard AES-256 encryption. Passwords are never stored in plain text.</p>
-                <p><strong>Data Residency:</strong> For our Canadian subscribers, we prioritize storage in Canadian data centers to align with provincial privacy recommendations.</p>
-                <p><strong>PCI Compliance:</strong> Payment information is tokenized and handled entirely by Stripe. Pulse never sees or stores full credit card numbers.</p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Share2 className="w-5 h-5 text-violet-500" /> 4. Data Sharing &amp; Sub-Processors
-              </h2>
-              <div className="space-y-3">
-                <p>We do not sell, rent, or trade your data. We only share information with sub-processors essential to the service:</p>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li><strong>Stripe</strong> (stripe.com) — Secure payment processing, subscription billing, and Stripe Connect payouts.</li>
-                  <li><strong>Twilio</strong> (twilio.com) — SMS notification delivery to clients and businesses.</li>
-                  <li><strong>Resend</strong> (resend.com) — Transactional email delivery (booking confirmations, reminders).</li>
-                  <li><strong>Expo</strong> (expo.dev) — Push notification delivery infrastructure. When a push notification is sent from our servers, it is routed through Expo&apos;s notification service, which in turn delivers it via Apple&apos;s APN (for iOS) or Google&apos;s FCM (for Android). Expo does not retain notification content after delivery.</li>
-                  <li><strong>Google Cloud</strong> (cloud.google.com) — Secure infrastructure and hosting.</li>
-                  <li><strong>OpenAI</strong> (openai.com) — Used for AI-powered admin analytics features (no personal client data is sent; only aggregated error categories).</li>
-                </ul>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Bell className="w-5 h-5 text-violet-500" /> 5. Push Notifications
-              </h2>
-              <div className="space-y-3">
-                <p>The Pulse mobile app may send push notifications for: new booking requests, booking confirmations or cancellations, client messages, and appointment reminders. These are transactional notifications required for the core function of the service.</p>
-                <p>You may enable or disable push notifications at any time through your device&apos;s <strong>Settings → Notifications → Pulse</strong>. Disabling notifications will not affect your ability to use the app; you will still see alerts within the app itself.</p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-violet-500" /> 6. Mobile App &amp; Device Permissions
-              </h2>
-              <div className="space-y-3">
-                <p><strong>Camera:</strong> Used only to scan payment cards at checkout. Camera images are processed on-device and are not uploaded to Pulse servers.</p>
-                <p><strong>Photo Library:</strong> Used only when you choose to upload a business logo or profile image. Photos are uploaded to Pulse&apos;s secure file storage and linked to your account.</p>
-                <p><strong>Face ID / Touch ID:</strong> Used optionally as a local lock screen to secure app access. No biometric data leaves your device.</p>
-                <p><strong>Advertising Identifier (IDFA):</strong> Pulse does not access, collect, or use the device Advertising Identifier. No advertising SDKs or tracking is present in the app.</p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Trash2 className="w-5 h-5 text-violet-500" /> 7. Data Retention &amp; Deletion
-              </h2>
-              <div className="space-y-3">
-                <p><strong>Retention:</strong> We retain your account data for as long as your account is active or as needed to provide the service. <em>Financial transaction records</em> (invoices, payment confirmations, payout records) are retained for a minimum of 7 years to comply with the Canada Revenue Agency&apos;s record-keeping requirements under the <em>Income Tax Act</em> and <em>Excise Tax Act</em>. <em>Personal contact data</em> (names, emails, phone numbers) associated with inactive accounts is deleted or anonymized within 2 years of account closure, unless a longer period is required by law or you have an active legal dispute with a business on the platform.</p>
-                <p><strong>Deletion:</strong> You have the right to request deletion of your personal data. To submit a deletion request, email <strong>support@pulseappointments.com</strong> with the subject line &quot;Data Deletion Request.&quot; We will process your request within 30 days and confirm when your data has been deleted. Note that some data may be retained where required by law (e.g., financial transaction records).</p>
-                <p><strong>Account Closure:</strong> When you close your Pulse account, your business data and client records are queued for deletion within 90 days, subject to legal retention requirements.</p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-violet-500" /> 8. Data Breach Notification
-              </h2>
-              <p>In the event of a data breach that compromises personal information collected through Pulse, we will notify affected users as soon as reasonably practicable and no later than 72 hours after becoming aware of the breach, in accordance with applicable law and our obligations under the Apple Developer Program License Agreement. Notification will be provided by email to your registered email address.</p>
-            </section>
-
-            <section>
-              <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Scale className="w-5 h-5 text-violet-500" /> 9. Your Rights (PIPA / Alberta)
-              </h2>
-              <div className="space-y-3">
-                <p>Under Alberta&apos;s <em>Personal Information Protection Act</em> (PIPA), you have the right to access the personal information we hold about you, request corrections, and withdraw consent for non-essential processing.</p>
-                <p><strong>Privacy Officer:</strong> Pulse has designated a Privacy Officer responsible for handling data requests and PIPA compliance inquiries.</p>
-                <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-xs space-y-0.5">
-                  <p className="font-semibold text-slate-700">Privacy Officer, Pulse Appointments</p>
-                  <p>Email: <strong>privacy@pulseappointments.com</strong></p>
-                  <p>Mailing Address: Pulse Appointments Inc., Privacy Officer</p>
-                  <p>Suite 500 — 999 8th Street SW, Calgary, Alberta T2R 1J5, Canada</p>
+                <p>We may update this policy as Pulse, our providers, or legal requirements change. Material changes will be communicated through the service or by email where appropriate. The effective date above identifies the current version.</p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm">
+                  <p className="font-bold text-slate-900">Privacy Officer: Najat S.</p>
+                  <p>Pulse Appointments</p>
+                  <p>3 St. SE, Calgary, Alberta T2G 0T9, Canada</p>
+                  <p>Email: <a className="font-semibold text-amber-700 hover:underline" href="mailto:support@pulseappointments.com">support@pulseappointments.com</a></p>
                 </div>
-                <p>If you are unsatisfied with our response, you may file a complaint with the <strong>Office of the Information and Privacy Commissioner of Alberta (OIPC)</strong> at <strong>www.oipc.ab.ca</strong>.</p>
+                <p>If we cannot resolve a privacy concern, you may contact the Office of the Information and Privacy Commissioner of Alberta or the Office of the Privacy Commissioner of Canada, as applicable.</p>
               </div>
             </section>
 
-            <div className="pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-              <p className="text-xs text-slate-400">Questions? support@pulseappointments.com</p>
-              <div className="flex gap-6">
-                <Link href="/terms" className="text-violet-600 font-semibold hover:underline">Terms of Service</Link>
-                <Link href="/" className="text-violet-600 font-semibold hover:underline">Home</Link>
-              </div>
-            </div>
+            <footer className="flex flex-col gap-4 border-t border-slate-100 pt-7 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-400">Pulse Appointments · Calgary, Alberta</p>
+              <div className="flex gap-5 font-semibold text-amber-700"><Link href="/terms" className="hover:underline">Terms of Service</Link><Link href="/" className="hover:underline">Home</Link></div>
+            </footer>
           </div>
-        </div>
+        </article>
       </div>
-    </div>
+    </main>
   );
 }

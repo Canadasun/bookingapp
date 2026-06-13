@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Crown, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, MembershipPlan, MembershipMember } from "@/lib/api";
@@ -20,15 +20,15 @@ export default function MembershipsPage() {
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [planForm, setPlanForm] = useState({ name: "", description: "", priceMonthly: "" });
 
-  useEffect(() => { if (bizId) load(); }, [bizId]);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
-      const [p, m] = await Promise.all([api.memberships.listPlans(bizId!), api.memberships.listMembers(bizId!)]);
+      const [p, m] = await Promise.all([api.memberships.listPlans(bizId), api.memberships.listMembers(bizId)]);
       setPlans(p); setMembers(m);
     } catch { toast.error("Could not load memberships"); }
     finally { setLoading(false); }
-  }
+  }, [bizId]);
+
+  useEffect(() => { if (bizId) void load(); }, [bizId, load]);
 
   async function createPlan(e: React.FormEvent) {
     e.preventDefault();

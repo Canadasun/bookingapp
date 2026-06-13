@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type, Eye, EyeOff } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore – react-qr-code ships types but they're not resolved via "exports"; works fine at runtime
 import QRCode from "react-qr-code";
@@ -180,10 +180,10 @@ function SettingsPage() {
   const bizId = user?.businessId ?? "";
 
   // Sync section ↔ URL so refresh stays on the same tab.
-  function goSection(s: Section) {
+  const goSection = useCallback((s: Section) => {
     setSection(s);
     router.replace(`/dashboard/settings?tab=${s}`, { scroll: false });
-  }
+  }, [router]);
 
   // Two-factor: seeded from the session, updated optimistically on toggle.
   const [twoFA, setTwoFA] = useState<boolean>(user?.twoFactorEnabled ?? false);
@@ -252,11 +252,11 @@ function SettingsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [locationForm, setLocationForm] = useState({ name: "", address: "", phone: "", timezone: "" });
   const [locationBusy, setLocationBusy] = useState(false);
-  function loadLocations() {
+  const loadLocations = useCallback(() => {
     if (!bizId) return;
     api.locations.list(bizId).then(setLocations).catch(() => {});
-  }
-  useEffect(() => { loadLocations(); }, [bizId]);
+  }, [bizId]);
+  useEffect(() => { loadLocations(); }, [loadLocations]);
 
   // Stripe Connect / Payouts
   type ConnectStatus = { onboarded: boolean; chargesEnabled: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] };
@@ -321,7 +321,7 @@ function SettingsPage() {
       toast.error(msg);
       goSection("calendar");
     }
-  }, []);
+  }, [goSection]);
   async function connectCal() {
     try { const { url } = await api.calendarSync.connect(); window.location.assign(url); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Google connect"); }
@@ -463,9 +463,9 @@ function SettingsPage() {
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const embedSnippet = `<script src="${embedOrigin}/embed.js" data-business-id="${biz?.id ?? ""}" async></script>`;
   const plan = biz?.plan ?? "FREE";
-  // While NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false' treat every account as Pro
-  // for UI gating so all features are accessible during testing/launch.
-  const featuresOpen = process.env.NEXT_PUBLIC_UNLOCK_ALL_FEATURES !== 'false';
+  // Development override only. Paid features remain gated unless the flag is
+  // deliberately enabled at build time.
+  const featuresOpen = process.env.NEXT_PUBLIC_UNLOCK_ALL_FEATURES === "true";
   const isPro = featuresOpen || plan === "PRO" || plan === "UNLIMITED";
   const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED";
   const isUnlimited = featuresOpen || plan === "UNLIMITED";
@@ -811,11 +811,11 @@ function SettingsPage() {
                     <div className="space-y-2">
                       <div>
                         <p className="font-semibold">📱 iPhone / Apple Calendar</p>
-                        <p className="text-amber-700 mt-0.5">Download the .ics file → tap "Add to Calendar" when prompted.</p>
+                        <p className="text-amber-700 mt-0.5">Download the .ics file → tap &quot;Add to Calendar&quot; when prompted.</p>
                       </div>
                       <div>
                         <p className="font-semibold">🗓 Google Calendar</p>
-                        <p className="text-amber-700 mt-0.5">Copy the link above → open Google Calendar → click <strong>"+"</strong> next to "Other calendars" → <strong>"From URL"</strong> → paste the link → click "Add calendar".</p>
+                        <p className="text-amber-700 mt-0.5">Copy the link above → open Google Calendar → click <strong>&quot;+&quot;</strong> next to &quot;Other calendars&quot; → <strong>&quot;From URL&quot;</strong> → paste the link → click &quot;Add calendar&quot;.</p>
                       </div>
                       <div>
                         <p className="font-semibold">💻 Outlook</p>
@@ -1101,7 +1101,8 @@ function SettingsPage() {
             )}
 
             {section === "branding" && (() => {
-              const brandHex = (bookingSettings.brandColor as string) || "#7C3AED";
+              const storedBrandHex = (bookingSettings.brandColor as string) || "#7C3AED";
+              const brandHex = /^#[0-9a-f]{6}$/i.test(storedBrandHex) ? storedBrandHex : "#7C3AED";
               const onWhite = wcagContrast(brandHex, "#ffffff");
               const onBlack = wcagContrast(brandHex, "#1f2937");
               const whiteText = wcagContrast("#ffffff", brandHex);
@@ -1117,6 +1118,18 @@ function SettingsPage() {
                 { id: "bold",     label: "Bold",     style: "font-sans font-black", preview: "Aa" },
               ] as const;
               const fontVal = (bookingSettings.fontFamily as string) || "default";
+              const COLOR_FAMILIES = [
+                { name: "Red", shades: ["#7F1D1D", "#B91C1C", "#DC2626", "#EF4444", "#FCA5A5"] },
+                { name: "Rose", shades: ["#881337", "#BE123C", "#E11D48", "#F43F5E", "#FDA4AF"] },
+                { name: "Orange", shades: ["#7C2D12", "#C2410C", "#EA580C", "#F97316", "#FDBA74"] },
+                { name: "Amber", shades: ["#78350F", "#B45309", "#D97706", "#F59E0B", "#FCD34D"] },
+                { name: "Emerald", shades: ["#064E3B", "#047857", "#059669", "#10B981", "#6EE7B7"] },
+                { name: "Teal", shades: ["#134E4A", "#0F766E", "#0D9488", "#14B8A6", "#5EEAD4"] },
+                { name: "Blue", shades: ["#1E3A8A", "#1D4ED8", "#2563EB", "#3B82F6", "#93C5FD"] },
+                { name: "Violet", shades: ["#4C1D95", "#6D28D9", "#7C3AED", "#8B5CF6", "#C4B5FD"] },
+                { name: "Fuchsia", shades: ["#701A75", "#A21CAF", "#C026D3", "#D946EF", "#F0ABFC"] },
+                { name: "Slate", shades: ["#0F172A", "#334155", "#475569", "#64748B", "#94A3B8"] },
+              ] as const;
               return (
                 <div className="p-6 space-y-6">
                   <div>
@@ -1199,26 +1212,25 @@ function SettingsPage() {
                       )}
                     </div>
 
-                    {/* Colour palette quick picks */}
+                    {/* Colour palette shades */}
                     <div>
-                      <p className="text-xs text-gray-500 mb-2">Quick picks (all meet WCAG AA)</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { label: "Violet",  hex: "#7C3AED" },
-                          { label: "Blue",    hex: "#2563EB" },
-                          { label: "Teal",    hex: "#0D9488" },
-                          { label: "Rose",    hex: "#E11D48" },
-                          { label: "Orange",  hex: "#EA580C" },
-                          { label: "Amber",   hex: "#B45309" },
-                          { label: "Emerald", hex: "#059669" },
-                          { label: "Slate",   hex: "#334155" },
-                        ].map(({ label, hex }) => (
-                          <button key={hex} type="button" title={label}
-                            onClick={() => bf("brandColor", hex)}
-                            className={cn("w-7 h-7 rounded-lg shadow-sm border-2 transition-transform hover:scale-110",
-                              brandHex.toLowerCase() === hex.toLowerCase() ? "border-gray-900 scale-110" : "border-transparent")}
-                            style={{ backgroundColor: hex }}
-                            aria-label={`${label} — ${hex}`} />
+                      <p className="text-xs font-medium text-gray-600">Colour shades</p>
+                      <p className="mb-3 mt-0.5 text-[11px] text-gray-400">Choose a prepared shade or use the picker above for any colour.</p>
+                      <div className="space-y-2.5">
+                        {COLOR_FAMILIES.map((family) => (
+                          <div key={family.name} className="grid grid-cols-[64px_1fr] items-center gap-2">
+                            <span className="text-[11px] font-medium text-gray-500">{family.name}</span>
+                            <div className="grid grid-cols-5 gap-1.5">
+                              {family.shades.map((hex, shadeIndex) => (
+                                <button key={hex} type="button" title={`${family.name} shade ${shadeIndex + 1} — ${hex}`}
+                                  onClick={() => bf("brandColor", hex)}
+                                  className={cn("h-8 rounded-lg border-2 shadow-sm transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-violet-300",
+                                    brandHex.toLowerCase() === hex.toLowerCase() ? "border-gray-950 scale-105" : "border-white")}
+                                  style={{ backgroundColor: hex }}
+                                  aria-label={`${family.name} shade ${shadeIndex + 1}, ${hex}`} />
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1272,7 +1284,7 @@ function SettingsPage() {
                   <div className={cn("flex items-center justify-between p-4 rounded-xl border", isUnlimited ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-75")}>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-gray-800">Remove "Powered by Pulse" watermark</p>
+                        <p className="text-sm font-semibold text-gray-800">Remove &quot;Powered by Pulse&quot; watermark</p>
                         {!isUnlimited && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">Unlimited</span>}
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">Hides the Pulse credit line at the bottom of your booking page so clients only see your brand.</p>
@@ -1293,6 +1305,7 @@ function SettingsPage() {
                     <div className="rounded-xl overflow-hidden border border-gray-100">
                       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100" style={{ backgroundColor: brandHex + "18" }}>
                         {biz?.logoUrl
+                          // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={biz.logoUrl} alt="" className="w-6 h-6 rounded-lg object-cover shrink-0" />
                           : <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: brandHex }}>
                               <CheckCircle2 className="w-3.5 h-3.5 text-white" />
@@ -1415,8 +1428,8 @@ function SettingsPage() {
                     <tbody>
                       {[
                         { id: "FREE",      name: "Free",      mo: "$0",   cp: "2.6% + $0.15", cnp: "3.5% + $0.15", online: "3.3% + $0.30" },
-                        { id: "BASIC",     name: "Basic",     mo: "$49",  cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
-                        { id: "PRO",       name: "Pro",       mo: "$149", cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
+                        { id: "BASIC",     name: "Basic",     mo: "$10",  cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
+                        { id: "PRO",       name: "Pro",       mo: "$20", cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
                         { id: "UNLIMITED", name: "Unlimited", mo: "$80",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
                       ].map((row) => (
                         <tr key={row.id} className={cn("border-b border-gray-50 last:border-0", plan === row.id && "bg-violet-50")}>
@@ -1806,14 +1819,14 @@ function SettingsPage() {
                       cta: "Current plan", disabled: true,
                     },
                     {
-                      id: "BASIC", name: "Basic", price: "$49", period: "/mo",
+                      id: "BASIC", name: "Basic", price: "$10", period: "/mo",
                       desc: "Great for growing businesses",
                       recommended: true,
                       features: ["Everything in Free","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies","Up to 10 staff members"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
                     {
-                      id: "PRO", name: "Pro", price: "$149", period: "/mo",
+                      id: "PRO", name: "Pro", price: "$20", period: "/mo",
                       desc: "Full power for busy businesses",
                       highlight: true,
                       features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics & reports","Up to 10 staff members"],
