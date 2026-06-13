@@ -301,9 +301,9 @@ function SettingsPage() {
   }, [bizId]);
 
   useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get("tab");
+    const tab = searchParams.get("tab");
     if (tab && SECTIONS.some((s) => s.id === tab)) setSection(tab as Section);
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     const connect = searchParams.get("connect");
@@ -412,7 +412,7 @@ function SettingsPage() {
     </div>
   );
 
-  const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/b/${biz?.id ?? ""}`;
+  const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/book/${biz?.slug ?? biz?.id ?? ""}`;
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const embedSnippet = `<script src="${embedOrigin}/embed.js" data-business-id="${biz?.id ?? ""}" async></script>`;
   const plan = biz?.plan ?? "FREE";
@@ -924,7 +924,39 @@ function SettingsPage() {
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-violet-500 mt-2">Share this non-email public link on your website, Instagram bio, or Google Business profile.</p>
+                  <p className="text-xs text-violet-500 mt-2">Share this link anywhere clients can find you.</p>
+
+                  {/* Social share row */}
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(`Book an appointment with me: ${bookingUrl}`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                    >
+                      WhatsApp
+                    </a>
+                    <a
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(bookingUrl)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1877F2] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                    >
+                      Facebook
+                    </a>
+                    <a
+                      href={`mailto:?subject=Book an appointment&body=You can book an appointment with me here: ${bookingUrl}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Email
+                    </a>
+                  </div>
+
+                  {/* Instagram tip */}
+                  <div className="mt-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 px-3 py-2 text-xs text-purple-800">
+                    <span className="font-semibold">📸 Instagram:</span> Go to your profile → <strong>Edit profile</strong> → paste your link in the <strong>Website</strong> field. Clients can tap it directly from your bio.
+                  </div>
+                  <div className="mt-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
+                    <span className="font-semibold">🔍 Google Business:</span> Go to your Google Business Profile → <strong>Edit profile</strong> → <strong>Website</strong> → paste your link so clients who find you on Google can book instantly.
+                  </div>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">
