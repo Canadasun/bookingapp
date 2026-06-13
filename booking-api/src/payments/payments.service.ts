@@ -53,6 +53,32 @@ export class PaymentsService {
     return (b?.currency ?? 'CAD').toLowerCase();
   }
 
+  // Platform fee retained by Pulse on each charge, based on the business's plan.
+  // This is deducted from the transfer to the connected account via application_fee_amount.
+  private platformFeeCents(plan: string, amountCents: number): number {
+    const rates: Record<string, { pct: number; fixed: number }> = {
+      FREE:      { pct: 0.026, fixed: 15 },
+      BASIC:     { pct: 0.025, fixed: 15 },
+      PRO:       { pct: 0.024, fixed: 15 },
+      UNLIMITED: { pct: 0.024, fixed: 15 },
+    };
+    const r = rates[plan] ?? rates.FREE;
+    return Math.max(1, Math.round(amountCents * r.pct + r.fixed));
+  }
+
+  // Returns Stripe destination-charge params when the business has an active
+  // Connect account, or an empty object so the charge falls through to the platform.
+  private connectChargeParams(
+    business: { stripeConnectAccountId: string | null; stripeConnectOnboarded: boolean; plan: string },
+    amountCents: number,
+  ): Record<string, unknown> {
+    if (!business.stripeConnectAccountId || !business.stripeConnectOnboarded) return {};
+    return {
+      application_fee_amount: this.platformFeeCents(business.plan, amountCents),
+      transfer_data: { destination: business.stripeConnectAccountId },
+    };
+  }
+
   private idempotencyKey(parts: Array<string | number | null | undefined>): string {
     const raw = parts.map((p) => String(p ?? '')).join(':');
     const digest = createHash('sha256').update(raw).digest('hex').slice(0, 32);
@@ -131,6 +157,7 @@ export class PaymentsService {
         automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
         metadata: { appointmentId, businessId, kind: 'deposit' },
         description: `Deposit — ${apt.service.name} @ ${b.name}`,
+        ...this.connectChargeParams(b, depositCents),
       }, { idempotencyKey: this.idempotencyKey(['deposit', businessId, appointmentId, depositCents]) });
       await this.prisma.appointment.update({
         where: { id: appointmentId },
@@ -194,6 +221,7 @@ export class PaymentsService {
         ...(input.clientId ? { clientId: input.clientId } : {}),
       },
       description: input.description?.trim() || `In-person charge — ${business.name}`,
+      ...this.connectChargeParams(business, input.amountCents),
     }, {
       idempotencyKey: input.idempotencyKey?.trim()
         ? this.idempotencyKey(['custom', businessId, input.idempotencyKey.trim()])
@@ -789,6 +817,7 @@ export class PaymentsService {
       confirm: true,
       metadata: { appointmentId, businessId, kind: 'no_show_fee' },
       description: `No-show fee — ${apt.service.name} @ ${apt.business.name}`,
+      ...this.connectChargeParams(apt.business, feeCents),
     }, { idempotencyKey: this.idempotencyKey(['no-show', businessId, appointmentId, feeCents]) });
 
     await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
@@ -830,6 +859,7 @@ export class PaymentsService {
         confirm: true,
         metadata: { appointmentId, businessId, kind: 'late_cancel_fee' },
         description: `Late cancellation fee — ${apt.service.name} @ ${apt.business.name}`,
+        ...this.connectChargeParams(apt.business, feeCents),
       }, { idempotencyKey: this.idempotencyKey(['late-cancel', businessId, appointmentId, feeCents]) });
       await this.recordPayment({
         businessId, appointmentId, clientId: apt.clientId,

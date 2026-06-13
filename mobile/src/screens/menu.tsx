@@ -18,10 +18,11 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill, SwipeToDelete } from '../components';
 
+type ConnectStatus = { onboarded: boolean; chargesEnabled: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] };
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations'
-  | 'promo-codes' | 'memberships' | 'hours' | 'soon';
+  | 'promo-codes' | 'memberships' | 'hours' | 'payouts' | 'soon';
 
 // Plan tiers mirror the web billing page. Display-only on mobile for now — every
 // business is on Pro during testing; paid switching gets wired up after testing.
@@ -63,6 +64,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [invoiceEditor, setInvoiceEditor] = useState<{ items:Array<{description:string;quantity:string;unit:string}>; notes:string }|null>(null);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[] | null>(null);
   const [biz, setBiz]           = useState<any | null>(null);
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const [connectBusy, setConnectBusy] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
 
@@ -981,6 +984,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         setPayments(paymentRows);
       }
       else if (v === 'transactions') { setLoading(true); setPayments(await api<any[]>(`/payments`)); }
+      else if (v === 'payouts') { setLoading(true); setConnectStatus(await api<ConnectStatus>(`/payments/connect/status`)); }
       else if (v === 'invoices' && !invoices) { setLoading(true); setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`)); }
       else if (v === 'resources') { setLoading(true); setResources(await api<Resource[]>(`/businesses/${bizId()}/resources`)); }
       else if (v === 'locations') { setLoading(true); setLocations(await api<Location[]>(`/businesses/${bizId()}/locations`)); }
@@ -2233,6 +2237,103 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               );
             })}
             {payments && payments.length===0 && <Text style={ms.empty}>No transactions yet. In-person charges and deposits show here.</Text>}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  if (view === 'payouts') {
+    const cs = connectStatus;
+    const refreshConnect = () => api<ConnectStatus>('/payments/connect/status').then(setConnectStatus).catch(() => {});
+    return (
+      <SafeAreaView style={s.screen}>
+        <Head title="Payouts"/>
+        {loading && !cs ? <Loader/> : (
+          <ScrollView contentContainerStyle={{ padding:16, gap:12 }} showsVerticalScrollIndicator={false}>
+            {!cs ? (
+              <Text style={{ color:GRAY_400, fontSize:14 }}>Loading…</Text>
+            ) : !cs.onboarded ? (
+              <View style={{ backgroundColor:'#EDE9FE', borderRadius:14, padding:16, gap:10 }}>
+                <Text style={{ fontSize:15, fontWeight:'700', color:'#4C1D95' }}>Connect your bank account</Text>
+                <Text style={{ fontSize:13, color:'#5B21B6' }}>Link your bank account via Stripe to receive payouts from client payments and in-person charges.</Text>
+                <TouchableOpacity
+                  style={[s.btnPrimary, connectBusy && { opacity:0.6 }]}
+                  disabled={connectBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Set up payouts with Stripe"
+                  onPress={async () => {
+                    setConnectBusy(true);
+                    try {
+                      const { url } = await api<{ url: string; accountId: string }>('/payments/connect/onboard', { method:'POST' });
+                      await Linking.openURL(url);
+                    } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not start Stripe onboarding'); }
+                    finally { setConnectBusy(false); }
+                  }}>
+                  <Text style={s.btnPrimaryText}>{connectBusy ? 'Opening…' : 'Set up payouts with Stripe'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : !cs.chargesEnabled ? (
+              <View style={{ backgroundColor:'#FFFBEB', borderRadius:14, padding:16, gap:10, borderWidth:1, borderColor:'#FDE68A' }}>
+                <Text style={{ fontSize:15, fontWeight:'700', color:'#78350F' }}>Verification in progress</Text>
+                <Text style={{ fontSize:13, color:'#92400E' }}>You've submitted your information — Stripe is reviewing your account. This typically takes a few minutes to 1 business day.</Text>
+                <Text style={{ fontSize:12, color:'#B45309' }}>Payments made before approval are held safely in your Stripe balance.</Text>
+                <TouchableOpacity
+                  style={[s.btnGhost, connectBusy && { opacity:0.6 }]}
+                  disabled={connectBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Check status in Stripe dashboard"
+                  onPress={async () => {
+                    setConnectBusy(true);
+                    try {
+                      const { url } = await api<{ url: string }>('/payments/connect/dashboard', { method:'POST' });
+                      await Linking.openURL(url);
+                    } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not open dashboard'); }
+                    finally { setConnectBusy(false); refreshConnect(); }
+                  }}>
+                  <Text style={s.btnGhostText}>{connectBusy ? 'Opening…' : 'Check status in Stripe dashboard'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <View style={{ backgroundColor:'#ECFDF5', borderRadius:14, padding:16, gap:4, borderWidth:1, borderColor:'#A7F3D0' }}>
+                  <Text style={{ fontSize:15, fontWeight:'700', color:'#065F46' }}>Bank account connected</Text>
+                  <Text style={{ fontSize:13, color:'#047857' }}>Your Stripe Express account is active and ready to receive payouts.</Text>
+                </View>
+                {cs.available.length > 0 && (
+                  <View style={{ flexDirection:'row', gap:10 }}>
+                    <View style={{ flex:1, backgroundColor:'#fff', borderRadius:14, padding:14, borderWidth:1, borderColor:GRAY_100 }}>
+                      <Text style={{ fontSize:11, color:GRAY_400, marginBottom:4 }}>Available</Text>
+                      {cs.available.map(b => (
+                        <Text key={b.currency} style={{ fontSize:22, fontWeight:'700', color:GRAY_900 }}>${(b.amount/100).toFixed(2)} <Text style={{ fontSize:13, color:GRAY_400 }}>{b.currency.toUpperCase()}</Text></Text>
+                      ))}
+                    </View>
+                    <View style={{ flex:1, backgroundColor:'#fff', borderRadius:14, padding:14, borderWidth:1, borderColor:GRAY_100 }}>
+                      <Text style={{ fontSize:11, color:GRAY_400, marginBottom:4 }}>Pending</Text>
+                      {cs.pending.map(b => (
+                        <Text key={b.currency} style={{ fontSize:22, fontWeight:'700', color:GRAY_500 }}>${(b.amount/100).toFixed(2)} <Text style={{ fontSize:13, color:GRAY_400 }}>{b.currency.toUpperCase()}</Text></Text>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={[s.btnPrimary, connectBusy && { opacity:0.6 }]}
+                  disabled={connectBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Stripe Express dashboard"
+                  onPress={async () => {
+                    setConnectBusy(true);
+                    try {
+                      const { url } = await api<{ url: string }>('/payments/connect/dashboard', { method:'POST' });
+                      await Linking.openURL(url);
+                    } catch(e) { Alert.alert('Error', e instanceof Error ? e.message : 'Could not open dashboard'); }
+                    finally { setConnectBusy(false); refreshConnect(); }
+                  }}>
+                  <Text style={s.btnPrimaryText}>{connectBusy ? 'Opening…' : 'Open Stripe Express dashboard'}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <Text style={{ fontSize:11, color:GRAY_400, textAlign:'center', marginTop:8 }}>Powered by Stripe Connect. Payouts are processed securely by Stripe.</Text>
           </ScrollView>
         )}
       </SafeAreaView>
@@ -3494,6 +3595,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Tasks',            icon:'checkbox-outline',        onPress:()=>open('tasks') },
     { label:'Follow-ups',       icon:'repeat-outline',          onPress:()=>open('followups') },
     { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
+    { label:'Payouts',           icon:'wallet-outline',          onPress:()=>open('payouts') },
     { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
     { label:'Invoices',         icon:'receipt-outline',         onPress:()=>open('invoices') },
     { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
