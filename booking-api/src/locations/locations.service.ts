@@ -21,8 +21,8 @@ export class LocationsService {
 
     const existing = await this.prisma.location.count({ where: { businessId, active: true } });
 
-    // Only UNLIMITED can manage multiple locations; FREE/BASIC/PRO are single-location.
-    if (!featuresUnlocked() && business.plan !== 'UNLIMITED') {
+    // Only UNLIMITED can add a second location; FREE/BASIC/PRO are single-location.
+    if (existing > 0 && !featuresUnlocked() && business.plan !== 'UNLIMITED') {
       throw new ForbiddenException('Managing multiple locations requires an Unlimited plan.');
     }
 

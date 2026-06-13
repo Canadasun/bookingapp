@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreatePackageDto, UpdatePackageDto,
@@ -88,21 +89,27 @@ export class PackagesService {
   }
 
   async redeem(businessId: string, id: string, dto: RedeemClientPackageDto) {
-    const cp = await this.getClientPackage(businessId, id);
-    if (cp.status === 'VOID') throw new BadRequestException('This package has been voided');
-    if (cp.expiresAt && cp.expiresAt < new Date()) throw new BadRequestException('This package has expired');
-    if (cp.creditsRemaining <= 0) throw new BadRequestException('No credits remaining on this package');
+    // SERIALIZABLE isolation ensures two concurrent redemptions cannot both read
+    // the same balance and both deduct from it — mirrors gift-cards.service.ts.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const cp = await tx.clientPackage.findFirst({
+        where: { id, businessId },
+      });
+      if (!cp) throw new NotFoundException('Client package not found');
+      if (cp.status === 'VOID') throw new BadRequestException('This package has been voided');
+      if (cp.expiresAt && cp.expiresAt < new Date()) throw new BadRequestException('This package has expired');
+      if (cp.creditsRemaining <= 0) throw new BadRequestException('No credits remaining on this package');
 
-    const remaining = cp.creditsRemaining - 1;
-    const [, updated] = await this.prisma.$transaction([
-      this.prisma.packageRedemption.create({
+      const remaining = cp.creditsRemaining - 1;
+      await tx.packageRedemption.create({
         data: { clientPackageId: cp.id, appointmentId: dto.appointmentId },
-      }),
-      this.prisma.clientPackage.update({
+      });
+      return tx.clientPackage.update({
         where: { id: cp.id },
         data: { creditsRemaining: remaining, status: remaining === 0 ? 'USED' : 'ACTIVE' },
-      }),
-    ]);
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
     return { creditsRemaining: updated.creditsRemaining, status: updated.status };
   }
 

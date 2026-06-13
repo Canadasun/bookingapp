@@ -51,8 +51,10 @@ export class StaffController {
   }
 
   @Get(':id/time-off')
-  getTimeOffs(@Param('id') id: string) {
-    return this.staffService.getTimeOffs(id);
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  getTimeOffs(@Param('id') id: string, @Param('businessId') businessId: string) {
+    return this.staffService.getTimeOffs(id, businessId);
   }
 
   // Owner/Admin only — create a staff member + login with a one-time temp

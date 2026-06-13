@@ -4,6 +4,7 @@ import { normalizePhone } from '../common/util/phone';
 import { TwilioSmsProvider } from '../notifications/providers/sms.provider';
 import { EventsGateway } from '../events/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { isProPlan } from '../common/util/plan-features';
 
 @Injectable()
 export class MessagesService {
@@ -116,7 +117,7 @@ export class MessagesService {
         where: { businessId, clientId, fromClient: true, channel: 'SMS' }, select: { id: true },
       });
       let eligible = !!textedFirst;
-      if (!eligible && plan === 'PRO') {
+      if (!eligible && isProPlan(plan)) {
         const booked = await this.prisma.appointment.findFirst({ where: { businessId, clientId }, select: { id: true } });
         eligible = !!booked;
       }
