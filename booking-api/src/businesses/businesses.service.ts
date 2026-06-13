@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
-import { applyPlanLimits } from '../common/util/plan-features';
+import { applyPlanLimits, isUnlimitedPlan } from '../common/util/plan-features';
 import { ResendEmailProvider } from '../notifications/providers/email.provider';
 
 @Injectable()
@@ -282,12 +282,22 @@ export class BusinessesService {
         ? { cancellationWindowHours: Math.floor(limited.cancellationWindowMinutes / 60) }
         : {}),
     };
+    // Branding removal (hidePouredBy) is UNLIMITED-only; strip it for lower tiers
+    // so a direct API call can't bypass the frontend gate.
+    let safeBookingPageSettings = bookingPageSettings;
+    if (safeBookingPageSettings !== undefined) {
+      const s = safeBookingPageSettings as Record<string, unknown>;
+      if (s.hidePouredBy === true && !isUnlimitedPlan(current.plan)) {
+        throw new ForbiddenException('Removing Pulse branding requires an Unlimited plan.');
+      }
+    }
+
     return this.prisma.business.update({
       where: { id },
       data: {
         ...data,
-        ...(bookingPageSettings !== undefined
-          ? { bookingPageSettings: bookingPageSettings as Prisma.InputJsonValue }
+        ...(safeBookingPageSettings !== undefined
+          ? { bookingPageSettings: safeBookingPageSettings as Prisma.InputJsonValue }
           : {}),
         ...(notificationSettings !== undefined
           ? { notificationSettings: notificationSettings as Prisma.InputJsonValue }

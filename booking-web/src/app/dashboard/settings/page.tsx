@@ -469,8 +469,9 @@ function SettingsPage() {
   const isPro = featuresOpen || plan === "PRO" || plan === "UNLIMITED";
   const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED";
   const isUnlimited = featuresOpen || plan === "UNLIMITED";
-  function promptUpgrade(target: "BASIC" | "PRO", feature: string) {
-    toast.info(`${feature} requires ${target === "BASIC" ? "Basic or Pro" : "Pro"}.`);
+  function promptUpgrade(target: "BASIC" | "PRO" | "UNLIMITED", feature: string) {
+    const label = target === "BASIC" ? "Basic or higher" : target === "PRO" ? "Pro or higher" : "Unlimited";
+    toast.info(`${feature} requires ${label}.`);
     goSection("billing");
   }
   function copyEmbed() {
@@ -1277,7 +1278,7 @@ function SettingsPage() {
                       <p className="text-xs text-gray-400 mt-0.5">Hides the Pulse credit line at the bottom of your booking page so clients only see your brand.</p>
                     </div>
                     <button type="button"
-                      onClick={() => isUnlimited ? bf("hidePouredBy", !bookingSettings.hidePouredBy) : promptUpgrade("PRO", "Remove Pulse branding")}
+                      onClick={() => isUnlimited ? bf("hidePouredBy", !bookingSettings.hidePouredBy) : promptUpgrade("UNLIMITED", "Remove Pulse branding")}
                       aria-label="Toggle remove Powered by Pulse"
                       className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4",
                         bookingSettings.hidePouredBy && isUnlimited ? "bg-violet-600" : "bg-gray-200")}>

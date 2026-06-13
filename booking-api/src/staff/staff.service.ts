@@ -15,6 +15,11 @@ import {
   AssignServicesDto,
   InviteStaffDto,
 } from './dto/staff.dto';
+import { isUnlimitedPlan } from '../common/util/plan-features';
+
+// Non-Unlimited plans cap the number of active staff accounts.
+// UNLIMITED advertises "unlimited staff accounts" as a differentiator.
+const STAFF_LIMITS: Record<string, number> = { FREE: 5, BASIC: 10, PRO: 10 };
 
 @Injectable()
 export class StaffService {
@@ -50,6 +55,7 @@ export class StaffService {
     // The linked user must belong to this business (no cross-business linking).
     const user = await this.prisma.user.findFirst({ where: { id: dto.userId, businessId } });
     if (!user) throw new NotFoundException('User not found in this business');
+    await this.enforceStaffLimit(businessId);
     return this.prisma.staff.create({
       data: { businessId, userId: dto.userId, bio: dto.bio, avatarUrl: dto.avatarUrl },
       include: { user: { select: { name: true, email: true, role: true } } },
@@ -70,6 +76,7 @@ export class StaffService {
     }
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
+    await this.enforceStaffLimit(businessId);
 
     const tempPassword = randomBytes(9).toString('base64url').slice(0, 12);
     const passwordHash = await bcrypt.hash(tempPassword, 12);
@@ -150,6 +157,18 @@ export class StaffService {
       await tx.user.delete({ where: { id: staff.userId } });    // remove their login too
     });
     return { ok: true };
+  }
+
+  private async enforceStaffLimit(businessId: string) {
+    const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
+    if (!biz || isUnlimitedPlan(biz.plan)) return;
+    const limit = STAFF_LIMITS[biz.plan ?? 'FREE'] ?? 5;
+    const count = await this.prisma.staff.count({ where: { businessId, active: true } });
+    if (count >= limit) {
+      throw new ForbiddenException(
+        `Your ${biz.plan} plan supports up to ${limit} active staff members. Upgrade to Unlimited for unlimited staff.`,
+      );
+    }
   }
 
   // The owner is the fallback provider (sole-proprietor model). Ensure they have
