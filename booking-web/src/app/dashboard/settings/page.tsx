@@ -219,7 +219,7 @@ function SettingsPage() {
   useEffect(() => { loadLocations(); }, [bizId]);
 
   // Stripe Connect / Payouts
-  type ConnectStatus = { onboarded: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] };
+  type ConnectStatus = { onboarded: boolean; chargesEnabled: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] };
   const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
   const [connectBusy, setConnectBusy] = useState<string | null>(null);
   const [payoutAmount, setPayoutAmount] = useState("");
@@ -1196,6 +1196,28 @@ function SettingsPage() {
                       className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
                       <ExternalLink className="w-4 h-4" />
                       {connectBusy === "onboard" ? "Redirecting…" : "Set up payouts with Stripe"}
+                    </button>
+                  </div>
+                ) : !connectStatus.chargesEnabled ? (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-900">Verification in progress</p>
+                        <p className="text-xs text-amber-700 mt-1">You&apos;ve submitted your information — Stripe is reviewing your account. This typically takes a few minutes to 1 business day. You&apos;ll receive an email when it&apos;s approved.</p>
+                        <p className="text-xs text-amber-600 mt-2">Payments made before approval are held safely in your Stripe balance and will be available once verified.</p>
+                      </div>
+                    </div>
+                    <button type="button" disabled={connectBusy !== null}
+                      onClick={async () => {
+                        setConnectBusy("dashboard");
+                        try { const { url } = await api.connect.dashboard(); window.open(url, "_blank"); }
+                        catch (e) { toast.error(e instanceof Error ? e.message : "Could not open dashboard"); }
+                        finally { setConnectBusy(null); }
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-3 py-2 hover:bg-amber-100 disabled:opacity-60 transition-colors">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      {connectBusy === "dashboard" ? "Opening…" : "Check status in Stripe dashboard"}
                     </button>
                   </div>
                 ) : (

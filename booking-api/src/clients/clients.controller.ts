@@ -6,6 +6,7 @@ import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDt
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('clients')
 @ApiBearerAuth()
@@ -17,6 +18,7 @@ export class ClientsController {
   @UseGuards(JwtAuthGuard, TenantGuard)
   findAll(
     @Param('businessId') businessId: string,
+    @CurrentUser() _user: { id: string; role: string; businessId: string | null },
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,

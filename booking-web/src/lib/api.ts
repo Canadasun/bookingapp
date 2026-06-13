@@ -516,7 +516,7 @@ export const api = {
     // Start or resume Stripe Connect Express onboarding.
     onboard: () => req<{ url: string; accountId: string }>("/payments/connect/onboard", { method: "POST" }),
     // Get Connect account status + balance.
-    status: () => req<{ onboarded: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] }>("/payments/connect/status"),
+    status: () => req<{ onboarded: boolean; chargesEnabled: boolean; accountId: string | null; available: { amount: number; currency: string }[]; pending: { amount: number; currency: string }[] }>("/payments/connect/status"),
     // Open the Stripe Express dashboard.
     dashboard: () => req<{ url: string }>("/payments/connect/dashboard", { method: "POST" }),
     // Trigger a manual or instant payout.

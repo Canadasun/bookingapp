@@ -902,22 +902,26 @@ export class PaymentsService {
   async getConnectStatus(businessId: string) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     if (!business.stripeConnectAccountId) {
-      return { onboarded: false, accountId: null, available: [], pending: [] };
+      return { onboarded: false, chargesEnabled: false, accountId: null, available: [], pending: [] };
     }
     const stripe = this.getStripe();
-    const [account, balance] = await Promise.all([
-      stripe.accounts.retrieve(business.stripeConnectAccountId),
-      stripe.balance.retrieve({}, { stripeAccount: business.stripeConnectAccountId }),
-    ]);
+    const account = await stripe.accounts.retrieve(business.stripeConnectAccountId);
     const onboarded = !!account.details_submitted;
+    const chargesEnabled = !!account.charges_enabled;
     if (onboarded !== business.stripeConnectOnboarded) {
       await this.prisma.business.update({ where: { id: businessId }, data: { stripeConnectOnboarded: onboarded } });
     }
+    // Only fetch balance once charges are enabled — before that the endpoint
+    // returns zeros and counts as a billable API call.
+    const balance = chargesEnabled
+      ? await stripe.balance.retrieve({}, { stripeAccount: business.stripeConnectAccountId })
+      : null;
     return {
       onboarded,
+      chargesEnabled,
       accountId: business.stripeConnectAccountId,
-      available: balance.available.map((b) => ({ amount: b.amount, currency: b.currency })),
-      pending: balance.pending.map((b) => ({ amount: b.amount, currency: b.currency })),
+      available: balance?.available.map((b) => ({ amount: b.amount, currency: b.currency })) ?? [],
+      pending: balance?.pending.map((b) => ({ amount: b.amount, currency: b.currency })) ?? [],
     };
   }
 
