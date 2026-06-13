@@ -28,7 +28,7 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 // business is on Pro during testing; paid switching gets wired up after testing.
 const PLANS = [
   { id:'FREE',      name:'Free',      price:'$0',   period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page'] },
-  { id:'BASIC',     name:'Basic',     price:'$49',  period:'/mo', features:['Everything in Free','1 extra location','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies'] },
+  { id:'BASIC',     name:'Basic',     price:'$49',  period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies'] },
   { id:'PRO',       name:'Pro',       price:'$149', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Analytics'] },
   { id:'UNLIMITED', name:'Unlimited', price:'$80',  period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support'] },
 ] as const;
@@ -972,7 +972,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'packages' && (!packages || !issuedPackages)){ setLoading(true); await loadPackages(); }
       else if (v === 'tasks' && !tasks){ setLoading(true); await loadTasks(); }
       else if (v === 'followups' && !followups){ setLoading(true); await loadFollowups(); }
-      else if ((v === 'settings' || v === 'booking' || v === 'subscriptions' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
+      else if ((v === 'settings' || v === 'booking' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
+      else if (v === 'subscriptions') { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
       else if (v === 'notifications' && !deliveries) { setLoading(true); setDeliveries(await api<NotificationDelivery[]>(`/notifications/deliveries?limit=50`)); }
       else if (v === 'reports' && !appts) {
         setLoading(true);

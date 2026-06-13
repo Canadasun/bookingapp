@@ -19,7 +19,10 @@ export function useBusinessId() {
   return bizId;
 }
 
-export function useEvents(onUpdate: (data: unknown) => void) {
+export function useEvents(
+  onUpdate: (data: unknown) => void,
+  onPlanUpdate?: (data: { plan: string; planExpiresAt: string | null }) => void,
+) {
   const bizId = useBusinessId();
 
   useEffect(() => {
@@ -50,6 +53,9 @@ export function useEvents(onUpdate: (data: unknown) => void) {
         socket.on("messageUpdated", (data: unknown) => {
           onUpdate(data);
         });
+        socket.on("planUpdated", (data: { plan: string; planExpiresAt: string | null }) => {
+          onPlanUpdate?.(data);
+        });
       })
       .catch(() => {
         // Not authenticated / ticket unavailable — skip realtime; the UI still
@@ -63,5 +69,5 @@ export function useEvents(onUpdate: (data: unknown) => void) {
         socket.disconnect();
       }
     };
-  }, [bizId, onUpdate]);
+  }, [bizId, onUpdate, onPlanUpdate]);
 }

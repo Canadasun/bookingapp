@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'crypto';
 import Stripe from 'stripe';
 import { isPaidPlan, isProPlan } from '../common/util/plan-features';
 import { ReferralsService } from '../referrals/referrals.service';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class PaymentsService {
@@ -18,6 +19,7 @@ export class PaymentsService {
     private configService: ConfigService,
     private notifications: NotificationsService,
     private referrals: ReferralsService,
+    private events: EventsGateway,
   ) {}
 
   // Lazily construct Stripe so a missing STRIPE_SECRET_KEY can't crash the app
@@ -562,6 +564,7 @@ export class PaymentsService {
     if (prev && prev.plan !== effectivePlan) {
       await this.notifications.sendPlanChanged(businessId, effectivePlan).catch(() => {});
     }
+    this.events.emitPlanUpdate(businessId, { plan: effectivePlan, planExpiresAt: periodEnd });
     // When a referred business becomes a paying customer, grant the referrer their
     // reward (once). Best-effort: a reward hiccup never breaks the subscription.
     if (effectivePlan !== 'FREE') {

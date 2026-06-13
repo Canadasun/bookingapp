@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type, Eye, EyeOff } from "lucide-react";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
+import { useEvents } from "@/lib/hooks";
 
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
@@ -221,6 +222,14 @@ function SettingsPage() {
       .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); setLoading(false); })
       .finally(() => setLoading(false));
   }, [bizId]);
+
+  useEvents(
+    useCallback(() => {}, []),
+    useCallback((data: { plan: string; planExpiresAt: string | null }) => {
+      setBiz((prev) => prev ? { ...prev, plan: data.plan as Business["plan"] } : prev);
+      toast.success(`Plan updated to ${data.plan.charAt(0) + data.plan.slice(1).toLowerCase()}`);
+    }, []),
+  );
 
   const f = (k: keyof Business, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
   const bookingSettings = (form.bookingPageSettings ?? {}) as Record<string, unknown>;
@@ -1313,19 +1322,14 @@ function SettingsPage() {
                 </div>
                 <hr className="border-gray-100" />
 
-                {plan === "FREE" ? (
+                {!isUnlimited ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-900">Multi-location requires Basic or higher</p>
-                    <p className="text-xs text-amber-700 mt-1">Upgrade to manage multiple branches, each with their own staff and calendar, under one Pulse account — without needing separate logins per location.</p>
+                    <p className="text-sm font-semibold text-amber-900">Multiple locations require Unlimited</p>
+                    <p className="text-xs text-amber-700 mt-1">Free, Basic, and Pro plans are for single-location businesses. Upgrade to <strong>Unlimited</strong> to manage multiple branches, each with their own staff and calendar, under one account.</p>
                     <button type="button" onClick={() => { goSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
                   </div>
                 ) : (
                   <>
-                    {(plan === "BASIC" || plan === "PRO") && (
-                      <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-                        <p className="text-xs text-blue-700">Basic and Pro support 1 extra location. Upgrade to <strong>Unlimited</strong> to manage unlimited locations across one account.</p>
-                      </div>
-                    )}
                     <div className="space-y-2">
                       {locations.length === 0 && <p className="text-xs text-gray-400">No extra locations yet.</p>}
                       {locations.map((loc) => (
@@ -1803,14 +1807,14 @@ function SettingsPage() {
                       id: "BASIC", name: "Basic", price: "$49", period: "/mo",
                       desc: "Great for growing businesses",
                       recommended: true,
-                      features: ["Everything in Free","1 extra location","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
+                      features: ["Everything in Free","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
                     {
                       id: "PRO", name: "Pro", price: "$149", period: "/mo",
                       desc: "Full power for busy businesses",
                       highlight: true,
-                      features: ["Everything in Basic","1 extra location (same as Basic)","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics"],
+                      features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
                     {

@@ -21,15 +21,9 @@ export class LocationsService {
 
     const existing = await this.prisma.location.count({ where: { businessId, active: true } });
 
-    // FREE: no extra locations. BASIC/PRO: up to 1 location. UNLIMITED: unlimited.
-    // Bypassed while UNLOCK_ALL_FEATURES is enabled (launch/testing mode).
-    if (!featuresUnlocked()) {
-      if (business.plan === 'FREE') {
-        throw new ForbiddenException('Managing multiple locations requires a Basic plan or higher.');
-      }
-      if ((business.plan === 'BASIC' || business.plan === 'PRO') && existing >= 1) {
-        throw new ForbiddenException('Unlimited plan required to manage more than one location.');
-      }
+    // Only UNLIMITED can manage multiple locations; FREE/BASIC/PRO are single-location.
+    if (!featuresUnlocked() && business.plan !== 'UNLIMITED') {
+      throw new ForbiddenException('Managing multiple locations requires an Unlimited plan.');
     }
 
     return this.prisma.location.create({

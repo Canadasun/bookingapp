@@ -83,4 +83,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitMessageUpdate(businessId: string, data: { clientId: string; unreadMessages: number; unreadThreads: number }) {
     this.server.to(`business_${businessId}`).emit('messageUpdated', data);
   }
+
+  emitPlanUpdate(businessId: string, data: { plan: string; planExpiresAt: Date | null }) {
+    this.server.to(`business_${businessId}`).emit('planUpdated', data);
+  }
 }
