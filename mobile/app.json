@@ -46,7 +46,13 @@
           "imageWidth": 200
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#E9A23C"
+        }
+      ],
       "expo-secure-store",
       [
         "@stripe/stripe-react-native",

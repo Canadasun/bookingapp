@@ -323,7 +323,8 @@ export default function App() {
   return (
     <StripeProvider
       publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''}
-      urlScheme="mobile"
+      urlScheme="pulseappointments"
+      merchantIdentifier="merchant.com.pulseappointments.stripe"
     >
       <AppContent />
     </StripeProvider>

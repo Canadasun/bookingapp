@@ -60,7 +60,9 @@ export async function registerPushNotifications() {
       ? current.status
       : (await Notifications.requestPermissionsAsync()).status;
     if (finalStatus !== 'granted') return;
-    const result = await Notifications.getExpoPushTokenAsync();
+    const Constants = require('expo-constants').default;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? 'a30e642e-d737-4642-9e9e-e832d7676cb5';
+    const result = await Notifications.getExpoPushTokenAsync({ projectId });
     const pushToken = result?.data;
     if (!pushToken) return;
     await api('/users/me/device-token', {
