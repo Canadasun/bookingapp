@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Pulse",
-    "slug": "pulseappointments",
+    "slug": "Mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -13,7 +13,9 @@
       "buildNumber": "27",
       "entitlements": {
         "aps-environment": "production",
-        "com.apple.developer.in-app-payments": ["merchant.com.pulseappointments.stripe"]
+        "com.apple.developer.in-app-payments": [
+          "merchant.com.pulseappointments.stripe"
+        ]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -74,6 +76,7 @@
       "eas": {
         "projectId": "a30e642e-d737-4642-9e9e-e832d7676cb5"
       }
-    }
+    },
+    "owner": "canadasun"
   }
 }
