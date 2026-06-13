@@ -1414,9 +1414,10 @@ function SettingsPage() {
                     </thead>
                     <tbody>
                       {[
-                        { id: "FREE",  name: "Free",    mo: "$0",    cp: "2.6% + $0.15", cnp: "3.5% + $0.15", online: "3.3% + $0.30" },
-                        { id: "BASIC", name: "Plus",    mo: "$49",   cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
-                        { id: "PRO",   name: "Premium", mo: "$149",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
+                        { id: "FREE",      name: "Free",      mo: "$0",   cp: "2.6% + $0.15", cnp: "3.5% + $0.15", online: "3.3% + $0.30" },
+                        { id: "BASIC",     name: "Basic",     mo: "$49",  cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
+                        { id: "PRO",       name: "Pro",       mo: "$149", cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
+                        { id: "UNLIMITED", name: "Unlimited", mo: "$80",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
                       ].map((row) => (
                         <tr key={row.id} className={cn("border-b border-gray-50 last:border-0", plan === row.id && "bg-violet-50")}>
                           <td className="px-4 py-2.5 font-semibold text-gray-800">{row.name}{plan === row.id && <span className="ml-1.5 text-violet-600">(current)</span>}</td>
