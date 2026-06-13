@@ -44,7 +44,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
   // Owner can enforce the cancellation fee only when the business is on Pro with a
   // fee configured (a card must also be on file — the API verifies that and tells
   // us if it couldn't charge).
-  const feeEligible = apt.business?.plan === "PRO" && (apt.business?.cancellationFeeCents ?? 0) > 0;
+  const feeEligible = (apt.business?.plan === "PRO" || apt.business?.plan === "UNLIMITED") && (apt.business?.cancellationFeeCents ?? 0) > 0;
   const [edit, setEdit] = useState({
     clientName: apt.client.name,
     clientEmail: apt.client.email ?? "",

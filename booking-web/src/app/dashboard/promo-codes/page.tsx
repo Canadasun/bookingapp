@@ -28,7 +28,7 @@ export default function PromoCodesPage() {
   async function create(e: React.FormEvent) {
     e.preventDefault();
     if (!form.code.trim()) { toast.error("Code is required"); return; }
-    const val = parseInt(form.discountValue);
+    const val = parseInt(form.discountValue, 10);
     if (!val || val <= 0) { toast.error("Enter a valid discount value"); return; }
     if (form.discountType === "PERCENT" && val > 100) { toast.error("Percentage must be 0–100"); return; }
     try {
@@ -36,7 +36,7 @@ export default function PromoCodesPage() {
         code: form.code.trim().toUpperCase(),
         discountType: form.discountType,
         discountValue: form.discountType === "FLAT" ? val * 100 : val,
-        maxUsages: form.maxUsages ? parseInt(form.maxUsages) : undefined,
+        maxUsages: form.maxUsages ? parseInt(form.maxUsages, 10) : undefined,
         expiresAt: form.expiresAt || undefined,
       });
       setCodes(p => [pc, ...p]);

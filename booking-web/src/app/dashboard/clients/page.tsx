@@ -106,7 +106,7 @@ export default function ClientsPage() {
       toast.success("Client added");
       setShowAdd(false);
       setForm({ name: "", email: "", phone: "", notes: "" });
-      load();
+      await load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     finally { setSaving(false); }
   }
