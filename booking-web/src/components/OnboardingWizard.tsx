@@ -44,8 +44,8 @@ export function OnboardingWizard() {
       const built: Step[] = [
         { id: "services", title: "Add your first service", description: "Define what you offer — haircut, massage, cleaning, etc.", href: "/dashboard/services", done: hasServices },
         { id: "staff", title: "Set up your staff & hours", description: "Add yourself or team members and set working hours.", href: "/dashboard/staff", done: hasStaff },
-        { id: "stripe", title: "Connect Stripe to get paid", description: "Accept deposits, card payments, and no-show fees.", href: "/dashboard/settings", done: hasStripe },
-        { id: "share", title: "Share your booking link", description: "Post it on Instagram, Google, or anywhere clients find you.", href: "/dashboard/settings", done: false },
+        { id: "stripe", title: "Connect Stripe to get paid", description: "Accept deposits, card payments, and no-show fees.", href: "/dashboard/settings?tab=payouts", done: hasStripe },
+        { id: "share", title: "Share your booking link", description: "Post it on Instagram, Google, or anywhere clients find you.", href: "/dashboard/settings?tab=online", done: false },
       ];
 
       const coreDone = built.slice(0, 3).every(s => s.done);

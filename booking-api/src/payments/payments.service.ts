@@ -799,29 +799,38 @@ export class PaymentsService {
   async getConnectOnboardingUrl(businessId: string): Promise<{ url: string; accountId: string }> {
     const stripe = this.getStripe();
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
-    const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const webUrl = (this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? '').replace(/\/$/, '') || 'https://pulseappointments.com';
 
-    let accountId = business.stripeConnectAccountId;
-    if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        email: business.email,
-        business_type: 'individual',
-        metadata: { businessId },
-        settings: { payouts: { schedule: { interval: 'manual' } } },
+    try {
+      let accountId = business.stripeConnectAccountId;
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          type: 'express',
+          email: business.email,
+          business_type: 'individual',
+          metadata: { businessId },
+          settings: { payouts: { schedule: { interval: 'manual' } } },
+        });
+        accountId = account.id;
+        await this.prisma.business.update({ where: { id: businessId }, data: { stripeConnectAccountId: accountId } });
+      }
+
+      const link = await stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: `${webUrl}/dashboard/settings?tab=payouts&connect=refresh`,
+        return_url: `${webUrl}/dashboard/settings?tab=payouts&connect=success`,
+        type: 'account_onboarding',
       });
-      accountId = account.id;
-      await this.prisma.business.update({ where: { id: businessId }, data: { stripeConnectAccountId: accountId } });
+
+      return { url: link.url, accountId };
+    } catch (err) {
+      // Surface the real Stripe error message so the dashboard can display it.
+      const msg = err instanceof Stripe.errors.StripeError
+        ? `Stripe: ${err.message}`
+        : (err instanceof Error ? err.message : 'Could not start Stripe onboarding');
+      this.logger.error(`Connect onboarding failed for business ${businessId}: ${msg}`);
+      throw new BadRequestException(msg);
     }
-
-    const link = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: `${webUrl}/dashboard/settings?tab=payouts&connect=refresh`,
-      return_url: `${webUrl}/dashboard/settings?tab=payouts&connect=success`,
-      type: 'account_onboarding',
-    });
-
-    return { url: link.url, accountId };
   }
 
   /** Open the Stripe Express dashboard (login link) for the business. */

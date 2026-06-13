@@ -26,7 +26,7 @@ async function bootstrap() {
   // the real client IP — required for per-IP rate limiting to work correctly.
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(helmet());
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', { exclude: ['/'] });
   // Drain connections + run onModuleDestroy (Prisma disconnect, BullMQ workers)
   // on SIGTERM/SIGINT (e.g. Railway redeploys) for a graceful shutdown.
   app.enableShutdownHooks();

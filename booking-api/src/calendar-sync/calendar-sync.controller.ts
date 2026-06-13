@@ -49,10 +49,22 @@ export class CalendarSyncController {
     @Query('code') code: string,
     @Query('state') state: string,
     @Query('error') oauthError: string,
+    @Query('iss') iss: string,
     @Res() res: Response,
   ) {
-    const web = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000';
+    // Use a hard-coded production fallback so a missing env var doesn't redirect
+    // the user to localhost. NEXT_PUBLIC_WEB_URL must be set on the API service.
+    const web = (process.env.NEXT_PUBLIC_WEB_URL ?? 'https://pulseappointments.com').replace(/\/$/, '');
     const logger = new Logger('GoogleCallback');
+
+    // Google OIDC issuer hint — a protocol probe sent before the real callback
+    // that carries only ?iss= (no code, no error). Acknowledge silently; the
+    // actual callback with code= arrives in a separate request.
+    if (iss && !code && !oauthError) {
+      logger.log('Google OIDC issuer probe received — no action needed');
+      return res.status(200).send('OK');
+    }
+
     const queryInfo = `code=${code ? 'yes' : 'no'} error=${oauthError ?? 'none'} state=${state ? 'yes' : 'no'}`;
     try {
       if (oauthError) throw new Error(`google_denied:${oauthError}`); // e.g. access_denied
@@ -60,12 +72,12 @@ export class CalendarSyncController {
       await this.google.handleCallback(code, state);
       logger.log('Google Calendar connected successfully');
       CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: true, query: queryInfo };
-      return res.redirect(`${web}/dashboard/settings?calendar=connected`);
+      return res.redirect(`${web}/dashboard/settings?tab=calendar&calendar=connected`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : 'unknown';
       logger.warn(`Google callback FAILED: ${reason}`);
       CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: false, reason, query: queryInfo };
-      return res.redirect(`${web}/dashboard/settings?calendar=error&reason=${encodeURIComponent(reason)}`);
+      return res.redirect(`${web}/dashboard/settings?tab=calendar&calendar=error&reason=${encodeURIComponent(reason)}`);
     }
   }
 

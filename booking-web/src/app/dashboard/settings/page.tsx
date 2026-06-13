@@ -272,9 +272,16 @@ function SettingsPage() {
   function loadCal() { api.calendarSync.status().then(setCal).catch(() => {}); }
   useEffect(() => { loadCal(); }, []);
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("calendar");
-    if (p === "connected") { toast.success("Google Calendar connected"); loadCal(); window.history.replaceState({}, "", "/dashboard/settings"); }
-    else if (p === "error") { toast.error("Could not connect Google Calendar"); window.history.replaceState({}, "", "/dashboard/settings"); }
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("calendar");
+    if (p === "connected") { toast.success("Google Calendar connected — bookings will sync automatically."); loadCal(); setSection("calendar"); window.history.replaceState({}, "", "/dashboard/settings?tab=calendar"); }
+    else if (p === "error") {
+      const reason = params.get("reason") ?? "";
+      const msg = reason.startsWith("google_denied") ? "Google Calendar access was denied. You can try again." : reason === "missing_code" ? "The connection was interrupted. Please try again." : `Could not connect Google Calendar${reason ? `: ${reason}` : ""}.`;
+      toast.error(msg);
+      setSection("calendar");
+      window.history.replaceState({}, "", "/dashboard/settings?tab=calendar");
+    }
   }, []);
   async function connectCal() {
     try { const { url } = await api.calendarSync.connect(); window.location.assign(url); }
@@ -306,7 +313,7 @@ function SettingsPage() {
       setSection("payouts");
     } else if (connect === "refresh") {
       // Auto-restart onboarding
-      api.connect.onboard().then(({ url }) => window.location.assign(url)).catch(() => {});
+      api.connect.onboard().then(({ url }) => window.location.assign(url)).catch((e) => toast.error(e instanceof Error ? e.message : "Could not resume Stripe onboarding"));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -712,61 +719,91 @@ function SettingsPage() {
               <div className="p-6 space-y-5">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Calendar sync</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Push confirmed bookings to your Google Calendar automatically.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">See your Pulse appointments in any calendar app on your phone or computer.</p>
                 </div>
-                {!cal ? (
-                  <p className="text-sm text-gray-400">Loading…</p>
-                ) : !cal.configured ? (
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                    <p className="text-sm font-semibold text-blue-900">Google Calendar not configured</p>
-                    <p className="text-xs text-blue-700 mt-0.5">Google Calendar sync requires server credentials that aren’t set up yet. Use the iCal feed below — it works with Google Calendar, Apple Calendar, Outlook, and any app that supports webcal subscriptions.</p>
+
+                {/* ── iCal feed (primary, beginner-friendly) ───────────────── */}
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex w-9 h-9 rounded-lg bg-amber-100 items-center justify-center shrink-0">
+                      <Download className="w-4 h-4 text-amber-700" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-amber-900">iCal feed — works with every calendar app</p>
+                      <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                        Download or subscribe to your appointments in <strong>Google Calendar, Apple Calendar, Outlook</strong>, or any app on your phone or computer. No scary screens, no special setup — just one click.
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-gray-100 bg-white p-4 flex items-center justify-between gap-4">
-                    <div className="min-w-0 flex items-center gap-3">
-                      <span className={cn("inline-flex w-9 h-9 rounded-lg items-center justify-center shrink-0", cal.connected ? "bg-green-50" : "bg-violet-50")}>
-                        <CalendarDays className={cn("w-4 h-4", cal.connected ? "text-green-600" : "text-violet-600")} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
-                        {cal.connected ? (
-                          <p className="text-xs text-gray-500 mt-0.5">Connected{cal.email ? ` as ${cal.email}` : ""} — bookings sync to your calendar, and personal events on it automatically block those times from booking.</p>
-                        ) : (
-                          <p className="text-xs text-gray-500 mt-0.5">Connect so confirmed bookings appear on your Google Calendar.</p>
-                        )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={api.calendarSync.icalFeedUrl()}
+                      download="pulse-appointments.ics"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download .ics file
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}${api.calendarSync.icalFeedUrl()}`;
+                        navigator.clipboard.writeText(url).then(() => toast.success("Feed link copied — paste it into Google Calendar → Other calendars → From URL")).catch(() => toast.error("Could not copy"));
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-400 text-amber-800 text-xs font-semibold rounded-lg hover:bg-amber-100 transition-colors"
+                    >
+                      Copy link
+                    </button>
+                  </div>
+
+                  {/* Step-by-step for beginners */}
+                  <div className="rounded-lg bg-white/70 border border-amber-100 p-4 space-y-3 text-xs text-amber-900">
+                    <p className="font-semibold text-amber-800">How to add to your calendar:</p>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="font-semibold">📱 iPhone / Apple Calendar</p>
+                        <p className="text-amber-700 mt-0.5">Download the .ics file → tap "Add to Calendar" when prompted.</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">🗓 Google Calendar</p>
+                        <p className="text-amber-700 mt-0.5">Copy the link above → open Google Calendar → click <strong>"+"</strong> next to "Other calendars" → <strong>"From URL"</strong> → paste the link → click "Add calendar".</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">💻 Outlook</p>
+                        <p className="text-amber-700 mt-0.5">Download the .ics file → open Outlook → File → Open &amp; Export → Import/Export → Import an iCalendar file.</p>
                       </div>
                     </div>
+                    <p className="text-amber-600 italic">Tip: confirmation emails sent to your clients also include a calendar invite they can add in one tap.</p>
+                  </div>
+                </div>
+
+                {/* ── Google Calendar two-way sync (advanced) ──────────────── */}
+                {cal?.configured && (
+                  <div className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-violet-500" />
+                      <p className="text-sm font-semibold text-gray-900">Google Calendar — two-way sync</p>
+                      <span className="ml-auto text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">Advanced</span>
+                    </div>
                     {cal.connected ? (
-                      <button type="button" onClick={disconnectCal}
-                        className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors shrink-0">Disconnect</button>
+                      <>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          Connected as <strong>{cal.email}</strong>. Confirmed bookings sync automatically to your Google Calendar, and your personal Google Calendar events block those time slots from new bookings.
+                        </p>
+                        <button type="button" onClick={disconnectCal}
+                          className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">Disconnect</button>
+                      </>
                     ) : (
-                      <button type="button" onClick={connectCal}
-                        className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors shrink-0">Connect</button>
+                      <>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          Connect your Google account for automatic two-way sync. Google will show a &quot;This app isn&apos;t verified&quot; warning — this is normal for apps awaiting Google review. Click <strong>Advanced → Go to pulseappointments.com</strong> to continue.
+                        </p>
+                        <button type="button" onClick={connectCal}
+                          className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors">Connect Google Calendar</button>
+                      </>
                     )}
                   </div>
                 )}
-
-                {/* iCal feed — works regardless of Google sync status */}
-                <div className={cn("rounded-xl border p-4", cal?.configured ? "border-gray-100 bg-gray-50" : "border-violet-200 bg-violet-50")}>
-                  <div className="flex items-start gap-3">
-                    <Download className={cn("w-4 h-4 mt-0.5 shrink-0", cal?.configured ? "text-gray-500" : "text-violet-600")} />
-                    <div className="flex-1 min-w-0">
-                      <p className={cn("text-sm font-semibold", cal?.configured ? "text-gray-800" : "text-violet-900")}>
-                        iCal feed{!cal?.configured ? " — recommended" : ""}
-                      </p>
-                      <p className={cn("text-xs mt-0.5", cal?.configured ? "text-gray-400" : "text-violet-700")}>
-                        Subscribe to your appointments in any calendar app — Google Calendar, Apple Calendar, Outlook, or any webcal-compatible app. Works without any extra setup. Confirmation emails also include a .ics calendar invite.
-                      </p>
-                      <a
-                        href={api.calendarSync.icalFeedUrl()}
-                        download="pulse-appointments.ics"
-                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:underline"
-                      >
-                        <Download className="w-3 h-3" /> Download / subscribe to iCal feed
-                      </a>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 

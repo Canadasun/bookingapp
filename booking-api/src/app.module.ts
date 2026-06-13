@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -43,6 +44,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
 
 @Module({
+  controllers: [AppController],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     LoggerModule.forRoot({
