@@ -58,7 +58,7 @@ const nextConfig: NextConfig = {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.clarity.ms",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' wss://api.pulseappointments.com wss://bookingapp-production-32f8.up.railway.app https://api.stripe.com https://js.stripe.com https://www.clarity.ms https://c.clarity.ms",
+      "connect-src 'self' https://api.pulseappointments.com wss://api.pulseappointments.com https://bookingapp-production-32f8.up.railway.app wss://bookingapp-production-32f8.up.railway.app https://api.stripe.com https://js.stripe.com https://www.clarity.ms https://c.clarity.ms",
       "font-src 'self' data:",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",
