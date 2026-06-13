@@ -39,8 +39,8 @@
   <domain-config>
     <domain includeSubdomains="true">api.pulseappointments.com</domain>
     <pin-set expiration="2027-06-13">
-      <pin digest="SHA-256">B+njsJBP1pw/5SOYuRTFRdFP4ZrmaI520QII6e2PaM8=</pin>
-      <pin digest="SHA-256">brzvtCELCIZUo4sD/qPX0ccRtPsd3DY6RfmxpOU9oB4=</pin>
+      <pin digest="SHA-256">Y2szDQ38zdCBYaiOpHUXO4mySTA3HXYwVOPUQeg4izY=</pin>
+      <pin digest="SHA-256">nWN7PSep5XDQdge5zK24CnCRXHr3KvzhKEGxsdqCX9E=</pin>
     </pin-set>
   </domain-config>
 </network-security-config>
