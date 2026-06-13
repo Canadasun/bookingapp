@@ -369,12 +369,66 @@ export class PaymentsService {
       }
       case 'account.updated': {
         const account = event.data.object as Stripe.Account;
+        // details_submitted = owner finished the onboarding form.
+        // charges_enabled   = Stripe approved KYC; the account can now accept payments.
+        // payouts_enabled    = Stripe approved payouts to the linked bank account.
         if (account.details_submitted) {
-          await this.prisma.business.updateMany({
+          const biz = await this.prisma.business.findFirst({
             where: { stripeConnectAccountId: account.id },
-            data: { stripeConnectOnboarded: true },
+            select: { id: true, stripeConnectOnboarded: true },
           });
+          if (biz) {
+            await this.prisma.business.update({
+              where: { id: biz.id },
+              data: { stripeConnectOnboarded: true },
+            });
+            // Notify the owner the first time their account is fully approved.
+            if (!biz.stripeConnectOnboarded && account.charges_enabled) {
+              await this.prisma.systemError?.create?.({
+                data: {
+                  businessId: biz.id,
+                  category: 'PAYMENT',
+                  severity: 'INFO',
+                  message: 'Your Stripe account has been verified. You can now accept deposits and card payments from clients.',
+                  context: { accountId: account.id, chargesEnabled: true },
+                },
+              }).catch(() => {});
+            }
+            // Surface unresolved requirements so the owner knows to take action.
+            const pastDue = account.requirements?.past_due ?? [];
+            if (pastDue.length > 0) {
+              this.logger.warn(`Stripe account ${account.id} has past_due requirements: ${pastDue.join(', ')}`);
+              await this.prisma.systemError?.create?.({
+                data: {
+                  businessId: biz.id,
+                  category: 'PAYMENT',
+                  severity: 'WARN',
+                  message: 'Stripe needs more information to keep your account active. Go to your Stripe dashboard to complete the required steps.',
+                  context: { accountId: account.id, pastDue },
+                },
+              }).catch(() => {});
+            }
+          }
         }
+        break;
+      }
+      case 'account.application.deauthorized': {
+        // Business owner disconnected Pulse from their Stripe account via the
+        // Stripe dashboard. Clear our stored account ID so they can reconnect.
+        const deauth = event.data.object as { id: string };
+        await this.prisma.business.updateMany({
+          where: { stripeConnectAccountId: deauth.id },
+          data: { stripeConnectAccountId: null, stripeConnectOnboarded: false },
+        });
+        this.logger.warn(`Stripe Connect account ${deauth.id} deauthorized — cleared from business record`);
+        break;
+      }
+      case 'capability.updated': {
+        // A specific capability (e.g. card_payments, transfers) changed status.
+        // Log for visibility; stripeConnectOnboarded is reconciled via account.updated.
+        const cap = event.data.object as Stripe.Capability;
+        const acctId = typeof cap.account === 'string' ? cap.account : cap.account?.id;
+        this.logger.log(`Capability ${cap.id} on account ${acctId} → ${cap.status}`);
         break;
       }
       case 'payout.paid': {
