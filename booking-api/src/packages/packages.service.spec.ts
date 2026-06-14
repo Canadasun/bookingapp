@@ -16,13 +16,15 @@ function makeCP(over: Partial<Record<string, unknown>> = {}) {
 }
 
 function build() {
-  const prisma = {
+  const prisma: Record<string, any> = {
     package: { findFirst: jest.fn() },
     client: { findFirst: jest.fn() },
     clientPackage: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
     packageRedemption: { create: jest.fn() },
-    $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
+  prisma.$transaction = jest.fn().mockImplementation((operation: unknown) =>
+    typeof operation === 'function' ? operation(prisma) : Promise.all(operation as Promise<unknown>[]),
+  );
   return prisma;
 }
 

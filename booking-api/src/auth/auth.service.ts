@@ -194,18 +194,35 @@ export class AuthService {
   }
 
   // Trusted-device ("remember this device") token for 2FA. Bound to the user's
-  // current passwordHash so changing the password revokes every trusted device.
-  private trustedDeviceSecret(passwordHash: string): string {
-    return `td:${process.env.JWT_SECRET!}${passwordHash}`;
+  // password, current 2FA setup, and a version-stable browser/OS signature.
+  private normalizedDeviceKey(userAgent?: string, ip?: string): string {
+    const normalizedUa = (userAgent ?? '')
+      .toLowerCase()
+      .replace(/([a-z][a-z0-9._-]*)\/[\d._]+/g, '$1')
+      .replace(/\b(os(?: x)?|android) [\d._]+/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const source = normalizedUa || `ip:${ip ?? 'unknown'}`;
+    return createHash('sha256').update(source).digest('hex').slice(0, 32);
   }
-  private mintTrustedDeviceToken(user: User): string {
-    return this.jwt.sign({ sub: user.id, kind: 'td' }, { secret: this.trustedDeviceSecret(user.passwordHash), expiresIn: '30d' });
+
+  private trustedDeviceSecret(user: User): string {
+    // Recovery codes are regenerated on each off→on transition, so including
+    // them revokes all old trusted-device tokens when 2FA is reset.
+    return `td:${process.env.JWT_SECRET!}${user.passwordHash}:${user.twoFactorRecoveryCodes.join(':')}`;
   }
-  private isTrustedDevice(user: User, token?: string): boolean {
+  private mintTrustedDeviceToken(user: User, ctx?: { ip?: string; userAgent?: string }): string {
+    return this.jwt.sign(
+      { sub: user.id, kind: 'td', deviceKey: this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip) },
+      { secret: this.trustedDeviceSecret(user), expiresIn: '30d' },
+    );
+  }
+  private isTrustedDevice(user: User, token?: string, ctx?: { ip?: string; userAgent?: string }): boolean {
     if (!token) return false;
     try {
-      const p = this.jwt.verify(token, { secret: this.trustedDeviceSecret(user.passwordHash) }) as { sub?: string; kind?: string };
-      return p?.sub === user.id && p?.kind === 'td';
+      const p = this.jwt.verify(token, { secret: this.trustedDeviceSecret(user) }) as { sub?: string; kind?: string; deviceKey?: string };
+      return p?.sub === user.id && p?.kind === 'td' &&
+        (!p.deviceKey || p.deviceKey === this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip));
     } catch { return false; }
   }
 
@@ -277,7 +294,7 @@ export class AuthService {
     // Opt-in 2FA: password ok, but require a one-time code before issuing tokens —
     // UNLESS this device was previously remembered (trusted), so we don't bug the
     // user with a code on every sign-in from the same device.
-    if (user.twoFactorEnabled && !this.isTrustedDevice(user, dto.trustedDeviceToken)) {
+    if (user.twoFactorEnabled && !this.isTrustedDevice(user, dto.trustedDeviceToken, ctx)) {
       const challenge = await this.createLoginChallenge(user);
       return { twoFactorRequired: true as const, challengeId: challenge.id, method: challenge.method };
     }
@@ -370,7 +387,7 @@ export class AuthService {
     const tokens = await this.issueTokens(user, { userAgent: ctx?.userAgent });
     // "Remember this device": hand back a trusted-device token the client stores,
     // so future logins from here skip the 2FA prompt.
-    return rememberDevice ? { ...tokens, trustedDeviceToken: this.mintTrustedDeviceToken(user) } : tokens;
+    return rememberDevice ? { ...tokens, trustedDeviceToken: this.mintTrustedDeviceToken(user, ctx) } : tokens;
   }
 
   // A readable one-time code, e.g. "a3f9c-1e7d2".
@@ -427,15 +444,17 @@ export class AuthService {
   private async recordLoginAndMaybeAlert(user: User, ctx?: { ip?: string; userAgent?: string }) {
     try {
       const ua = ctx?.userAgent ?? '';
-      const deviceKey = createHash('sha256').update(ua).digest('hex').slice(0, 32);
-      const [priorSameDevice, total] = await Promise.all([
+      const ip = ctx?.ip?.slice(0, 64) || null;
+      const deviceKey = this.normalizedDeviceKey(ua, ip ?? undefined);
+      const [priorSameDevice, priorSameIp, total] = await Promise.all([
         this.prisma.loginEvent.findFirst({ where: { userId: user.id, deviceKey } }),
+        ip ? this.prisma.loginEvent.findFirst({ where: { userId: user.id, ip } }) : Promise.resolve(null),
         this.prisma.loginEvent.count({ where: { userId: user.id } }),
       ]);
       await this.prisma.loginEvent.create({
-        data: { userId: user.id, deviceKey, ip: ctx?.ip?.slice(0, 64) || null, userAgent: ua.slice(0, 256) || null },
+        data: { userId: user.id, deviceKey, ip, userAgent: ua.slice(0, 256) || null },
       });
-      if (total > 0 && !priorSameDevice) {
+      if (total > 0 && !priorSameDevice && !priorSameIp) {
         const resetToken = this.jwt.sign(
           { sub: user.id, kind: 'reset' },
           { secret: this.resetSecret(user.passwordHash), expiresIn: '15m' },

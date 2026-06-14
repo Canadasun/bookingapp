@@ -240,6 +240,45 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
   );
 }
 
+function TwoFactorRecommendation({ user }: { user: SessionUser | null }) {
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    try {
+      const until = Number(localStorage.getItem("pulse_2fa_reminder_until") ?? "0");
+      setDismissed(until > Date.now());
+    } catch {
+      setDismissed(false);
+    }
+  }, []);
+
+  if (!user || user.role === "ADMIN" || user.twoFactorEnabled || dismissed) return null;
+
+  function dismiss() {
+    try {
+      localStorage.setItem("pulse_2fa_reminder_until", String(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    } catch {}
+    setDismissed(true);
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <span className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-blue-700" />
+        Protect your business: two-factor sign-in is recommended for owners and staff.
+      </span>
+      <div className="flex items-center gap-3 self-end sm:self-auto">
+        <Link href="/dashboard/settings?tab=security" className="font-semibold text-blue-800 underline underline-offset-2 hover:text-blue-950">
+          Turn on two-factor
+        </Link>
+        <button type="button" onClick={dismiss} aria-label="Dismiss two-factor reminder for 30 days" className="text-blue-700 hover:text-blue-950">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -470,17 +509,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         <EmailVerificationBanner user={user} />
-        {user && !user.twoFactorEnabled && (
-          <div className="flex flex-col gap-2 border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <span className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-blue-700" />
-              Protect your business: two-factor sign-in is strongly recommended for owners and staff.
-            </span>
-            <Link href="/dashboard/settings?tab=security" className="shrink-0 font-semibold text-blue-800 underline underline-offset-2 hover:text-blue-950">
-              Turn on two-factor
-            </Link>
-          </div>
-        )}
+        <TwoFactorRecommendation user={user} />
         <main id="main-content" className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
       </div>
     </div>

@@ -91,6 +91,9 @@ export class BookingsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('Access denied to this business resource');
+    }
     return this.appointmentService.findAll(
       businessId,
       page ? parseInt(page, 10) : 1,

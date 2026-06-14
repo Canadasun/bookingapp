@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Res, HttpCode, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Res, HttpCode, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -29,11 +29,14 @@ export class ClientsController {
   @UseGuards(JwtAuthGuard, TenantGuard)
   findAll(
     @Param('businessId') businessId: string,
-    @CurrentUser() _user: { id: string; role: string; businessId: string | null },
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('Access denied to this business resource');
+    }
     return this.clientService.findAll(
       businessId, search,
       page ? parseInt(page, 10) : 1,

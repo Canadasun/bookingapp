@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // Replicate the assertSameOrigin logic here so we can test it independently of
 // the Next.js runtime (NextRequest is not available in jsdom).

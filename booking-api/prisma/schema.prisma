@@ -471,7 +471,8 @@ model DeviceToken {
 }
 
 // One row per successful sign-in. Used to detect logins from a new device and
-// fire a security alert. deviceKey = hash of the user-agent (per-user).
+// fire a security alert. deviceKey = hash of a normalized browser/OS signature;
+// IP is retained both for alert context and recognition of a previously seen IP.
 model LoginEvent {
   id        String   @id @default(cuid())
   userId    String

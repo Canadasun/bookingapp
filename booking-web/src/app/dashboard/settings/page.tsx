@@ -27,6 +27,13 @@ const TIMEZONES = [
 ];
 
 type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "branding" | "notifications" | "security" | "billing";
+type SubscriptionDetails = {
+  plan: string;
+  status: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  hasBilling: boolean;
+};
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
@@ -245,9 +252,20 @@ function SettingsPage() {
   }));
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [referralInput, setReferralInput] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
   const [refCopied, setRefCopied] = useState(false);
+
+  const loadSubscription = useCallback(async () => {
+    const details = await api.subscriptions.get();
+    setSubscription(details);
+    return details;
+  }, []);
+
+  useEffect(() => {
+    if (bizId) loadSubscription().catch(() => {});
+  }, [bizId, loadSubscription]);
 
   // Locations
   const [locations, setLocations] = useState<Location[]>([]);
@@ -332,13 +350,50 @@ function SettingsPage() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect"); }
   }
 
-  // Toast the result of a returning Stripe Checkout, then reload the plan.
+  // Verify and reconcile a returning Stripe Checkout before claiming activation.
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("billing");
-    if (p === "success") { toast.success("Subscription updated"); if (bizId) api.business.get(bizId).then(setBiz).catch(() => {}); }
-    else if (p === "cancel") { toast.info("Checkout canceled"); }
-    if (p) window.history.replaceState({}, "", "/dashboard/settings");
-  }, [bizId]);
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("billing");
+    const sessionId = params.get("session_id");
+    if (!result) return;
+
+    window.history.replaceState({}, "", "/dashboard/settings?tab=billing");
+    goSection("billing");
+    if (result === "cancel") {
+      toast.info("Checkout canceled");
+      return;
+    }
+    if (result !== "success" || !sessionId || !bizId) {
+      toast.error("Checkout returned without a valid subscription confirmation. No plan change was applied.");
+      return;
+    }
+
+    let cancelled = false;
+    setBillingBusy("confirming");
+    const confirm = async () => {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 5 && !cancelled; attempt += 1) {
+        try {
+          const confirmed = await api.subscriptions.confirmCheckout(sessionId);
+          if (!confirmed.confirmed) throw new Error("Stripe is still completing checkout");
+          const [business] = await Promise.all([api.business.get(bizId), loadSubscription()]);
+          if (cancelled) return;
+          setBiz(business);
+          setForm({ ...business, phone: formatPhoneDisplay(business.phone) });
+          toast.success(`Subscription active on ${confirmed.plan ?? business.plan}`);
+          return;
+        } catch (error) {
+          lastError = error;
+          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+      }
+      if (!cancelled) {
+        toast.error(lastError instanceof Error ? lastError.message : "Subscription activation is still processing. Refresh Billing shortly.", { duration: 8000 });
+      }
+    };
+    confirm().finally(() => { if (!cancelled) setBillingBusy(null); });
+    return () => { cancelled = true; };
+  }, [bizId, goSection, loadSubscription]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -364,7 +419,7 @@ function SettingsPage() {
       if (result.url) window.location.assign(result.url);
       else {
         toast.success(`Switched to ${plan}. Stripe applied the prorated difference.`);
-        if (bizId) api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch(() => {});
+        if (bizId) Promise.all([api.business.get(bizId), loadSubscription()]).then(([b]) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch(() => {});
         setBillingBusy(null);
       }
     } catch (e) {
@@ -1688,7 +1743,7 @@ function SettingsPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-700">Two-factor sign-in</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      After your password, we&apos;ll ask for a one-time code before letting you in.
+                      After your password, we&apos;ll ask for a one-time code. You can remember a browser for 30 days; clearing its cookies or changing browser profiles requires another code.
                     </p>
                   </div>
                   <button
@@ -1783,6 +1838,36 @@ function SettingsPage() {
                 </div>
                 <hr className="border-gray-100" />
 
+                <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Current plan: {(subscription?.plan ?? biz?.plan ?? "FREE").toLowerCase().replace(/^./, (c) => c.toUpperCase())}
+                      </p>
+                      {billingBusy === "confirming" ? (
+                        <p className="mt-1 text-xs font-medium text-violet-700">Confirming your Stripe subscription...</p>
+                      ) : subscription?.status === "PAST_DUE" ? (
+                        <p className="mt-1 text-xs font-medium text-amber-700">Payment is past due. Update your payment method to avoid losing paid features.</p>
+                      ) : subscription?.cancelAtPeriodEnd ? (
+                        <p className="mt-1 text-xs font-medium text-amber-700">
+                          Cancellation scheduled. Paid access continues until {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : "the end of this billing period"}.
+                        </p>
+                      ) : (subscription?.plan ?? biz?.plan ?? "FREE") !== "FREE" ? (
+                        <p className="mt-1 text-xs text-gray-600">
+                          Renews automatically{subscription?.currentPeriodEnd ? ` on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}` : " each billing period"} until canceled.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-gray-600">No recurring subscription charge.</p>
+                      )}
+                    </div>
+                    {subscription?.status && (
+                      <span className="w-fit rounded-full border border-violet-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                        {subscription.status.replaceAll("_", " ")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Referral: apply a code for a discount + share your own */}
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
                   <div>
@@ -1815,7 +1900,7 @@ function SettingsPage() {
                     {
                       id: "FREE", name: "Free", price: "$0", period: "/mo",
                       desc: "Get started with the essentials",
-                      features: ["Unlimited bookings","Client management","Email confirmations","Public booking page","Basic dashboard","Up to 5 staff members","1 location"],
+                      features: ["Unlimited bookings","Client management","Public booking page","Email confirmations, cancellations & reschedules","Recurring appointment series","Dashboard & notification center","Up to 5 staff members","1 location"],
                       cta: "Current plan", disabled: true,
                     },
                     {
@@ -1904,7 +1989,7 @@ function SettingsPage() {
                   <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
                     <div>
                       <p className="text-sm font-medium text-gray-700">Stripe billing portal</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, switch billing details, or cancel your plan.</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, or cancel automatic renewal. Cancellation normally takes effect at the end of the paid period.</p>
                     </div>
                     <button type="button" onClick={manageBilling} disabled={billingBusy !== null}
                       className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-60 transition-colors shrink-0">

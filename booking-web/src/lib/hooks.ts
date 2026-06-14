@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 
 export function useEvents(

@@ -85,7 +85,16 @@ Vercel auto-deploys on every push to `main`.
 
 1. Go to [dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks)
 2. Add endpoint: `https://booking-api-xxxx.railway.app/api/payments/webhook/stripe`
-3. Select events: `payment_intent.succeeded`, `payment_intent.payment_failed`
+3. Select events:
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `setup_intent.succeeded`
+   - `charge.refunded`
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - Stripe Connect events used by payouts: `account.updated`, `account.application.deauthorized`, `capability.updated`, `payout.paid`, `payout.failed`
 4. Copy the signing secret (`whsec_...`) → add to Railway `STRIPE_WEBHOOK_SECRET`
 
 ---
@@ -108,6 +117,8 @@ Until your domain is verified, use `onboarding@resend.dev` (limited to 100 email
 - [ ] Login with the seeded owner account (password set via `OWNER_PASSWORD` at seed time)
 - [ ] Book a test appointment → confirm email arrives
 - [ ] Check Stripe webhook fires on payment
+- [ ] Complete a subscription Checkout and confirm the paid plan is active immediately on return
+- [ ] Confirm Stripe subscription update/cancel events reach the webhook endpoint
 - [ ] Update `NEXT_PUBLIC_WEB_URL` to your final domain in both API and web env
 
 ---

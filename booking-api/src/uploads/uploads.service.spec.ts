@@ -21,6 +21,24 @@ async function build() {
 }
 
 describe('UploadsService.create', () => {
+  const storageEnv = {
+    bucket: process.env.S3_BUCKET,
+    accessKey: process.env.S3_ACCESS_KEY_ID,
+    secretKey: process.env.S3_SECRET_ACCESS_KEY,
+  };
+
+  beforeAll(() => {
+    delete process.env.S3_BUCKET;
+    delete process.env.S3_ACCESS_KEY_ID;
+    delete process.env.S3_SECRET_ACCESS_KEY;
+  });
+
+  afterAll(() => {
+    if (storageEnv.bucket !== undefined) process.env.S3_BUCKET = storageEnv.bucket;
+    if (storageEnv.accessKey !== undefined) process.env.S3_ACCESS_KEY_ID = storageEnv.accessKey;
+    if (storageEnv.secretKey !== undefined) process.env.S3_SECRET_ACCESS_KEY = storageEnv.secretKey;
+  });
+
   it('stores a valid image and returns its public url', async () => {
     const { svc, prisma } = await build();
     const res = await svc.create('biz1', file(), 'LOGO');

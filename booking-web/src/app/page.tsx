@@ -41,12 +41,12 @@ const features = [
   {
     icon: Bell,
     title: "Automated Reminders",
-    desc: "Email and SMS reminders go out automatically. No-shows drop by up to 80%.",
+    desc: "Paid plans add scheduled email and SMS reminders. Every plan includes booking confirmations and updates.",
   },
   {
     icon: CreditCard,
     title: "Deposits & Protection",
-    desc: "Collect a deposit at booking. Your time is protected even when plans change.",
+    desc: "Basic and higher plans can collect deposits at booking; Pro adds automatic saved-card fee protection.",
   },
 ];
 
@@ -92,7 +92,7 @@ export default async function LandingPage() {
 
           {/* Subheadline */}
           <p className="text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">
-            Clients book themselves 24/7. You get reminders, deposits, and a beautiful dashboard — without lifting a finger.
+            Start free with unlimited online bookings, client management, confirmations, and a public booking page. Upgrade when you need reminders, deposits, or SMS.
           </p>
 
           <LandingHeroCta />

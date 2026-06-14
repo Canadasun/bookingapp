@@ -8,7 +8,7 @@ import { AuthLockService } from './auth-lock.service';
 import { RedisService } from '../common/redis/redis.service';
 
 async function build(decoded: unknown | 'throw') {
-  const prisma = { user: { update: jest.fn().mockResolvedValue({}) } };
+  const prisma = { user: { update: jest.fn().mockResolvedValue({ role: 'OWNER' }) } };
   const jwt = {
     verify: jest.fn().mockImplementation(() => {
       if (decoded === 'throw') throw new Error('bad token');
@@ -22,7 +22,7 @@ async function build(decoded: unknown | 'throw') {
       { provide: PrismaService, useValue: prisma },
       { provide: NotificationsService, useValue: {} },
       { provide: AuthLockService, useValue: { isLocked: jest.fn().mockResolvedValue(false), recordFailure: jest.fn(), clearFailures: jest.fn() } },
-      { provide: RedisService, useValue: { client: { set: jest.fn(), exists: jest.fn().mockResolvedValue(0) } } },
+      { provide: RedisService, useValue: { client: { set: jest.fn().mockResolvedValue('OK'), exists: jest.fn().mockResolvedValue(0) } } },
     ],
   }).compile();
   return { svc: module.get<AuthService>(AuthService), prisma };
@@ -30,8 +30,8 @@ async function build(decoded: unknown | 'throw') {
 
 describe('AuthService.verifyEmail', () => {
   it('sets emailVerified for a valid verify token', async () => {
-    const { svc, prisma } = await build({ sub: 'u1', kind: 'verify' });
-    await expect(svc.verifyEmail('tok')).resolves.toEqual({ ok: true });
+    const { svc, prisma } = await build({ sub: 'u1', kind: 'verify', jti: 'verify-1' });
+    await expect(svc.verifyEmail('tok')).resolves.toEqual({ ok: true, role: 'OWNER' });
     expect(prisma.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { emailVerified: true } });
   });
 
@@ -102,5 +102,28 @@ describe('AuthService SMS 2FA phone resolution', () => {
 
     await expect(svc.resolveTwoFactorSmsPhone({ id: 'u1', email: 'owner@example.com', phone: null, businessId: 'b1' }))
       .resolves.toBeNull();
+  });
+});
+
+describe('AuthService trusted device recognition', () => {
+  it('treats browser version upgrades as the same normalized device', () => {
+    const svc = new AuthService(
+      {} as PrismaService,
+      {} as JwtService,
+      {} as NotificationsService,
+      {} as AuthLockService,
+      {} as RedisService,
+    ) as unknown as { normalizedDeviceKey(userAgent?: string, ip?: string): string };
+
+    const before = svc.normalizedDeviceKey(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36',
+      '203.0.113.10',
+    );
+    const after = svc.normalizedDeviceKey(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36',
+      '203.0.113.10',
+    );
+
+    expect(after).toBe(before);
   });
 });

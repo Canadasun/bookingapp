@@ -52,6 +52,8 @@ function mockPrisma(overrides: Record<string, unknown> = {}) {
     staffService: { count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
     appointment: { findMany: jest.fn().mockResolvedValue([]) },
     timeOff: { findMany: jest.fn().mockResolvedValue([]) },
+    businessHours: { findMany: jest.fn().mockResolvedValue([]) },
+    businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
     availabilityRule: {
       findMany: jest.fn().mockResolvedValue([
         { id: 'r1', staffId: 'staff1', dayOfWeek: 1, startTime: '09:00', endTime: '17:00' },

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ReferralsService } from '../referrals/referrals.service';
+import { EventsGateway } from '../events/events.gateway';
 
 function makePayment(overrides = {}) {
   return {
@@ -34,6 +35,7 @@ async function build(paymentRow: unknown) {
       { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('sk_test_x') } },
       { provide: NotificationsService, useValue: {} },
       { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
+      { provide: EventsGateway, useValue: { emitPlanUpdate: jest.fn() } },
     ],
   }).compile();
   const svc = module.get<PaymentsService>(PaymentsService);
@@ -109,7 +111,11 @@ describe('PaymentsService.handleWebhook', () => {
 describe('PaymentsService subscriptions', () => {
   async function buildSub(env: Record<string, string | undefined>) {
     const prisma = {
-      business: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'biz1', name: 'Biz', email: 'b@x.com' }) },
+      business: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'biz1', name: 'Biz', email: 'b@x.com' }),
+        findUnique: jest.fn().mockResolvedValue({ plan: 'FREE' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       subscription: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}) },
     };
     const module: TestingModule = await Test.createTestingModule({
@@ -117,14 +123,25 @@ describe('PaymentsService subscriptions', () => {
         PaymentsService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
-        { provide: NotificationsService, useValue: {} },
+        { provide: NotificationsService, useValue: { sendPlanChanged: jest.fn().mockResolvedValue(undefined) } },
       { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
+      { provide: EventsGateway, useValue: { emitPlanUpdate: jest.fn() } },
       ],
     }).compile();
     const svc = module.get<PaymentsService>(PaymentsService);
     const stripe = {
       customers: { create: jest.fn().mockResolvedValue({ id: 'cus_1' }) },
-      checkout: { sessions: { create: jest.fn().mockResolvedValue({ url: 'https://stripe.test/checkout' }) } },
+      checkout: { sessions: {
+        create: jest.fn().mockResolvedValue({ url: 'https://stripe.test/checkout' }),
+        retrieve: jest.fn().mockResolvedValue({
+          mode: 'subscription', status: 'complete', subscription: 'sub_1', metadata: { businessId: 'biz1' },
+        }),
+      } },
+      subscriptions: { retrieve: jest.fn().mockResolvedValue({
+        id: 'sub_1', status: 'active', customer: 'cus_1', cancel_at_period_end: false,
+        current_period_end: Math.floor(Date.now() / 1000) + 86400,
+        items: { data: [{ price: { id: 'price_basic_123' } }] },
+      }) },
     };
     (svc as unknown as { stripe: unknown }).stripe = stripe;
     return { svc, stripe };
@@ -139,8 +156,29 @@ describe('PaymentsService subscriptions', () => {
     const { svc, stripe } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123', STRIPE_CURRENCY: 'CAD' });
     await expect(svc.createSubscriptionCheckout('biz1', 'BASIC')).resolves.toEqual({ url: 'https://stripe.test/checkout' });
     expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-      expect.objectContaining({ currency: 'cad', line_items: [{ price: 'price_basic_123', quantity: 1 }] }),
+      expect.objectContaining({
+        currency: 'cad',
+        line_items: [{ price: 'price_basic_123', quantity: 1 }],
+        success_url: expect.stringContaining('session_id={CHECKOUT_SESSION_ID}'),
+      }),
       expect.any(Object),
     );
+  });
+
+  it('confirms a completed checkout and activates the paid plan immediately', async () => {
+    const { svc } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123' });
+    await expect(svc.confirmSubscriptionCheckout('biz1', 'cs_1')).resolves.toMatchObject({
+      confirmed: true,
+      plan: 'BASIC',
+      status: 'ACTIVE',
+    });
+  });
+
+  it('rejects a checkout session belonging to another business', async () => {
+    const { svc, stripe } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123' });
+    stripe.checkout.sessions.retrieve.mockResolvedValueOnce({
+      mode: 'subscription', status: 'complete', subscription: 'sub_1', metadata: { businessId: 'other' },
+    });
+    await expect(svc.confirmSubscriptionCheckout('biz1', 'cs_other')).rejects.toThrow(BadRequestException);
   });
 });

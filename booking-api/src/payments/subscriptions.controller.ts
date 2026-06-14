@@ -10,6 +10,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
 const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO', 'UNLIMITED']), referralCode: z.string().trim().max(40).optional() });
+const ConfirmCheckoutSchema = z.object({ sessionId: z.string().trim().min(1).max(255) });
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -35,6 +36,19 @@ export class SubscriptionsController {
     if (!parsed.success) throw new BadRequestException('A valid plan (BASIC or PRO) is required');
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.payments.createSubscriptionCheckout(user.businessId, parsed.data.plan, parsed.data.referralCode);
+  }
+
+  // Owner/Admin — verify a completed Checkout Session and activate the plan now,
+  // rather than making the returning browser wait for Stripe's webhook delivery.
+  @Post('confirm-checkout')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  confirmCheckout(@Body() body: unknown, @CurrentUser() user: { businessId: string | null }) {
+    const parsed = ConfirmCheckoutSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('A valid checkout session is required');
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.payments.confirmSubscriptionCheckout(user.businessId, parsed.data.sessionId);
   }
 
   // Owner/Admin — open the Stripe billing portal.

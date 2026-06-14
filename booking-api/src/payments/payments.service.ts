@@ -537,15 +537,24 @@ export class PaymentsService {
     }
   }
 
+  private effectiveSubscriptionPlan(status: SubscriptionStatus, priceId: string | null, periodEnd: Date | null): PlanTier {
+    if (status === 'ACTIVE' || status === 'TRIALING') return this.planForPriceId(priceId);
+    // Give past-due subscriptions access through the already-paid billing period.
+    // Stripe may recover a failed renewal automatically; dropping the business to
+    // Free immediately makes a temporary card failure unnecessarily disruptive.
+    if (status === 'PAST_DUE' && periodEnd && periodEnd.getTime() + 3 * 24 * 60 * 60 * 1000 > Date.now()) {
+      return this.planForPriceId(priceId);
+    }
+    return 'FREE';
+  }
+
   // Reconcile our Subscription + Business.plan from a Stripe subscription object.
   private async applySubscription(businessId: string, sub: Stripe.Subscription) {
     const priceId = sub.items.data[0]?.price?.id ?? null;
     const status = this.mapSubStatus(sub.status);
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
     const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
-    // Only an active/trialing subscription grants the paid tier; anything else
-    // (past_due, canceled, …) falls back to FREE.
-    const effectivePlan: PlanTier = status === 'ACTIVE' || status === 'TRIALING' ? this.planForPriceId(priceId) : 'FREE';
+    const effectivePlan = this.effectiveSubscriptionPlan(status, priceId, periodEnd);
     const data = {
       stripeCustomerId: customerId,
       stripeSubscriptionId: sub.id,
@@ -628,8 +637,10 @@ export class PaymentsService {
         : null;
     if (!activeSubId) {
       try {
-        const subs = await this.getStripe().subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-        activeSubId = subs.data[0]?.id ?? null;
+        const subs = await this.getStripe().subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+        activeSubId = subs.data.find((sub) =>
+          ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(sub.status),
+        )?.id ?? null;
       } catch { /* ignore */ }
     }
     if (activeSubId) {
@@ -652,7 +663,20 @@ export class PaymentsService {
           return { updated: true as const, plan };
         }
       } catch {
-        // Fall through to a fresh checkout if the in-place switch isn't possible.
+        // Fail closed against duplicate subscriptions. Only start a fresh Checkout
+        // when Stripe itself confirms there is no longer any live subscription.
+        try {
+          const subs = await this.getStripe().subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+          const live = subs.data.some((sub) =>
+            ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(sub.status),
+          );
+          if (live) {
+            throw new BadRequestException('Your existing subscription could not be updated. Open Manage billing or try again shortly.');
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) throw error;
+          throw new ServiceUnavailableException('Could not verify your existing Stripe subscription. Please try again shortly.');
+        }
       }
     }
 
@@ -671,13 +695,44 @@ export class PaymentsService {
       currency: this.stripeCurrency(),
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${webUrl}/dashboard/settings?billing=success`,
+      success_url: `${webUrl}/dashboard/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${webUrl}/dashboard/settings?billing=cancel`,
       metadata: { businessId, plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) },
       subscription_data: { metadata: { businessId, plan } },
       ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-    }, { idempotencyKey: this.idempotencyKey(['subscription-checkout', businessId, plan, referralCode ?? '']) });
+    }, {
+      // Deduplicate double-clicks without returning an expired Checkout Session
+      // forever when the same business retries the same plan later.
+      idempotencyKey: this.idempotencyKey([
+        'subscription-checkout', businessId, plan, referralCode ?? '', Math.floor(Date.now() / (5 * 60 * 1000)),
+      ]),
+    });
     return { url: session.url };
+  }
+
+  // Verify the Checkout Session belongs to this business, then reconcile the
+  // Stripe subscription synchronously. This removes the user-visible webhook lag
+  // while keeping webhook processing as the ongoing source of lifecycle updates.
+  async confirmSubscriptionCheckout(businessId: string, sessionId: string) {
+    const session = await this.getStripe().checkout.sessions.retrieve(sessionId);
+    if (session.mode !== 'subscription' || session.metadata?.businessId !== businessId || !session.subscription) {
+      throw new BadRequestException('This checkout session does not belong to your business subscription.');
+    }
+    if (session.status !== 'complete') {
+      return { confirmed: false as const, reason: 'checkout_incomplete' as const };
+    }
+    const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+    const sub = await this.getStripe().subscriptions.retrieve(subId);
+    await this.applySubscription(businessId, sub);
+    return {
+      confirmed: true as const,
+      plan: this.effectiveSubscriptionPlan(
+        this.mapSubStatus(sub.status),
+        sub.items.data[0]?.price?.id ?? null,
+        sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+      ),
+      status: this.mapSubStatus(sub.status),
+    };
   }
 
   // Owner — open the Stripe billing portal (update card, cancel, view invoices).

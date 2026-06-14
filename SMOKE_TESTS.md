@@ -46,6 +46,14 @@ Run this checklist in a real browser and on a mobile build before each public de
 3. Confirm payment ledger shows succeeded, failed, and refunded states correctly.
 4. Run a refund from the dashboard and verify Stripe/dashboard totals.
 
+## Subscriptions
+
+1. Upgrade a Free business through Stripe Checkout.
+2. Confirm the returning Billing page verifies the Checkout Session and shows the paid plan without a manual refresh.
+3. Confirm Billing shows automatic renewal and the next billing date.
+4. Schedule cancellation in Stripe Billing Portal and confirm the app shows access through the current period end.
+5. Confirm `checkout.session.completed` and `customer.subscription.*` deliveries succeed in Stripe.
+
 ## Mobile
 
 1. Sign in as the same owner.

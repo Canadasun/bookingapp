@@ -16,7 +16,7 @@ function makeCard(over: Partial<Record<string, unknown>> = {}) {
 }
 
 function build(prismaOver: Record<string, unknown> = {}) {
-  const prisma = {
+  const prisma: Record<string, any> = {
     giftCard: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
@@ -24,9 +24,11 @@ function build(prismaOver: Record<string, unknown> = {}) {
       update: jest.fn(),
     },
     giftCardRedemption: { create: jest.fn() },
-    $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
     ...prismaOver,
   };
+  prisma.$transaction = jest.fn().mockImplementation((operation: unknown) =>
+    typeof operation === 'function' ? operation(prisma) : Promise.all(operation as Promise<unknown>[]),
+  );
   const notifications = { sendGiftCardIssued: jest.fn().mockResolvedValue(undefined) };
   return { prisma, notifications };
 }
