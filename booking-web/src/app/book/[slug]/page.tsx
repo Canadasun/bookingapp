@@ -277,7 +277,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       const client = await api.clients.create(bizId, {
         name: form.name, email: form.email || undefined, phone: form.phone ? normalizePhoneE164(form.phone) : undefined, notes: form.notes || undefined,
       });
-      setClientMatched(!!client.matched);
+      if (!client.clientToken) throw new Error("Could not start a secure booking session");
+      setClientMatched(false);
 
       // Collect answers to the business intake questions (by label, for display).
       const intakeAnswers = (biz?.intakeQuestions ?? [])
@@ -289,7 +290,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         staffId,
         serviceId: selectedServices[0].id,
         additionalServiceIds: selectedServices.slice(1).map((s) => s.id),
-        clientId: client.id,
+        clientToken: client.clientToken,
         startsAt: selectedSlot.startsAt,
         notes: form.notes || undefined,
         intakeAnswers: intakeAnswers.length ? intakeAnswers : undefined,

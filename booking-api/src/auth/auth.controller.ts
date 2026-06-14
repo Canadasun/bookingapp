@@ -150,11 +150,15 @@ export class AuthController {
     if (!expected || body.secret !== expected) throw new ForbiddenException('Invalid bootstrap secret');
     const allowed = process.env.BOOTSTRAP_ADMIN_EMAIL;
     if (!allowed || body.email.toLowerCase().trim() !== allowed.toLowerCase()) throw new ForbiddenException('Email not authorised for bootstrap');
+    const existingAdmins = await this.prisma.user.count({ where: { role: 'ADMIN' } });
+    if (existingAdmins > 0) throw new ForbiddenException('Admin bootstrap has already been completed');
     const user = await this.prisma.user.update({
       where: { email: body.email.toLowerCase().trim() },
       data: { role: 'ADMIN' },
       select: { id: true, email: true, role: true },
     });
+    // Disable the capability in this process immediately after successful use.
+    delete process.env.BOOTSTRAP_ADMIN_SECRET;
     return { ok: true, user };
   }
 }

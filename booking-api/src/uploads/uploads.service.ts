@@ -77,9 +77,9 @@ export class UploadsService {
 
   // Resolve an upload for serving: either a redirect URL (public bucket / CDN) or
   // the raw bytes (DB storage, or streamed from a private bucket).
-  async resolve(id: string, user?: { role: string } | null): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string }> {
+  async resolve(id: string, user?: { role: string; businessId: string | null } | null): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string }> {
     const file = await this.get(id);
-    if (file.kind === 'OTHER' && (!user || !['ADMIN', 'OWNER'].includes(user.role))) {
+    if (file.kind === 'OTHER' && (!user || (user.role !== 'ADMIN' && user.businessId !== file.businessId))) {
       throw new ForbiddenException('Document access requires authentication');
     }
     if (file.storageKey) {

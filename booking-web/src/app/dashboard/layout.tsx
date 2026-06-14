@@ -357,7 +357,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ]
       : []),
   ];
-  const nav = user?.role === "STAFF" ? staffNav : OWNER_NAV;
+  const nav = user?.role === "STAFF" ? staffNav : user?.role === "OWNER" ? OWNER_NAV : [];
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -383,6 +383,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (user?.mustResetPassword) router.replace("/change-password");
   }, [user, router]);
 
+  useEffect(() => {
+    if (!loading && user && user.role !== "OWNER" && user.role !== "STAFF") {
+      router.replace(user.role === "ADMIN" ? "/admin" : "/my/dashboard");
+    }
+  }, [loading, router, user]);
+
   const currentLabel =
     nav.flatMap((n) => [n, ...(n.children ?? []).filter((c) => c.href).map((c) => ({ ...c, icon: n.icon }))]).find((n) =>
       n.href === "/dashboard" ? pathname === n.href : n.href && pathname.startsWith(n.href.split("?")[0])
@@ -391,7 +397,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Show a blank shell while the auth check is in flight to prevent a flash of
   // the dashboard layout for unauthenticated visitors. useCurrentUser() redirects
   // to /login if the session is invalid.
-  if (loading) {
+  if (loading || !user || (user.role !== "OWNER" && user.role !== "STAFF")) {
     return (
       <div className="dashboard-shell flex brand-shell items-center justify-center">
         <div className="w-8 h-8 rounded-full border-4 border-violet-200 border-t-violet-600 animate-spin" />

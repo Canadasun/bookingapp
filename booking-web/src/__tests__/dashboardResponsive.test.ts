@@ -32,7 +32,7 @@ describe("dashboard responsive contracts", () => {
     const appointments = source("src/app/dashboard/appointments/page.tsx");
     expect(appointments).toContain("min-w-[700px] grid-cols-7");
     expect(appointments).toContain("min-w-[760px]");
-    expect(appointments).toContain("overflow-auto");
+    expect(appointments).toContain("overflow-x-auto");
   });
 
   it("keeps settings in compact navigation until wide desktop", () => {

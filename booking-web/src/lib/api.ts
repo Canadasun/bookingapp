@@ -796,10 +796,8 @@ export const api = {
     },
     get: (businessId: string, id: string) =>
       req<Client & { appointments: Appointment[]; totalSpentCents: number }>(`/businesses/${businessId}/clients/${id}`),
-    // `matched: true` means the booking synced to an existing client (deduped on
-    // email/phone) rather than creating a new profile.
     create: (businessId: string, data: { name: string; email?: string; phone?: string; notes?: string; birthday?: string }) =>
-      req<{ id: string; businessId: string; matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
+      req<{ id: string; businessId: string; matched: boolean; clientToken: string }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[]; birthday?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     duplicates: (businessId: string) =>
@@ -822,7 +820,7 @@ export const api = {
     get: (id: string, token?: string) => req<Appointment>(`/bookings/${id}${token ? `?token=${encodeURIComponent(token)}` : ""}`, undefined, null),
     // Owner-scoped single appointment (for receipts/detail).
     getOne: (businessId: string, id: string) => req<Appointment>(`/businesses/${businessId}/bookings/${id}`),
-    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string }) =>
+    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientToken: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).

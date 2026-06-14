@@ -35,9 +35,9 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      let businessId = dto.businessId;
+      let businessId: string | undefined;
 
-      if (dto.role === "OWNER" && !businessId) {
+      if (dto.role === "OWNER") {
         // Brand the new (empty) business from the signup form, falling back to
         // the owner's name. The account starts empty — no staff/services/clients —
         // the owner sets it up in-app.

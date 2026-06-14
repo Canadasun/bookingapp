@@ -6,11 +6,27 @@ import { z } from 'zod';
 import { ClientsService } from './clients.service';
 import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto } from './dto/client.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 const MAX_IMPORT_ROWS = 1000;
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(25),
+});
+
+function pagination(page?: string, limit?: string) {
+  const result = PaginationSchema.safeParse({ page, limit });
+  if (!result.success) throw new BadRequestException('Invalid pagination parameters');
+  return result.data;
+}
+
+function csvCell(value: unknown) {
+  let text = String(value ?? '').replace(/"/g, '""');
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text}"`;
+}
 const ImportCsvRowSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().email().optional().or(z.literal('')).transform(v => v || undefined),
@@ -37,11 +53,8 @@ export class ClientsController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('Access denied to this business resource');
     }
-    return this.clientService.findAll(
-      businessId, search,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 25,
-    );
+    const paging = pagination(page, limit);
+    return this.clientService.findAll(businessId, search, paging.page, paging.limit);
   }
 
   // (Removed) The unauthenticated guest "lookup by email/phone" endpoint was
@@ -59,7 +72,7 @@ export class ClientsController {
     const clients = await this.clientService.exportAll(businessId);
     const header = 'Name,Email,Phone,Tags,Notes,Birthday,Created\n';
     const rows = clients.map(c =>
-      [c.name, c.email ?? '', c.phone ?? '', c.tags.join(';'), (c.notes ?? '').replace(/,/g, ' '), c.birthday ?? '', c.createdAt.toISOString()].map(v => `"${v}"`).join(',')
+      [c.name, c.email, c.phone, c.tags.join(';'), c.notes, c.birthday, c.createdAt.toISOString()].map(csvCell).join(',')
     ).join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="clients.csv"');
@@ -123,12 +136,17 @@ export class ClientsController {
 
   // Public — called during the unauthenticated booking wizard
   @Post()
+  @UseGuards(OptionalJwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateClientSchema)) dto: CreateClientDto,
+    @CurrentUser() user?: { role: string; businessId: string | null },
   ) {
-    return this.clientService.findOrCreate(businessId, dto);
+    if (user && (user.role === 'ADMIN' || user.businessId === businessId) && user.role !== 'CLIENT') {
+      return this.clientService.findOrCreate(businessId, dto);
+    }
+    return this.clientService.createPublicBookingClient(businessId, dto);
   }
 
   @Patch(':id')

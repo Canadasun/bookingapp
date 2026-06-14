@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, PayloadTooLargeException } from '@nestjs/common';
 import { UploadsService } from './uploads.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -87,5 +87,24 @@ describe('UploadsService.create', () => {
   it('rejects an image larger than 2 MB', async () => {
     const { svc } = await build();
     await expect(svc.create('biz1', file({ size: 3 * 1024 * 1024 }), 'LOGO')).rejects.toThrow(PayloadTooLargeException);
+  });
+});
+
+describe('UploadsService.resolve', () => {
+  it('rejects an owner from another tenant reading a private document', async () => {
+    const prisma = {
+      uploadedFile: { findUnique: jest.fn().mockResolvedValue({ id: 'f1', businessId: 'biz-1', kind: 'OTHER', mimeType: 'application/pdf', data: PDF_MAGIC }) },
+    };
+    const service = new UploadsService(prisma as unknown as PrismaService);
+    await expect(service.resolve('f1', { role: 'OWNER', businessId: 'biz-2' })).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows the owning tenant and platform admins to read a private document', async () => {
+    const prisma = {
+      uploadedFile: { findUnique: jest.fn().mockResolvedValue({ id: 'f1', businessId: 'biz-1', kind: 'OTHER', mimeType: 'application/pdf', data: PDF_MAGIC }) },
+    };
+    const service = new UploadsService(prisma as unknown as PrismaService);
+    await expect(service.resolve('f1', { role: 'OWNER', businessId: 'biz-1' })).resolves.toMatchObject({ contentType: 'application/pdf' });
+    await expect(service.resolve('f1', { role: 'ADMIN', businessId: null })).resolves.toMatchObject({ contentType: 'application/pdf' });
   });
 });

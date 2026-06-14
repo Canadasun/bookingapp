@@ -1,22 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 
 export function OwnerOnly({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const { user, loading } = useCurrentUser();
 
   useEffect(() => {
-    const user = getUser();
-    if (!user || user.role !== "OWNER") {
+    if (!loading && user?.role !== "OWNER" && user?.role !== "ADMIN") {
       router.replace("/dashboard/appointments");
-    } else {
-      setReady(true);
     }
-  }, [router]);
+  }, [loading, router, user]);
 
-  if (!ready) return null;
+  if (loading || (user?.role !== "OWNER" && user?.role !== "ADMIN")) return null;
   return <>{children}</>;
 }

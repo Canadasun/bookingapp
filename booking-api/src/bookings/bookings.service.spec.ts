@@ -10,7 +10,8 @@ import { CalendarSyncService } from '../calendar-sync/calendar-sync.service';
 
 // 7 days out: within the default 60-day max-advance and past the 120-min notice
 // window, so public-booking policy checks pass.
-const SLOT_START = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+const slotBase = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+const SLOT_START = new Date(Date.UTC(slotBase.getUTCFullYear(), slotBase.getUTCMonth(), slotBase.getUTCDate(), 12));
 const SLOT_END = new Date(SLOT_START.getTime() + 60 * 60 * 1000);
 
 const mockAvailability = () => ({

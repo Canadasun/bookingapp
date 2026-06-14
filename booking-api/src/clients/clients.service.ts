@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto, UpdateClientDto } from './dto/client.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
+import { signPublicClientToken } from '../common/util/public-client-token';
 
 @Injectable()
 export class ClientsService {
@@ -159,6 +160,14 @@ export class ClientsService {
 
   create(businessId: string, dto: CreateClientDto) {
     return this.prisma.client.create({ data: { ...dto, businessId } });
+  }
+
+  // Public booking contacts are deliberately isolated from existing customer
+  // profiles. Email/phone knowledge is not identity proof and must not attach an
+  // attacker-controlled booking to a private record.
+  async createPublicBookingClient(businessId: string, dto: CreateClientDto) {
+    const created = await this.prisma.client.create({ data: { ...dto, businessId } });
+    return { clientToken: signPublicClientToken(businessId, created.id) };
   }
 
   async update(id: string, dto: UpdateClientDto, businessId?: string) {

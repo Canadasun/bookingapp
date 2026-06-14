@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
 import { verifyAppointmentToken } from '../common/util/appointment-token';
 import {
-  CreateAppointmentSchema, CreateAppointmentDto,
+  CreateAppointmentSchema, CreateAppointmentDto, PublicCreateAppointmentSchema, PublicCreateAppointmentDto,
   CreateRecurringSchema, CreateRecurringDto,
   RescheduleSchema, RescheduleDto,
   StatusSchema, StatusDto,
@@ -16,6 +16,18 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { z } from 'zod';
+
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+function pagination(page?: string, limit?: string) {
+  const result = PaginationSchema.safeParse({ page, limit });
+  if (!result.success) throw new BadRequestException('Invalid pagination parameters');
+  return result.data;
+}
 
 @ApiTags('bookings')
 @Controller('bookings')
@@ -33,7 +45,7 @@ export class PublicBookingsController {
   @Get(':id')
   findOne(@Param('id') id: string, @Query('token') token?: string) {
     this.assertToken(id, token);
-    return this.bookingsService.findOne(id);
+    return this.bookingsService.findOnePublic(id, token!);
   }
 
   // Public cancel — used by the client manage page (no login required).
@@ -41,13 +53,14 @@ export class PublicBookingsController {
   // used to confirm/complete/no-show a booking even with a valid token.
   @Patch(':id/status')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  updateStatus(
+  async updateStatus(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(PublicStatusSchema)) dto: PublicStatusDto,
     @Query('token') token?: string,
   ) {
     this.assertToken(id, token);
-    return this.bookingsService.updateStatus(id, dto);
+    const appointment = await this.bookingsService.updateStatus(id, dto);
+    return this.bookingsService.toPublicAppointment(appointment, token!);
   }
 
   // Public late-cancel request — does NOT cancel the appointment. It only alerts
@@ -66,13 +79,14 @@ export class PublicBookingsController {
   // Public reschedule — used by the client manage page redirect to booking wizard.
   @Patch(':id/reschedule')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  reschedule(
+  async reschedule(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
     @Query('token') token?: string,
   ) {
     this.assertToken(id, token);
-    return this.bookingsService.reschedule(id, dto, undefined, { byClient: true });
+    const appointment = await this.bookingsService.reschedule(id, dto, undefined, { byClient: true });
+    return this.bookingsService.toPublicAppointment(appointment, token!);
   }
 }
 
@@ -94,12 +108,8 @@ export class BookingsController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('Access denied to this business resource');
     }
-    return this.appointmentService.findAll(
-      businessId,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
-      user,
-    );
+    const paging = pagination(page, limit);
+    return this.appointmentService.findAll(businessId, paging.page, paging.limit, user);
   }
 
   @Get(':id')
@@ -117,9 +127,9 @@ export class BookingsController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   create(
     @Param('businessId') businessId: string,
-    @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,
+    @Body(new ZodValidationPipe(PublicCreateAppointmentSchema)) dto: PublicCreateAppointmentDto,
   ) {
-    return this.appointmentService.create(businessId, dto);
+    return this.appointmentService.createPublic(businessId, dto);
   }
 
   // Owner/staff-initiated booking (dashboard / mobile app). Authenticated and

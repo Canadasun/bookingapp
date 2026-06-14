@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
-export const CreateAppointmentSchema = z.object({
+const AppointmentFieldsSchema = z.object({
   staffId: z.string().min(1),
   serviceId: z.string().min(1),
   additionalServiceIds: z.array(z.string().min(1)).optional(),
-  clientId: z.string().min(1),
   startsAt: z.string().datetime(),
   notes: z.string().optional(),
   allowOverride: z.boolean().optional(),
@@ -15,6 +14,14 @@ export const CreateAppointmentSchema = z.object({
   })).max(20).optional(),
   referralSource: z.string().max(100).optional(),
   promoCodeId: z.string().cuid().optional(),
+});
+
+export const CreateAppointmentSchema = AppointmentFieldsSchema.extend({
+  clientId: z.string().min(1),
+});
+
+export const PublicCreateAppointmentSchema = AppointmentFieldsSchema.extend({
+  clientToken: z.string().min(1),
 });
 
 // Owner-initiated recurring series: the base booking + how it repeats. Each
@@ -60,6 +67,7 @@ export const LateCancelRequestSchema = z.object({
 });
 
 export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;
+export type PublicCreateAppointmentDto = z.infer<typeof PublicCreateAppointmentSchema>;
 export type CreateRecurringDto = z.infer<typeof CreateRecurringSchema>;
 export type RescheduleDto = z.infer<typeof RescheduleSchema>;
 export type StatusDto = z.infer<typeof StatusSchema>;

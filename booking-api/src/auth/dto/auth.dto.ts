@@ -7,7 +7,6 @@ export const RegisterSchema = z.object({
   // Public self-signup is restricted to business owners and clients only.
   // STAFF are created by an owner via the staff-invite endpoint; ADMIN via seed.
   role: z.enum(['OWNER', 'CLIENT']).default('CLIENT'),
-  businessId: z.string().cuid().optional(),
   // OWNER signup only — brand the new (empty) business. All optional; falls back
   // to "<name>'s Business" / America/New_York when omitted.
   businessName: z.string().trim().min(1).max(120).optional(),

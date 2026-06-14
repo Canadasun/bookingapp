@@ -11,7 +11,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
 import { AvailabilityService } from '../availability/availability.service';
 import { CalendarSyncService } from '../calendar-sync/calendar-sync.service';
-import { CreateAppointmentDto, CreateRecurringDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import { CreateAppointmentDto, CreateRecurringDto, PublicCreateAppointmentDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
 import { isPaidPlan } from '../common/util/plan-features';
@@ -19,6 +19,7 @@ import { Prisma } from '@prisma/client';
 import { addMinutes, addWeeks, addMonths, differenceInMinutes } from 'date-fns';
 import { randomUUID } from 'node:crypto';
 import { formatInTimeZone } from 'date-fns-tz';
+import { verifyPublicClientToken } from '../common/util/public-client-token';
 
 @Injectable()
 export class BookingsService {
@@ -74,6 +75,78 @@ export class BookingsService {
     });
     if (!apt) throw new NotFoundException('Appointment not found');
     return apt;
+  }
+
+  async findOnePublic(id: string, manageToken: string) {
+    const appointment = await this.findOne(id);
+    return this.toPublicAppointment(appointment, manageToken);
+  }
+
+  async createPublic(businessId: string, dto: PublicCreateAppointmentDto) {
+    const clientId = verifyPublicClientToken(dto.clientToken, businessId);
+    if (!clientId) throw new ForbiddenException('Invalid or expired booking session');
+    const { clientToken: _clientToken, ...fields } = dto;
+    void _clientToken;
+    const appointment = await this.create(businessId, { ...fields, clientId });
+    return this.toPublicAppointment(appointment, appointment.manageToken);
+  }
+
+  toPublicAppointment(appointment: any, manageToken: string) {
+    return {
+      id: appointment.id,
+      businessId: appointment.businessId,
+      staffId: appointment.staffId,
+      serviceId: appointment.serviceId,
+      clientId: appointment.clientId,
+      startsAt: appointment.startsAt,
+      endsAt: appointment.endsAt,
+      status: appointment.status,
+      cancelReason: appointment.cancelReason,
+      depositCents: appointment.depositCents,
+      totalPriceCents: appointment.totalPriceCents,
+      notes: appointment.notes,
+      intakeAnswers: appointment.intakeAnswers,
+      locationId: appointment.locationId,
+      discountCents: appointment.discountCents,
+      createdAt: appointment.createdAt,
+      updatedAt: appointment.updatedAt,
+      manageToken,
+      client: {
+        id: appointment.client.id,
+        name: appointment.client.name,
+        email: appointment.client.email,
+        phone: appointment.client.phone,
+      },
+      service: {
+        id: appointment.service.id,
+        name: appointment.service.name,
+        description: appointment.service.description,
+        durationMinutes: appointment.service.durationMinutes,
+        priceCents: appointment.service.priceCents,
+        priceType: appointment.service.priceType,
+      },
+      staff: {
+        id: appointment.staff.id,
+        bio: appointment.staff.bio,
+        avatarUrl: appointment.staff.avatarUrl,
+        user: { name: appointment.staff.user.name },
+      },
+      business: {
+        id: appointment.business.id,
+        name: appointment.business.name,
+        slug: appointment.business.slug,
+        timezone: appointment.business.timezone,
+        address: appointment.business.address,
+        phone: appointment.business.phone,
+        logoUrl: appointment.business.logoUrl,
+        currency: appointment.business.currency,
+        cancellationWindowHours: appointment.business.cancellationWindowHours,
+        cancellationWindowMinutes: appointment.business.cancellationWindowMinutes,
+        cancellationPolicy: appointment.business.cancellationPolicy,
+        allowClientReschedule: appointment.business.allowClientReschedule,
+      },
+      location: appointment.location ? { id: appointment.location.id, name: appointment.location.name } : null,
+    };
   }
 
   // Providers with no explicit service assignments offer every service. This is
