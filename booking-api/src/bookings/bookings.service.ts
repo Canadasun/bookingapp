@@ -755,18 +755,6 @@ export class BookingsService {
       startsAt = new Date(dto.startsAt);
       endsAt = addMinutes(startsAt, service.durationMinutes);
       timeChanged = startsAt.getTime() !== existing.startsAt.getTime();
-
-      const conflict = await this.prisma.appointment.findFirst({
-        where: {
-          businessId: existing.businessId,
-          staffId: existing.staffId,
-          status: { in: ['CONFIRMED', 'PENDING'] },
-          id: { not: id },
-          startsAt: { lt: endsAt },
-          endsAt: { gt: startsAt },
-        },
-      });
-      if (conflict) throw new ConflictException('New time slot is not available');
     }
 
     const normalizedClientPhone =
@@ -777,25 +765,77 @@ export class BookingsService {
       throw new BadRequestException('Enter a valid phone number, e.g. +1 555 123 4567');
     }
 
-    const updated = await this.prisma.appointment.update({
-      where: { id },
-      data: {
-        ...(dto.startsAt ? { startsAt, endsAt } : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
-        ...(dto.clientName || dto.clientEmail || dto.clientPhone !== undefined
-          ? {
-              client: {
-                update: {
-                  ...(dto.clientName ? { name: dto.clientName } : {}),
-                  ...(dto.clientEmail ? { email: dto.clientEmail } : {}),
-                  ...(dto.clientPhone !== undefined ? { phone: normalizedClientPhone ?? null } : {}),
-                },
+    const updateData = {
+      ...(dto.startsAt ? { startsAt, endsAt } : {}),
+      ...(dto.notes !== undefined ? { notes: dto.notes || null } : {}),
+      ...(dto.clientName || dto.clientEmail || dto.clientPhone !== undefined
+        ? {
+            client: {
+              update: {
+                ...(dto.clientName ? { name: dto.clientName } : {}),
+                ...(dto.clientEmail ? { email: dto.clientEmail } : {}),
+                ...(dto.clientPhone !== undefined ? { phone: normalizedClientPhone ?? null } : {}),
               },
-            }
-          : {}),
-      },
-      include: { client: true, service: true, staff: { include: { user: true } }, business: true },
-    });
+            },
+          }
+        : {}),
+    };
+
+    const include = { client: true, service: true, staff: { include: { user: true } }, business: true } as const;
+
+    // Time change: acquire row lock to serialise against concurrent reschedules.
+    // Same pattern as reschedule() — Serializable isolation + SELECT FOR UPDATE
+    // + P2034 retry prevents two concurrent requests from double-booking a slot.
+    const runUpdate = () =>
+      this.prisma.$transaction(
+        async (tx) => {
+          if (timeChanged) {
+            await tx.$queryRaw(Prisma.sql`
+              SELECT id FROM "Appointment"
+              WHERE "staffId" = ${existing.staffId}
+                AND "businessId" = ${existing.businessId}
+                AND status IN ('CONFIRMED', 'PENDING')
+                AND id != ${id}
+                AND "startsAt" < ${endsAt}
+                AND "endsAt" > ${startsAt}
+              FOR UPDATE
+            `);
+
+            const conflict = await tx.appointment.findFirst({
+              where: {
+                businessId: existing.businessId,
+                staffId: existing.staffId,
+                status: { in: ['CONFIRMED', 'PENDING'] },
+                id: { not: id },
+                startsAt: { lt: endsAt },
+                endsAt: { gt: startsAt },
+              },
+            });
+            if (conflict) throw new ConflictException('New time slot is not available');
+          }
+
+          return tx.appointment.update({ where: { id }, data: updateData, include });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+
+    let updated!: Awaited<ReturnType<typeof runUpdate>>;
+
+    if (timeChanged) {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          updated = await runUpdate();
+          break;
+        } catch (err) {
+          if (err instanceof ConflictException) throw err;
+          const isWriteConflict =
+            err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034';
+          if (!isWriteConflict || attempt >= 2) throw err;
+        }
+      }
+    } else {
+      updated = await this.prisma.appointment.update({ where: { id }, data: updateData, include });
+    }
 
     if (timeChanged) await this.notifications.cancelReminders(id);
     if (dto.notifyClient) {
