@@ -17,11 +17,25 @@ export class AuthController {
 
   // Returns the authoritative user profile for the current access token.
   // Always callable even when mustResetPassword is true.
+  // Explicit allowlist — any new column added to User is denied by default.
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: User) {
-    const { passwordHash: _, ...safe } = user as User & { passwordHash?: string };
-    return safe;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      role: user.role,
+      businessId: user.businessId,
+      avatarUrl: user.avatarUrl,
+      emailVerified: user.emailVerified,
+      mustResetPassword: user.mustResetPassword,
+      twoFactorEnabled: user.twoFactorEnabled,
+      twoFactorMethod: user.twoFactorMethod,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 
   @Post('register')

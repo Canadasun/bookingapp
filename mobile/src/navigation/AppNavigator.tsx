@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ScreenCapture from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
 import { GRAY_100, GRAY_400, GRAY_900 } from '../theme';
 import { Client } from '../types';
@@ -99,7 +100,7 @@ function MainTabs() {
 }
 
 export function AppNavigator() {
-  const { token, user, booting, login, logout, configError } = useAuth();
+  const { token, user, booting, login, logout, configError, showPrivacyScreen } = useAuth();
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot'>('login');
 
   // Final Privacy & Entitlement Audit (Runtime)
@@ -115,6 +116,16 @@ export function AppNavigator() {
       });
     }
   }, []);
+
+  // Prevent in-app screenshots and Android app-switcher capture when the user
+  // is authenticated. iOS app-switcher is handled by the showPrivacyScreen overlay.
+  useEffect(() => {
+    if (token) {
+      ScreenCapture.preventScreenCaptureAsync('main');
+    } else {
+      ScreenCapture.allowScreenCaptureAsync('main');
+    }
+  }, [token]);
 
   if (booting) return null;
 
@@ -142,10 +153,26 @@ export function AppNavigator() {
   if (user?.role === 'CLIENT') return <ClientPortalScreen onLogout={logout} />;
   if (user?.role === 'ADMIN') return <AdminScreen onLogout={logout} />;
 
-  return <MainTabs />;
+  return (
+    <>
+      <MainTabs />
+      {showPrivacyScreen && (
+        <View style={styles.privacyOverlay} pointerEvents="none">
+          <Ionicons name="shield-checkmark" size={56} color="#7C3AED" />
+        </View>
+      )}
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
+  privacyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+  },
   errorScreen: {
     flex: 1,
     alignItems: 'center',

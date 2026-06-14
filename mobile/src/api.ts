@@ -40,7 +40,10 @@ export async function api<T>(path: string, init?: RequestInit, _retried = false)
     const nested = body.message && typeof body.message === 'object'
       ? (body.message as Record<string, unknown>).message
       : undefined;
-    throw new Error(typeof body.message === 'string' ? body.message : typeof nested === 'string' ? nested : `HTTP ${res.status}`);
+    const msg = typeof body.message === 'string' ? body.message : typeof nested === 'string' ? nested : `HTTP ${res.status}`;
+    const err = new Error(msg) as Error & { status: number };
+    err.status = res.status;
+    throw err;
   }
   return res.json() as Promise<T>;
 }

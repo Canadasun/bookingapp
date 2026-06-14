@@ -17,6 +17,7 @@ interface AuthContextType {
   unreadMessages: number;
   isOffline: boolean;
   configError: 'MISMATCH' | 'INVALID_BIZ' | null;
+  showPrivacyScreen: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
   const [configError, setConfigError] = useState<'MISMATCH' | 'INVALID_BIZ' | null>(null);
+  const [showPrivacyScreen, setShowPrivacyScreen] = useState(false);
 
   const refreshUnreadMessages = useCallback(async () => {
     const businessId = bizId();
@@ -62,10 +64,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await api(`/businesses/${businessId}`);
       } catch (err: any) {
-        if (err.message?.includes('404')) {
+        if (err?.status === 404) {
           console.error(`CRITICAL: Business ID "${businessId}" not found on backend.`);
           setConfigError('INVALID_BIZ');
         }
+        // Network errors (no status) are ignored — offline startup is allowed.
       }
     };
     checkConfig();
@@ -107,13 +110,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const wasBackgrounded = useRef(false);
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (next) => {
-      if (next === 'background') {
-        wasBackgrounded.current = true;
-      } else if (next === 'active' && wasBackgrounded.current) {
-        wasBackgrounded.current = false;
-        const a = getAuth();
-        if (a.token && await isBiometricEnabled() && (await biometricCapability()).available) {
-          setLocked(true);
+      // Show a privacy overlay as soon as the app enters the inactive/background
+      // state so the iOS app switcher screenshot captures the overlay, not live
+      // content with client PII or payment data.
+      if (next === 'inactive' || next === 'background') {
+        setShowPrivacyScreen(true);
+        if (next === 'background') wasBackgrounded.current = true;
+      } else if (next === 'active') {
+        setShowPrivacyScreen(false);
+        if (wasBackgrounded.current) {
+          wasBackgrounded.current = false;
+          const a = getAuth();
+          if (a.token && await isBiometricEnabled() && (await biometricCapability()).available) {
+            setLocked(true);
+          }
         }
       }
     });
@@ -139,7 +149,7 @@ return (
   <AuthContext.Provider value={{
     token, user, booting, locked, setLocked,
     login, logout, refreshUnreadMessages, unreadMessages,
-    isOffline, configError
+    isOffline, configError, showPrivacyScreen,
   }}>
     {children}
   </AuthContext.Provider>

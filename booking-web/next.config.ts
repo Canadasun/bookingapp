@@ -50,6 +50,19 @@ const nextConfig: NextConfig = {
   // in an iframe on customers' own sites, so framing must stay allowed there.
   // Dashboard and admin routes are never embedded, so they get a full CSP.
   async headers() {
+    // CSP for auth pages (login, register, etc.) — no Stripe frames needed here.
+    // Prevents credential phishing via XSS on sign-in flows.
+    const authCsp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://www.clarity.ms",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://api.pulseappointments.com https://www.clarity.ms https://c.clarity.ms",
+      "font-src 'self' data:",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join("; ");
+
     // CSP for authenticated areas. script-src includes 'unsafe-inline' because
     // Next.js injects inline hydration scripts; without nonces that's unavoidable.
     // object-src 'none' and base-uri 'self' are the most impactful restrictions.
@@ -97,6 +110,17 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      // Auth pages get CSP to block XSS-based credential phishing.
+      ...[
+        "/login", "/register", "/forgot-password", "/reset-password",
+        "/change-password", "/verify-email", "/support",
+      ].map((source) => ({
+        source,
+        headers: [
+          { key: "Content-Security-Policy", value: authCsp },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      })),
     ];
   },
 };

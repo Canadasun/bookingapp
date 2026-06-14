@@ -364,16 +364,26 @@ export class AuthService {
     // Recovery-code fallback: if the OTP didn't match, the user may have entered
     // one of their one-time recovery codes (which bypass the email/SMS channel
     // entirely — the whole point of recovery). Consume it on use.
+    // Codes may be stored as bcrypt hashes (new) or legacy SHA-256 hex (old).
     let recoveryOk = false;
     if (!otpOk) {
       const u = await this.prisma.user.findUnique({ where: { id: ch.userId } });
-      const recHash = createHash('sha256').update(code.trim().toLowerCase()).digest('hex');
-      if (u && u.twoFactorRecoveryCodes.includes(recHash)) {
-        recoveryOk = true;
-        await this.prisma.user.update({
-          where: { id: u.id },
-          data: { twoFactorRecoveryCodes: u.twoFactorRecoveryCodes.filter((h) => h !== recHash) },
-        });
+      if (u) {
+        const candidate = code.trim().toLowerCase();
+        let matchingHash: string | undefined;
+        for (const h of u.twoFactorRecoveryCodes) {
+          const matched = h.startsWith('$2')
+            ? await bcrypt.compare(candidate, h)
+            : h === createHash('sha256').update(candidate).digest('hex');
+          if (matched) { matchingHash = h; break; }
+        }
+        if (matchingHash) {
+          recoveryOk = true;
+          await this.prisma.user.update({
+            where: { id: u.id },
+            data: { twoFactorRecoveryCodes: u.twoFactorRecoveryCodes.filter((h) => h !== matchingHash) },
+          });
+        }
       }
     }
 
@@ -409,7 +419,7 @@ export class AuthService {
     let recoveryCodes: string[] | undefined;
     if (enabled && !user.twoFactorEnabled) {
       recoveryCodes = Array.from({ length: 8 }, () => this.genRecoveryCode());
-      data.twoFactorRecoveryCodes = recoveryCodes.map((c) => createHash('sha256').update(c).digest('hex'));
+      data.twoFactorRecoveryCodes = await Promise.all(recoveryCodes.map((c) => bcrypt.hash(c, 10)));
     } else if (!enabled) {
       data.twoFactorRecoveryCodes = [];
     }
