@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
-  DollarSign, BarChart3, FileText, Search, Clock,
+  DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
   ShieldCheck,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
@@ -32,36 +32,38 @@ interface NavChild {
 const OWNER_NAV: NavItem[] = [
   { href: "/dashboard",              label: "Home",         icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
-  { href: "/dashboard/checkout",     label: "New booking",  icon: CalendarPlus },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
-  { href: "/dashboard/services",     label: "Services",     icon: Scissors },
   { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
-  { href: "/dashboard/hours",        label: "Hours",        icon: Clock },
   {
-    href: "/dashboard/more",         label: "More",         icon: MenuIcon,
+    href: "/dashboard/nav-financials", label: "Financials", icon: DollarSign,
     children: [
-      { group: "Operations" },
-      { href: "/dashboard/staff",        label: "Staff" },
-      { href: "/dashboard/resources",    label: "Resources" },
-      { href: "/dashboard/tasks",        label: "Tasks" },
-      { href: "/dashboard/followups",    label: "Follow-ups" },
-      { href: "/dashboard/waitlist",     label: "Waitlist" },
-      { group: "Growth" },
-      { href: "/dashboard/offers",       label: "Offers" },
-      { href: "/dashboard/promo-codes",  label: "Promo codes" },
-      { href: "/dashboard/memberships",  label: "Memberships" },
-      { href: "/dashboard/reviews",      label: "Reviews" },
-      { href: "/dashboard/marketing",    label: "Marketing" },
-      { href: "/dashboard/gift-cards",   label: "Gift cards" },
-      { href: "/dashboard/packages",     label: "Packages" },
-      { group: "Financials" },
       { href: "/dashboard/transactions", label: "Transactions" },
       { href: "/dashboard/invoices",     label: "Invoices" },
       { href: "/dashboard/reports",      label: "Reports" },
-      { group: "Admin" },
-      { href: "/dashboard/notifications",label: "Notifications" },
-      { href: "/dashboard/account",      label: "Account" },
-      { href: "/dashboard/settings",     label: "Settings" },
+    ],
+  },
+  {
+    href: "/dashboard/nav-operations", label: "Operations", icon: Scissors,
+    children: [
+      { href: "/dashboard/staff",        label: "Staff" },
+      { href: "/dashboard/services",     label: "Services" },
+      { href: "/dashboard/resources",    label: "Resources" },
+      { href: "/dashboard/hours",        label: "Hours" },
+      { href: "/dashboard/tasks",        label: "Tasks" },
+      { href: "/dashboard/followups",    label: "Follow-ups" },
+      { href: "/dashboard/waitlist",     label: "Waitlist" },
+    ],
+  },
+  {
+    href: "/dashboard/nav-marketing",  label: "Marketing",  icon: Megaphone,
+    children: [
+      { href: "/dashboard/marketing",    label: "Campaigns" },
+      { href: "/dashboard/offers",       label: "Offers" },
+      { href: "/dashboard/promo-codes",  label: "Promo codes" },
+      { href: "/dashboard/gift-cards",   label: "Gift cards" },
+      { href: "/dashboard/packages",     label: "Packages" },
+      { href: "/dashboard/memberships",  label: "Memberships" },
+      { href: "/dashboard/reviews",      label: "Reviews" },
     ],
   },
 ];
@@ -70,6 +72,14 @@ const STAFF_NAV: NavItem[] = [
   { href: "/dashboard/appointments", label: "My Appointments", icon: Calendar },
   { href: "/dashboard/tasks",        label: "My Tasks",        icon: CheckSquare },
   { href: "/dashboard/messages",     label: "Messages",        icon: MessageSquare },
+];
+
+// Pages reachable via sidebar footer / topbar — kept out of OWNER_NAV but
+// still included in the command palette so owners can jump there with ⌘K.
+const FOOTER_PAGES = [
+  { href: "/dashboard/notifications", label: "Notifications" },
+  { href: "/dashboard/account",       label: "Account" },
+  { href: "/dashboard/settings",      label: "Settings" },
 ];
 
 function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
@@ -138,7 +148,7 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
 }
 
 function commandItems(nav: NavItem[]) {
-  return nav.flatMap((item) => {
+  const navItems = nav.flatMap((item) => {
     const parent = item.children
       ? []
       : [{ href: item.href, label: item.label }];
@@ -147,6 +157,7 @@ function commandItems(nav: NavItem[]) {
       .map((child) => ({ href: child.href, label: child.label }));
     return [...parent, ...children];
   });
+  return [...navItems, ...FOOTER_PAGES];
 }
 
 function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[]; onClose: () => void }) {
@@ -435,6 +446,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </Link>
           )}
+          <Link href="/dashboard/settings" onClick={() => setOpen(false)}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
+            <SettingsIcon className="w-4 h-4" /> Settings
+          </Link>
           <button onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
             <LogOut className="w-4 h-4" /> Sign out
@@ -467,6 +482,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <Link href="/dashboard/checkout"
+              className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shrink-0">
+              <CalendarPlus className="h-4 w-4" />
+              <span className="hidden sm:inline">New booking</span>
+            </Link>
             <button type="button" onClick={() => setCommandOpen(true)}
               className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 lg:inline-flex">
               <Search className="h-4 w-4" />

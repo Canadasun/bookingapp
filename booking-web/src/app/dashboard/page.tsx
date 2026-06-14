@@ -185,6 +185,27 @@ export default function OverviewPage() {
       </div>
 
 
+      {actions.length > 0 && (
+        <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Action needed</h3>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {actions.map(({ label, value, href, icon: Icon, tone }) => (
+              <Link key={label} href={href}
+                className="rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 p-3 transition-colors">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tone}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <p className="mt-3 text-2xl font-bold text-gray-900">{value}</p>
+                <p className="text-xs font-medium text-gray-500">{label}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Get verified — one-click request, lands the business in the admin queue */}
       {!isStaff && (verifStatus === "UNVERIFIED" || verifStatus === "REJECTED") && (
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -220,44 +241,7 @@ export default function OverviewPage() {
         </div>
       )}
 
-      {!isStaff && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {[
-            { label: "Cancelled this week", value: cancelledThisWeek },
-            { label: "No-shows this month", value: noShowsThisMonth },
-            { label: "Top service this week", value: topService ? `${topService[0]} (${topService[1]})` : "—" },
-            { label: "Waitlist", value: waitlistCount },
-          ].map((m) => (
-            <div key={m.label} className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-              <p className="text-xs font-medium text-gray-400">{m.label}</p>
-              <p className="mt-1 text-lg font-bold text-gray-900 truncate">{m.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {actions.length > 0 && (
-        <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <h3 className="text-sm font-semibold text-gray-900">Action needed</h3>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {actions.map(({ label, value, href, icon: Icon, tone }) => (
-              <Link key={label} href={href}
-                className="rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 p-3 transition-colors">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tone}`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <p className="mt-3 text-2xl font-bold text-gray-900">{value}</p>
-                <p className="text-xs font-medium text-gray-500">{label}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Timeline + Upcoming grid */}
+      {/* Today's schedule + stats grid */}
       <div className="grid md:grid-cols-5 gap-5">
 
         {/* Today timeline */}
@@ -284,13 +268,28 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* Upcoming */}
+        {/* Upcoming + quick stats */}
         <div className="md:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50">
             <h3 className="text-sm font-semibold text-gray-900">Coming up</h3>
             <p className="text-xs text-gray-400 mt-0.5">Next {upcoming.length} upcoming</p>
           </div>
-          <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+          {!isStaff && (
+            <div className="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+              {[
+                { label: "Cancelled (wk)", val: cancelledThisWeek },
+                { label: "No-shows (mo)",  val: noShowsThisMonth },
+                { label: "Top service",    val: topService ? topService[0] : "—" },
+                { label: "Waitlist",       val: waitlistCount },
+              ].map((s) => (
+                <div key={s.label} className="bg-white px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
+                  <p className="mt-0.5 text-lg font-bold text-gray-900 truncate">{s.val}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
             {upcoming.length === 0 ? (
               <p className="py-10 text-sm text-gray-400 text-center">No upcoming appointments</p>
             ) : upcoming.map((apt) => (
