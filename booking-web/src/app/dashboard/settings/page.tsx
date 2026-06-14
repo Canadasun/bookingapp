@@ -1953,8 +1953,15 @@ function SettingsPage() {
                           <p className="text-xs text-gray-400 mt-0.5">{plan.desc}</p>
                         </div>
                         {(() => {
-                          const isCurrent = (biz?.plan ?? "FREE") === plan.id;
+                          const RANK: Record<string, number> = { FREE: 0, BASIC: 1, PRO: 2, UNLIMITED: 3 };
+                          const currentPlan = biz?.plan ?? "FREE";
+                          const isCurrent = currentPlan === plan.id;
                           const canBuy = (plan.id === "BASIC" || plan.id === "PRO" || plan.id === "UNLIMITED") && !isCurrent;
+                          const isDowngrade = (RANK[plan.id] ?? 0) < (RANK[currentPlan] ?? 0);
+                          const label = isCurrent ? "Current plan"
+                            : billingBusy === plan.id ? "Redirecting…"
+                            : isDowngrade ? `Downgrade to ${plan.name}`
+                            : plan.cta;
                           return (
                             <button
                               type="button"
@@ -1971,7 +1978,7 @@ function SettingsPage() {
                                   : "border border-violet-300 text-violet-600 hover:bg-violet-50",
                                 billingBusy !== null && "opacity-60",
                               )}>
-                              {isCurrent ? "Current plan" : billingBusy === plan.id ? "Redirecting…" : plan.cta}
+                              {label}
                             </button>
                           );
                         })()}
