@@ -102,6 +102,20 @@ export function AppNavigator() {
   const { token, user, booting, login, logout, configError } = useAuth();
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot'>('login');
 
+  // Final Privacy & Entitlement Audit (Runtime)
+  useEffect(() => {
+    if (__DEV__) {
+      const Constants = require('expo-constants').default;
+      const infoPlist = Constants.expoConfig?.ios?.infoPlist;
+      const required = ['NSCameraUsageDescription', 'NSFaceIDUsageDescription', 'NSPhotoLibraryUsageDescription'];
+      required.forEach(key => {
+        if (!infoPlist?.[key]) {
+          console.warn(`PRIVACY WARNING: Missing ${key} in app.json. iOS submission will fail.`);
+        }
+      });
+    }
+  }, []);
+
   if (booting) return null;
 
   if (configError) {
