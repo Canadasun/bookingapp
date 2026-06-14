@@ -107,7 +107,7 @@ export default function OverviewPage() {
     } finally { setLoading(false); }
   }, [isStaff, user?.staffId, bizId]);
 
-  useEvents(useCallback(() => {
+  useEvents(bizId || null, useCallback(() => {
     load();
   }, [load]));
 

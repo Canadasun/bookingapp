@@ -97,10 +97,12 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
-  // Minimal readable hint for middleware routing — name + role only. Everything
-  // else is fetched from /api/auth/me by useCurrentUser(). Matches access-token
-  // lifetime so it never outlasts the session.
-  const hint = { name: data.user.name, role: data.user.role };
+  // Readable hint cookie: carries routing fields (id, role, businessId, staffId,
+  // permissions) but NOT email, mustResetPassword, emailVerified, or 2FA flags.
+  // Those come from useCurrentUser() → /api/auth/me. TTL matches the access token
+  // so it never outlasts the session.
+  const { email: _e, mustResetPassword: _mr, emailVerified: _ev, twoFactorEnabled: _tfe, twoFactorMethod: _tfm, ...hint } = data.user as typeof data.user & Record<string, unknown>;
+  void _e; void _mr; void _ev; void _tfe; void _tfm;
   res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(hint)).toString("base64")), {
     httpOnly: false,
     secure,

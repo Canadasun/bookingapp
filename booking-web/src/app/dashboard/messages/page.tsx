@@ -47,7 +47,7 @@ export default function MessagesPage() {
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
-  useEvents(useCallback(() => {
+  useEvents(bizId || null, useCallback(() => {
     loadThreads();
     if (selected && bizId) {
       api.messages.thread(bizId, selected.clientId).then(setMsgs).catch(() => {});

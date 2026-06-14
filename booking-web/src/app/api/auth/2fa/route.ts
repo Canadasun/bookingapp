@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
     });
   }
   if (data.user) {
-    const hint = { name: data.user.name, role: data.user.role };
+    const { email: _e, mustResetPassword: _mr, twoFactorEnabled: _tfe, twoFactorMethod: _tfm, ...hint } = data.user;
+    void _e; void _mr; void _tfe; void _tfm;
     res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(hint)).toString("base64")), {
       httpOnly: false,
       secure,

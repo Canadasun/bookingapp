@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
   });
-  const hint = { name: data.user.name, role: data.user.role };
+  const { email: _e, mustResetPassword: _mr, ...hint } = data.user;
+  void _e; void _mr;
   res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(hint)).toString("base64")), {
     httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });

@@ -224,6 +224,7 @@ function SettingsPage() {
   }, [bizId]);
 
   useEvents(
+    bizId || null,
     useCallback(() => {}, []),
     useCallback((data: { plan: string; planExpiresAt: string | null }) => {
       setBiz((prev) => prev ? { ...prev, plan: data.plan as Business["plan"] } : prev);
