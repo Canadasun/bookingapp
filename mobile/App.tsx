@@ -94,6 +94,8 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
   setMsgClient: (c:Client|null)=>void;
   onLogout: ()=>void;
 }) {
+  const { user: tabUser } = getAuth();
+  const canCheckout = tabUser?.role === 'OWNER' || tabUser?.role === 'ADMIN';
   const insets = useSafeAreaInsets();
   const barHeight = 60 + Math.max(insets.bottom, 8);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -142,7 +144,7 @@ function MainTabs({ msgClient, setMsgClient, onLogout }: {
       })}
     >
       <Tab.Screen name="Calendar" component={CalendarStack}/>
-      <Tab.Screen name="Checkout" component={CheckoutScreen}/>
+      {canCheckout && <Tab.Screen name="Checkout" component={CheckoutScreen}/>}
       <Tab.Screen name="Customers">
         {()=><ClientsScreen onMessage={c=>setMsgClient(c)}/>}
       </Tab.Screen>
@@ -203,12 +205,15 @@ function AppContent() {
   const [token, setToken]             = useState<string|null>(null);
   const [user, setUser]               = useState<User|null>(null);
   const [msgClient, setMsgClient]     = useState<Client|null>(null);
-  const [_, forceRender]              = useState(0);
   const [booting, setBooting]         = useState(true);
   const [locked, setLocked]           = useState(false);
   const [authView, setAuthView]       = useState<'login'|'register'|'forgot'>('login');
 
-  useEffect(()=>{ const unsub=()=>forceRender(n=>n+1); listeners.add(unsub); return ()=>{ listeners.delete(unsub); }; },[]);
+  useEffect(()=>{
+    const unsub = () => { const a = getAuth(); setToken(a.token); setUser(a.user); };
+    listeners.add(unsub);
+    return ()=>{ listeners.delete(unsub); };
+  },[]);
 
   // Restore a persisted session on cold start. The stored access token may be
   // expired (15m), so refresh it via the saved refresh token (7d). If that
@@ -249,7 +254,10 @@ function AppContent() {
   }, []);
 
   function handleLogin(t:string, r:string, u:User) { setAuth(t,u,r); setToken(t); setUser(u); persistAuth(); requestPushWithContext(); }
-  function handleLogout() { setAuth(null,null,null); setToken(null); setUser(null); persistAuth(); }
+  function handleLogout() {
+    api('/auth/logout', { method: 'POST' }).catch(() => {});
+    setAuth(null,null,null); setToken(null); setUser(null); persistAuth();
+  }
 
   if (booting) return (
     <ErrorBoundary>

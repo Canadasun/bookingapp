@@ -24,13 +24,12 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations'
   | 'promo-codes' | 'memberships' | 'hours' | 'payouts' | 'soon';
 
-// Plan tiers mirror the web billing page. Display-only on mobile for now — every
-// business is on Pro during testing; paid switching gets wired up after testing.
+// Plan tiers mirror the web billing page.
 const PLANS = [
-  { id:'FREE',      name:'Free',      price:'$0',   period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page','Up to 5 staff members','1 location'] },
-  { id:'BASIC',     name:'Basic',     price:'$49',  period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies','Manual charges','Up to 10 staff members'] },
-  { id:'PRO',       name:'Pro',       price:'$149', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Late-cancellation fees','Analytics & reports','Up to 10 staff members'] },
-  { id:'UNLIMITED', name:'Unlimited', price:'$80',  period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
+  { id:'FREE',      name:'Free',      price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page','Up to 5 staff members','1 location'] },
+  { id:'BASIC',     name:'Basic',     price:'$10', period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies','Manual charges','Up to 10 staff members'] },
+  { id:'PRO',       name:'Pro',       price:'$20', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Late-cancellation fees','Analytics & reports','Up to 10 staff members'] },
+  { id:'UNLIMITED', name:'Unlimited', price:'$80', period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
 ] as const;
 
 import * as ImagePicker from 'expo-image-picker';
@@ -972,9 +971,18 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       else if (v === 'packages' && (!packages || !issuedPackages)){ setLoading(true); await loadPackages(); }
       else if (v === 'tasks' && !tasks){ setLoading(true); await loadTasks(); }
       else if (v === 'followups' && !followups){ setLoading(true); await loadFollowups(); }
-      else if ((v === 'settings' || v === 'booking' || v === 'notifications') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
+      else if ((v === 'settings' || v === 'booking') && !biz) { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
       else if (v === 'subscriptions') { setLoading(true); setBiz(await api<any>(`/businesses/${bizId()}`)); }
-      else if (v === 'notifications' && !deliveries) { setLoading(true); setDeliveries(await api<NotificationDelivery[]>(`/notifications/deliveries?limit=50`)); }
+      else if (v === 'notifications') {
+        setLoading(true);
+        const [bizResult, deliveriesResult] = await Promise.allSettled([
+          !biz ? api<any>(`/businesses/${bizId()}`) : Promise.resolve(biz),
+          !deliveries ? api<NotificationDelivery[]>(`/notifications/deliveries?limit=50`) : Promise.resolve(deliveries),
+        ]);
+        if (!biz && bizResult.status === 'fulfilled') setBiz(bizResult.value);
+        if (!deliveries && deliveriesResult.status === 'fulfilled') setDeliveries(deliveriesResult.value);
+        else if (deliveriesResult.status === 'rejected') Alert.alert('Could not load deliveries', deliveriesResult.reason instanceof Error ? deliveriesResult.reason.message : 'Please try again.');
+      }
       else if (v === 'reports' && !appts) {
         setLoading(true);
         const [bookingRows, paymentRows] = await Promise.all([
@@ -3315,8 +3323,6 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               </View>
             );
           })}
-          <Text style={[ms.empty,{ marginTop:0, marginBottom:6 }]}>Every business is on Pro during testing. Paid plan changes will be enabled here soon.</Text>
-
           <View style={ms.card}>
             <Text style={ms.cardLabel}>Cancellation window</Text>
             <Text style={ms.cardValue}>{(biz as any)?.cancellationWindowHours ?? 24} hours</Text>
@@ -3626,6 +3632,21 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={s.profileName}>{biz?.name ?? user.name}</Text>
               <Text style={s.profileRole}>{user.role.toLowerCase()}</Text>
             </View>
+          </TouchableOpacity>
+        )}
+        {user?.role === 'OWNER' && !twoFA && (
+          <TouchableOpacity
+            style={{ flexDirection:'row', alignItems:'center', gap:10, backgroundColor:'#FFF7ED', borderRadius:12, padding:14, marginBottom:12, borderWidth:1, borderColor:'#FED7AA' }}
+            onPress={()=>open('settings')}
+            accessibilityRole="button"
+            accessibilityLabel="Enable two-factor authentication"
+          >
+            <Ionicons name="shield-outline" size={20} color="#C2410C"/>
+            <View style={{ flex:1 }}>
+              <Text style={{ fontSize:13, fontWeight:'700', color:'#C2410C' }}>Secure your account</Text>
+              <Text style={{ fontSize:12, color:'#9A3412', marginTop:1 }}>Enable two-factor sign-in in Settings to protect access.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#C2410C"/>
           </TouchableOpacity>
         )}
         <View style={s.menuCard}>

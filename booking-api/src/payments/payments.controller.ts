@@ -78,10 +78,11 @@ export class PaymentsController {
     return this.paymentService.chargeNoShowFee(appointmentId, user.businessId);
   }
 
-  // In-person custom charge (mobile Checkout → Stripe PaymentSheet). Scoped to the owner's business.
+  // In-person custom charge (mobile Checkout → Stripe PaymentSheet). Owner/admin only.
   @Post('charge')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   createCharge(
     @Body() body: unknown,

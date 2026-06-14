@@ -49,8 +49,17 @@ export async function loadPersistedAuth(): Promise<boolean> {
 }
 
 // Exchange the stored refresh token (7d) for a fresh access token (15m).
-// Called on cold start and on a 401 mid-session. Rotates + re-persists tokens.
+// Called on cold start and on a 401 mid-session. A shared promise prevents
+// concurrent 401 responses from rotating the same token more than once.
+let _refreshPromise: Promise<boolean> | null = null;
+
 export async function refreshSession(): Promise<boolean> {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = _doRefresh().finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+async function _doRefresh(): Promise<boolean> {
   if (!_refresh) return false;
   try {
     const res = await fetch(`${API_BASE}/auth/refresh`, {
@@ -58,7 +67,11 @@ export async function refreshSession(): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: _refresh }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      setAuth(null, null, null);
+      await persistAuth();
+      return false;
+    }
     const data = await res.json() as { accessToken:string; refreshToken:string; user:User };
     setAuth(data.accessToken, data.user, data.refreshToken);
     await persistAuth();

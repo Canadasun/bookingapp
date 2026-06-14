@@ -26,7 +26,7 @@
       }
     },
     "android": {
-      "packageName": "com.pulseappointments.app",
+      "package": "com.pulseappointments.app",
       "adaptiveIcon": {
         "backgroundColor": "#E9A23C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -62,15 +62,10 @@
           "enableGooglePay": false
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "networkSecurityConfig": "./network-security-config.xml"
-          }
-        }
-      ],
-      "./plugins/withPrivacyManifest"
+      "./plugins/withNetworkSecurityConfig",
+      "./plugins/withPrivacyManifest",
+      "expo-build-properties",
+      "expo-image"
     ],
     "extra": {
       "eas": {

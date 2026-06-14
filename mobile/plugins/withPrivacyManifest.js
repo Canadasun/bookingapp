@@ -25,7 +25,74 @@ const PRIVACY_MANIFEST = `<?xml version="1.0" encoding="UTF-8"?>
 \t<key>NSPrivacyTrackingDomains</key>
 \t<array/>
 \t<key>NSPrivacyCollectedDataTypes</key>
-\t<array/>
+\t<array>
+\t\t<!-- Name: collected at registration, linked to the user account -->
+\t\t<dict>
+\t\t\t<key>NSPrivacyCollectedDataType</key>
+\t\t\t<string>NSPrivacyCollectedDataTypeName</string>
+\t\t\t<key>NSPrivacyCollectedDataTypeLinked</key>
+\t\t\t<true/>
+\t\t\t<key>NSPrivacyCollectedDataTypeTracking</key>
+\t\t\t<false/>
+\t\t\t<key>NSPrivacyCollectedDataTypePurposes</key>
+\t\t\t<array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+\t\t</dict>
+\t\t<!-- Email address: used for sign-in, confirmations, and reminders -->
+\t\t<dict>
+\t\t\t<key>NSPrivacyCollectedDataType</key>
+\t\t\t<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+\t\t\t<key>NSPrivacyCollectedDataTypeLinked</key>
+\t\t\t<true/>
+\t\t\t<key>NSPrivacyCollectedDataTypeTracking</key>
+\t\t\t<false/>
+\t\t\t<key>NSPrivacyCollectedDataTypePurposes</key>
+\t\t\t<array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+\t\t</dict>
+\t\t<!-- Phone number: business contact and SMS notifications -->
+\t\t<dict>
+\t\t\t<key>NSPrivacyCollectedDataType</key>
+\t\t\t<string>NSPrivacyCollectedDataTypePhoneNumber</string>
+\t\t\t<key>NSPrivacyCollectedDataTypeLinked</key>
+\t\t\t<true/>
+\t\t\t<key>NSPrivacyCollectedDataTypeTracking</key>
+\t\t\t<false/>
+\t\t\t<key>NSPrivacyCollectedDataTypePurposes</key>
+\t\t\t<array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+\t\t</dict>
+\t\t<!-- Device ID: push token stored server-side for notification delivery -->
+\t\t<dict>
+\t\t\t<key>NSPrivacyCollectedDataType</key>
+\t\t\t<string>NSPrivacyCollectedDataTypeDeviceID</string>
+\t\t\t<key>NSPrivacyCollectedDataTypeLinked</key>
+\t\t\t<true/>
+\t\t\t<key>NSPrivacyCollectedDataTypeTracking</key>
+\t\t\t<false/>
+\t\t\t<key>NSPrivacyCollectedDataTypePurposes</key>
+\t\t\t<array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+\t\t</dict>
+\t\t<!-- Other user content: appointment/booking records -->
+\t\t<dict>
+\t\t\t<key>NSPrivacyCollectedDataType</key>
+\t\t\t<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+\t\t\t<key>NSPrivacyCollectedDataTypeLinked</key>
+\t\t\t<true/>
+\t\t\t<key>NSPrivacyCollectedDataTypeTracking</key>
+\t\t\t<false/>
+\t\t\t<key>NSPrivacyCollectedDataTypePurposes</key>
+\t\t\t<array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+\t\t</dict>
+\t\t<!-- Other financial info: payment references (Stripe charge IDs, not full card data) -->
+\t\t<dict>
+\t\t\t<key>NSPrivacyCollectedDataType</key>
+\t\t\t<string>NSPrivacyCollectedDataTypeOtherFinancialInfo</string>
+\t\t\t<key>NSPrivacyCollectedDataTypeLinked</key>
+\t\t\t<true/>
+\t\t\t<key>NSPrivacyCollectedDataTypeTracking</key>
+\t\t\t<false/>
+\t\t\t<key>NSPrivacyCollectedDataTypePurposes</key>
+\t\t\t<array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+\t\t</dict>
+\t</array>
 \t<key>NSPrivacyAccessedAPITypes</key>
 \t<array>
 \t\t<dict>

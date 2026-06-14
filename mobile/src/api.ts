@@ -7,10 +7,11 @@ import { pinnedFetch } from './pinnedFetch';
 
 export async function api<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
   const { token } = getAuth();
+  const isFormData = init?.body instanceof FormData;
   const res = await pinnedFetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
