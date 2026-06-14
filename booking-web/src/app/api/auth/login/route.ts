@@ -97,13 +97,16 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
-  // Readable user profile cookie so client JS knows who is logged in (HMAC-signed when COOKIE_SIGN_SECRET is set)
-  res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(data.user)).toString("base64")), {
+  // Minimal readable hint for middleware routing — name + role only. Everything
+  // else is fetched from /api/auth/me by useCurrentUser(). Matches access-token
+  // lifetime so it never outlasts the session.
+  const hint = { name: data.user.name, role: data.user.role };
+  res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(hint)).toString("base64")), {
     httpOnly: false,
     secure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 15,
   });
   return res;
 }

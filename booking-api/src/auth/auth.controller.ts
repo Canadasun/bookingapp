@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, HttpCode, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, HttpCode, Req, ForbiddenException } from '@nestjs/common';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
@@ -14,6 +14,15 @@ import { User } from '@prisma/client';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService, private prisma: PrismaService) {}
+
+  // Returns the authoritative user profile for the current access token.
+  // Always callable even when mustResetPassword is true.
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: User) {
+    const { passwordHash: _, ...safe } = user as User & { passwordHash?: string };
+    return safe;
+  }
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })

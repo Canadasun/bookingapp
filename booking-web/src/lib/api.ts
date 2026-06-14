@@ -41,11 +41,28 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
         return retry.json() as Promise<T>;
       }
     }
-    // Refresh failed — redirect to login
+    // Refresh failed — clear hint cookie and redirect to login
     if (typeof window !== "undefined") {
-      window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+      document.cookie = "booking_user=; Max-Age=0; path=/";
+      window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
     }
     throw new Error("Session expired");
+  }
+
+  // The API returns 403 PASSWORD_RESET_REQUIRED when the user has a forced
+  // password reset pending. Redirect to /change-password rather than surfacing
+  // this as an unhandled error in every page.
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const nested = body.message as Record<string, unknown> | undefined;
+    const code = nested?.code ?? body.code;
+    if (code === "PASSWORD_RESET_REQUIRED" && typeof window !== "undefined") {
+      window.location.replace("/change-password");
+      throw new Error("Password reset required");
+    }
+    const raw = nested?.message ?? body.message;
+    const msg = typeof raw === "string" ? raw : res.statusText;
+    throw new Error(msg);
   }
 
   if (!res.ok) {
@@ -81,6 +98,11 @@ export interface Business {
   planExpiresAt?: string;
   suspended?: boolean;
   verificationStatus?: VerificationStatus;
+  capabilities?: {
+    deposits: boolean; cardOnFile: boolean; memberships: boolean; giftCards: boolean;
+    sms: boolean; noShowFees: boolean; cancellationFees: boolean; marketing: boolean;
+    multipleLocations: boolean; removeBranding: boolean;
+  };
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
   locations?: { id: string; name: string; address?: string | null }[];

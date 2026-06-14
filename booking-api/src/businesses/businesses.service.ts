@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { applyPlanLimits, isUnlimitedPlan } from '../common/util/plan-features';
+import { getCapabilities } from '../common/util/plan';
 import { ResendEmailProvider } from '../notifications/providers/email.provider';
 
 @Injectable()
@@ -67,7 +68,7 @@ export class BusinessesService {
   async findOne(id: string) {
     const business = await this.prisma.business.findUnique({ where: { id } });
     if (!business) throw new NotFoundException('Business not found');
-    return business;
+    return { ...business, capabilities: getCapabilities(business.plan) };
   }
 
   async findBySlug(slug: string) {

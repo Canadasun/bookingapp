@@ -17,6 +17,7 @@ import { NotificationsScreen } from '../screens/notifications';
 import { MenuScreen } from '../screens/menu';
 import { AdminScreen } from '../screens/admin';
 import { LoginScreen, RegisterScreen, ForgotPasswordScreen, ChangePasswordScreen, ClientPortalScreen } from '../screens/auth';
+import { View, Text, SafeAreaView, StyleSheet } from 'react-native';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -98,10 +99,24 @@ function MainTabs() {
 }
 
 export function AppNavigator() {
-  const { token, user, booting, login, logout } = useAuth();
+  const { token, user, booting, login, logout, configError } = useAuth();
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot'>('login');
 
   if (booting) return null;
+
+  if (configError) {
+    return (
+      <SafeAreaView style={styles.errorScreen}>
+        <Ionicons name="alert-circle" size={64} color="#EF4444" />
+        <Text style={styles.errorTitle}>Configuration Error</Text>
+        <Text style={styles.errorText}>
+          {configError === 'MISMATCH'
+            ? 'Production build detected but using a Stripe TEST key. Please update EAS environment variables.'
+            : 'The business ID configured for this app is invalid or could not be found. Please check your deployment settings.'}
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   if (!token) {
     if (authView === 'register') return <RegisterScreen onRegistered={login} onBack={() => setAuthView('login')} />;
@@ -115,3 +130,26 @@ export function AppNavigator() {
 
   return <MainTabs />;
 }
+
+const styles = StyleSheet.create({
+  errorScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: '#fff',
+  },
+  errorTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: GRAY_900,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 15,
+    color: GRAY_400,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+});

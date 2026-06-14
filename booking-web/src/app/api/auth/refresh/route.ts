@@ -46,8 +46,9 @@ export async function POST(req: NextRequest) {
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
   });
-  res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(data.user)).toString("base64")), {
-    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
+  const hint = { name: data.user.name, role: data.user.role };
+  res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(hint)).toString("base64")), {
+    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });
   return res;
 }

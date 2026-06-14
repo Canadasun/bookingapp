@@ -13,9 +13,9 @@ const MAIN_DOMAIN  = process.env.NEXT_PUBLIC_WEB_URL
 
 const COOKIE_SECRET = process.env.COOKIE_SIGN_SECRET ?? '';
 
-// Decode the user from the booking_user cookie, verifying its HMAC signature
-// when COOKIE_SIGN_SECRET is configured. Uses the Web Crypto API (Edge-compatible).
-async function userFromCookie(req: NextRequest): Promise<{ role?: string; mustResetPassword?: boolean } | null> {
+// Decode the minimal hint from the booking_user cookie — only { name, role }.
+// mustResetPassword is no longer stored here; it's enforced server-side by the API.
+async function userFromCookie(req: NextRequest): Promise<{ role?: string } | null> {
   const raw = req.cookies.get("booking_user")?.value;
   if (!raw) return null;
   if (process.env.NODE_ENV === "production" && !COOKIE_SECRET) return null;
@@ -75,15 +75,9 @@ export async function proxy(req: NextRequest) {
   const authed = !!(req.cookies.get("booking_token")?.value || req.cookies.get("booking_refresh")?.value);
   const user = await userFromCookie(req);
 
-  // Forced first-login password reset: until the flag clears, keep the user on
-  // /change-password and out of the dashboard area.
-  if (
-    authed && user?.mustResetPassword && pathname !== "/change-password" &&
-    (pathname.startsWith("/dashboard") || pathname.startsWith("/my/dashboard") || pathname.startsWith("/admin"))
-  ) {
-    return NextResponse.redirect(new URL("/change-password", req.url));
-  }
-  // /change-password itself requires a login.
+  // /change-password requires a login. mustResetPassword is now enforced
+  // server-side by the API (403 PASSWORD_RESET_REQUIRED on protected endpoints)
+  // so the middleware no longer needs to inspect it.
   if (pathname === "/change-password" && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";

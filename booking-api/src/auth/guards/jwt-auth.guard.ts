@@ -1,8 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
+// Endpoints a user flagged for forced password reset may still call.
+const RESET_ALLOWED = [
+  '/api/auth/change-password',
+  '/api/auth/logout',
+  '/api/auth/me',
+  '/api/auth/resend-verification',
+];
+
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {}
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  handleRequest<TUser = any>(err: any, user: any, info: any, context: ExecutionContext): TUser {
+    const resolved = super.handleRequest(err, user, info, context) as TUser & { mustResetPassword?: boolean };
+    if (resolved?.mustResetPassword) {
+      const req = context.switchToHttp().getRequest<{ path: string }>();
+      if (!RESET_ALLOWED.some(p => req.path.startsWith(p))) {
+        throw new ForbiddenException({ code: 'PASSWORD_RESET_REQUIRED', message: 'You must reset your password before continuing.' });
+      }
+    }
+    return resolved;
+  }
+}
 
 @Injectable()
 export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {}

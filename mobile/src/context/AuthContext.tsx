@@ -16,6 +16,7 @@ interface AuthContextType {
   refreshUnreadMessages: () => Promise<void>;
   unreadMessages: number;
   isOffline: boolean;
+  configError: 'MISMATCH' | 'INVALID_BIZ' | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [locked, setLocked] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
+  const [configError, setConfigError] = useState<'MISMATCH' | 'INVALID_BIZ' | null>(null);
 
   const refreshUnreadMessages = useCallback(async () => {
     const businessId = bizId();
@@ -35,6 +37,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await api<{ unreadMessages: number }>(`/businesses/${businessId}/messages/unread-count`);
       setUnreadMessages(result.unreadMessages);
     } catch { /* foreground polling is best-effort */ }
+  }, []);
+
+  useEffect(() => {
+    const checkConfig = async () => {
+      // 1. Stripe Key Mismatch Check
+      const isProd = !__DEV__;
+      const stripeKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+      if (isProd && stripeKey.startsWith('pk_test_')) {
+        console.error('CRITICAL: Production build detected but using a Stripe TEST key.');
+        setConfigError('MISMATCH');
+        return;
+      }
+
+      // 2. Business ID Check
+      const businessId = bizId();
+      if (!businessId) {
+        console.error('CRITICAL: No EXPO_PUBLIC_BUSINESS_ID found in environment.');
+        setConfigError('INVALID_BIZ');
+        return;
+      }
+
+      // 3. Optional: Verify Business ID against API
+      try {
+        await api(`/businesses/${businessId}`);
+      } catch (err: any) {
+        if (err.message?.includes('404')) {
+          console.error(`CRITICAL: Business ID "${businessId}" not found on backend.`);
+          setConfigError('INVALID_BIZ');
+        }
+      }
+    };
+    checkConfig();
   }, []);
 
   useEffect(() => {
@@ -101,15 +135,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     persistAuth();
   };
+return (
+  <AuthContext.Provider value={{
+    token, user, booting, locked, setLocked,
+    login, logout, refreshUnreadMessages, unreadMessages,
+    isOffline, configError
+  }}>
+    {children}
+  </AuthContext.Provider>
+);
 
-  return (
-    <AuthContext.Provider value={{
-      token, user, booting, locked, setLocked,
-      login, logout, refreshUnreadMessages, unreadMessages
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
 };
 
 export const useAuth = () => {

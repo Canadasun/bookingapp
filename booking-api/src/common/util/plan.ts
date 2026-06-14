@@ -1,15 +1,37 @@
 // Feature-gating by plan tier.
 //
-// Launch mode keeps all product features open. Set UNLOCK_ALL_FEATURES=false
-// when paid-plan enforcement is intentionally enabled after launch.
+// Fail-closed: features are locked unless UNLOCK_ALL_FEATURES is explicitly
+// set to "true". Missing or misspelled → locked. Invalid value → startup crash.
 
-export function featuresUnlocked(): boolean {
-  return process.env.UNLOCK_ALL_FEATURES !== 'false';
+const _unlockValue = process.env.UNLOCK_ALL_FEATURES;
+if (_unlockValue !== undefined && _unlockValue !== 'true' && _unlockValue !== 'false') {
+  throw new Error(`UNLOCK_ALL_FEATURES must be "true" or "false", got "${_unlockValue}"`);
 }
 
-// The plan to use when deciding whether a FEATURE is available. Treats everyone
-// as PRO while unlocked; otherwise the business's real plan.
+export function featuresUnlocked(): boolean {
+  return _unlockValue === 'true';
+}
+
 export function effectivePlan(plan?: string | null): 'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED' {
   if (featuresUnlocked()) return 'UNLIMITED';
   return (plan as 'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED') ?? 'FREE';
+}
+
+export function getCapabilities(plan: string | null | undefined) {
+  const p = effectivePlan(plan);
+  const paid     = p === 'BASIC' || p === 'PRO' || p === 'UNLIMITED';
+  const pro      = p === 'PRO'   || p === 'UNLIMITED';
+  const unlimited = p === 'UNLIMITED';
+  return {
+    deposits:          paid,
+    cardOnFile:        paid,
+    memberships:       paid,
+    giftCards:         paid,
+    sms:               pro,
+    noShowFees:        pro,
+    cancellationFees:  pro,
+    marketing:         pro,
+    multipleLocations: unlimited,
+    removeBranding:    unlimited,
+  };
 }

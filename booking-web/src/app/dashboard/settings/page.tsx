@@ -465,10 +465,9 @@ function SettingsPage() {
   const plan = biz?.plan ?? "FREE";
   // Development override only. Paid features remain gated unless the flag is
   // deliberately enabled at build time.
-  const featuresOpen = process.env.NEXT_PUBLIC_UNLOCK_ALL_FEATURES === "true";
-  const isPro = featuresOpen || plan === "PRO" || plan === "UNLIMITED";
-  const isPaid = featuresOpen || plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED";
-  const isUnlimited = featuresOpen || plan === "UNLIMITED";
+  const isPaid     = biz?.capabilities?.deposits      ?? (plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED");
+  const isPro      = biz?.capabilities?.sms           ?? (plan === "PRO"   || plan === "UNLIMITED");
+  const isUnlimited = biz?.capabilities?.multipleLocations ?? (plan === "UNLIMITED");
   function promptUpgrade(target: "BASIC" | "PRO" | "UNLIMITED", feature: string) {
     const label = target === "BASIC" ? "Basic or higher" : target === "PRO" ? "Pro or higher" : "Unlimited";
     toast.info(`${feature} requires ${label}.`);

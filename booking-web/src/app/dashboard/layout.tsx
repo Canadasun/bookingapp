@@ -11,7 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
-import { getUser, clearSession, type SessionUser } from "@/lib/auth";
+import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { cn } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
@@ -244,7 +244,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router   = useRouter();
   const pathname = usePathname();
   const [open, setOpen]  = useState(false);
-  const [user, setUser]  = useState<SessionUser | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -252,19 +251,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [commandOpen, setCommandOpen] = useState(false);
   const [biz, setBiz] = useState<Business | null>(null);
 
-  // Re-read the (display) session and refresh the avatar on every navigation, so
-  // edits made on the account page show up in the header/sidebar without a reload.
-  useEffect(() => { setUser(getUser()); }, [pathname]);
+  // useCurrentUser() is the authoritative auth check. It calls /api/auth/me on
+  // first mount (result is module-level cached), redirects to /login on 401, and
+  // provides the full user profile (businessId, permissions, etc.) that the
+  // minimal booking_user hint cookie no longer carries.
+  const { user, loading } = useCurrentUser();
+
+  // Keep the avatar and business data fresh on every navigation.
   useEffect(() => {
     api.users.me().then((u) => setAvatar(u.avatarUrl ?? null)).catch(() => {});
   }, [pathname]);
   useEffect(() => {
-    const u = getUser();
-    if (!u?.businessId) return;
-    api.business.get(u.businessId).then(setBiz).catch(() => {});
-    if (u.role !== "OWNER" && u.role !== "ADMIN") return;
-    api.verification.status(u.businessId).then((v) => setVerified(v.verificationStatus === "VERIFIED")).catch(() => {});
-  }, []);
+    if (!user?.businessId) return;
+    api.business.get(user.businessId).then(setBiz).catch(() => {});
+    if (user.role !== "OWNER" && user.role !== "ADMIN") return;
+    api.verification.status(user.businessId).then((v) => setVerified(v.verificationStatus === "VERIFIED")).catch(() => {});
+  }, [user]);
   useEffect(() => {
     api.notifications.unreadCount()
       .then((r) => setUnread(r.count))
@@ -272,12 +274,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   const refreshUnreadMessages = useCallback(() => {
-    const current = getUser();
-    if (!current?.businessId) return;
-    api.messages.unreadCount(current.businessId)
+    if (!user?.businessId) return;
+    api.messages.unreadCount(user.businessId)
       .then((result) => setUnreadMessages(result.unreadMessages))
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     refreshUnreadMessages();
@@ -290,7 +291,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [pathname, refreshUnreadMessages]);
 
-  useEvents(useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]));
+  useEvents(user?.businessId, useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]));
 
   // Staff get the base nav plus anything their granted permissions unlock.
   const perms = user?.permissions ?? [];
@@ -325,10 +326,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.replace("/login");
   }
 
+  // Redirect to change-password if the API says the user must reset first.
+  // The API also enforces this with 403 PASSWORD_RESET_REQUIRED, so this is
+  // just an early client-side shortcut to avoid a full API round-trip first.
+  useEffect(() => {
+    if (user?.mustResetPassword) router.replace("/change-password");
+  }, [user, router]);
+
   const currentLabel =
     nav.flatMap((n) => [n, ...(n.children ?? []).filter((c) => c.href).map((c) => ({ ...c, icon: n.icon }))]).find((n) =>
       n.href === "/dashboard" ? pathname === n.href : n.href && pathname.startsWith(n.href.split("?")[0])
     )?.label ?? "Dashboard";
+
+  // Show a blank shell while the auth check is in flight to prevent a flash of
+  // the dashboard layout for unauthenticated visitors. useCurrentUser() redirects
+  // to /login if the session is invalid.
+  if (loading) {
+    return (
+      <div className="flex min-h-screen brand-shell items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-violet-200 border-t-violet-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen brand-shell">

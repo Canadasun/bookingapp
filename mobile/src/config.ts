@@ -3,9 +3,18 @@
 // Public marketing/legal site (where Terms & Privacy live).
 export const WEB_URL = 'https://www.pulseappointments.com';
 
+const PRODUCTION_DOMAIN = 'https://api.pulseappointments.com/api';
+const isProd = !__DEV__;
+
 // Auto-detect the dev machine's IP from Expo's host URI so the app works
 // on physical devices without changing .env every time.
 function resolveApiBase(): string {
+  if (isProd) {
+    // In production, always prefer the env var or the hardcoded domain.
+    // Never attempt IP resolution or localhost fallbacks.
+    return process.env.EXPO_PUBLIC_API_BASE ?? PRODUCTION_DOMAIN;
+  }
+
   if (process.env.EXPO_PUBLIC_API_BASE && !process.env.EXPO_PUBLIC_API_BASE.includes('localhost')) {
     return process.env.EXPO_PUBLIC_API_BASE; // explicit non-localhost override wins
   }
