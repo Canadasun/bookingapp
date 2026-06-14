@@ -43,7 +43,7 @@ export default function MembershipsPage() {
     if (params.get("membership") === "cancel" && cancelledMembershipId) {
       api.memberships.cancel(bizId, cancelledMembershipId)
         .then(() => load())
-        .catch(() => {})
+        .catch((error) => toast.error(error instanceof Error ? error.message : "Could not cancel membership"))
         .finally(() => window.history.replaceState({}, "", "/dashboard/memberships"));
       return;
     }

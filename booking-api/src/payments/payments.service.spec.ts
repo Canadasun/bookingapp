@@ -216,6 +216,16 @@ describe('PaymentsService client memberships', () => {
         delete: jest.fn().mockResolvedValue({}),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ ...membership, status: 'ACTIVE', cancelAtPeriodEnd: true }),
       },
+      $transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          $queryRaw: jest.fn().mockResolvedValue([]),
+          membershipPlan: {
+            findUnique: jest.fn().mockResolvedValue({ stripePriceId: null, stripeProductId: null }),
+            update: jest.fn().mockResolvedValue({}),
+          },
+        };
+        return fn(tx);
+      }),
     };
     const module = await Test.createTestingModule({
       providers: [

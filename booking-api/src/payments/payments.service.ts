@@ -656,23 +656,37 @@ export class PaymentsService {
     let priceId = plan.stripePriceId;
     let productId = plan.stripeProductId;
     if (!priceId) {
-      const product = await this.getStripe().products.create({
-        name: `${business.name} - ${plan.name}`,
-        description: plan.description ?? undefined,
-        metadata: { kind: 'client_membership_plan', businessId, planId },
+      // SELECT FOR UPDATE serializes concurrent first-enrollment requests so only
+      // one creates the Stripe product+price pair. Without this, two simultaneous
+      // requests both see stripePriceId = null and produce orphaned Stripe objects.
+      const resolved = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "MembershipPlan" WHERE id = ${plan.id} FOR UPDATE`;
+        const fresh = await tx.membershipPlan.findUnique({
+          where: { id: plan.id },
+          select: { stripePriceId: true, stripeProductId: true },
+        });
+        if (fresh?.stripePriceId) {
+          return { priceId: fresh.stripePriceId, productId: fresh.stripeProductId };
+        }
+        const product = await this.getStripe().products.create({
+          name: `${business.name} - ${plan.name}`,
+          description: plan.description ?? undefined,
+          metadata: { kind: 'client_membership_plan', businessId, planId },
+        });
+        const price = await this.getStripe().prices.create({
+          product: product.id,
+          unit_amount: plan.priceMonthly,
+          currency: this.currencyOf(business),
+          recurring: { interval: 'month' },
+          metadata: { kind: 'client_membership_plan', businessId, planId },
+        });
+        await tx.membershipPlan.update({
+          where: { id: plan.id }, data: { stripeProductId: product.id, stripePriceId: price.id },
+        });
+        return { priceId: price.id, productId: product.id };
       });
-      productId = product.id;
-      const price = await this.getStripe().prices.create({
-        product: product.id,
-        unit_amount: plan.priceMonthly,
-        currency: this.currencyOf(business),
-        recurring: { interval: 'month' },
-        metadata: { kind: 'client_membership_plan', businessId, planId },
-      });
-      priceId = price.id;
-      await this.prisma.membershipPlan.update({
-        where: { id: plan.id }, data: { stripeProductId: productId, stripePriceId: priceId },
-      });
+      priceId = resolved.priceId;
+      productId = resolved.productId;
     }
 
     const membership = await this.prisma.clientMembership.create({
@@ -716,6 +730,17 @@ export class PaymentsService {
     return { confirmed: true as const, membershipId: session.metadata.membershipId, status: this.membershipStatus(sub.status) };
   }
 
+  async archiveMembershipPlanStripe(priceId: string, productId: string | null): Promise<void> {
+    await this.getStripe().prices.update(priceId, { active: false }).catch((e) =>
+      this.logger.warn(`Could not archive Stripe price ${priceId}: ${e.message}`),
+    );
+    if (productId) {
+      await this.getStripe().products.update(productId, { active: false }).catch((e) =>
+        this.logger.warn(`Could not archive Stripe product ${productId}: ${e.message}`),
+      );
+    }
+  }
+
   async cancelClientMembership(businessId: string, membershipId: string) {
     const membership = await this.prisma.clientMembership.findFirst({ where: { id: membershipId, businessId } });
     if (!membership) throw new NotFoundException('Membership not found');
@@ -724,6 +749,9 @@ export class PaymentsService {
         where: { id: membership.id },
         data: { status: 'CANCELLED', cancelledAt: new Date(), cancelAtPeriodEnd: false },
       });
+    }
+    if (membership.cancelAtPeriodEnd) {
+      return this.prisma.clientMembership.findUniqueOrThrow({ where: { id: membership.id } });
     }
     const sub = await this.getStripe().subscriptions.update(membership.stripeSubscriptionId, { cancel_at_period_end: true });
     await this.applyClientMembership(businessId, membership.id, sub);

@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
@@ -10,14 +11,27 @@ type RefreshData = {
   user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: string };
 };
 
+// Deduplicates concurrent refresh calls that carry the same token (e.g. two
+// tabs both hitting /api/auth/me at the same instant with an expired access
+// token). Without this, both tabs race to POST /auth/refresh; the first
+// rotates the session row and the second's token is now stale — it gets a 401,
+// clears cookies, and the user is logged out in that tab.
+const pendingRefreshes = new Map<string, Promise<RefreshData | null>>();
+
 async function silentRefresh(refreshToken: string): Promise<RefreshData | null> {
-  const r = await fetch(`${API}/auth/refresh`, {
+  const key = createHash("sha256").update(refreshToken).digest("hex");
+  const pending = pendingRefreshes.get(key);
+  if (pending) return pending;
+  const promise = fetch(`${API}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken }),
-  }).catch(() => null);
-  if (!r?.ok) return null;
-  return r.json().catch(() => null) as Promise<RefreshData | null>;
+  })
+    .then((r) => (r.ok ? (r.json() as Promise<RefreshData>) : null))
+    .catch(() => null)
+    .finally(() => pendingRefreshes.delete(key));
+  pendingRefreshes.set(key, promise);
+  return promise;
 }
 
 function applySessionCookies(res: NextResponse, data: RefreshData) {

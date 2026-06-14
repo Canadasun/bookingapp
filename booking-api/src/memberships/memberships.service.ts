@@ -36,18 +36,21 @@ export class MembershipsService {
         throw new BadRequestException('Create a new plan to change pricing for future members');
       }
     }
-    return this.prisma.membershipPlan.update({
+    const priceChanging = dto.priceMonthly !== undefined && dto.priceMonthly !== plan.priceMonthly;
+    const updated = await this.prisma.membershipPlan.update({
       where: { id },
       data: {
         ...dto,
         // Stripe prices are immutable. A price change must provision a fresh
         // recurring price for future enrollments while existing subscriptions
         // continue on their original contracted price.
-        ...(dto.priceMonthly !== undefined && dto.priceMonthly !== plan.priceMonthly
-          ? { stripeProductId: null, stripePriceId: null }
-          : {}),
+        ...(priceChanging ? { stripeProductId: null, stripePriceId: null } : {}),
       },
     });
+    if (priceChanging && plan.stripePriceId) {
+      await this.payments.archiveMembershipPlanStripe(plan.stripePriceId, plan.stripeProductId).catch(() => {});
+    }
+    return updated;
   }
 
   async deletePlan(businessId: string, id: string) {
