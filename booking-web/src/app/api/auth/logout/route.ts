@@ -33,9 +33,12 @@ export async function POST(req: NextRequest) {
 
   if (token) {
     // Best-effort: revoke access and refresh sessions server-side.
+    // Include the refresh token so the API can revoke only this session
+    // (not all sessions on other devices).
     const logout = await fetch(`${API}/auth/logout`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: refreshToken ?? null }),
     }).catch(() => null);
 
     if (logout?.status === 401 && refreshToken) {

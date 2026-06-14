@@ -11,6 +11,7 @@ import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
 import { formatPrice } from "@/lib/utils";
 import { getUser } from "@/lib/auth";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function MetricCard({ label, value, icon: Icon, accent }: {
   label: string; value: string | number; icon: React.ElementType; accent: string;
@@ -84,7 +85,7 @@ export default function OverviewPage() {
     setLoading(true); setError("");
     try {
       const [aptsRes, clsRes, notifRes, threadsRes, paymentsRes, waitlistRes, deliveryRes] = await Promise.all([
-        api.appointments.list(bizId),
+        api.appointments.list(bizId, 1, 1000),
         isStaff ? Promise.resolve({ data: [] as ClientWithStats[] }) : api.clients.list(bizId),
         api.notifications.unreadCount().catch(() => ({ count: 0 })),
         api.messages.threads(bizId).catch(() => []),
@@ -168,7 +169,7 @@ export default function OverviewPage() {
   return (
     <div className="max-w-5xl mx-auto min-w-0 space-y-5 sm:space-y-6">
 
-      <OnboardingWizard />
+      <ErrorBoundary><OnboardingWizard /></ErrorBoundary>
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -289,7 +290,7 @@ export default function OverviewPage() {
               ))}
             </div>
           )}
-          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+          <div className={`divide-y divide-gray-50 overflow-y-auto ${isStaff ? "max-h-80" : "max-h-64"}`}>
             {upcoming.length === 0 ? (
               <p className="py-10 text-sm text-gray-400 text-center">No upcoming appointments</p>
             ) : upcoming.map((apt) => (

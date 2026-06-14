@@ -119,7 +119,7 @@ export class AvailabilityService {
       ? rules
       : bizHours.length > 0
         ? bizHours.map((h) => ({ id: `biz-${h.id}`, staffId, dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }))
-        : [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+        : [1, 2, 3, 4, 5].map((d) => ({
             id: `default-${staffId}-${d}`, staffId, dayOfWeek: d, startTime: '09:00', endTime: '17:00',
           }));
 

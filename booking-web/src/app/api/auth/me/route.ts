@@ -97,5 +97,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(await upstream.json());
+  // Token is still valid — return user data and re-issue the booking_user hint
+  // cookie so it doesn't expire while the access token is still live. Without
+  // this, getUser() returns null mid-session and the dashboard goes blank.
+  const upstreamUser = await upstream.json() as Record<string, unknown>;
+  const { email: _e, mustResetPassword: _mr, twoFactorEnabled: _tfe, twoFactorMethod: _tfm, ...hint } = upstreamUser;
+  void _e; void _mr; void _tfe; void _tfm;
+  const secure = process.env.NODE_ENV === "production";
+  const res = NextResponse.json(upstreamUser);
+  res.cookies.set("booking_user", signCookieValue(Buffer.from(JSON.stringify(hint)).toString("base64")), {
+    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
+  });
+  return res;
 }

@@ -35,7 +35,7 @@ const OWNER_NAV: NavItem[] = [
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
   { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
   {
-    href: "/dashboard/nav-financials", label: "Financials", icon: DollarSign,
+    href: "#", label: "Financials", icon: DollarSign,
     children: [
       { href: "/dashboard/transactions", label: "Transactions" },
       { href: "/dashboard/invoices",     label: "Invoices" },
@@ -43,7 +43,7 @@ const OWNER_NAV: NavItem[] = [
     ],
   },
   {
-    href: "/dashboard/nav-operations", label: "Operations", icon: Scissors,
+    href: "#", label: "Operations", icon: Scissors,
     children: [
       { href: "/dashboard/staff",        label: "Staff" },
       { href: "/dashboard/services",     label: "Services" },
@@ -55,7 +55,7 @@ const OWNER_NAV: NavItem[] = [
     ],
   },
   {
-    href: "/dashboard/nav-marketing",  label: "Marketing",  icon: Megaphone,
+    href: "#", label: "Marketing",  icon: Megaphone,
     children: [
       { href: "/dashboard/marketing",    label: "Campaigns" },
       { href: "/dashboard/offers",       label: "Offers" },

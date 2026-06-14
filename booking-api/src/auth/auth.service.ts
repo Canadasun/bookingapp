@@ -483,9 +483,15 @@ export class AuthService {
     });
   }
 
-  async logout(userId: string) {
-    // Sign the account out on every device (matches prior single-token behaviour).
-    await this.prisma.refreshSession.deleteMany({ where: { userId } });
+  async logout(userId: string, refreshToken?: string) {
+    if (refreshToken) {
+      // Revoke only the presented session so other devices stay signed in.
+      const tokenHash = hashRefreshToken(refreshToken);
+      await this.prisma.refreshSession.deleteMany({ where: { userId, tokenHash } });
+    } else {
+      // No token presented (e.g. older clients) — fall back to revoking all sessions.
+      await this.prisma.refreshSession.deleteMany({ where: { userId } });
+    }
   }
 
   // Authenticated password change. Verifies the current password, sets the new

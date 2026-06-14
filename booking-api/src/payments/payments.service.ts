@@ -1032,9 +1032,11 @@ export class PaymentsService {
       return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. Automatic no-show charging requires Pro; collect manually on Basic.' };
     }
 
-    const feeCents = apt.business.noShowFeeCents > 0
-      ? apt.business.noShowFeeCents
-      : Math.round((apt.totalPriceCents || apt.service.priceCents) * 0.5); // fallback: 50% of appointment price
+    if ((apt.business.noShowFeeCents ?? 0) === 0) {
+      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+      return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. No no-show fee configured — collect manually if needed.' };
+    }
+    const feeCents = apt.business.noShowFeeCents;
 
     if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
       // No saved card — can't auto-charge; mark NO_SHOW for manual collection.

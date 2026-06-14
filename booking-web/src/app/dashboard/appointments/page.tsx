@@ -889,7 +889,7 @@ function AppointmentsPage() {
     }
     setLoading(true); setError("");
     try {
-      const res = await api.appointments.list(bizId);
+      const res = await api.appointments.list(bizId, 1, 1000);
       const filtered = isStaff && user?.staffId
         ? res.data.filter((a) => a.staff.id === user.staffId)
         : res.data;

@@ -31,8 +31,8 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       const [a, c, p, b] = await Promise.all([
-        api.appointments.list(bizId),
-        api.clients.list(bizId).catch(() => ({ data: [] as ClientWithStats[] })),
+        api.appointments.list(bizId, 1, 1000),
+        api.clients.list(bizId, undefined, 1, 500).catch(() => ({ data: [] as ClientWithStats[] })),
         api.payments.list().catch(() => [] as Payment[]),
         api.business.get(bizId).catch(() => null as Business | null),
       ]);

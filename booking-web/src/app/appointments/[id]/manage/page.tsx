@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { format, isBefore, subMinutes } from 'date-fns';
 import { Calendar, Clock, User, Scissors, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -19,7 +19,8 @@ function formatHHMM(totalMinutes: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export default function ManageAppointmentPage() {
+// Wrapped in its own component so useSearchParams() is inside a Suspense boundary.
+function ManageAppointmentInner() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const token = useSearchParams().get('token') ?? undefined;
@@ -236,5 +237,13 @@ export default function ManageAppointmentPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ManageAppointmentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>}>
+      <ManageAppointmentInner />
+    </Suspense>
   );
 }

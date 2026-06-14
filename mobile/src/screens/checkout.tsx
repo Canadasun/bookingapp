@@ -28,6 +28,8 @@ function CheckoutScreen() {
   const [receipt, setReceipt] = useState<{ amountCents:number; ref:string; at:Date }|null>(null);
   const chargeKey = useRef<string|null>(null);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteModalText, setNoteModalText] = useState('');
 
   const cents     = parseInt(digits || '0', 10);
   const tipCents  = Math.round(cents * tipPct / 100);
@@ -129,7 +131,12 @@ function CheckoutScreen() {
         {keys.map(k => {
           if (k==='note') return (
             <TouchableOpacity key={k} style={co.key} accessibilityRole="button" accessibilityLabel="Add a note" onPress={()=>{
-              Alert.prompt?.('Add a note', 'What is this charge for?', (t)=>{ chargeKey.current = null; setNote((t||'').slice(0,80)); }, 'plain-text', note);
+              if (Platform.OS === 'ios') {
+                Alert.prompt?.('Add a note', 'What is this charge for?', (t)=>{ chargeKey.current = null; setNote((t||'').slice(0,80)); }, 'plain-text', note);
+              } else {
+                setNoteModalText(note);
+                setShowNoteModal(true);
+              }
             }}>
               <Ionicons name="create-outline" size={22} color={GRAY_500}/>
             </TouchableOpacity>
@@ -179,6 +186,28 @@ function CheckoutScreen() {
           ? <ActivityIndicator color="#fff"/>
           : <Text style={co.chargeBtnText}>Charge ${(totalCents/100).toFixed(2)}</Text>}
       </TouchableOpacity>
+      {/* Android note input — Alert.prompt is iOS-only */}
+      <Modal visible={showNoteModal} transparent animationType="fade" onRequestClose={() => setShowNoteModal(false)}>
+        <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.5)', justifyContent:'center', padding:24 }}>
+          <View style={{ backgroundColor:'#fff', borderRadius:12, padding:20 }}>
+            <Text style={{ fontSize:16, fontWeight:'600', color:GRAY_900, marginBottom:8 }}>Add a note</Text>
+            <Text style={{ fontSize:13, color:GRAY_500, marginBottom:12 }}>What is this charge for?</Text>
+            <TextInput
+              autoFocus style={{ borderWidth:1, borderColor:GRAY_200, borderRadius:8, padding:10, fontSize:14, color:GRAY_900 }}
+              value={noteModalText} onChangeText={t => setNoteModalText(t.slice(0,80))}
+              placeholder="e.g. Extra styling time" placeholderTextColor={GRAY_400} multiline={false} returnKeyType="done"
+            />
+            <View style={{ flexDirection:'row', gap:10, marginTop:16 }}>
+              <TouchableOpacity style={{ flex:1, padding:12, borderRadius:8, borderWidth:1, borderColor:GRAY_200, alignItems:'center' }} onPress={() => setShowNoteModal(false)}>
+                <Text style={{ color:GRAY_700 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex:1, padding:12, borderRadius:8, backgroundColor:BRAND, alignItems:'center' }} onPress={() => { setNote(noteModalText); setShowNoteModal(false); }}>
+                <Text style={{ color:'#fff', fontWeight:'600' }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

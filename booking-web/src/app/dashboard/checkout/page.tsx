@@ -272,7 +272,7 @@ export default function CheckoutPage() {
                 </div>
                 <span className={cn("text-xs font-medium", cur ? "text-gray-900" : done ? "text-violet-700" : "text-gray-500")}>{labels[s]}</span>
               </button>
-              {i < 4 && <ChevronRight className="w-3 h-3 text-gray-400 mx-1" />}
+              {i < STEPS.length - 1 && <ChevronRight className="w-3 h-3 text-gray-400 mx-1" />}
             </div>
           );
         })}

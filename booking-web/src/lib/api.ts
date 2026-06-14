@@ -44,7 +44,7 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
     // Refresh failed — clear hint cookie and redirect to login
     if (typeof window !== "undefined") {
       document.cookie = "booking_user=; Max-Age=0; path=/";
-      window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     }
     throw new Error("Session expired");
   }

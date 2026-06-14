@@ -41,7 +41,7 @@ export default function InvoicesPage() {
     try {
       const [inv, cl, b] = await Promise.all([
         api.invoices.list(bizId),
-        api.clients.list(bizId).catch(() => ({ data: [] as ClientWithStats[] })),
+        api.clients.list(bizId, undefined, 1, 500).catch(() => ({ data: [] as ClientWithStats[] })),
         api.business.get(bizId).catch(() => null),
       ]);
       setInvoices(inv);

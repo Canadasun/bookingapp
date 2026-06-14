@@ -63,6 +63,16 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
     ].join("; ");
 
+    // Build connect-src dynamically so it tracks the API URL env var instead of
+    // a hardcoded Railway hostname that will break if the domain changes.
+    const wsOrigin = (process.env.NEXT_PUBLIC_WS_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "")
+      .replace(/\/+$/, "").replace(/\/api$/, "");
+    const wsOriginWss = wsOrigin ? wsOrigin.replace(/^https/, "wss").replace(/^http/, "ws") : "";
+    const apiConnectSrc = [
+      wsOrigin && wsOrigin !== wsOriginWss ? wsOrigin : "",
+      wsOriginWss || "",
+    ].filter(Boolean).join(" ");
+
     // CSP for authenticated areas. script-src includes 'unsafe-inline' because
     // Next.js injects inline hydration scripts; without nonces that's unavoidable.
     // object-src 'none' and base-uri 'self' are the most impactful restrictions.
@@ -71,7 +81,7 @@ const nextConfig: NextConfig = {
       "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.clarity.ms",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://api.pulseappointments.com wss://api.pulseappointments.com https://bookingapp-production-32f8.up.railway.app wss://bookingapp-production-32f8.up.railway.app https://api.stripe.com https://js.stripe.com https://www.clarity.ms https://c.clarity.ms",
+      `connect-src 'self' https://api.pulseappointments.com wss://api.pulseappointments.com ${apiConnectSrc} https://api.stripe.com https://js.stripe.com https://www.clarity.ms https://c.clarity.ms`.trim(),
       "font-src 'self' data:",
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",

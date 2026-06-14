@@ -189,8 +189,12 @@ function CalendarScreen() {
 
   async function saveAppointmentEdit() {
     if (!editAppt) return;
-    if (!editAppt.name.trim() || !editAppt.email.trim()) {
-      Alert.alert('Check details', 'Client name and email are required.');
+    if (!editAppt.name.trim()) {
+      Alert.alert('Check details', 'Client name is required.');
+      return;
+    }
+    if (!editAppt.email.trim() && !editAppt.phone?.trim()) {
+      Alert.alert('Check details', 'Email or phone number is required.');
       return;
     }
     setActing(true);

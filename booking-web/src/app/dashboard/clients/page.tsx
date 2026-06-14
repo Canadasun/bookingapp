@@ -98,7 +98,8 @@ export default function ClientsPage() {
   }
 
   async function addClient() {
-    if (!form.name || !form.email) { toast.error("Name and email required"); return; }
+    if (!form.name) { toast.error("Client name is required"); return; }
+    if (!form.email && !form.phone) { toast.error("Email or phone number is required"); return; }
     if (!bizId) return;
     setSaving(true);
     try {
@@ -165,7 +166,8 @@ export default function ClientsPage() {
 
   async function saveEdit() {
     if (!bizId || !selected) return;
-    if (!editForm.name.trim() || !editForm.email.trim()) { toast.error("Name and email are required"); return; }
+    if (!editForm.name.trim()) { toast.error("Client name is required"); return; }
+    if (!editForm.email.trim() && !editForm.phone.trim()) { toast.error("Email or phone number is required"); return; }
     setSavingEdit(true);
     try {
       const updated = await api.clients.update(bizId, selected.id, {
@@ -229,9 +231,28 @@ export default function ClientsPage() {
             <input type="file" accept=".csv" className="hidden" onChange={async (e) => {
               const file = e.target.files?.[0]; if (!file) return;
               const text = await file.text();
-              const lines = text.trim().split("\n"); const headers = lines[0].split(",").map(h => h.trim().toLowerCase().replace(/^"|"$/g, ""));
+              // RFC 4180-compliant parser: handles commas inside quoted fields and
+              // escaped double-quotes (""). Naive split(",") corrupts "Smith, Jane".
+              function parseCsvRow(line: string): string[] {
+                const vals: string[] = []; let cur = ""; let inQ = false;
+                for (let i = 0; i < line.length; i++) {
+                  const ch = line[i];
+                  if (inQ) {
+                    if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                    else if (ch === '"') { inQ = false; }
+                    else { cur += ch; }
+                  } else {
+                    if (ch === '"') { inQ = true; }
+                    else if (ch === ',') { vals.push(cur.trim()); cur = ""; }
+                    else { cur += ch; }
+                  }
+                }
+                vals.push(cur.trim()); return vals;
+              }
+              const lines = text.trim().split("\n");
+              const headers = parseCsvRow(lines[0]).map(h => h.toLowerCase());
               const rows = lines.slice(1).map(line => {
-                const vals = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""));
+                const vals = parseCsvRow(line);
                 const obj: Record<string, string> = {};
                 headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
                 return { name: obj.name ?? obj["full name"] ?? "", email: obj.email || undefined, phone: obj.phone || undefined, tags: obj.tags || undefined, notes: obj.notes || undefined };
@@ -512,7 +533,7 @@ export default function ClientsPage() {
             <CardContent className="space-y-3">
               {[
                 { k:"name",  label:"Full name *",   type:"text",  ph:"Jane Doe" },
-                { k:"email", label:"Email *",        type:"email", ph:"jane@example.com" },
+                { k:"email", label:"Email",          type:"email", ph:"jane@example.com" },
                 { k:"phone", label:"Phone",          type:"tel",   ph:"+1 (416) 555-0123" },
                 { k:"notes", label:"Notes",          type:"text",  ph:"Any notes…" },
               ].map(({ k, label, type, ph }) => (

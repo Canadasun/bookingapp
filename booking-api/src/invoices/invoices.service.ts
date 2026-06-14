@@ -135,6 +135,8 @@ export class InvoicesService {
       throw new BadRequestException('Client has no email address');
     }
 
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
     const bizName = invoice.business?.name ?? 'Your Business';
     const currency = (invoice.currency ?? 'CAD').toUpperCase();
     const fmt = (cents: number) =>
@@ -144,7 +146,7 @@ export class InvoicesService {
       .map(
         (li) => `
         <tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #E5E7EB">${li.description}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #E5E7EB">${esc(String(li.description ?? ''))}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #E5E7EB;text-align:center">${li.quantity}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #E5E7EB;text-align:right">${fmt(li.unitCents)}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #E5E7EB;text-align:right">${fmt(li.amountCents)}</td>
@@ -175,7 +177,7 @@ export class InvoicesService {
 
     const billingBlock = invoice.billingAddress
       ? `<div style="margin-top:16px"><p style="margin:0;font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.05em">Bill To</p>
-         <p style="margin:4px 0;font-size:13px;color:#374151;white-space:pre-line">${invoice.billingAddress}</p></div>`
+         <p style="margin:4px 0;font-size:13px;color:#374151;white-space:pre-line">${esc(invoice.billingAddress)}</p></div>`
       : '';
 
     const html = `<!DOCTYPE html>
@@ -209,8 +211,8 @@ export class InvoicesService {
             </td>
             <td align="right" style="vertical-align:top">
               ${invoice.client ? `<p style="margin:0;font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.05em">Client</p>
-              <p style="margin:4px 0 0;font-size:14px;color:#111827">${invoice.client.name}</p>
-              <p style="margin:2px 0 0;font-size:13px;color:#6B7280">${invoice.client.email}</p>` : ''}
+              <p style="margin:4px 0 0;font-size:14px;color:#111827">${esc(invoice.client.name)}</p>
+              <p style="margin:2px 0 0;font-size:13px;color:#6B7280">${esc(invoice.client.email)}</p>` : ''}
             </td>
           </tr></table>
           ${billingBlock}
@@ -244,7 +246,7 @@ export class InvoicesService {
           invoice.notes
             ? `<tr><td style="padding:24px 32px 0">
                  <p style="margin:0;font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.05em">Notes</p>
-                 <p style="margin:8px 0 0;font-size:13px;color:#6B7280;white-space:pre-line">${invoice.notes}</p>
+                 <p style="margin:8px 0 0;font-size:13px;color:#6B7280;white-space:pre-line">${esc(invoice.notes)}</p>
                </td></tr>`
             : ''
         }

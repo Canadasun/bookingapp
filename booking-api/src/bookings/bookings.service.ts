@@ -16,7 +16,7 @@ import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
 import { isPaidPlan } from '../common/util/plan-features';
 import { Prisma } from '@prisma/client';
-import { addMinutes, addWeeks, addMonths } from 'date-fns';
+import { addMinutes, addWeeks, addMonths, differenceInMinutes } from 'date-fns';
 import { randomUUID } from 'node:crypto';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -443,7 +443,11 @@ export class BookingsService {
     if (service.active === false) throw new BadRequestException('Service is not available');
 
     const startsAt = new Date(dto.startsAt);
-    const endsAt = addMinutes(startsAt, service.durationMinutes);
+    // Preserve the original appointment length (which may span multiple services).
+    // Recomputing from service.durationMinutes alone would truncate any add-on
+    // services that were included at booking time.
+    const originalDurationMinutes = differenceInMinutes(existing.endsAt, existing.startsAt);
+    const endsAt = addMinutes(startsAt, Math.max(originalDurationMinutes, service.durationMinutes));
 
     // Re-apply the same integrity + policy checks as creation — a reschedule must
     // not slip a booking into a state the business wouldn't otherwise allow.
@@ -749,11 +753,10 @@ export class BookingsService {
     let timeChanged = false;
 
     if (dto.startsAt) {
-      const service = await this.prisma.service.findFirstOrThrow({
-        where: { id: existing.serviceId, businessId: existing.businessId },
-      });
       startsAt = new Date(dto.startsAt);
-      endsAt = addMinutes(startsAt, service.durationMinutes);
+      // Preserve the original appointment length so multi-service duration is kept.
+      const originalDurationMinutes = differenceInMinutes(existing.endsAt, existing.startsAt);
+      endsAt = addMinutes(startsAt, originalDurationMinutes);
       timeChanged = startsAt.getTime() !== existing.startsAt.getTime();
     }
 

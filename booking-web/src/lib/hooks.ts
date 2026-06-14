@@ -14,7 +14,7 @@ export function useEvents(
     // directly. Instead fetch a short-lived ticket over the authenticated proxy
     // and present it in the handshake; the gateway verifies it and scopes the
     // connection to our business.
-    const apiUrl = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
+    const apiUrl = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || "";
     let socket: Socket | null = null;
     let cancelled = false;
 

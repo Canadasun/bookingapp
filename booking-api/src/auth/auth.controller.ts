@@ -92,7 +92,8 @@ export class AuthController {
     if (jtiUser._jti && jtiUser._tokenExp) {
       this.authService.revokeAccessToken(jtiUser._jti, jtiUser._tokenExp).catch(() => {});
     }
-    return this.authService.logout(user.id);
+    const refreshToken = (req.body as { refreshToken?: string })?.refreshToken;
+    return this.authService.logout(user.id, refreshToken);
   }
 
   @Post('change-password')

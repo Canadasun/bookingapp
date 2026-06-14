@@ -378,7 +378,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     setPolicyAccepted(false); setBooking(null); setSlots([]);
   }
 
-  const brandColor = (biz?.bookingPageSettings as Record<string, unknown> | null)?.brandColor as string ?? '#7C3AED';
+  const rawBrandColor = (biz?.bookingPageSettings as Record<string, unknown> | null)?.brandColor as string ?? '';
+  // Only allow valid CSS hex colours to prevent CSS injection via style tag.
+  const brandColor = /^#[0-9A-Fa-f]{3,8}$/.test(rawBrandColor) ? rawBrandColor : '#7C3AED';
   const hidePouredBy = !!(biz?.bookingPageSettings as Record<string, unknown> | null)?.hidePouredBy;
   const bookingTagline = (biz?.bookingPageSettings as Record<string, unknown> | null)?.tagline as string ?? '';
 

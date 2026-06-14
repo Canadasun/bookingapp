@@ -267,8 +267,8 @@ export class ClientsService {
         await this.prisma.client.update({ where: { id: existing.id }, data: { phone: phone ?? existing.phone, tags: tags.length ? tags : existing.tags, notes: row.notes?.trim() ?? existing.notes } });
         updated++;
       } else {
-        await this.prisma.client.create({ data: { businessId, name: row.name.trim(), email, phone, tags, notes: row.notes?.trim() } }).catch(() => { updated++; });
-        created++;
+        const created_ok = await this.prisma.client.create({ data: { businessId, name: row.name.trim(), email, phone, tags, notes: row.notes?.trim() } }).then(() => true).catch(() => false);
+        if (created_ok) created++; else updated++;
       }
     }
     return { created, updated, total: rows.length };
