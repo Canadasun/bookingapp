@@ -146,3 +146,5 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+/* Firefox equivalent */
+* { scrollbar-width: thin; scrollbar-color: #D1D5DB transparent; }

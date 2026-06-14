@@ -84,7 +84,7 @@ export default function MarketingPage() {
                       <span className="font-medium text-gray-900 truncate">{c.name}</span>
                       <StatusPill status={c.status} />
                     </div>
-                    {c.subject && <p className="text-sm text-gray-700 mt-1">{c.subject}</p>}
+                    {c.subject && <p className="text-sm text-gray-700 mt-1 truncate">{c.subject}</p>}
                     <p className="text-sm text-gray-500 mt-0.5 line-clamp-2 whitespace-pre-wrap">{c.body}</p>
                     <p className="text-xs text-gray-400 mt-1.5">
                       {AUDIENCES.find((a) => a.value === c.audience)?.label ?? c.audience}

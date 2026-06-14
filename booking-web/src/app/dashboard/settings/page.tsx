@@ -558,7 +558,8 @@ function SettingsPage() {
       <div className="flex flex-col xl:flex-row gap-5">
 
         {/* Compact tab bar — used until there is room for both dashboard sidebars. */}
-        <div className="xl:hidden mb-4 -mx-3 px-3 sm:-mx-5 sm:px-5 overflow-x-auto">
+        <div className="xl:hidden mb-4 relative -mx-3 sm:-mx-5">
+          <div className="px-3 sm:px-5 overflow-x-auto">
           <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
             {SECTIONS.map((s) => (
               <button key={s.id} onClick={() => goSection(s.id)}
@@ -569,6 +570,8 @@ function SettingsPage() {
               </button>
             ))}
           </div>
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
         </div>
 
         {/* Left nav */}

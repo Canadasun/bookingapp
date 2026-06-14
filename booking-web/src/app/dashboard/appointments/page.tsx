@@ -702,14 +702,19 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-900">{rangeLabel}</p>
         <div className="flex items-center gap-1">
-          <button onClick={onToday} className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">This week</button>
-          <button onClick={onPrev} aria-label="Previous week" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
-          <button onClick={onNext} aria-label="Next week" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={onToday} className="px-3 py-2 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">This week</button>
+          <button onClick={onPrev} aria-label="Previous week" className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={onNext} aria-label="Next week" className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
 
+      {/* Day headers and time grid share one horizontal scroll container so
+          the column headers stay in sync with day columns on screens < 760 px. */}
+      <div className="overflow-x-auto">
+      <div className="min-w-[760px]">
+
       {/* Day headers */}
-      <div className="flex min-w-[760px] border-b border-gray-100">
+      <div className="flex border-b border-gray-100">
         <div className="w-12 shrink-0" />
         {days.map((day) => (
           <div key={day.toISOString()} className={cn(
@@ -722,9 +727,9 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
         ))}
       </div>
 
-      {/* Scrollable time grid */}
-      <div className="overflow-auto" style={{ maxHeight: "600px" }}>
-        <div className="flex min-w-[760px]" style={{ height: `${gridH}px` }}>
+      {/* Time grid — vertical scroll only; horizontal is handled by the parent. */}
+      <div className="overflow-y-auto" style={{ maxHeight: "600px" }}>
+        <div className="flex" style={{ height: `${gridH}px` }}>
           {/* Hour labels */}
           <div className="w-12 shrink-0 relative">
             {hours.map((h) => (
@@ -830,6 +835,8 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
             );
           })}
         </div>
+      </div>
+      </div>
       </div>
     </div>
   );
