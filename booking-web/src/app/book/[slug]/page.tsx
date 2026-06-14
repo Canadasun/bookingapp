@@ -295,7 +295,6 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         intakeAnswers: intakeAnswers.length ? intakeAnswers : undefined,
         referralSource: referralSource || undefined,
         promoCodeId: promoResult?.id || undefined,
-        discountCents: promoResult?.discountCents ?? 0,
       });
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before

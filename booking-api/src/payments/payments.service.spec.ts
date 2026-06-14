@@ -182,3 +182,100 @@ describe('PaymentsService subscriptions', () => {
     await expect(svc.confirmSubscriptionCheckout('biz1', 'cs_other')).rejects.toThrow(BadRequestException);
   });
 });
+
+describe('PaymentsService client memberships', () => {
+  async function buildMembership() {
+    const membership = {
+      id: 'mem1', businessId: 'biz1', clientId: 'client1', planId: 'plan1',
+      status: 'PENDING', stripeSubscriptionId: null, cancelAtPeriodEnd: false,
+    };
+    const prisma = {
+      business: { findUnique: jest.fn().mockResolvedValue({
+        id: 'biz1', name: 'Salon', plan: 'PRO', currency: 'CAD',
+        stripeConnectAccountId: 'acct_1', stripeConnectOnboarded: true,
+      }) },
+      client: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: 'client1', businessId: 'biz1', name: 'Jane', email: 'jane@example.com',
+          phone: null, stripeCustomerId: 'cus_1',
+        }),
+        update: jest.fn(),
+      },
+      membershipPlan: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'plan1', businessId: 'biz1', name: 'Monthly', description: null,
+          priceMonthly: 7900, active: true, stripeProductId: null, stripePriceId: null,
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      clientMembership: {
+        findFirst: jest.fn().mockImplementation(({ where }) => Promise.resolve(where.OR ? null : membership)),
+        create: jest.fn().mockResolvedValue(membership),
+        update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...membership, ...data })),
+        delete: jest.fn().mockResolvedValue({}),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ ...membership, status: 'ACTIVE', cancelAtPeriodEnd: true }),
+      },
+    };
+    const module = await Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((key: string) => key === 'NEXT_PUBLIC_WEB_URL' ? 'https://app.test' : 'sk_test_x') } },
+        { provide: NotificationsService, useValue: {} },
+        { provide: ReferralsService, useValue: {} },
+        { provide: EventsGateway, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get(PaymentsService);
+    const subscription = {
+      id: 'sub_member', status: 'active', customer: 'cus_1', cancel_at_period_end: false,
+      current_period_end: Math.floor(Date.now() / 1000) + 86400,
+      metadata: { kind: 'client_membership', businessId: 'biz1', membershipId: 'mem1' },
+      items: { data: [{ price: { id: 'price_member' } }] },
+    };
+    const stripe = {
+      products: { create: jest.fn().mockResolvedValue({ id: 'prod_member' }) },
+      prices: { create: jest.fn().mockResolvedValue({ id: 'price_member' }) },
+      checkout: { sessions: {
+        create: jest.fn().mockResolvedValue({ url: 'https://checkout.test/member' }),
+        retrieve: jest.fn().mockResolvedValue({
+          mode: 'subscription', status: 'complete', subscription: 'sub_member',
+          metadata: { kind: 'client_membership', businessId: 'biz1', membershipId: 'mem1' },
+        }),
+      } },
+      subscriptions: {
+        retrieve: jest.fn().mockResolvedValue(subscription),
+        update: jest.fn().mockResolvedValue({ ...subscription, cancel_at_period_end: true }),
+      },
+    };
+    (svc as unknown as { stripe: unknown }).stripe = stripe;
+    return { svc, prisma, stripe };
+  }
+
+  it('keeps enrollment pending until Stripe checkout succeeds', async () => {
+    const { svc, prisma, stripe } = await buildMembership();
+    await expect(svc.createClientMembershipCheckout('biz1', 'client1', 'plan1')).resolves.toEqual({
+      url: 'https://checkout.test/member', membershipId: 'mem1',
+    });
+    expect(prisma.clientMembership.create).toHaveBeenCalledWith({
+      data: { businessId: 'biz1', clientId: 'client1', planId: 'plan1', status: 'PENDING' },
+    });
+    expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscription_data: expect.objectContaining({ transfer_data: { destination: 'acct_1' } }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('activates a membership only after confirming the completed Stripe session', async () => {
+    const { svc, prisma } = await buildMembership();
+    await expect(svc.confirmClientMembershipCheckout('biz1', 'cs_member')).resolves.toMatchObject({
+      confirmed: true, membershipId: 'mem1', status: 'ACTIVE',
+    });
+    expect(prisma.clientMembership.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'mem1' }, data: expect.objectContaining({ stripeSubscriptionId: 'sub_member', status: 'ACTIVE' }),
+    }));
+  });
+});

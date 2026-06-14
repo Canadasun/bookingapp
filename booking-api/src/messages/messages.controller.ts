@@ -64,6 +64,13 @@ export class MessagesController {
       if (!ok) throw new ForbiddenException('You do not have access to this client profile');
     }
 
+    // This route represents a message sent by the client. Business users must use
+    // /reply; otherwise an authenticated user from another tenant could forge a
+    // client-authored message without presenting an appointment manage token.
+    if (user && user.role !== 'CLIENT') {
+      throw new ForbiddenException('Business users must use the reply endpoint');
+    }
+
     // 2. If guest, require valid appointment token
     if (!user) {
       if (!appointmentId || !token || !verifyAppointmentToken(appointmentId, token)) {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Crown, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { api, MembershipPlan, MembershipMember } from "@/lib/api";
+import { api, ClientWithStats, MembershipPlan, MembershipMember } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,19 +16,48 @@ export default function MembershipsPage() {
   const [tab, setTab] = useState<Tab>("plans");
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [members, setMembers] = useState<MembershipMember[]>([]);
+  const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [planForm, setPlanForm] = useState({ name: "", description: "", priceMonthly: "" });
+  const [showEnrollForm, setShowEnrollForm] = useState(false);
+  const [enrollForm, setEnrollForm] = useState({ clientId: "", planId: "" });
+  const [enrolling, setEnrolling] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [p, m] = await Promise.all([api.memberships.listPlans(bizId), api.memberships.listMembers(bizId)]);
-      setPlans(p); setMembers(m);
+      const [p, m, c] = await Promise.all([
+        api.memberships.listPlans(bizId), api.memberships.listMembers(bizId), api.clients.list(bizId, undefined, 1, 100),
+      ]);
+      setPlans(p); setMembers(m); setClients(c.data);
     } catch { toast.error("Could not load memberships"); }
     finally { setLoading(false); }
   }, [bizId]);
 
   useEffect(() => { if (bizId) void load(); }, [bizId, load]);
+
+  useEffect(() => {
+    if (!bizId) return;
+    const params = new URLSearchParams(window.location.search);
+    const cancelledMembershipId = params.get("membership_id");
+    if (params.get("membership") === "cancel" && cancelledMembershipId) {
+      api.memberships.cancel(bizId, cancelledMembershipId)
+        .then(() => load())
+        .catch(() => {})
+        .finally(() => window.history.replaceState({}, "", "/dashboard/memberships"));
+      return;
+    }
+    const sessionId = params.get("session_id");
+    if (params.get("membership") !== "success" || !sessionId) return;
+    api.memberships.confirm(bizId, sessionId)
+      .then((result) => {
+        if (result.confirmed) toast.success("Membership activated");
+        else toast.error("Membership checkout is not complete");
+        return load();
+      })
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Could not confirm membership"))
+      .finally(() => window.history.replaceState({}, "", "/dashboard/memberships"));
+  }, [bizId, load]);
 
   async function createPlan(e: React.FormEvent) {
     e.preventDefault();
@@ -54,9 +83,22 @@ export default function MembershipsPage() {
     if (!confirm(`Cancel ${m.client.name}'s ${m.plan.name} membership?`)) return;
     try {
       await api.memberships.cancel(bizId!, m.id);
-      setMembers(prev => prev.map(x => x.id === m.id ? { ...x, status: "CANCELLED" } : x));
-      toast.success("Membership cancelled");
+      await load();
+      toast.success("Membership will cancel at the end of the billing period");
     } catch { toast.error("Failed to cancel"); }
+  }
+
+  async function enrollClient(e: React.FormEvent) {
+    e.preventDefault();
+    if (!enrollForm.clientId || !enrollForm.planId) { toast.error("Choose a client and plan"); return; }
+    setEnrolling(true);
+    try {
+      const { url } = await api.memberships.subscribe(bizId, enrollForm.clientId, enrollForm.planId);
+      window.location.assign(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not start membership checkout");
+      setEnrolling(false);
+    }
   }
 
   const activeMembers = members.filter(m => m.status === "ACTIVE");
@@ -71,7 +113,7 @@ export default function MembershipsPage() {
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Crown className="w-6 h-6 text-amber-500" /> Memberships</h1>
           <p className="text-sm text-gray-500 mt-1">Recurring monthly plans for your best clients.</p>
         </div>
-        {tab === "plans" && <Button onClick={() => setShowPlanForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> New plan</Button>}
+        {tab === "plans" ? <Button onClick={() => setShowPlanForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> New plan</Button> : <Button onClick={() => setShowEnrollForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> Enroll client</Button>}
       </div>
 
       {activeMembers.length > 0 && (
@@ -144,6 +186,22 @@ export default function MembershipsPage() {
         </div>
       ) : (
         <div className="space-y-2">
+          {showEnrollForm && (
+            <form onSubmit={enrollClient} className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+              <h2 className="font-semibold text-gray-900">Enroll a client</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <select className="min-h-11 rounded-xl border border-gray-200 bg-white px-3 text-base lg:text-sm" value={enrollForm.clientId} onChange={(e) => setEnrollForm((f) => ({ ...f, clientId: e.target.value }))}>
+                  <option value="">Choose client</option>
+                  {clients.map((client) => <option key={client.id} value={client.id}>{client.name}{client.email ? ` - ${client.email}` : ""}</option>)}
+                </select>
+                <select className="min-h-11 rounded-xl border border-gray-200 bg-white px-3 text-base lg:text-sm" value={enrollForm.planId} onChange={(e) => setEnrollForm((f) => ({ ...f, planId: e.target.value }))}>
+                  <option value="">Choose plan</option>
+                  {plans.filter((plan) => plan.active).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {formatPrice(plan.priceMonthly)}/mo</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2"><Button type="submit" disabled={enrolling}>{enrolling ? "Opening checkout..." : "Continue to Stripe"}</Button><Button type="button" variant="outline" onClick={() => setShowEnrollForm(false)}>Cancel</Button></div>
+            </form>
+          )}
           {members.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -157,12 +215,12 @@ export default function MembershipsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-gray-900">{m.client.name}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${m.status === "ACTIVE" ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>{m.status}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${m.status === "ACTIVE" ? "bg-green-50 text-green-700" : m.status === "PAST_DUE" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-500"}`}>{m.cancelAtPeriodEnd ? "CANCELS AT PERIOD END" : m.status}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{m.plan.name} · {formatPrice(m.plan.priceMonthly)}/mo</p>
                     {m.client.email && <p className="text-xs text-gray-400">{m.client.email}</p>}
                   </div>
-                  {m.status === "ACTIVE" && (
+                  {m.status === "ACTIVE" && !m.cancelAtPeriodEnd && (
                     <button onClick={() => cancelMembership(m)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
                   )}
                 </div>

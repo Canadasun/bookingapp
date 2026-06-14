@@ -1,9 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentsService } from '../payments/payments.service';
+import { isPaidPlan } from '../common/util/plan-features';
 
 @Injectable()
 export class MembershipsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private payments: PaymentsService) {}
+
+  private async assertMembershipsEnabled(businessId: string) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
+    if (!business) throw new NotFoundException('Business not found');
+    if (!isPaidPlan(business.plan)) throw new BadRequestException('Memberships require a paid Pulse plan');
+  }
 
   // ── Plans ─────────────────────────────────────────────────────────────────
 
@@ -11,14 +19,35 @@ export class MembershipsService {
     return this.prisma.membershipPlan.findMany({ where: { businessId }, orderBy: { createdAt: 'asc' } });
   }
 
-  createPlan(businessId: string, dto: { name: string; description?: string; priceMonthly: number }) {
+  async createPlan(businessId: string, dto: { name: string; description?: string; priceMonthly: number }) {
+    await this.assertMembershipsEnabled(businessId);
     return this.prisma.membershipPlan.create({ data: { businessId, ...dto } });
   }
 
   async updatePlan(businessId: string, id: string, dto: Partial<{ name: string; description: string; priceMonthly: number; active: boolean }>) {
+    await this.assertMembershipsEnabled(businessId);
     const plan = await this.prisma.membershipPlan.findFirst({ where: { id, businessId } });
     if (!plan) throw new NotFoundException('Plan not found');
-    return this.prisma.membershipPlan.update({ where: { id }, data: dto });
+    if (dto.priceMonthly !== undefined && dto.priceMonthly !== plan.priceMonthly) {
+      const billedMembers = await this.prisma.clientMembership.count({
+        where: { planId: id, status: { in: ['ACTIVE', 'PAST_DUE'] } },
+      });
+      if (billedMembers > 0) {
+        throw new BadRequestException('Create a new plan to change pricing for future members');
+      }
+    }
+    return this.prisma.membershipPlan.update({
+      where: { id },
+      data: {
+        ...dto,
+        // Stripe prices are immutable. A price change must provision a fresh
+        // recurring price for future enrollments while existing subscriptions
+        // continue on their original contracted price.
+        ...(dto.priceMonthly !== undefined && dto.priceMonthly !== plan.priceMonthly
+          ? { stripeProductId: null, stripePriceId: null }
+          : {}),
+      },
+    });
   }
 
   async deletePlan(businessId: string, id: string) {
@@ -40,27 +69,16 @@ export class MembershipsService {
   }
 
   async subscribe(businessId: string, clientId: string, planId: string) {
-    const [client, plan] = await Promise.all([
-      this.prisma.client.findFirst({ where: { id: clientId, businessId } }),
-      this.prisma.membershipPlan.findFirst({ where: { id: planId, businessId, active: true } }),
-    ]);
-    if (!client) throw new NotFoundException('Client not found');
-    if (!plan) throw new NotFoundException('Plan not found');
-    const existing = await this.prisma.clientMembership.findFirst({ where: { clientId, planId, status: 'ACTIVE' } });
-    if (existing) throw new BadRequestException('Client already has an active membership on this plan');
-    return this.prisma.clientMembership.create({
-      data: { businessId, clientId, planId, status: 'ACTIVE' },
-      include: { plan: { select: { name: true } } },
-    });
+    await this.assertMembershipsEnabled(businessId);
+    return this.payments.createClientMembershipCheckout(businessId, clientId, planId);
+  }
+
+  confirm(businessId: string, sessionId: string) {
+    return this.payments.confirmClientMembershipCheckout(businessId, sessionId);
   }
 
   async cancel(businessId: string, id: string) {
-    const m = await this.prisma.clientMembership.findFirst({ where: { id, businessId } });
-    if (!m) throw new NotFoundException('Membership not found');
-    return this.prisma.clientMembership.update({
-      where: { id },
-      data: { status: 'CANCELLED', cancelledAt: new Date() },
-    });
+    return this.payments.cancelClientMembership(businessId, id);
   }
 
   clientMemberships(businessId: string, clientId: string) {

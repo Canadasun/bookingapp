@@ -1,0 +1,4 @@
+ALTER TYPE "MembershipStatus" ADD VALUE IF NOT EXISTS 'PENDING' BEFORE 'ACTIVE';
+
+ALTER TABLE "ClientMembership"
+ADD COLUMN "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false;

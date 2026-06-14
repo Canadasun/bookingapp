@@ -68,6 +68,10 @@ export class PaymentsService {
     return Math.max(1, Math.round(amountCents * r.pct + r.fixed));
   }
 
+  private platformFeePercent(plan: string): number {
+    return plan === 'FREE' ? 2.6 : plan === 'BASIC' ? 2.5 : 2.4;
+  }
+
   // Returns Stripe destination-charge params when the business has an active
   // Connect account, or an empty object so the charge falls through to the platform.
   private connectChargeParams(
@@ -374,7 +378,11 @@ export class PaymentsService {
           const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
           if (businessId) {
             const sub = await this.getStripe().subscriptions.retrieve(subId);
-            await this.applySubscription(businessId, sub);
+            if (session.metadata?.kind === 'client_membership') {
+              await this.applyClientMembership(businessId, session.metadata.membershipId, sub);
+            } else {
+              await this.applySubscription(businessId, sub);
+            }
           }
         }
         break;
@@ -383,7 +391,13 @@ export class PaymentsService {
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
         const businessId = sub.metadata?.businessId;
-        if (businessId) await this.applySubscription(businessId, sub);
+        if (businessId) {
+          if (sub.metadata?.kind === 'client_membership') {
+            await this.applyClientMembership(businessId, sub.metadata.membershipId, sub);
+          } else {
+            await this.applySubscription(businessId, sub);
+          }
+        }
         break;
       }
       case 'customer.subscription.deleted': {
@@ -391,7 +405,13 @@ export class PaymentsService {
         const businessId = sub.metadata?.businessId;
         // Route through applySubscription so the plan-changed email and WebSocket
         // event fire automatically (status 'canceled' maps effectivePlan → FREE).
-        if (businessId) await this.applySubscription(businessId, sub);
+        if (businessId) {
+          if (sub.metadata?.kind === 'client_membership') {
+            await this.applyClientMembership(businessId, sub.metadata.membershipId, sub);
+          } else {
+            await this.applySubscription(businessId, sub);
+          }
+        }
         break;
       }
       case 'account.updated': {
@@ -577,6 +597,137 @@ export class PaymentsService {
     if (effectivePlan !== 'FREE') {
       await this.grantReferralReward(businessId).catch(() => {});
     }
+  }
+
+  private membershipStatus(status: Stripe.Subscription.Status): 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' {
+    if (status === 'active' || status === 'trialing') return 'ACTIVE';
+    if (status === 'past_due' || status === 'unpaid') return 'PAST_DUE';
+    if (status === 'canceled' || status === 'incomplete_expired') return 'CANCELLED';
+    return 'PENDING';
+  }
+
+  private async applyClientMembership(businessId: string, membershipId: string | undefined, sub: Stripe.Subscription) {
+    if (!membershipId) {
+      this.logger.warn(`Client membership subscription ${sub.id} is missing membershipId metadata`);
+      return;
+    }
+    const membership = await this.prisma.clientMembership.findFirst({ where: { id: membershipId, businessId } });
+    if (!membership) {
+      this.logger.warn(`Client membership ${membershipId} was not found for business ${businessId}`);
+      return;
+    }
+    const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
+    await this.prisma.clientMembership.update({
+      where: { id: membership.id },
+      data: {
+        stripeSubscriptionId: sub.id,
+        status: this.membershipStatus(sub.status),
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
+        ...(sub.status === 'canceled' ? { cancelledAt: new Date() } : {}),
+      },
+    });
+  }
+
+  async createClientMembershipCheckout(businessId: string, clientId: string, planId: string) {
+    const [business, client, plan] = await Promise.all([
+      this.prisma.business.findUnique({ where: { id: businessId } }),
+      this.prisma.client.findFirst({ where: { id: clientId, businessId } }),
+      this.prisma.membershipPlan.findFirst({ where: { id: planId, businessId, active: true } }),
+    ]);
+    if (!business) throw new NotFoundException('Business not found');
+    if (!client) throw new NotFoundException('Client not found');
+    if (!plan) throw new NotFoundException('Membership plan not found');
+    if (!business.stripeConnectAccountId || !business.stripeConnectOnboarded) {
+      throw new BadRequestException('Connect Stripe before enrolling clients in paid memberships.');
+    }
+    const existing = await this.prisma.clientMembership.findFirst({
+      where: {
+        clientId,
+        planId,
+        OR: [
+          { status: { in: ['ACTIVE', 'PAST_DUE'] } },
+          { status: 'PENDING', createdAt: { gt: new Date(Date.now() - 30 * 60 * 1000) } },
+        ],
+      },
+    });
+    if (existing) throw new BadRequestException('Client already has this membership or a checkout in progress');
+
+    let priceId = plan.stripePriceId;
+    let productId = plan.stripeProductId;
+    if (!priceId) {
+      const product = await this.getStripe().products.create({
+        name: `${business.name} - ${plan.name}`,
+        description: plan.description ?? undefined,
+        metadata: { kind: 'client_membership_plan', businessId, planId },
+      });
+      productId = product.id;
+      const price = await this.getStripe().prices.create({
+        product: product.id,
+        unit_amount: plan.priceMonthly,
+        currency: this.currencyOf(business),
+        recurring: { interval: 'month' },
+        metadata: { kind: 'client_membership_plan', businessId, planId },
+      });
+      priceId = price.id;
+      await this.prisma.membershipPlan.update({
+        where: { id: plan.id }, data: { stripeProductId: productId, stripePriceId: priceId },
+      });
+    }
+
+    const membership = await this.prisma.clientMembership.create({
+      data: { businessId, clientId, planId, status: 'PENDING' },
+    });
+    try {
+      const customerId = await this.ensureCustomer(client.id);
+      const metadata = { kind: 'client_membership', businessId, clientId, planId, membershipId: membership.id };
+      const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+      const session = await this.getStripe().checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${webUrl}/dashboard/memberships?membership=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${webUrl}/dashboard/memberships?membership=cancel&membership_id=${membership.id}`,
+        metadata,
+        subscription_data: {
+          metadata,
+          transfer_data: { destination: business.stripeConnectAccountId },
+          application_fee_percent: this.platformFeePercent(business.plan),
+        },
+      }, { idempotencyKey: this.idempotencyKey(['client-membership', membership.id]) });
+      if (!session.url) throw new ServiceUnavailableException('Stripe did not return a checkout URL. Please try again.');
+      return { url: session.url, membershipId: membership.id };
+    } catch (error) {
+      await this.prisma.clientMembership.delete({ where: { id: membership.id } }).catch(() => {});
+      throw error;
+    }
+  }
+
+  async confirmClientMembershipCheckout(businessId: string, sessionId: string) {
+    const session = await this.getStripe().checkout.sessions.retrieve(sessionId);
+    if (session.mode !== 'subscription' || session.metadata?.kind !== 'client_membership' ||
+        session.metadata.businessId !== businessId || !session.subscription) {
+      throw new BadRequestException('This checkout session does not belong to a client membership.');
+    }
+    if (session.status !== 'complete') return { confirmed: false as const, reason: 'checkout_incomplete' as const };
+    const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+    const sub = await this.getStripe().subscriptions.retrieve(subId);
+    await this.applyClientMembership(businessId, session.metadata.membershipId, sub);
+    return { confirmed: true as const, membershipId: session.metadata.membershipId, status: this.membershipStatus(sub.status) };
+  }
+
+  async cancelClientMembership(businessId: string, membershipId: string) {
+    const membership = await this.prisma.clientMembership.findFirst({ where: { id: membershipId, businessId } });
+    if (!membership) throw new NotFoundException('Membership not found');
+    if (!membership.stripeSubscriptionId) {
+      return this.prisma.clientMembership.update({
+        where: { id: membership.id },
+        data: { status: 'CANCELLED', cancelledAt: new Date(), cancelAtPeriodEnd: false },
+      });
+    }
+    const sub = await this.getStripe().subscriptions.update(membership.stripeSubscriptionId, { cancel_at_period_end: true });
+    await this.applyClientMembership(businessId, membership.id, sub);
+    return this.prisma.clientMembership.findUniqueOrThrow({ where: { id: membership.id } });
   }
 
   // Grant the referrer of `referredBusinessId` an account credit, applied to their

@@ -148,24 +148,13 @@ export class ClientsService {
       },
     });
 
-    if (existing) {
-      // Merge in the freshest details. Don't overwrite the email when we matched
-      // on phone (avoids colliding with the businessId_email unique constraint);
-      // fill phone in if it was missing before.
-      const updated = await this.prisma.client.update({
-        where: { id: existing.id },
-        data: {
-          name: dto.name,
-          ...(!existing.email && dto.email ? { email: dto.email } : {}),
-          ...(dto.phone && dto.phone !== existing.phone ? { phone: dto.phone } : {}),
-          ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-        },
-      });
-      return { ...updated, matched: true as const };
-    }
+    // Public booking may reuse an existing profile, but it must never mutate it.
+    // Knowing a client's email or phone is not proof of identity and must not let
+    // an unauthenticated caller overwrite their name, phone, or private notes.
+    if (existing) return { id: existing.id, businessId: existing.businessId, matched: true as const };
 
     const created = await this.prisma.client.create({ data: { ...dto, businessId } });
-    return { ...created, matched: false as const };
+    return { id: created.id, businessId: created.businessId, matched: false as const };
   }
 
   create(businessId: string, dto: CreateClientDto) {

@@ -64,7 +64,7 @@ export class PromoCodesService {
     if (pc.maxUsages !== null && pc.usageCount >= pc.maxUsages) throw new BadRequestException('Promo code has reached its usage limit');
 
     const discountCents = pc.discountType === 'PERCENT'
-      ? Math.round(priceCents * pc.discountValue / 100)
+      ? Math.min(priceCents, Math.round(priceCents * pc.discountValue / 100))
       : Math.min(pc.discountValue, priceCents);
 
     return { id: pc.id, code: pc.code, discountType: pc.discountType, discountValue: pc.discountValue, discountCents };

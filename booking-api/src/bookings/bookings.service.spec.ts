@@ -51,6 +51,10 @@ function makeAppointment(overrides = {}) {
 }
 
 function mockPrisma(options: { conflictExists?: boolean } = {}) {
+  const promoCode = {
+    findFirst: jest.fn().mockResolvedValue(null),
+    update: jest.fn().mockResolvedValue({}),
+  };
   const txMock = {
     $queryRaw: jest.fn().mockResolvedValue([]),
     appointment: {
@@ -60,6 +64,7 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       create: jest.fn().mockResolvedValue(makeAppointment()),
       update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
     },
+    promoCode,
   };
 
   return {
@@ -67,6 +72,7 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue({
         id: 'svc1',
         durationMinutes: 60,
+        priceCents: 10000,
         active: true,
       }),
       findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }),
@@ -116,6 +122,7 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
+    promoCode,
     $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => {
       return fn(txMock);
     }),
@@ -211,6 +218,24 @@ describe('BookingsService', () => {
           startsAt: SLOT_START.toISOString(),
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('calculates promo discounts on the server and consumes them transactionally', async () => {
+      const { svc, prisma } = await buildService();
+      prisma.promoCode.findFirst.mockResolvedValue({
+        id: 'promo1', businessId: 'biz1', active: true, expiresAt: null,
+        maxUsages: 10, usageCount: 2, discountType: 'PERCENT', discountValue: 25,
+      });
+
+      await svc.create('biz1', {
+        staffId: 'staff1', serviceId: 'svc1', clientId: 'client1',
+        startsAt: SLOT_START.toISOString(), promoCodeId: 'promo1',
+      });
+
+      expect(prisma.promoCode.update).toHaveBeenCalledWith({
+        where: { id: 'promo1' }, data: { usageCount: { increment: 1 } },
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
     });
   });
 

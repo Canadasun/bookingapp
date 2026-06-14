@@ -272,10 +272,10 @@ export interface MembershipPlan {
   id: string; businessId: string; name: string; description?: string | null;
   priceMonthly: number; active: boolean; createdAt: string;
 }
-export type MembershipStatus = "ACTIVE" | "CANCELLED" | "EXPIRED" | "PAST_DUE";
+export type MembershipStatus = "PENDING" | "ACTIVE" | "CANCELLED" | "EXPIRED" | "PAST_DUE";
 export interface MembershipMember {
   id: string; businessId: string; clientId: string; planId: string; status: MembershipStatus;
-  currentPeriodEnd?: string | null; cancelledAt?: string | null; createdAt: string;
+  currentPeriodEnd?: string | null; cancelAtPeriodEnd?: boolean; cancelledAt?: string | null; createdAt: string;
   client: { id: string; name: string; email?: string | null; phone?: string | null };
   plan: { id: string; name: string; priceMonthly: number };
 }
@@ -799,7 +799,7 @@ export const api = {
     // `matched: true` means the booking synced to an existing client (deduped on
     // email/phone) rather than creating a new profile.
     create: (businessId: string, data: { name: string; email?: string; phone?: string; notes?: string; birthday?: string }) =>
-      req<Client & { matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
+      req<{ id: string; businessId: string; matched: boolean }>(`/businesses/${businessId}/clients`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[]; birthday?: string }) =>
       req<Client>(`/businesses/${businessId}/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     duplicates: (businessId: string) =>
@@ -822,7 +822,7 @@ export const api = {
     get: (id: string, token?: string) => req<Appointment>(`/bookings/${id}${token ? `?token=${encodeURIComponent(token)}` : ""}`, undefined, null),
     // Owner-scoped single appointment (for receipts/detail).
     getOne: (businessId: string, id: string) => req<Appointment>(`/businesses/${businessId}/bookings/${id}`),
-    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string; discountCents?: number }) =>
+    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).
@@ -927,7 +927,9 @@ export const api = {
     deletePlan: (businessId: string, id: string) => req<void>(`/businesses/${businessId}/memberships/plans/${id}`, { method: "DELETE" }),
     listMembers: (businessId: string) => req<MembershipMember[]>(`/businesses/${businessId}/memberships/members`),
     subscribe: (businessId: string, clientId: string, planId: string) =>
-      req<unknown>(`/businesses/${businessId}/memberships/subscribe`, { method: "POST", body: JSON.stringify({ clientId, planId }) }),
+      req<{ url: string; membershipId: string }>(`/businesses/${businessId}/memberships/subscribe`, { method: "POST", body: JSON.stringify({ clientId, planId }) }),
+    confirm: (businessId: string, sessionId: string) =>
+      req<{ confirmed: boolean; membershipId?: string; status?: MembershipStatus; reason?: string }>(`/businesses/${businessId}/memberships/confirm`, { method: "POST", body: JSON.stringify({ sessionId }) }),
     cancel: (businessId: string, id: string) => req<unknown>(`/businesses/${businessId}/memberships/${id}/cancel`, { method: "PATCH" }),
     clientMemberships: (businessId: string, clientId: string) => req<MembershipMember[]>(`/businesses/${businessId}/memberships/clients/${clientId}`),
   },

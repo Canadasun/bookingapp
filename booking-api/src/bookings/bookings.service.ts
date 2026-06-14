@@ -137,7 +137,7 @@ export class BookingsService {
 
     // Sum durations of all selected services
     let totalDurationMinutes = primaryService.durationMinutes;
-    let totalPriceCents = primaryService.priceCents;
+    let subtotalCents = primaryService.priceCents;
     const additionalServiceNames: string[] = [];
     if (dto.additionalServiceIds?.length) {
       const ids = [...new Set(dto.additionalServiceIds)];
@@ -158,7 +158,7 @@ export class BookingsService {
         throw new BadRequestException('This staff member does not offer one of the selected services');
       }
       totalDurationMinutes += extras.reduce((sum, s) => sum + s.durationMinutes, 0);
-      totalPriceCents += extras.reduce((sum, s) => sum + s.priceCents, 0);
+      subtotalCents += extras.reduce((sum, s) => sum + s.priceCents, 0);
       additionalServiceNames.push(...extras.map((s) => s.name));
     }
 
@@ -197,6 +197,33 @@ export class BookingsService {
     const runBooking = () =>
       this.prisma.$transaction(
         async (tx) => {
+          let discountCents = 0;
+          if (dto.promoCodeId) {
+            // Serialize promo consumption with booking creation so maxUsages cannot
+            // be exceeded by concurrent requests and the client cannot choose the
+            // discount amount or attach another business's promotion.
+            await tx.$queryRaw(Prisma.sql`
+              SELECT id FROM "PromoCode" WHERE id = ${dto.promoCodeId} FOR UPDATE
+            `);
+            const promo = await tx.promoCode.findFirst({
+              where: { id: dto.promoCodeId, businessId, active: true },
+            });
+            if (!promo) throw new BadRequestException('Invalid promo code');
+            if (promo.expiresAt && promo.expiresAt < new Date()) {
+              throw new BadRequestException('Promo code has expired');
+            }
+            if (promo.maxUsages !== null && promo.usageCount >= promo.maxUsages) {
+              throw new BadRequestException('Promo code has reached its usage limit');
+            }
+            discountCents = promo.discountType === 'PERCENT'
+              ? Math.min(subtotalCents, Math.round(subtotalCents * promo.discountValue / 100))
+              : Math.min(subtotalCents, promo.discountValue);
+            await tx.promoCode.update({
+              where: { id: promo.id },
+              data: { usageCount: { increment: 1 } },
+            });
+          }
+
           // Lock all overlapping appointments for this staff member.
           // This prevents concurrent transactions from inserting a conflicting row.
           await tx.$queryRaw(Prisma.sql`
@@ -262,7 +289,7 @@ export class BookingsService {
               clientId: dto.clientId,
               startsAt,
               endsAt,
-              totalPriceCents,
+              totalPriceCents: Math.max(0, subtotalCents - discountCents),
               notes: notesWithServices,
               // Owner/staff-initiated bookings skip the approval queue and are
               // confirmed immediately; public self-service stays PENDING.
@@ -272,7 +299,7 @@ export class BookingsService {
               // Multi-location: the appointment inherits its provider's location.
               ...(staff.locationId ? { locationId: staff.locationId } : {}),
               ...(dto.referralSource ? { referralSource: dto.referralSource } : {}),
-              ...(dto.promoCodeId ? { promoCodeId: dto.promoCodeId, discountCents: dto.discountCents ?? 0 } : {}),
+              ...(dto.promoCodeId ? { promoCodeId: dto.promoCodeId, discountCents } : {}),
             },
             include: { client: true, service: true, staff: { include: { user: true } }, business: true },
           });
@@ -312,11 +339,6 @@ export class BookingsService {
       appointmentId: appointment.id,
       status: appointment.status,
     });
-
-    // Increment promo code usage counter (best-effort, non-blocking)
-    if (dto.promoCodeId) {
-      this.prisma.promoCode.update({ where: { id: dto.promoCodeId }, data: { usageCount: { increment: 1 } } }).catch(() => {});
-    }
 
     if (opts.confirmed) {
       // Owner/staff booking: confirm immediately, send the real confirmation to
