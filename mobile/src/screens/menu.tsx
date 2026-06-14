@@ -37,6 +37,7 @@ import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
 
 function MenuScreen({ onLogout }: { onLogout:()=>void }) {
+  const [renderedAt] = useState(() => Date.now());
   const { user } = getAuth();
   const nav = useNavigation<any>();
   // Which drill-in this screen shows is driven by the navigation route param, so
@@ -940,7 +941,6 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   function open(v: MoreView) { nav.push('MenuDetail', { view: v }); }
 
   // Load the data this drill-in needs, once, when its screen mounts.
-  useEffect(() => { if (view !== 'menu') loadView(view); }, []);
   async function loadView(v: MoreView) {
     try {
       if (v === 'services' && !services) {
@@ -1020,8 +1020,13 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       }
     } catch { /* ignore */ } finally { setLoading(false); }
   }
+  useEffect(() => {
+    if (view === 'menu') return;
+    const timer = setTimeout(() => loadView(view), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const Head = ({ title }: { title:string }) => (
+  const head = (title: string) => (
     <View style={[s.header, view!=='menu' && { flexDirection:'row', alignItems:'center' }]}>
       {view !== 'menu' && (
         <TouchableOpacity onPress={()=>nav.goBack()} style={{ marginRight:6 }}
@@ -1030,7 +1035,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       <Text style={s.headerTitle}>{title}</Text>
     </View>
   );
-  const Loader = () => <View style={{ padding:40, alignItems:'center' }}><ActivityIndicator color={BRAND}/></View>;
+  const loader = <View style={{ padding:40, alignItems:'center' }}><ActivityIndicator color={BRAND}/></View>;
 
   if (view === 'services') return (
     <SafeAreaView style={s.screen}>
@@ -1043,7 +1048,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {!!(categories && categories.length) && (
             <>
@@ -1149,8 +1154,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'staff') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Team"/>
-      {loading ? <Loader/> : (
+      {head('Team')}
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(staff ?? []).map(st => (
             <View key={st.id} style={ms.card}>
@@ -1463,7 +1468,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(offers ?? []).map(of => (
             <View key={of.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor:'#10B981' }]}>
@@ -1512,8 +1517,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'waitlist') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Waitlist"/>
-      {loading ? <Loader/> : (
+      {head('Waitlist')}
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(waitlist ?? []).map(w => (
             <View key={w.id} style={[ms.card,{ gap:10 }]}>
@@ -1543,8 +1548,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'reviews') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Reviews"/>
-      {loading ? <Loader/> : (
+      {head('Reviews')}
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {reviews && reviews.count>0 && (
             <View style={[ms.card,{ alignItems:'center', paddingVertical:16 }]}>
@@ -1584,7 +1589,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(campaigns ?? []).map(c => (
             <View key={c.id} style={ms.card}>
@@ -1674,7 +1679,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <TouchableOpacity onPress={()=>setGiftMode('issue')} accessibilityRole="button" accessibilityLabel="Issue gift card"><Ionicons name="add" size={24} color={BRAND}/></TouchableOpacity>
         </View>
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           {(giftcards ?? []).map(g => (
             <View key={g.id} style={[ms.card,{ borderLeftWidth:3, borderLeftColor: g.status==='ACTIVE' ? '#10B981' : GRAY_200 }]}>
@@ -1759,7 +1764,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           </TouchableOpacity>
         )}
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={[ms.card,{ flexDirection:'row', gap:8 }]}>
             {(['products','issued'] as const).map(tab => (
@@ -1920,7 +1925,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const doneTasks = (tasks ?? []).filter(t => t.status === 'DONE');
     const renderTask = (t: TaskItem) => {
       const due = t.dueAt ? new Date(t.dueAt) : null;
-      const overdue = !!due && t.status !== 'DONE' && due.getTime() < Date.now();
+      const overdue = !!due && t.status !== 'DONE' && due.getTime() < renderedAt;
       return (
         <View key={t.id} style={ms.row}>
           <TouchableOpacity onPress={()=>toggleTask(t)} style={[ms.checkCircle, t.status === 'DONE' && ms.checkCircleOn]}
@@ -1955,7 +1960,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             </TouchableOpacity>
           )}
         </View>
-        {loading ? <Loader/> : (
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             {openTasks.map(renderTask)}
             {openTasks.length === 0 && <Text style={ms.empty}>No open tasks.</Text>}
@@ -2044,8 +2049,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     );
     return (
       <SafeAreaView style={s.screen}>
-        <Head title="Follow-ups"/>
-        {loading ? <Loader/> : (
+        {head('Follow-ups')}
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             {due.length > 0 && <Text style={[ms.cardLabel,{ marginBottom:8, marginLeft:2, color:'#B45309' }]}>DUE NOW</Text>}
             {due.map(it => renderFollowup(it, true))}
@@ -2062,8 +2067,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const bookingUrl = `${WEB_URL}/book/${biz?.slug ?? ''}`;
     return (
       <SafeAreaView style={s.screen}>
-        <Head title="Online Booking"/>
-        {loading ? <Loader/> : (
+        {head('Online Booking')}
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>YOUR BOOKING PAGE</Text>
             <View style={ms.card}>
@@ -2108,8 +2113,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'notifications') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Notifications"/>
-      {loading ? <Loader/> : (
+      {head('Notifications')}
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <Text style={[ms.cardLabel,{ marginBottom:6, marginLeft:2 }]}>CLIENT NOTIFICATIONS</Text>
           <View style={ms.card}>
@@ -2169,8 +2174,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'reports') {
     const list = appts ?? [];
-    const now = Date.now();
-    const todayKey = new Date().toDateString();
+    const now = renderedAt;
+    const todayKey = new Date(renderedAt).toDateString();
     const todayCount = list.filter(a => new Date(a.startsAt).toDateString()===todayKey).length;
     const upcoming = list.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > now).length;
     const completed = list.filter(a => a.status==='COMPLETED');
@@ -2198,8 +2203,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     ];
     return (
       <SafeAreaView style={s.screen}>
-        <Head title="Reports"/>
-        {loading ? <Loader/> : (
+        {head('Reports')}
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             {stats.map(st => (
               <View key={st.label} style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
@@ -2220,8 +2225,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const SB: Record<string,string> = { SUCCEEDED:'#D1FAE5', PENDING:'#FEF3C7', FAILED:'#FEE2E2', REFUNDED:GRAY_100, PARTIALLY_REFUNDED:'#FEF3C7', CANCELED:GRAY_100 };
     return (
       <SafeAreaView style={s.screen}>
-        <Head title="Transactions"/>
-        {loading ? <Loader/> : (
+        {head('Transactions')}
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             {(payments ?? []).map(p => {
               const refundable = (p.status==='SUCCEEDED' || p.status==='PARTIALLY_REFUNDED') && (p.amountCents - p.refundedCents) > 0;
@@ -2257,8 +2262,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const refreshConnect = () => api<ConnectStatus>('/payments/connect/status').then(setConnectStatus).catch(() => {});
     return (
       <SafeAreaView style={s.screen}>
-        <Head title="Payouts"/>
-        {loading && !cs ? <Loader/> : (
+        {head('Payouts')}
+        {loading && !cs ? loader : (
           <ScrollView contentContainerStyle={{ padding:16, gap:12 }} showsVerticalScrollIndicator={false}>
             {!cs ? (
               <Text style={{ color:GRAY_400, fontSize:14 }}>Loading…</Text>
@@ -2285,7 +2290,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             ) : !cs.chargesEnabled ? (
               <View style={{ backgroundColor:'#FFFBEB', borderRadius:14, padding:16, gap:10, borderWidth:1, borderColor:'#FDE68A' }}>
                 <Text style={{ fontSize:15, fontWeight:'700', color:'#78350F' }}>Verification in progress</Text>
-                <Text style={{ fontSize:13, color:'#92400E' }}>You've submitted your information — Stripe is reviewing your account. This typically takes a few minutes to 1 business day.</Text>
+                <Text style={{ fontSize:13, color:'#92400E' }}>You&apos;ve submitted your information — Stripe is reviewing your account. This typically takes a few minutes to 1 business day.</Text>
                 <Text style={{ fontSize:12, color:'#B45309' }}>Payments made before approval are held safely in your Stripe balance.</Text>
                 <TouchableOpacity
                   style={[s.btnGhost, connectBusy && { opacity:0.6 }]}
@@ -2354,8 +2359,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     const subtotal = invoiceEditor ? invoiceEditor.items.reduce((t,it)=>t + (Math.max(1,Number.parseInt(it.quantity||'1',10)||1) * (Number.parseFloat(it.unit||'0')||0)), 0) : 0;
     return (
       <SafeAreaView style={s.screen}>
-        <Head title="Invoices"/>
-        {loading ? <Loader/> : (
+        {head('Invoices')}
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             <TouchableOpacity style={[s.btnPrimary,{ marginBottom:14 }]} onPress={()=>setInvoiceEditor({ items:[{ description:'', quantity:'1', unit:'0.00' }], notes:'' })}
               accessibilityRole="button" accessibilityLabel="Add new invoice">
@@ -2436,7 +2441,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'addons') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Add-ons"/>
+      {head('Add-ons')}
       <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
         <View style={ms.card}>
           {[
@@ -2461,8 +2466,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'subscriptions') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Subscriptions"/>
-      {loading ? <Loader/> : (
+      {head('Subscriptions')}
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={[ms.card,{ alignItems:'center', paddingVertical:22 }]}>
             <Text style={ms.cardLabel}>CURRENT PLAN</Text>
@@ -2577,10 +2582,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <Text style={[ms.empty,{ marginBottom:12 }]}>
-            Add branches or locations. Assign staff to a location so clients only see that branch's providers when booking.
+            Add branches or locations. Assign staff to a location so clients only see that branch&apos;s providers when booking.
           </Text>
 
           {(locations ?? []).length === 0 ? (
@@ -2732,7 +2737,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Ionicons name="add" size={24} color={BRAND}/>
         </TouchableOpacity>
       </View>
-      {loading ? <Loader/> : (
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <Text style={[ms.empty,{ marginBottom:12 }]}>
             Shared rooms, chairs, or equipment. Assign one to a service to block it when already in use.
@@ -2893,7 +2898,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={[s.headerTitle,{ flex:1 }]}>Business Hours</Text>
         </View>
-        {loading && !hoursLoaded ? <Loader/> : (
+        {loading && !hoursLoaded ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             {/* Weekly schedule */}
             <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -3051,7 +3056,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <Ionicons name="add" size={24} color={BRAND}/>
           </TouchableOpacity>
         </View>
-        {loading ? <Loader/> : (
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             {(!promoCodes || promoCodes.length === 0) ? (
               <View style={[s.center,{ padding:40 }]}>
@@ -3150,7 +3155,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={GRAY_700}/></TouchableOpacity>
           <Text style={s.headerTitle}>Memberships</Text>
         </View>
-        {loading ? <Loader/> : (
+        {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
             <View style={[ms.card,{ flexDirection:'row', gap:0 }]}>
               <View style={{ flex:1, alignItems:'center' }}>
@@ -3262,7 +3267,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'soon') return (
     <SafeAreaView style={s.screen}>
-      <Head title={soonLabel}/>
+      {head(soonLabel)}
       <View style={[s.center,{ padding:32 }]}>
         <View style={ms.soonIcon}><Ionicons name="construct-outline" size={28} color={BRAND}/></View>
         <Text style={[ms.rowTitle,{ marginTop:14, textAlign:'center' }]}>{soonLabel} is coming to the app</Text>
@@ -3273,8 +3278,8 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (view === 'settings') return (
     <SafeAreaView style={s.screen}>
-      <Head title="Settings"/>
-      {loading ? <Loader/> : (
+      {head('Settings')}
+      {loading ? loader : (
         <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
           <View style={ms.card}>
             <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom: 8 }}>
@@ -3444,10 +3449,6 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                 {recoveryCodes.map(c => <Text key={c} style={ms.recoveryCode}>{c}</Text>)}
               </View>
               <View style={{ flexDirection:'row', gap:8, marginTop:10 }}>
-                <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>Share.share({ message: `Pulse recovery codes:\n${recoveryCodes.join('\n')}` })}
-                  accessibilityRole="button" accessibilityLabel="Share recovery codes">
-                  <Text style={ms.methodChipText}>Share</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={[ms.methodChip,{ flex:1 }]} onPress={()=>setRecoveryCodes(null)}
                   accessibilityRole="button" accessibilityLabel="Dismiss recovery codes, I have saved them">
                   <Text style={ms.methodChipText}>I&apos;ve saved them</Text>
@@ -3591,33 +3592,71 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
-  // ── default menu (exact spec order) ──
-  const MENU: Array<{ label:string; icon:any; onPress:()=>void; badge?:string }> = [
-    { label:'Items & Services', icon:'pricetags-outline',       onPress:()=>open('services') },
-    { label:'Locations',        icon:'location-outline',        onPress:()=>open('locations') },
-    { label:'Rooms & Resources',icon:'business-outline',        onPress:()=>open('resources'), badge:'New' },
-    { label:'Business Hours',    icon:'time-outline',            onPress:()=>open('hours') },
-    { label:'Online Booking',   icon:'globe-outline',           onPress:()=>open('booking') },
-    { label:'Waitlist',         icon:'hourglass-outline',       onPress:()=>open('waitlist') },
-    { label:'Tasks',            icon:'checkbox-outline',        onPress:()=>open('tasks') },
-    { label:'Follow-ups',       icon:'repeat-outline',          onPress:()=>open('followups') },
-    { label:'Notifications',    icon:'notifications-outline',   onPress:()=>open('notifications') },
-    { label:'Payouts',           icon:'wallet-outline',          onPress:()=>open('payouts') },
-    { label:'Transactions',     icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
-    { label:'Invoices',         icon:'receipt-outline',         onPress:()=>open('invoices') },
-    { label:'Reports',          icon:'bar-chart-outline',       onPress:()=>open('reports') },
-    { label:'Promo Codes',       icon:'pricetag-outline',        onPress:()=>open('promo-codes') },
-    { label:'Memberships',      icon:'people-circle-outline',   onPress:()=>open('memberships') },
-    { label:'Add-ons',          icon:'extension-puzzle-outline',onPress:()=>open('addons') },
-    { label:'Subscriptions',    icon:'card-outline',            onPress:()=>open('subscriptions') },
-    { label:'Support',          icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
-    { label:'Privacy Policy',   icon:'shield-checkmark-outline',onPress:()=>Linking.openURL(`${WEB_URL}/privacy`) },
-    { label:'Terms of Service', icon:'document-text-outline',   onPress:()=>Linking.openURL(`${WEB_URL}/terms`) },
-    { label:'Settings',         icon:'settings-outline',        onPress:()=>open('settings') },
+  // Mirror the web dashboard's information architecture so features stay in a
+  // predictable place across desktop and mobile.
+  const isOwner = user?.role === 'OWNER';
+  const dashboardGroups: Array<{ title:string; items:Array<{ label:string; icon:any; onPress:()=>void; badge?:string }> }> = isOwner ? [
+    { title:'Operations', items:[
+      { label:'Staff',             icon:'people-outline',          onPress:()=>open('staff') },
+      { label:'Services',          icon:'pricetags-outline',       onPress:()=>open('services') },
+      { label:'Locations',         icon:'location-outline',        onPress:()=>open('locations') },
+      { label:'Rooms & Resources', icon:'business-outline',        onPress:()=>open('resources') },
+      { label:'Business Hours',    icon:'time-outline',            onPress:()=>open('hours') },
+      { label:'Online Booking',    icon:'globe-outline',           onPress:()=>open('booking') },
+      { label:'Tasks',             icon:'checkbox-outline',        onPress:()=>open('tasks') },
+      { label:'Follow-ups',        icon:'repeat-outline',          onPress:()=>open('followups') },
+      { label:'Waitlist',          icon:'hourglass-outline',       onPress:()=>open('waitlist') },
+    ]},
+    { title:'Financials', items:[
+      { label:'Payouts',           icon:'wallet-outline',          onPress:()=>open('payouts') },
+      { label:'Transactions',      icon:'swap-horizontal-outline', onPress:()=>open('transactions') },
+      { label:'Invoices',          icon:'receipt-outline',         onPress:()=>open('invoices') },
+      { label:'Reports',           icon:'bar-chart-outline',       onPress:()=>open('reports') },
+    ]},
+    { title:'Marketing', items:[
+      { label:'Campaigns',         icon:'megaphone-outline',       onPress:()=>open('marketing') },
+      { label:'Offers',            icon:'sparkles-outline',        onPress:()=>open('offers') },
+      { label:'Promo Codes',       icon:'pricetag-outline',        onPress:()=>open('promo-codes') },
+      { label:'Gift Cards',        icon:'gift-outline',            onPress:()=>open('giftcards') },
+      { label:'Packages',          icon:'cube-outline',            onPress:()=>open('packages') },
+      { label:'Memberships',       icon:'people-circle-outline',   onPress:()=>open('memberships') },
+      { label:'Reviews',           icon:'star-outline',            onPress:()=>open('reviews') },
+    ]},
+    { title:'Account', items:[
+      { label:'Notifications',     icon:'notifications-outline',   onPress:()=>open('notifications') },
+      { label:'Plan & Add-ons',    icon:'extension-puzzle-outline',onPress:()=>open('addons') },
+      { label:'Subscriptions',     icon:'card-outline',            onPress:()=>open('subscriptions') },
+      { label:'Settings',          icon:'settings-outline',        onPress:()=>open('settings') },
+      { label:'Support',           icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
+      { label:'Privacy Policy',    icon:'shield-checkmark-outline',onPress:()=>Linking.openURL(`${WEB_URL}/privacy`) },
+      { label:'Terms of Service',  icon:'document-text-outline',   onPress:()=>Linking.openURL(`${WEB_URL}/terms`) },
+    ]},
+  ] : [
+    { title:'Work', items:[
+      { label:'My Tasks',          icon:'checkbox-outline',        onPress:()=>open('tasks') },
+      { label:'Follow-ups',        icon:'repeat-outline',          onPress:()=>open('followups') },
+      { label:'Notifications',     icon:'notifications-outline',   onPress:()=>open('notifications') },
+    ]},
+    { title:'Account', items:[
+      { label:'Settings',          icon:'settings-outline',        onPress:()=>open('settings') },
+      { label:'Support',           icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
+      { label:'Privacy Policy',    icon:'shield-checkmark-outline',onPress:()=>Linking.openURL(`${WEB_URL}/privacy`) },
+      { label:'Terms of Service',  icon:'document-text-outline',   onPress:()=>Linking.openURL(`${WEB_URL}/terms`) },
+    ]},
+  ];
+  const quickActions = isOwner ? [
+    { label:'Services', icon:'pricetags-outline', view:'services' as MoreView },
+    { label:'Staff', icon:'people-outline', view:'staff' as MoreView },
+    { label:'Reports', icon:'bar-chart-outline', view:'reports' as MoreView },
+    { label:'Settings', icon:'settings-outline', view:'settings' as MoreView },
+  ] : [
+    { label:'Tasks', icon:'checkbox-outline', view:'tasks' as MoreView },
+    { label:'Alerts', icon:'notifications-outline', view:'notifications' as MoreView },
+    { label:'Settings', icon:'settings-outline', view:'settings' as MoreView },
   ];
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>Menu</Text></View>
+      <View style={s.header}><Text style={s.headerTitle}>Dashboard</Text></View>
       <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
         {user&&(
           <TouchableOpacity style={s.profileCard} activeOpacity={0.7} onPress={()=>open('settings')}
@@ -3649,21 +3688,32 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <Ionicons name="chevron-forward" size={16} color="#C2410C"/>
           </TouchableOpacity>
         )}
-        <View style={s.menuCard}>
-          {MENU.map((r,i)=>(
-            <TouchableOpacity key={r.label} style={[s.menuRow, i<MENU.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}
-              accessibilityRole="button" accessibilityLabel={r.label}>
-              <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
-              <Text style={s.menuLabel}>{r.label}</Text>
-              {r.badge && (
-                <View style={{ backgroundColor:BRAND, borderRadius:10, paddingHorizontal:7, paddingVertical:2, marginRight:6 }}>
-                  <Text style={{ color:'#fff', fontSize:10, fontWeight:'700' }}>{r.badge}</Text>
-                </View>
-              )}
-              <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
+        <Text style={{ fontSize:12, fontWeight:'700', color:GRAY_500, textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Quick actions</Text>
+        <View style={{ flexDirection:'row', flexWrap:'wrap', gap:10, marginBottom:18 }}>
+          {quickActions.map(action => (
+            <TouchableOpacity key={action.label} onPress={()=>open(action.view)} activeOpacity={0.7}
+              style={{ width:'48%', minHeight:82, borderRadius:14, padding:14, backgroundColor:'#fff', borderWidth:1, borderColor:GRAY_100 }}
+              accessibilityRole="button" accessibilityLabel={action.label}>
+              <View style={s.menuIcon}><Ionicons name={action.icon as any} size={20} color={BRAND}/></View>
+              <Text style={{ fontSize:14, fontWeight:'700', color:GRAY_900, marginTop:8 }}>{action.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
+        {dashboardGroups.map(group => (
+          <View key={group.title}>
+            <Text style={{ fontSize:12, fontWeight:'700', color:GRAY_500, textTransform:'uppercase', letterSpacing:0.8, marginBottom:8, marginLeft:2 }}>{group.title}</Text>
+            <View style={s.menuCard}>
+              {group.items.map((r,i)=>(
+                <TouchableOpacity key={r.label} style={[s.menuRow, i<group.items.length-1&&s.menuRowBorder]} onPress={r.onPress} activeOpacity={0.7}
+                  accessibilityRole="button" accessibilityLabel={r.label}>
+                  <View style={s.menuIcon}><Ionicons name={r.icon} size={20} color={BRAND}/></View>
+                  <Text style={s.menuLabel}>{r.label}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={GRAY_400}/>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ))}
         <TouchableOpacity style={s.logoutBtn} onPress={()=>{
           Alert.alert('Sign out','Are you sure?',[{text:'Cancel',style:'cancel'},{text:'Sign out',style:'destructive',onPress:onLogout}]);
         }} accessibilityRole="button" accessibilityLabel="Sign out">

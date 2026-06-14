@@ -11,14 +11,15 @@
   In DEBUG builds: user CAs are still trusted so developers can use
   Charles / Proxyman / mitmproxy for local debugging.
 
-  To implement full certificate pinning (pin to a specific public key):
-  1. Get the SHA-256 SPKI fingerprint of your API certificate:
+  To rotate the public-key pins:
+  1. Get the SHA-256 SPKI fingerprint of the API certificate:
        openssl s_client -connect api.pulseappointments.com:443 </dev/null | \
          openssl x509 -pubkey -noout | \
          openssl pkey -pubin -outform DER | \
          openssl dgst -sha256 -binary | base64
-  2. Replace the commented-out <pin-set> block below with actual values.
-  3. Always include a backup pin (from a spare key pair) for rotation safety.
+  2. Update both this file and src/pinnedFetch.ts.
+  3. Keep a longer-lived chain pin so leaf-certificate rotation does not
+     strand released app versions.
 -->
 <network-security-config>
   <base-config cleartextTrafficPermitted="false">

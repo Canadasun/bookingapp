@@ -2,8 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 import { User, Client } from '../types';
-import { getAuth, setAuth, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, biometricCapability, bizId } from '../auth';
-import { api, registerPushNotifications } from '../api';
+import { getAuth, setAuth, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, biometricCapability, bizId, invalidateSessionRefresh } from '../auth';
+import { api, registerPushNotifications, unregisterPushNotifications } from '../api';
 
 interface AuthContextType {
   token: string | null;
@@ -12,7 +12,7 @@ interface AuthContextType {
   locked: boolean;
   setLocked: (locked: boolean) => void;
   login: (token: string, refresh: string, user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUnreadMessages: () => Promise<void>;
   unreadMessages: number;
   isOffline: boolean;
@@ -98,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const a = getAuth();
       setToken(a.token);
       setUser(a.user);
+      if (a.token) registerPushNotifications();
 
       if (a.token && await isBiometricEnabled() && (await biometricCapability()).available) {
         setLocked(true);
@@ -138,12 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     registerPushNotifications();
   };
 
-  const logout = () => {
-    api('/auth/logout', { method: 'POST' }).catch(() => { });
+  const logout = async () => {
+    invalidateSessionRefresh();
+    const unregister = unregisterPushNotifications();
+    const serverLogout = api('/auth/logout', { method: 'POST' }).catch(() => { });
     setAuth(null, null, null);
     setToken(null);
     setUser(null);
-    persistAuth();
+    await Promise.all([persistAuth(), unregister, serverLogout]);
   };
 return (
   <AuthContext.Provider value={{

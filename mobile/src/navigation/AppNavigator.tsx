@@ -93,7 +93,7 @@ function MainTabs() {
         {() => <MessagesScreen initialClient={msgClient} onClearClient={() => setMsgClient(null)} onUnreadChanged={() => { }} />}
       </Tab.Screen>
       <Tab.Screen name="Alerts" component={NotificationsScreen} />
-      <Tab.Screen name="Menu" component={MenuStack} />
+      <Tab.Screen name="Dashboard" component={MenuStack} />
     </Tab.Navigator>
     </>
   );
@@ -167,7 +167,7 @@ export function AppNavigator() {
 
 const styles = StyleSheet.create({
   privacyOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,6 +1,7 @@
 // Authenticated fetch wrapper with transparent token-refresh-on-401, plus
 // best-effort Expo push-token registration.
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { API_BASE } from './config';
 import { getAuth, refreshSession } from './auth';
 import { pinnedFetch } from './pinnedFetch';
@@ -8,6 +9,8 @@ import { pinnedFetch } from './pinnedFetch';
 export async function api<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
   const { token } = getAuth();
   const isFormData = init?.body instanceof FormData;
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const canRetryTransport = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
 
   const performFetch = async (retryCount = 0): Promise<Response> => {
     try {
@@ -21,7 +24,7 @@ export async function api<T>(path: string, init?: RequestInit, _retried = false)
       });
       return res;
     } catch (e) {
-      if (retryCount < 2) {
+      if (canRetryTransport && retryCount < 2) {
         await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
         return performFetch(retryCount + 1);
       }
@@ -58,9 +61,9 @@ export async function registerPushNotifications() {
     const Notifications = require('expo-notifications');
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowBanner: true,
+        shouldShowBanner: false,
         shouldShowList: true,
-        shouldPlaySound: true,
+        shouldPlaySound: false,
         shouldSetBadge: true,
       }),
     });
@@ -72,6 +75,7 @@ export async function registerPushNotifications() {
         sound: 'default',
         enableVibrate: true,
         showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.SECRET,
       });
     }
     const current = await Notifications.getPermissionsAsync();
@@ -84,11 +88,39 @@ export async function registerPushNotifications() {
     const result = await Notifications.getExpoPushTokenAsync({ projectId });
     const pushToken = result?.data;
     if (!pushToken) return;
-    await api('/users/me/device-token', {
+    const registered = await api<{ id: string }>('/users/me/device-token', {
       method:'POST',
       body: JSON.stringify({ token: pushToken, platform: Platform.OS.toUpperCase() }),
-    }).catch(() => {});
+    });
+    if (Platform.OS === 'ios') {
+      // APNs notification previews cannot be forcibly redacted by app code. Keep
+      // this device disabled until the server sends generic, non-PII push text.
+      await api('/users/me/device-token', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: registered.id, enabled: false }),
+      });
+      await SecureStore.deleteItemAsync('bookingapp.device-token-id.v1');
+      return;
+    }
+    await SecureStore.setItemAsync('bookingapp.device-token-id.v1', registered.id);
   } catch {
     // Push is best-effort; never block login or app launch.
+  }
+}
+
+export async function unregisterPushNotifications() {
+  const authToken = getAuth().token;
+  try {
+    const id = await SecureStore.getItemAsync('bookingapp.device-token-id.v1');
+    if (id) {
+      await api('/users/me/device-token', {
+        method: 'PATCH',
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+        body: JSON.stringify({ id, enabled: false }),
+      });
+    }
+    await SecureStore.deleteItemAsync('bookingapp.device-token-id.v1');
+  } catch {
+    // Logout still clears local credentials if remote revocation is unavailable.
   }
 }

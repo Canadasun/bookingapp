@@ -66,7 +66,6 @@ function CheckoutScreen() {
       const initialized = await initPaymentSheet({
         merchantDisplayName: 'Pulse',
         paymentIntentClientSecret: payment.clientSecret,
-        returnURL: 'pulseappointments://stripe-redirect',
         allowsDelayedPaymentMethods: false,
       });
       if (initialized.error) throw new Error(initialized.error.message);

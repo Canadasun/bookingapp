@@ -24,7 +24,6 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: 'Completed', CANCELLED: 'Cancelled', NO_SHOW: 'No-show',
 };
 
-import { io, Socket } from 'socket.io-client';
 
 function CalendarScreen() {
   const { user } = getAuth();
@@ -77,22 +76,13 @@ function CalendarScreen() {
     onSettled: () => setActing(false)
   });
 
-  // Real-time sync via sockets
+  // Poll through the pinned API transport while this screen is mounted. The
+  // Socket.IO client uses its own TLS stack and cannot share our certificate pins.
   useEffect(() => {
-    const bId = bizId();
-    if (!bId) return;
-
-    let socket: Socket | null = null;
-    const apiUrl = API_BASE.replace(/\/api$/, '');
-
-    api<{ ticket: string }>('/events/ws-ticket').then(({ ticket }) => {
-      socket = io(apiUrl, { transports: ['websocket'], auth: { ticket } });
-      socket.on('connect', () => socket?.emit('joinBusiness', bId));
-      socket.on('bookingUpdated', () => queryClient.invalidateQueries({ queryKey: ['bookings'] }));
-      socket.on('appointmentUpdated', () => queryClient.invalidateQueries({ queryKey: ['bookings'] }));
-    }).catch(() => { });
-
-    return () => { socket?.disconnect(); };
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    }, 15000);
+    return () => clearInterval(interval);
   }, [queryClient]);
 
   // Hardware back (Android) closes the open appointment detail instead of leaving

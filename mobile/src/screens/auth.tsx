@@ -175,14 +175,14 @@ function ForgotPasswordScreen({ onBack }: { onBack:()=>void }) {
         <Text style={s.loginTitle}>Reset password</Text>
         {sent ? (
           <>
-            <Text style={s.loginSub}>If an account exists for {email.trim()}, we've emailed a reset link. It expires in 30 minutes.</Text>
+            <Text style={s.loginSub}>If an account exists for {email.trim()}, we&apos;ve emailed a reset link. It expires in 30 minutes.</Text>
             <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={onBack} accessibilityRole="button" accessibilityLabel="Back to sign in">
               <Text style={s.btnPrimaryText}>Back to sign in</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text style={s.loginSub}>Enter your email and we'll send you a reset link.</Text>
+            <Text style={s.loginSub}>Enter your email and we&apos;ll send you a reset link.</Text>
             <Text style={s.fieldLabel}>Email</Text>
             <TextInput style={s.input} placeholder="you@example.com" placeholderTextColor={GRAY_400}
               keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} onSubmitEditing={submit} accessibilityLabel="Email address"/>
@@ -252,7 +252,7 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
             <Text style={s.logoText}>Pulse</Text>
           </View>
           <Text style={s.loginTitle}>Create your business</Text>
-          <Text style={s.loginSub}>Set up your account — you'll add services and staff next.</Text>
+          <Text style={s.loginSub}>Set up your account — you&apos;ll add services and staff next.</Text>
 
           <Text style={s.fieldLabel}>Your name</Text>
           <TextInput style={s.input} placeholder="Jane Doe" placeholderTextColor={GRAY_400}
@@ -363,6 +363,7 @@ function ChangePasswordScreen({ onDone }: { onDone:()=>void }) {
 
 // ── Client portal: bookings, messages, and offers for CLIENT users ───────────
 function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
+  const [renderedAt] = useState(() => Date.now());
   const { user } = getAuth();
   const [tab, setTab] = useState<'bookings'|'messages'|'offers'>('bookings');
   const [appointments, setAppointments] = useState<ClientPortalAppointment[]>([]);
@@ -400,7 +401,10 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   async function resendVerification() {
     try {
@@ -432,10 +436,6 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
     }
   }
 
-  function manageUrl(a: ClientPortalAppointment) {
-    return a.manageToken ? `${WEB_URL}/appointments/${a.id}/manage?token=${encodeURIComponent(a.manageToken)}` : null;
-  }
-
   async function cancelClientAppointment(a: ClientPortalAppointment) {
     if (!a.manageToken) {
       Alert.alert('Manage link unavailable', 'Open this appointment from your confirmation email to cancel it.');
@@ -457,12 +457,6 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
         }
       }},
     ]);
-  }
-
-  function openManage(a: ClientPortalAppointment) {
-    const url = manageUrl(a);
-    if (url) Linking.openURL(url);
-    else Alert.alert('Manage link unavailable', 'Open this appointment from your confirmation email.');
   }
 
   async function rescheduleClientAppointment(a: ClientPortalAppointment) {
@@ -566,7 +560,7 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
 
   if (selectedAppointment) {
     const a = selectedAppointment;
-    const upcoming = ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > Date.now();
+    const upcoming = ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > renderedAt;
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.header}>
@@ -586,9 +580,6 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
             </View>
           </View>
           <View style={ms.card}>
-            <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>openManage(a)} accessibilityRole="button" accessibilityLabel="Open manage link">
-              <Text style={ms.rowTitle}>Open manage link</Text><Ionicons name="open-outline" size={16} color={GRAY_400}/>
-            </TouchableOpacity>
             {upcoming && (
               <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>rescheduleClientAppointment(a)} accessibilityRole="button" accessibilityLabel="Reschedule appointment">
                 <Text style={ms.rowTitle}>Reschedule</Text><Ionicons name="calendar-outline" size={16} color={GRAY_400}/>

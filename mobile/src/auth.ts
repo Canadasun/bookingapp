@@ -3,14 +3,19 @@
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { API_BASE, BIZ_ID } from './config';
+import { pinnedFetch } from './pinnedFetch';
 import type { User } from './types';
 
 let _token:   string|null = null;
 let _refresh: string|null = null;
 let _user:    User|null   = null;
+let _sessionVersion = 0;
 export const listeners: Set<()=>void> = new Set();
 const notify = () => listeners.forEach(fn => fn());
 const AUTH_KEY = 'bookingapp.auth.v1';
+const AUTH_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
 
 export const setAuth = (token: string|null, user: User|null, refresh?: string|null) => {
   _token = token; _user = user;
@@ -18,6 +23,7 @@ export const setAuth = (token: string|null, user: User|null, refresh?: string|nu
   notify();
 };
 export const getAuth = () => ({ token: _token, user: _user, refresh: _refresh });
+export const invalidateSessionRefresh = () => { _sessionVersion += 1; };
 
 // The active business is the one the signed-in owner/staff belongs to. Each
 // account is fully isolated — we never assume the baked EXPO_PUBLIC_BUSINESS_ID
@@ -29,9 +35,9 @@ export const bizId = (): string => getAuth().user?.businessId || BIZ_ID;
 export async function persistAuth() {
   try {
     if (_token && _refresh) {
-      await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify({ token: _token, refresh: _refresh, user: _user }));
+      await SecureStore.setItemAsync(AUTH_KEY, JSON.stringify({ token: _token, refresh: _refresh, user: _user }), AUTH_STORE_OPTIONS);
     } else {
-      await SecureStore.deleteItemAsync(AUTH_KEY);
+      await SecureStore.deleteItemAsync(AUTH_KEY, AUTH_STORE_OPTIONS);
     }
   } catch { /* keychain unavailable — session remains in memory only */ }
 }
@@ -40,7 +46,7 @@ export async function persistAuth() {
 // token was found (so the caller can refresh for a fresh access token).
 export async function loadPersistedAuth(): Promise<boolean> {
   try {
-    const raw = await SecureStore.getItemAsync(AUTH_KEY);
+    const raw = await SecureStore.getItemAsync(AUTH_KEY, AUTH_STORE_OPTIONS);
     if (!raw) return false;
     const parsed = JSON.parse(raw) as { token?:string; refresh?:string; user?:User };
     setAuth(parsed.token ?? null, parsed.user ?? null, parsed.refresh ?? null);
@@ -61,18 +67,22 @@ export async function refreshSession(): Promise<boolean> {
 
 async function _doRefresh(): Promise<boolean> {
   if (!_refresh) return false;
+  const refreshToken = _refresh;
+  const sessionVersion = _sessionVersion;
   try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
+    const res = await pinnedFetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: _refresh }),
+      body: JSON.stringify({ refreshToken }),
     });
+    if (sessionVersion !== _sessionVersion || _refresh !== refreshToken) return false;
     if (!res.ok) {
       setAuth(null, null, null);
       await persistAuth();
       return false;
     }
     const data = await res.json() as { accessToken:string; refreshToken:string; user:User };
+    if (sessionVersion !== _sessionVersion || _refresh !== refreshToken) return false;
     setAuth(data.accessToken, data.user, data.refreshToken);
     await persistAuth();
     return true;

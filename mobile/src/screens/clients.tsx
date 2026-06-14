@@ -82,7 +82,6 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
       <FlashList
         data={clients}
         keyExtractor={c => c.id}
-        estimatedItemSize={100}
         contentContainerStyle={s.listContent}
         ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No customers found</Text></View>}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={BRAND} />}

@@ -1,3 +1,4 @@
+/* global __dirname */
 // Expo config plugin — copies network-security-config.xml into the Android
 // project and wires it into AndroidManifest during `expo prebuild` / EAS Build.
 //

@@ -110,7 +110,10 @@ export function AdminScreen({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   async function approveVerification(b: PendingVerification) {
     Alert.alert(

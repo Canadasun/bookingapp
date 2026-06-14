@@ -10,6 +10,7 @@ jest.mock('../config', () => ({ API_BASE: 'https://api.example.com', BIZ_ID: 'bi
 jest.mock('../pinnedFetch', () => ({ pinnedFetch: jest.fn() }));
 
 let api: typeof import('../api').api;
+let unregisterPushNotifications: typeof import('../api').unregisterPushNotifications;
 let setAuth: typeof import('../auth').setAuth;
 let pinnedFetchMock: jest.MockedFunction<any>;
 
@@ -17,7 +18,7 @@ beforeEach(() => {
   jest.resetModules();
   jest.mock('../pinnedFetch', () => ({ pinnedFetch: jest.fn() }));
   ({ setAuth } = require('../auth'));
-  ({ api } = require('../api'));
+  ({ api, unregisterPushNotifications } = require('../api'));
   ({ pinnedFetch: pinnedFetchMock } = require('../pinnedFetch'));
 });
 
@@ -66,5 +67,30 @@ describe('api Content-Type header', () => {
 
     const [, init] = pinnedFetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)['Authorization']).toBeUndefined();
+  });
+
+  it('does not replay a failed mutation after a transport error', async () => {
+    pinnedFetchMock.mockRejectedValue(new Error('connection reset'));
+    setAuth('test-token', null, null);
+
+    await expect(api('/messages', { method: 'POST', body: JSON.stringify({ content: 'hello' }) }))
+      .rejects.toThrow('connection reset');
+
+    expect(pinnedFetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('revokes the current device token with the captured session token', async () => {
+    const SecureStore = require('expo-secure-store');
+    SecureStore.getItemAsync.mockResolvedValueOnce('device-token-id');
+    pinnedFetchMock.mockResolvedValue(makeOkResponse({ ok: true }));
+    setAuth('logout-token', null, null);
+
+    const pending = unregisterPushNotifications();
+    setAuth(null, null, null);
+    await pending;
+
+    const [, init] = pinnedFetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe('PATCH');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer logout-token');
   });
 });

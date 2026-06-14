@@ -395,7 +395,7 @@ function BookScreen() {
               <View style={[ms.card, { alignItems:'center', paddingVertical:24 }]}>
                 <Ionicons name="time-outline" size={28} color={GRAY_400}/>
                 <Text style={[ms.rowTitle,{ marginTop:8, textAlign:'center' }]}>Fully booked on this day</Text>
-                <Text style={[ms.empty,{ textAlign:'center', marginTop:4 }]}>Join the waitlist and we'll contact you when a spot opens.</Text>
+                <Text style={[ms.empty,{ textAlign:'center', marginTop:4 }]}>Join the waitlist and we&apos;ll contact you when a spot opens.</Text>
                 <TouchableOpacity style={[s.btnPrimary,{ marginTop:12, paddingHorizontal:24 }]} onPress={()=>setWlPrompt(true)} accessibilityRole="button" accessibilityLabel="Join Waitlist">
                   <Text style={s.btnPrimaryText}>Join Waitlist</Text>
                 </TouchableOpacity>
@@ -508,7 +508,7 @@ function BookScreen() {
           {step==='done' && (
             <View style={s.doneBox}>
               <View style={s.doneIcon}><Ionicons name="checkmark" size={36} color="#fff"/></View>
-              <Text style={s.doneTitle}>You're booked!</Text>
+              <Text style={s.doneTitle}>You&apos;re booked!</Text>
               <Text style={s.doneSub}>Confirmation sent to {form.email || form.phone}</Text>
               <Text style={s.doneRef}>Ref #{bookedId.slice(-8).toUpperCase()}</Text>
               <TouchableOpacity style={[s.btnPrimary,{marginTop:24}]} onPress={reset} accessibilityRole="button" accessibilityLabel="Book another appointment">
@@ -531,7 +531,7 @@ function BookScreen() {
             <Text style={s.headerTitle}>Join Waitlist</Text>
           </View>
           <ScrollView contentContainerStyle={s.listContent}>
-            <Text style={ms.empty}>We'll notify you the moment a spot opens up.</Text>
+            <Text style={ms.empty}>We&apos;ll notify you the moment a spot opens up.</Text>
             <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={wlSaving} accessibilityRole="button" accessibilityLabel="Notify me when a spot opens" onPress={async()=>{
               setWlSaving(true);
               try {

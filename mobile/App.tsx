@@ -2,7 +2,7 @@ import 'react-native-screens';
 import { enableScreens } from 'react-native-screens';
 enableScreens();
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -14,13 +14,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { ErrorBoundary } from './src/components';
+import { authenticateBiometric } from './src/auth';
 import { BRAND, BRAND_LT, GRAY_900, GRAY_500 } from './src/theme';
 import { s } from './src/styles';
 
 const queryClient = new QueryClient();
 
-function LockScreen({ onUnlock, onSignOut }: { onUnlock: () => void; onSignOut: () => void }) {
-  const { locked } = useAuth();
+function LockScreen({ onUnlock, onSignOut, unlocking }: { onUnlock: () => void; onSignOut: () => void; unlocking: boolean }) {
   // We keep the internal logic in AuthContext, and just render UI here
   return (
     <SafeAreaView style={s.screen}>
@@ -30,8 +30,10 @@ function LockScreen({ onUnlock, onSignOut }: { onUnlock: () => void; onSignOut: 
         </View>
         <Text style={{ fontSize: 20, fontWeight: '700', color: GRAY_900 }}>Pulse is locked</Text>
         <Text style={{ fontSize: 14, color: GRAY_500, textAlign: 'center' }}>Unlock with Biometrics to continue.</Text>
-        <TouchableOpacity style={s.btnPrimary} onPress={onUnlock}>
-          <Text style={s.btnPrimaryText}>Unlock Pulse</Text>
+        <TouchableOpacity style={s.btnPrimary} onPress={onUnlock} disabled={unlocking}>
+          {unlocking
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={s.btnPrimaryText}>Unlock Pulse</Text>}
         </TouchableOpacity>
         <TouchableOpacity style={s.btnGhost} onPress={onSignOut}>
           <Text style={s.btnGhostText}>Sign out instead</Text>
@@ -43,6 +45,17 @@ function LockScreen({ onUnlock, onSignOut }: { onUnlock: () => void; onSignOut: 
 
 function AppContent() {
   const { booting, locked, setLocked, logout } = useAuth();
+  const [unlocking, setUnlocking] = useState(false);
+
+  const unlock = useCallback(async () => {
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      if (await authenticateBiometric()) setLocked(false);
+    } finally {
+      setUnlocking(false);
+    }
+  }, [setLocked, unlocking]);
 
   if (booting) {
     return (
@@ -55,7 +68,7 @@ function AppContent() {
   }
 
   if (locked) {
-    return <LockScreen onUnlock={() => setLocked(false)} onSignOut={() => { setLocked(false); logout(); }} />;
+    return <LockScreen unlocking={unlocking} onUnlock={unlock} onSignOut={() => { setLocked(false); logout(); }} />;
   }
 
   return <AppNavigator />;

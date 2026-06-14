@@ -44,7 +44,10 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     catch {}
     finally { setLoading(false); }
   }, [onUnreadChanged, filter, channel]);
-  useEffect(()=>{ loadThreads(); },[loadThreads]);
+  useEffect(()=>{
+    const timer = setTimeout(loadThreads, 0);
+    return () => clearTimeout(timer);
+  },[loadThreads]);
   useEffect(() => navigation.addListener('focus', loadThreads), [navigation, loadThreads]);
   useEffect(() => {
     const interval = setInterval(loadThreads, 10_000);

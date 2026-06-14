@@ -11,7 +11,7 @@ export function NetworkBanner({ isOffline }: { isOffline: boolean }) {
   return (
     <View style={styles.offlineBanner}>
       <Ionicons name="cloud-offline" size={14} color="#fff" />
-      <Text style={styles.offlineText}>You're offline. Reconnecting...</Text>
+      <Text style={styles.offlineText}>You&apos;re offline. Reconnecting...</Text>
     </View>
   );
 }
