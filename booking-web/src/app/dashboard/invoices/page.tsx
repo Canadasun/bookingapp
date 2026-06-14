@@ -54,7 +54,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Invoices</h2>
           <p className="text-sm text-gray-500">{invoices.length} total</p>
@@ -137,15 +137,15 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="dashboard-safe-bottom relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-xl max-h-[90dvh] overflow-y-auto">
         <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-violet-600" /><p className="text-sm font-semibold text-gray-900">New invoice</p></div>
           <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <div className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Client (optional)</label>
               <select value={clientId} onChange={(e) => setClientId(e.target.value)}

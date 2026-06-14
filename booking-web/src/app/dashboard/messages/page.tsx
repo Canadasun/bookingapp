@@ -94,7 +94,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto h-[calc(100vh-130px)] flex gap-4">
+    <div className="dashboard-dynamic-height max-w-5xl mx-auto flex min-h-[28rem] gap-4">
 
       {/* Thread list — full-width on mobile; hidden there once a thread is open */}
       <div className={cn(
@@ -198,7 +198,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3">
               {threadError && (
                 <div className="text-center py-8">
                   <p className="text-red-500 text-sm mb-3">{threadError}</p>
@@ -211,7 +211,7 @@ export default function MessagesPage() {
               {msgs.map((m) => (
                 <div key={m.id} className={cn("flex", m.fromClient ? "justify-start" : "justify-end")}>
                   <div className={cn(
-                    "max-w-[72%] rounded-2xl px-4 py-2.5 text-sm",
+                    "max-w-[88%] sm:max-w-[72%] rounded-2xl px-4 py-2.5 text-sm break-words [overflow-wrap:anywhere]",
                     m.fromClient
                       ? "bg-gray-100 text-gray-800 rounded-tl-sm"
                       : "bg-violet-600 text-white rounded-tr-sm",
@@ -226,7 +226,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Compose */}
-            <div className="px-4 py-3 border-t border-gray-100 flex items-end gap-2">
+            <div className="dashboard-safe-bottom px-3 sm:px-4 py-3 border-t border-gray-100 flex items-end gap-2">
               <>
                   <Input
                     placeholder="Type a reply…"

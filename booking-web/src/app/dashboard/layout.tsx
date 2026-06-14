@@ -181,7 +181,7 @@ function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[];
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
             placeholder="Jump to a page..."
-            className="h-8 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-gray-400"
+            className="h-10 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-gray-400 lg:text-sm"
           />
           <kbd className="hidden rounded-md border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 sm:inline">Esc</kbd>
         </div>
@@ -382,20 +382,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // to /login if the session is invalid.
   if (loading) {
     return (
-      <div className="flex min-h-screen brand-shell items-center justify-center">
+      <div className="dashboard-shell flex brand-shell items-center justify-center">
         <div className="w-8 h-8 rounded-full border-4 border-violet-200 border-t-violet-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen brand-shell">
+    <div className="dashboard-shell flex brand-shell">
       <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} />
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-60 bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5",
-        open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 w-60 max-w-[85vw] bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5 dashboard-safe-bottom",
+        open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}>
         {/* Business Logo/Name — Clicking leads to settings.
             Tapping it on mobile previously dumped owners onto "/", which reads as a
@@ -444,18 +444,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile overlay */}
       {open && (
-        <div className="fixed inset-0 z-30 bg-black/20 md:hidden" onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setOpen(false)} />
       )}
 
       {/* ── Main ──────────────────────────────────────────────────── */}
-      <div className="flex-1 md:ml-60 flex flex-col min-h-screen min-w-0">
+      <div className="dashboard-shell flex-1 lg:ml-60 flex flex-col min-w-0">
 
         {/* Top bar */}
         <header className="h-16 bg-white/82 backdrop-blur-xl border-b border-[#E9DDCB] flex items-center justify-between gap-3 px-3 sm:px-6 sticky top-0 z-20">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Hamburger — 3 lines */}
             <button
-              className="md:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
+              className="lg:hidden min-h-11 min-w-11 p-2 rounded-xl hover:bg-gray-100 transition-colors"
               onClick={() => setOpen((o) => !o)}
               aria-label="Toggle menu">
               {open
@@ -474,7 +474,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <kbd className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">⌘K</kbd>
             </button>
             <Link href="/dashboard/notifications"
-              className="relative p-2 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors text-amber-700"
+              className="relative flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-amber-50 p-2 text-amber-700 transition-colors hover:bg-amber-100"
               aria-label="Notifications">
               <Bell className="w-4.5 h-4.5" />
               {unread > 0 && (
@@ -485,7 +485,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Link>
             {/* Messages quick-link */}
             <Link href="/dashboard/messages"
-              className="relative p-2 rounded-xl bg-violet-50 hover:bg-violet-100 transition-colors text-violet-700"
+              className="relative flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-violet-50 p-2 text-violet-700 transition-colors hover:bg-violet-100"
               aria-label={unreadMessages > 0 ? `${unreadMessages} unread client messages` : "Messages"}>
               <MessageSquare className="w-4.5 h-4.5" />
               {unreadMessages > 0 && (
@@ -495,7 +495,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </Link>
             {user && (
-              <Link href="/dashboard/account" className="flex items-center gap-2 rounded-full hover:bg-gray-100 pr-2 transition-colors" title="Your account">
+              <Link href="/dashboard/account" className="flex min-h-11 items-center gap-2 rounded-full pr-2 transition-colors hover:bg-gray-100" title="Your account">
                 <div className="w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs">
                   {avatar
                     // eslint-disable-next-line @next/next/no-img-element
@@ -510,7 +510,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <EmailVerificationBanner user={user} />
         <TwoFactorRecommendation user={user} />
-        <main id="main-content" className="flex-1 min-w-0 p-3 sm:p-6">{children}</main>
+        <main id="main-content" className="flex-1 min-w-0 overflow-x-hidden p-3 sm:p-5 xl:p-6">{children}</main>
       </div>
     </div>
   );

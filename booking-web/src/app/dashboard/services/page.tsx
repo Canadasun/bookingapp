@@ -111,7 +111,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="service-modal-title"
@@ -119,7 +119,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       tabIndex={-1}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <Card className="relative w-full max-w-md z-10 max-h-[90vh] overflow-y-auto">
+      <Card className="dashboard-safe-bottom relative w-full max-w-md z-10 max-h-[90dvh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white flex items-center justify-between">
           <h3 id="service-modal-title" className="text-base font-semibold text-gray-900">{editing ? "Edit service" : "New service"}</h3>
           <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
@@ -150,7 +150,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
           {/* Duration — pick hours and minutes separately (e.g. 1:15, 2:08) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">How long does it take?</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <select
                   aria-label="Duration hours"
@@ -184,7 +184,7 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Pricing style</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {[
                 { value: "FLAT" as const, label: "Flat rate" },
                 { value: "PER_HOUR" as const, label: "Per hour" },
@@ -287,7 +287,7 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="category-modal-title"
@@ -295,7 +295,7 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
       tabIndex={-1}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <Card className="relative w-full max-w-sm z-10">
+      <Card className="dashboard-safe-bottom relative w-full max-w-sm max-h-[90dvh] overflow-y-auto z-10">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 id="category-modal-title" className="text-base font-semibold text-gray-900">{editing ? "Edit category" : "New category"}</h3>
           <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
@@ -440,7 +440,7 @@ export default function ServicesPage() {
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Services</h2>
             <p className="text-sm text-gray-500">

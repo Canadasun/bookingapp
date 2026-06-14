@@ -65,8 +65,8 @@ export default function MembershipsPage() {
   if (!bizId) return null;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Crown className="w-6 h-6 text-amber-500" /> Memberships</h1>
           <p className="text-sm text-gray-500 mt-1">Recurring monthly plans for your best clients.</p>

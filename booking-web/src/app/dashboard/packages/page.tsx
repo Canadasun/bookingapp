@@ -65,7 +65,7 @@ export default function PackagesPage() {
         <p className="text-sm text-gray-500">Sell prepaid session bundles, then redeem credits as clients visit.</p>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex rounded-xl border border-gray-200 p-0.5 bg-gray-50">
           {(["products", "issued"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
@@ -185,7 +185,7 @@ function ProductForm({ bizId, services, onDone, onCancel }: { bizId: string; ser
     <Card className="border-violet-200">
       <CardContent className="py-5 space-y-3">
         <Input placeholder="Package name, e.g. “5x Haircut”" value={name} onChange={(e) => setName(e.target.value)} />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <label className="text-xs font-medium text-gray-500">Credits</label>
             <Input type="number" min={1} value={credits} onChange={(e) => setCredits(e.target.value)} />

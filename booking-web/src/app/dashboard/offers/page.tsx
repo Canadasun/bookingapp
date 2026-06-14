@@ -71,7 +71,7 @@ export default function OffersPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Offers &amp; Promotions</h2>
           <p className="text-sm text-gray-600 mt-0.5">Visible to clients in their portal</p>
@@ -124,7 +124,7 @@ export default function OffersPage() {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="dashboard-safe-bottom fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="offer-modal-title"

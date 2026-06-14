@@ -76,6 +76,30 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Mobile Safari zooms focused controls whose computed font size is below 16px.
+   Keep dashboard forms stable while preserving the denser desktop typography. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.dashboard-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.dashboard-safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.dashboard-dynamic-height {
+  height: calc(100vh - 8.125rem);
+  height: calc(100dvh - 8.125rem);
+}
+
 ::selection {
   background: #F6CB8C;
   color: #17202A;

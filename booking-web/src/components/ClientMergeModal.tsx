@@ -55,7 +55,7 @@ export function ClientMergeModal({ bizId, onClose, onMerged }: { bizId: string; 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="client-merge-modal-title"
@@ -63,7 +63,7 @@ export function ClientMergeModal({ bizId, onClose, onMerged }: { bizId: string; 
       tabIndex={-1}
     >
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
+      <div className="dashboard-safe-bottom relative z-10 w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="sticky top-0 bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-violet-600" />

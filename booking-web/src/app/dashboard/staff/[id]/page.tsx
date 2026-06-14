@@ -120,7 +120,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
       {/* Availability */}
       <Card className="mb-4">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Weekly availability</CardTitle>
             <button onClick={copyMondayToWeekdays}
               className="flex items-center gap-1.5 text-xs text-violet-600 hover:underline">
@@ -130,18 +130,18 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
         </CardHeader>
         <CardContent className="space-y-2">
           {rules.map((rule, i) => (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className="flex flex-wrap items-center gap-3">
               <input type="checkbox" checked={rule.enabled} onChange={(e) => setRule(i, { enabled: e.target.checked })}
                 className="accent-violet-600 w-4 h-4 shrink-0" />
               <span className={cn("w-8 text-sm font-medium shrink-0", rule.enabled ? "text-gray-700" : "text-gray-400")}>
                 {SHORT[i]}
               </span>
               {rule.enabled ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <Input type="time" value={rule.startTime} className="w-28"
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Input type="time" value={rule.startTime} className="min-w-0 flex-1 sm:w-28 sm:flex-none"
                     onChange={(e) => setRule(i, { startTime: e.target.value })} />
                   <span className="text-gray-400 text-sm">–</span>
-                  <Input type="time" value={rule.endTime} className="w-28"
+                  <Input type="time" value={rule.endTime} className="min-w-0 flex-1 sm:w-28 sm:flex-none"
                     onChange={(e) => setRule(i, { endTime: e.target.value })} />
                 </div>
               ) : <span className="text-sm text-gray-400">Off</span>}
@@ -156,7 +156,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
         <CardHeader><CardTitle>Time off</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
                 <Input type="datetime-local" value={toForm.startsAt} onChange={(e) => setToForm((p) => ({ ...p, startsAt: e.target.value }))} />

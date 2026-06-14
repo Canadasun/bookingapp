@@ -555,10 +555,10 @@ function SettingsPage() {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row gap-5">
+      <div className="flex flex-col xl:flex-row gap-5">
 
-        {/* Mobile tab bar — hidden on md+ */}
-        <div className="md:hidden mb-4 -mx-4 px-4 overflow-x-auto">
+        {/* Compact tab bar — used until there is room for both dashboard sidebars. */}
+        <div className="xl:hidden mb-4 -mx-3 px-3 sm:-mx-5 sm:px-5 overflow-x-auto">
           <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
             {SECTIONS.map((s) => (
               <button key={s.id} onClick={() => goSection(s.id)}
@@ -572,7 +572,7 @@ function SettingsPage() {
         </div>
 
         {/* Left nav */}
-        <aside className="hidden md:block w-56 shrink-0">
+        <aside className="hidden xl:block w-56 shrink-0">
           <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {SECTIONS.map(({ id, label, icon: Icon, desc }) => (
               <button key={id} onClick={() => goSection(id)}
@@ -599,7 +599,7 @@ function SettingsPage() {
           <form onSubmit={save}>
 
             {section === "profile" && (
-              <div className="p-6 space-y-4">
+              <div className="p-4 space-y-4 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Business profile</h3>
                   <p className="text-xs text-gray-600 mt-0.5">This information appears on your booking page.</p>
@@ -713,7 +713,7 @@ function SettingsPage() {
             )}
 
             {section === "booking" && (
-              <div className="p-6 space-y-5">
+              <div className="p-4 space-y-5 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Booking policies</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Set the client booking rules that protect your calendar.</p>
@@ -787,7 +787,7 @@ function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-1">Shown during checkout on every business-specific booking link.</p>
                 </Field>
 
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
+                <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Client self-reschedule</p>
                     <p className="text-xs text-gray-400 mt-0.5">Clients can move appointments from their secure manage link when outside your policy window.</p>
@@ -820,7 +820,7 @@ function SettingsPage() {
             )}
 
             {section === "calendar" && (
-              <div className="p-6 space-y-5">
+              <div className="p-4 space-y-5 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Calendar sync</h3>
                   <p className="text-xs text-gray-400 mt-0.5">See your Pulse appointments in any calendar app on your phone or computer.</p>
@@ -912,7 +912,7 @@ function SettingsPage() {
             )}
 
             {section === "payments" && (
-              <div className="p-6 space-y-4">
+              <div className="p-4 space-y-4 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Payments &amp; fees</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Deposits and manual charges are Basic+. Automatic saved-card fees are Pro.</p>
@@ -940,7 +940,7 @@ function SettingsPage() {
                     <p className="mt-1 text-xs leading-relaxed text-blue-700">You can collect deposits at booking and take manual charges. Upgrade to Pro for automatic no-show and late-cancellation charges.</p>
                   </div>
                 )}
-                <div className={cn("flex items-center justify-between p-4 rounded-xl border", isPaid ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50")}>
+                <div className={cn("flex flex-col gap-3 p-4 rounded-xl border sm:flex-row sm:items-center sm:justify-between", isPaid ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50")}>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Require deposit at booking</p>
                     <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online. Basic+</p>
@@ -961,7 +961,7 @@ function SettingsPage() {
                   </Field>
                 )}
 
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50">
+                <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
                   <div className="pr-3">
                     <p className="text-sm font-semibold text-gray-800">Collect a card on file</p>
                     <p className="text-xs text-gray-400 mt-0.5">Ask every client to save a card with Stripe at booking (no upfront charge) so you can collect deposits/no-show/late-cancel fees later. Basic+</p>
@@ -999,7 +999,7 @@ function SettingsPage() {
                     </Field>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50">
+                <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Manual charges</p>
                     <p className="text-xs text-gray-400 mt-0.5">Basic+ businesses can charge a client manually from checkout for fees, balances, or add-ons.</p>
@@ -1012,7 +1012,7 @@ function SettingsPage() {
             )}
 
             {section === "online" && (
-              <div className="p-6 space-y-5">
+              <div className="p-4 space-y-5 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Online booking</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Share your booking link with clients.</p>
@@ -1186,7 +1186,7 @@ function SettingsPage() {
                 { name: "Slate", shades: ["#0F172A", "#334155", "#475569", "#64748B", "#94A3B8"] },
               ] as const;
               return (
-                <div className="p-6 space-y-6">
+                <div className="p-4 space-y-6 sm:p-6">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900">Branding</h3>
                     <p className="text-xs text-gray-400 mt-0.5">Customise how your booking page looks to clients. Changes apply after you save.</p>
@@ -1235,7 +1235,7 @@ function SettingsPage() {
                       <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
                         <ShieldCheck className="w-3.5 h-3.5" /> Accessibility — WCAG contrast ratios
                       </p>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                         <div className="rounded-lg bg-white border border-gray-100 p-2.5 text-center">
                           <p className="text-gray-400 mb-1">Colour on white</p>
                           <p className="font-bold text-gray-900 tabular-nums">{onWhite.toFixed(1)}:1</p>
@@ -1336,7 +1336,7 @@ function SettingsPage() {
                   <hr className="border-gray-100" />
 
                   {/* Powered by toggle — Unlimited only */}
-                  <div className={cn("flex items-center justify-between p-4 rounded-xl border", isUnlimited ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-75")}>
+                  <div className={cn("flex flex-col gap-3 p-4 rounded-xl border sm:flex-row sm:items-center sm:justify-between", isUnlimited ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-75")}>
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-gray-800">Remove &quot;Powered by Pulse&quot; watermark</p>
@@ -1384,7 +1384,7 @@ function SettingsPage() {
             })()}
 
             {section === "locations" && (
-              <div className="p-6 space-y-5">
+              <div className="p-4 space-y-5 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Locations</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Manage multiple branches under one account. Staff and appointments are assigned per location.</p>
@@ -1402,7 +1402,7 @@ function SettingsPage() {
                     <div className="space-y-2">
                       {locations.length === 0 && <p className="text-xs text-gray-400">No extra locations yet.</p>}
                       {locations.map((loc) => (
-                        <div key={loc.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3">
+                        <div key={loc.id} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-800 truncate">{loc.name}</p>
                             {loc.address && <p className="text-xs text-gray-400 truncate">{loc.address}</p>}
@@ -1457,7 +1457,7 @@ function SettingsPage() {
             )}
 
             {section === "payouts" && (
-              <div className="p-6 space-y-5">
+              <div className="p-4 space-y-5 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Payouts</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Connect your bank account and withdraw your earnings. Powered by Stripe Connect.</p>
@@ -1557,7 +1557,7 @@ function SettingsPage() {
 
                     {/* Balance */}
                     {connectStatus.available.length > 0 && (
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="rounded-xl border border-gray-100 bg-white p-4">
                           <p className="text-xs text-gray-400 mb-1">Available balance</p>
                           {connectStatus.available.map((b) => (
@@ -1616,7 +1616,7 @@ function SettingsPage() {
             )}
 
             {section === "notifications" && (
-              <div className="p-6 space-y-4">
+              <div className="p-4 space-y-4 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Choose what emails and SMS messages are sent to clients.</p>
@@ -1699,7 +1699,7 @@ function SettingsPage() {
                 ] as const).map(({ key, label, desc }) => {
                   const enabled = notificationSettings[key] !== false;
                   return (
-                    <div key={key} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0">
+                    <div key={key} className="flex flex-col gap-3 py-3 border-b border-gray-50 last:border-0 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-700">{label}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
@@ -1732,14 +1732,14 @@ function SettingsPage() {
             )}
 
             {section === "security" && (
-              <div className="p-6 space-y-4">
+              <div className="p-4 space-y-4 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Security</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Protect your account with a second step at sign-in.</p>
                 </div>
                 <hr className="border-gray-100" />
 
-                <div className="flex items-start justify-between gap-4 py-2">
+                <div className="flex flex-col gap-3 py-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-700">Two-factor sign-in</p>
                     <p className="text-xs text-gray-400 mt-0.5">
@@ -1799,7 +1799,7 @@ function SettingsPage() {
                     <p className="text-xs text-amber-700 mt-0.5 mb-3">
                       Each code works once. If you ever can&apos;t receive your verification code, enter one of these to sign in. They won&apos;t be shown again.
                     </p>
-                    <div className="grid grid-cols-2 gap-1.5 font-mono text-sm text-gray-800 bg-white rounded-lg border border-amber-100 p-3">
+                    <div className="grid grid-cols-1 gap-1.5 font-mono text-sm text-gray-800 bg-white rounded-lg border border-amber-100 p-3 min-[400px]:grid-cols-2">
                       {recoveryCodes.map((c) => <span key={c}>{c}</span>)}
                     </div>
                     <div className="flex gap-2 mt-3">
@@ -1817,7 +1817,7 @@ function SettingsPage() {
                 )}
 
                 <hr className="border-gray-100" />
-                <div className="flex items-start justify-between gap-4 py-1">
+                <div className="flex flex-col gap-3 py-1 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-700">Password</p>
                     <p className="text-xs text-gray-400 mt-0.5">Change the password you use to sign in.</p>
@@ -1831,7 +1831,7 @@ function SettingsPage() {
             )}
 
             {section === "billing" && (
-              <div className="p-6 space-y-5">
+              <div className="p-4 space-y-5 sm:p-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Billing &amp; plan</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Choose the plan that fits your business.</p>
@@ -1940,7 +1940,7 @@ function SettingsPage() {
                           Most popular
                         </span>
                       )}
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <div className="flex items-baseline gap-1">
                             <span className="text-2xl font-bold text-gray-900">{plan.price}</span>
@@ -1986,7 +1986,7 @@ function SettingsPage() {
                 </div>
 
                 {(biz?.plan ?? "FREE") !== "FREE" && (
-                  <div className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
+                  <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-700">Stripe billing portal</p>
                       <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, or cancel automatic renewal. Cancellation normally takes effect at the end of the paid period.</p>

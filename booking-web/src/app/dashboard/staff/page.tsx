@@ -180,7 +180,7 @@ export default function StaffPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Staff</h2>
           <p className="text-sm text-gray-500">{staff.filter((s) => s.active).length} active · {staff.filter((s) => !s.active).length} inactive</p>
@@ -246,7 +246,7 @@ export default function StaffPage() {
       {/* Location edit modal */}
       {editingLocation && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="location-modal-title"
@@ -254,7 +254,7 @@ export default function StaffPage() {
           onKeyDown={(e) => e.key === "Escape" && setEditingLocation(null)}
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingLocation(null)} />
-          <Card className="relative w-full max-w-sm z-10">
+          <Card className="dashboard-safe-bottom relative w-full max-w-sm max-h-[92dvh] overflow-y-auto z-10">
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 id="location-modal-title" className="font-semibold text-gray-900">Edit location</h3>
             </div>
@@ -351,7 +351,7 @@ export default function StaffPage() {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="staff-modal-title"
@@ -359,7 +359,7 @@ export default function StaffPage() {
           onKeyDown={(e) => e.key === "Escape" && setShowModal(false)}
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <Card className="relative w-full max-w-md z-10 max-h-[90vh] overflow-y-auto">
+          <Card className="dashboard-safe-bottom relative w-full max-w-md z-10 max-h-[90dvh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 id="staff-modal-title" className="font-semibold text-gray-900">{editing ? `Edit ${editing.user.name}` : "Add staff member"}</h3>
             </div>

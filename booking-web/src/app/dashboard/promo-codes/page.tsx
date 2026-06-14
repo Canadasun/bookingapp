@@ -75,8 +75,8 @@ export default function PromoCodesPage() {
   if (!bizId) return null;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Tag className="w-6 h-6 text-violet-600" /> Promo Codes</h1>
           <p className="text-sm text-gray-500 mt-1">Clients enter these at checkout to receive a discount.</p>
@@ -87,7 +87,7 @@ export default function PromoCodesPage() {
       {showForm && (
         <form onSubmit={create} className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-sm">
           <h2 className="font-semibold text-gray-900">Create promo code</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Code</label>
               <Input placeholder="e.g. SUMMER20" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} className="uppercase" />

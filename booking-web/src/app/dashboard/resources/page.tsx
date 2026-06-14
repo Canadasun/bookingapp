@@ -71,8 +71,8 @@ export default function ResourcesPage() {
   if (!bizId) return null;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Resources</h1>
           <p className="text-sm text-gray-500 mt-1">Rooms, chairs, equipment — assign to services to limit double-booking.</p>

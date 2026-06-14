@@ -153,7 +153,7 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
           <label className="text-xs font-medium text-gray-500">Amount ($)</label>
           <Input type="number" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input placeholder="Recipient name (optional)" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
           <Input type="email" placeholder="Recipient email (optional)" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} />
         </div>

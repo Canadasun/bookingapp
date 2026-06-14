@@ -70,7 +70,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
         aria-labelledby="apt-drawer-title"
         onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
         tabIndex={-1}
-        className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+        className="dashboard-safe-bottom fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <h2 id="apt-drawer-title" className="text-lg font-bold text-gray-900">Appointment details</h2>
@@ -273,7 +273,7 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
     (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(a);
   }
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-x-auto">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-900">{format(month, "MMMM yyyy")}</p>
         <div className="flex items-center gap-1">
@@ -282,12 +282,12 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
           <button onClick={onNext} aria-label="Next month" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
-      <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-100">
+      <div className="grid min-w-[700px] grid-cols-7 bg-gray-50 border-b border-gray-100">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-500">{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7">
+      <div className="grid min-w-[700px] grid-cols-7">
         {days.map((day) => {
           const k = format(day, "yyyy-MM-dd");
           const list = (byDay.get(k) ?? []).sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
@@ -416,7 +416,7 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
         onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
         tabIndex={-1}
         aria-hidden="false"
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+        className="dashboard-safe-bottom bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md sm:mx-4 max-h-[92dvh] overflow-y-auto p-4 sm:p-6">
         <div className="flex items-center justify-between mb-5">
           <p id="new-apt-modal-title" className="text-base font-semibold text-gray-900">New appointment</p>
           <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
@@ -476,7 +476,7 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
           )}
 
           {/* Date & time */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="new-apt-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
               <Input id="new-apt-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-required="true" />
@@ -553,7 +553,7 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
     .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
@@ -561,7 +561,7 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
         aria-labelledby="block-time-modal-title"
         onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
         tabIndex={-1}
-        className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
+        className="dashboard-safe-bottom relative z-10 w-full max-w-md max-h-[92dvh] rounded-2xl bg-white shadow-xl overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <CalendarOff className="w-4 h-4 text-violet-600" />
@@ -583,7 +583,7 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
             <label htmlFor="block-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
             <Input id="block-date" type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} aria-required="true" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="block-from" className="block text-sm font-medium text-gray-700 mb-1">From</label>
               <Input id="block-from" type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-required="true" />
@@ -709,7 +709,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
       </div>
 
       {/* Day headers */}
-      <div className="flex border-b border-gray-100">
+      <div className="flex min-w-[760px] border-b border-gray-100">
         <div className="w-12 shrink-0" />
         {days.map((day) => (
           <div key={day.toISOString()} className={cn(
@@ -723,8 +723,8 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
       </div>
 
       {/* Scrollable time grid */}
-      <div className="overflow-y-auto" style={{ maxHeight: "600px" }}>
-        <div className="flex" style={{ height: `${gridH}px`, minWidth: 0 }}>
+      <div className="overflow-auto" style={{ maxHeight: "600px" }}>
+        <div className="flex min-w-[760px]" style={{ height: `${gridH}px` }}>
           {/* Hour labels */}
           <div className="w-12 shrink-0 relative">
             {hours.map((h) => (
@@ -1001,12 +1001,12 @@ function AppointmentsPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Appointments</h2>
           <p className="text-sm text-gray-500">{appointments.length} total</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => setShowNewApt(true)} className="gap-1.5">
             + New appointment
           </Button>
@@ -1029,7 +1029,7 @@ function AppointmentsPage() {
       )}
 
       {/* Tabs + filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-5">
         <select value={tab} onChange={(e) => setTab(e.target.value as Tab)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700 font-medium">
           <option value="all">All appointments</option>
@@ -1044,9 +1044,9 @@ function AppointmentsPage() {
             <Search className="w-4 h-4" />
           </button>
           {showSearch && (
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input placeholder="Search client…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-48" autoFocus />
+              <Input placeholder="Search client…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-full sm:w-48" autoFocus />
             </div>
           )}
         </div>
@@ -1064,7 +1064,8 @@ function AppointmentsPage() {
             <option key={s} value={s}>{s}</option>)}
         </select>
 
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        <div className="max-w-full overflow-x-auto rounded-xl bg-gray-100 p-1">
+          <div className="flex w-max gap-1">
           {(["list","staff","week","calendar"] as ViewMode[]).map((v) => (
             <button key={v} onClick={() => {
               setViewMode(v);
@@ -1077,6 +1078,7 @@ function AppointmentsPage() {
               {v === "list" ? "List" : v === "staff" ? "Staff board" : v === "week" ? "Week" : "Month"}
             </button>
           ))}
+          </div>
         </div>
       </div>
 

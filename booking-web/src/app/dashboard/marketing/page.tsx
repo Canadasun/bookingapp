@@ -167,7 +167,7 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {AUDIENCES.map((a) => (
             <button key={a.value} onClick={() => setAudience(a.value)}
               className={`text-left p-3 rounded-xl border transition-colors ${audience === a.value ? "border-violet-400 bg-violet-50" : "border-gray-200 hover:bg-gray-50"}`}>

@@ -213,12 +213,12 @@ export default function ClientsPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Clients</h2>
           <p className="text-sm text-gray-500">{total} client{total !== 1 ? "s" : ""}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />Merge duplicates</Button>
           <a href={api.clients.exportCsv(bizId)} download="clients.csv"
             className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
@@ -268,7 +268,7 @@ export default function ClientsPage() {
           {clients.map((c) => (
             <Card key={c.id} className="overflow-hidden">
               <button type="button" onClick={() => openClient(c)}
-                className="flex w-full items-center gap-4 px-6 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-500">
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-500 sm:gap-4 sm:px-6">
                 <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm shrink-0">
                   {c.name.slice(0, 2).toUpperCase()}
                 </div>
@@ -279,9 +279,9 @@ export default function ClientsPage() {
                       <span key={t} className="rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 text-[10px] font-medium">{t}</span>
                     ))}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
-                    <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.email}</span>
-                    {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{formatPhoneDisplay(c.phone)}</span>}
+                  <div className="mt-0.5 flex flex-col gap-1 text-xs text-gray-500 sm:flex-row sm:items-center sm:gap-3">
+                    <span className="flex min-w-0 items-center gap-1 break-all"><Mail className="w-3 h-3 shrink-0" />{c.email}</span>
+                    {c.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3 shrink-0" />{formatPhoneDisplay(c.phone)}</span>}
                   </div>
                 </div>
                 <div className="text-right text-xs text-gray-500 shrink-0 hidden sm:block">
@@ -316,10 +316,10 @@ export default function ClientsPage() {
             aria-labelledby="client-drawer-title"
             onKeyDown={(e) => { if (e.key === 'Escape') setSelected(null) }}
             tabIndex={-1}
-            className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+            className="dashboard-safe-bottom fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+            <div className="flex flex-col gap-3 px-4 py-4 border-b border-gray-100 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
               <h2 id="client-drawer-title" className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Button size="sm" onClick={rebook} className="gap-1.5">
                   <CalendarPlus className="w-4 h-4" />Book again
                 </Button>
@@ -363,12 +363,12 @@ export default function ClientsPage() {
                 </div>
               ) : (
                 <div className="space-y-1.5 text-sm">
-                  <div className="flex items-center gap-2 text-gray-600"><Mail className="w-4 h-4 text-gray-400" />{selected.email}</div>
+                  <div className="flex min-w-0 items-center gap-2 break-all text-gray-600"><Mail className="w-4 h-4 shrink-0 text-gray-400" />{selected.email}</div>
                   {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{formatPhoneDisplay(selected.phone)}</div>}
                   {selected.birthday && <div className="flex items-center gap-2 text-gray-600"><span className="w-4 text-center">🎂</span>{format(new Date(`2000-${selected.birthday}T00:00:00`), "MMMM d")}</div>}
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-3">
                 {[
                   { label: "Total visits", value: selected.totalVisits, icon: Calendar },
                   { label: "Total spent",  value: formatPrice(selected.totalSpentCents ?? 0), icon: DollarSign },
@@ -499,7 +499,7 @@ export default function ClientsPage() {
 
       {/* Add client modal */}
       {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="dashboard-safe-bottom fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAdd(false)} aria-hidden="true" />
           <Card
             role="dialog"

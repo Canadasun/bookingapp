@@ -282,7 +282,7 @@ export default function CheckoutPage() {
 
         {/* ── Client ─────────────────────────────────────────────────── */}
         {step === "client" && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <h3 className="text-base font-semibold text-gray-900 mb-4">Who is this booking for?</h3>
 
             <div className="relative mb-3">
@@ -330,7 +330,7 @@ export default function CheckoutPage() {
 
         {/* ── Services ───────────────────────────────────────────────── */}
         {step === "services" && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <button onClick={() => setStep("client")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
               ← Back
             </button>
@@ -379,7 +379,7 @@ export default function CheckoutPage() {
 
         {/* ── Staff ──────────────────────────────────────────────────── */}
         {step === "staff" && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <button onClick={() => setStep("services")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
               ← Back
             </button>
@@ -446,7 +446,7 @@ export default function CheckoutPage() {
 
         {/* ── Date & Time ────────────────────────────────────────────── */}
         {step === "datetime" && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <button onClick={() => setStep(showStaffStep ? "staff" : "services")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
               ← Back
             </button>
@@ -550,7 +550,7 @@ export default function CheckoutPage() {
 
         {/* ── Confirm ────────────────────────────────────────────────── */}
         {step === "confirm" && (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <button onClick={() => setStep("datetime")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
               ← Back
             </button>
@@ -585,7 +585,7 @@ export default function CheckoutPage() {
                   onChange={(e) => setRecurring((p) => ({ ...p, enabled: e.target.checked }))} />
               </label>
               {recurring.enabled && (
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="recurring-frequency" className="block text-xs font-medium text-gray-500 mb-1">Frequency</label>
                     <select id="recurring-frequency" value={recurring.frequency}
@@ -606,7 +606,7 @@ export default function CheckoutPage() {
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} {n === 1 ? "time" : "times"}</option>)}
                     </select>
                   </div>
-                  <p className="col-span-2 text-xs text-gray-500">Creates {recurring.count} confirmed bookings; any that conflict are skipped.</p>
+                  <p className="text-xs text-gray-500 sm:col-span-2">Creates {recurring.count} confirmed bookings; any that conflict are skipped.</p>
                 </div>
               )}
             </div>

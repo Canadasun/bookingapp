@@ -20,9 +20,9 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses: Record<Size, string> = {
-  xs: "px-2.5 py-1 text-xs",
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-sm",
+  xs: "min-h-10 px-2.5 py-1 text-xs lg:min-h-0",
+  sm: "min-h-10 px-3 py-1.5 text-sm lg:min-h-0",
+  md: "min-h-11 px-4 py-2 text-sm lg:min-h-0",
   lg: "px-6 py-3 text-base",
 };
 
