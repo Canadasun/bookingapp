@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Alert, SafeAreaView, Platform, Modal, StatusBar,
   KeyboardAvoidingView, RefreshControl, BackHandler, Linking, Switch, Share,
 } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -16,10 +17,11 @@ import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, ref
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
+import { useHaptics } from '../hooks/useHaptics';
 
-const STATUS_LABEL: Record<string,string> = {
-  ALL:'All', PENDING:'Pending', CONFIRMED:'Confirmed',
-  COMPLETED:'Completed', CANCELLED:'Cancelled', NO_SHOW:'No-show',
+const STATUS_LABEL: Record<string, string> = {
+  ALL: 'All', PENDING: 'Pending', CONFIRMED: 'Confirmed',
+  COMPLETED: 'Completed', CANCELLED: 'Cancelled', NO_SHOW: 'No-show',
 };
 
 import { io, Socket } from 'socket.io-client';
@@ -27,42 +29,53 @@ import { io, Socket } from 'socket.io-client';
 function CalendarScreen() {
   const { user } = getAuth();
   const nav = useNavigation<any>();
-  const [apts, setApts]       = useState<Appointment[]>([]);
-  const [biz, setBiz]         = useState<any|null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selected, setSelected]     = useState<Appointment|null>(null);
-  const [statusFilter, setStatusFilter] = useState<'ALL'|'PENDING'|'CONFIRMED'|'COMPLETED'|'CANCELLED'|'NO_SHOW'>('ALL');
+  const queryClient = useQueryClient();
+  const haptics = useHaptics();
+  const [selected, setSelected] = useState<Appointment | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'>('ALL');
   const [staffFilter, setStaffFilter] = useState<string>('ALL');
-  // Calendar date strip: null = full upcoming agenda; a toDateString() key = that day only.
-  const [dayFilter, setDayFilter] = useState<string|null>(null);
-  const [reschedule, setReschedule] = useState<{ appointment:Appointment; date:string; slots:Slot[]; loading:boolean }|null>(null);
-  const [editAppt, setEditAppt] = useState<{ appointment:Appointment; name:string; email:string; phone:string; notes:string; notifyClient:boolean }|null>(null);
-  const [acting, setActing]         = useState(false);
+  const [dayFilter, setDayFilter] = useState<string | null>(null);
+  const [reschedule, setReschedule] = useState<{ appointment: Appointment; date: string; slots: Slot[]; loading: boolean } | null>(null);
+  const [editAppt, setEditAppt] = useState<{ appointment: Appointment; name: string; email: string; phone: string; notes: string; notifyClient: boolean } | null>(null);
+  const [acting, setActing] = useState(false);
 
-  const load = useCallback(async (silent=false) => {
-    if (!silent) setLoading(true);
-    try {
-      const bId = bizId();
-      const [res, b] = await Promise.all([
-        api<{data: Appointment[]}>(`/businesses/${bId}/bookings`),
-        api<any>(`/businesses/${bId}`),
-      ]);
+  const { data: apts = [], isLoading: loadingApts, isFetching: refreshingApts, refetch: refetchApts } = useQuery({
+    queryKey: ['bookings', bizId()],
+    queryFn: () => api<{ data: Appointment[] }>(`/businesses/${bizId()}/bookings`).then(res => {
       const all = res.data;
-      const filtered = user?.role==='STAFF' && user?.staffId
+      return (user?.role === 'STAFF' && user?.staffId
         ? all.filter(a => a.staff.id === user.staffId)
-        : all;
-      setApts(filtered.sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
-      setBiz(b);
-    } catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed to load'); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [user?.staffId, user?.role]);
+        : all
+      ).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+    }),
+    refetchInterval: 60_000,
+  });
 
-  useEffect(() => { 
-    load();
-    const interval = setInterval(() => load(true), 60_000); // Poll every 60s as backup
-    return () => clearInterval(interval);
-  }, [load]);
+  const { data: biz, isLoading: loadingBiz } = useQuery({
+    queryKey: ['business', bizId()],
+    queryFn: () => api<any>(`/businesses/${bizId()}`),
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => api(`/businesses/${bizId()}/bookings/${id}/confirm`, { method: 'PATCH' }),
+    onSuccess: () => {
+      haptics.notification();
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      setSelected(null);
+      Alert.alert('Done', 'Appointment confirmed');
+    },
+    onSettled: () => setActing(false)
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string, status: string }) => api(`/businesses/${bizId()}/bookings/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    onSuccess: () => {
+      haptics.notification();
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      setSelected(null);
+    },
+    onSettled: () => setActing(false)
+  });
 
   // Real-time sync via sockets
   useEffect(() => {
@@ -75,13 +88,12 @@ function CalendarScreen() {
     api<{ ticket: string }>('/events/ws-ticket').then(({ ticket }) => {
       socket = io(apiUrl, { transports: ['websocket'], auth: { ticket } });
       socket.on('connect', () => socket?.emit('joinBusiness', bId));
-      socket.on('bookingUpdated', () => load(true));
-      socket.on('appointmentUpdated', () => load(true));
-      socket.on('messageUpdated', () => {}); // handled elsewhere
-    }).catch(() => {});
+      socket.on('bookingUpdated', () => queryClient.invalidateQueries({ queryKey: ['bookings'] }));
+      socket.on('appointmentUpdated', () => queryClient.invalidateQueries({ queryKey: ['bookings'] }));
+    }).catch(() => { });
 
     return () => { socket?.disconnect(); };
-  }, [load]);
+  }, [queryClient]);
 
   // Hardware back (Android) closes the open appointment detail instead of leaving
   // the app; the overlay also has an on-screen close for iOS.
@@ -93,39 +105,36 @@ function CalendarScreen() {
     return () => sub.remove();
   }, [selected]);
 
-  async function confirm(id:string) {
+  async function confirm(id: string) {
     setActing(true);
-    try { await api(`/businesses/${bizId()}/bookings/${id}/confirm`,{method:'PATCH'}); load(true); setSelected(null); Alert.alert('Done','Appointment confirmed'); }
-    catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
-    finally { setActing(false); }
+    confirmMutation.mutate(id);
   }
-  async function cancel(id:string) {
-    Alert.alert('Cancel appointment','Are you sure?',[
-      {text:'No',style:'cancel'},
-      {text:'Cancel it',style:'destructive',onPress:async()=>{
-        setActing(true);
-        try { await api(`/businesses/${bizId()}/bookings/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'CANCELLED'})}); load(true); setSelected(null); }
-        catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
-        finally { setActing(false); }
-      }},
+  async function cancel(id: string) {
+    Alert.alert('Cancel appointment', 'Are you sure?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Cancel it', style: 'destructive', onPress: async () => {
+          setActing(true);
+          updateStatusMutation.mutate({ id, status: 'CANCELLED' });
+        }
+      },
     ]);
   }
-  async function complete(id:string) {
+  async function complete(id: string) {
     setActing(true);
-    try { await api(`/businesses/${bizId()}/bookings/${id}/status`,{method:'PATCH',body:JSON.stringify({status:'COMPLETED'})}); load(true); setSelected(null); }
-    catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
-    finally { setActing(false); }
+    updateStatusMutation.mutate({ id, status: 'COMPLETED' });
   }
-  async function syncCalendar(id:string) {
+  async function syncCalendar(id: string) {
     setActing(true);
     try {
-      const res = await api<{ success: boolean; googleSynced: boolean }>(`/calendar-sync/${id}`, { method:'POST' });
+      const res = await api<{ success: boolean; googleSynced: boolean }>(`/calendar-sync/${id}`, { method: 'POST' });
+      haptics.notification();
       if (res.googleSynced) {
         Alert.alert('Synced to Google Calendar', 'This appointment has been added to your Google Calendar.');
       } else {
         Alert.alert('Google Calendar not connected', "This appointment was saved, but Google Calendar isn't connected. Go to Settings → Calendar to link your account, or use the iCal feed to subscribe.");
       }
-    } catch(e) {
+    } catch (e) {
       Alert.alert('Sync failed', e instanceof Error ? e.message : 'Please try again.');
     } finally { setActing(false); }
   }
@@ -137,6 +146,7 @@ function CalendarScreen() {
   }
 
   async function loadRescheduleSlots(a: Appointment, d: string) {
+    haptics.impact();
     setReschedule(prev => prev ? { ...prev, date: d, loading: true, slots: [] } : prev);
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -153,13 +163,14 @@ function CalendarScreen() {
     setActing(true);
     try {
       await api(`/businesses/${bizId()}/bookings/${reschedule.appointment.id}/reschedule`, {
-        method:'PATCH',
+        method: 'PATCH',
         body: JSON.stringify({ startsAt }),
       });
+      haptics.notification();
       setReschedule(null);
-      load(true);
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
       Alert.alert('Rescheduled', 'The appointment was moved and the client was notified.');
-    } catch(e) {
+    } catch (e) {
       Alert.alert('Could not reschedule', e instanceof Error ? e.message : 'Please try again.');
     } finally { setActing(false); }
   }
@@ -185,7 +196,7 @@ function CalendarScreen() {
     setActing(true);
     try {
       await api(`/businesses/${bizId()}/bookings/${editAppt.appointment.id}`, {
-        method:'PATCH',
+        method: 'PATCH',
         body: JSON.stringify({
           clientName: editAppt.name.trim(),
           clientEmail: editAppt.email.trim().toLowerCase(),
@@ -194,10 +205,12 @@ function CalendarScreen() {
           notifyClient: editAppt.notifyClient,
         }),
       });
+      haptics.notification();
       setEditAppt(null);
-      load(true);
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
       Alert.alert('Saved', editAppt.notifyClient ? 'The client was notified.' : 'Saved without notifying the client.');
-    } catch(e) {
+    } catch (e) {
+
       Alert.alert('Could not save', e instanceof Error ? e.message : 'Please try again.');
     } finally { setActing(false); }
   }
@@ -210,13 +223,16 @@ function CalendarScreen() {
       {text:'Mark no-show',style:'destructive',onPress:async()=>{
         setActing(true);
         try {
-          const r = await api<{charged:boolean; feeCents:number; message?:string}>(`/payments/no-show/${id}`,{method:'POST'});
-          load(true); setSelected(null);
+          const r = await api<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${id}`, { method: 'POST' });
+          haptics.notification();
+          queryClient.invalidateQueries({ queryKey: ['bookings'] });
+          setSelected(null);
           Alert.alert(
             r.charged ? 'No-show fee charged' : 'Marked no-show',
-            r.charged ? `Charged $${(r.feeCents/100).toFixed(2)} to the card on file.` : (r.message || 'No saved card — collect the fee manually.'),
+            r.charged ? `Charged $${(r.feeCents / 100).toFixed(2)} to the card on file.` : (r.message || 'No saved card — collect the fee manually.'),
           );
-        } catch(e){ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
+        } catch (e) {
+ Alert.alert('Error', e instanceof Error ? e.message : 'Failed'); }
         finally { setActing(false); }
       }},
     ]);
@@ -257,17 +273,17 @@ function CalendarScreen() {
 
   function openMenu() {
     Alert.alert('Calendar', undefined, [
-      { text:'Refresh', onPress:()=>{ setRefreshing(true); load(true); } },
-      { text:'New appointment', onPress:()=>nav.navigate('Book') },
-      { text:'Close', style:'cancel' },
+      { text: 'Refresh', onPress: () => refetchApts() },
+      { text: 'New appointment', onPress: () => nav.navigate('Book') },
+      { text: 'Close', style: 'cancel' },
     ]);
   }
 
-  const monthLabel = new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const staffOptions = Array.from(new Map(apts.map(a => [a.staff.id, a.staff.user.name])).entries());
   const multiProvider = staffOptions.length > 1;
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
+  if (loadingApts) return <View style={s.center}><ActivityIndicator size="large" color={BRAND} /></View>;
 
   return (
     <SafeAreaView style={s.screen}>
@@ -282,10 +298,10 @@ function CalendarScreen() {
             <Ionicons name="person-circle-outline" size={28} color={GRAY_700}/>
           )}
         </TouchableOpacity>
-        <TouchableOpacity style={cal.monthWrap} activeOpacity={0.7} onPress={()=>{ setRefreshing(true); load(true); }}
+        <TouchableOpacity style={cal.monthWrap} activeOpacity={0.7} onPress={() => refetchApts()}
           accessibilityRole="button" accessibilityLabel="Refresh calendar">
           <Text style={cal.monthText}>{monthLabel}</Text>
-          <Ionicons name="chevron-down" size={16} color={GRAY_700} style={{marginLeft:4}}/>
+          <Ionicons name="chevron-down" size={16} color={GRAY_700} style={{ marginLeft: 4 }} />
         </TouchableOpacity>
         <TouchableOpacity style={cal.topBtn} onPress={()=>nav.navigate('Book')} hitSlop={{top:8,bottom:8,left:8,right:8}}
           accessibilityRole="button" accessibilityLabel="Add new appointment">
@@ -348,10 +364,10 @@ function CalendarScreen() {
 
       <SectionList
         sections={sections}
-        keyExtractor={(a)=>a.id}
+        keyExtractor={(a) => a.id}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingBottom:32 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true);}} tintColor={BRAND}/>}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={<RefreshControl refreshing={refreshingApts} onRefresh={refetchApts} tintColor={BRAND} />}
         showsVerticalScrollIndicator={false}
         renderSectionHeader={({section})=>(
           <View style={[cal.dateHeader, (section as any).isToday && cal.dateHeaderToday]}>

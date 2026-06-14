@@ -8,14 +8,29 @@ import { pinnedFetch } from './pinnedFetch';
 export async function api<T>(path: string, init?: RequestInit, _retried = false): Promise<T> {
   const { token } = getAuth();
   const isFormData = init?.body instanceof FormData;
-  const res = await pinnedFetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+
+  const performFetch = async (retryCount = 0): Promise<Response> => {
+    try {
+      const res = await pinnedFetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init?.headers ?? {}),
+        },
+      });
+      return res;
+    } catch (e) {
+      if (retryCount < 2) {
+        await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+        return performFetch(retryCount + 1);
+      }
+      throw e;
+    }
+  };
+
+  const res = await performFetch();
+
   // Access token expired mid-session → refresh once and retry transparently.
   if (res.status === 401 && !_retried && getAuth().refresh) {
     if (await refreshSession()) return api<T>(path, init, true);
