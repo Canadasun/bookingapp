@@ -1,12 +1,23 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Res, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Res, HttpCode, BadRequestException } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { z } from 'zod';
 import { ClientsService } from './clients.service';
 import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto } from './dto/client.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+const MAX_IMPORT_ROWS = 1000;
+const ImportCsvRowSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().optional().or(z.literal('')).transform(v => v || undefined),
+  phone: z.string().trim().max(30).optional(),
+  tags: z.string().trim().max(200).optional(),
+  notes: z.string().trim().max(2000).optional(),
+});
 
 @ApiTags('clients')
 @ApiBearerAuth()
@@ -56,11 +67,19 @@ export class ClientsController {
   @Post('import-csv')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, TenantGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   importCsv(
     @Param('businessId') businessId: string,
-    @Body() body: { rows: Array<{ name: string; email?: string; phone?: string; tags?: string; notes?: string }> },
+    @Body() body: { rows: unknown[] },
   ) {
-    return this.clientService.bulkImport(businessId, body.rows);
+    if (!Array.isArray(body?.rows)) throw new BadRequestException('rows must be an array');
+    if (body.rows.length > MAX_IMPORT_ROWS) throw new BadRequestException(`Cannot import more than ${MAX_IMPORT_ROWS} rows at once`);
+    const parsed = body.rows.map((row, i) => {
+      const result = ImportCsvRowSchema.safeParse(row);
+      if (!result.success) throw new BadRequestException(`Row ${i + 1}: ${result.error.errors[0]?.message ?? 'invalid'}`);
+      return result.data;
+    });
+    return this.clientService.bulkImport(businessId, parsed);
   }
 
   // Declared before @Get(':id') so "duplicates" isn't swallowed as a client id.
@@ -101,6 +120,7 @@ export class ClientsController {
 
   // Public — called during the unauthenticated booking wizard
   @Post()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   create(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateClientSchema)) dto: CreateClientDto,

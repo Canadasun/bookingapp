@@ -18,13 +18,15 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
-  check() {
-    return this.health.check([
+  async check() {
+    // Run the full infrastructure check but return only a single boolean to
+    // external callers — internal status (DB up/down, Redis up/down) should not
+    // be visible to unauthenticated observers.
+    const result = await this.health.check([
       () => this.prismaIndicator.pingCheck('database', this.prisma),
       async () => {
         try {
           const client = await this.queue.client;
-          // ioredis exposes ping() at runtime; cast to access it
           const ping = await (client as unknown as { ping(): Promise<string> }).ping();
           return { redis: { status: ping === 'PONG' ? 'up' : 'down' } };
         } catch {
@@ -32,5 +34,7 @@ export class HealthController {
         }
       },
     ]);
+    // Expose only pass/fail — no component details to unauthenticated callers.
+    return { status: result.status === 'ok' ? 'ok' : 'degraded' };
   }
 }

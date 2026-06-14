@@ -3,7 +3,17 @@ import { apiBase } from "@/lib/server-api";
 
 const API = apiBase();
 
+function assertSameOrigin(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  if (!origin) return;
+  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
+  if (expected && origin !== expected) {
+    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
+  }
+}
+
 export async function POST(req: NextRequest) {
+  assertSameOrigin(req);
   let token = req.cookies.get("booking_token")?.value;
 
   // If the short-lived access token has expired, exchange the refresh token

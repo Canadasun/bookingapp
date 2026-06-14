@@ -1,5 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const twilio = require('twilio') as typeof import('twilio');
+import { Logger } from '@nestjs/common';
 
 export interface SmsPayload {
   to: string;
@@ -11,6 +12,8 @@ export interface SmsProvider {
 }
 
 export class TwilioSmsProvider implements SmsProvider {
+  private readonly logger = new Logger(TwilioSmsProvider.name);
+
   async send(payload: SmsPayload): Promise<void> {
     const accountSid    = process.env.TWILIO_ACCOUNT_SID;   // AC... or SK...
     const mainAccountSid = process.env.TWILIO_MAIN_ACCOUNT_SID; // needed when accountSid is SK...
@@ -21,7 +24,7 @@ export class TwilioSmsProvider implements SmsProvider {
       accountSid.startsWith('AC_placeholder') || accountSid.startsWith('AC_test');
 
     if (isPlaceholder) {
-      console.log(`[SMS stub] To: ${payload.to} | Body: ${payload.body}`);
+      this.logger.debug('[SMS stub] message queued (recipient redacted)');
       return;
     }
 
@@ -32,9 +35,9 @@ export class TwilioSmsProvider implements SmsProvider {
         : twilio(accountSid, authToken);
 
       await client.messages.create({ from: fromNumber, to: payload.to, body: payload.body });
-      console.log(`[SMS sent] To: ${payload.to}`);
+      this.logger.log('[SMS sent] message delivered');
     } catch (error) {
-      console.error('[Twilio Error]', error);
+      this.logger.error('[Twilio Error]', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }

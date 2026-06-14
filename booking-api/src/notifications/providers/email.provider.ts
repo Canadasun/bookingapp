@@ -1,4 +1,11 @@
 import { Resend } from 'resend';
+import { Logger } from '@nestjs/common';
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return '***';
+  return `${local.slice(0, 2)}***@${domain}`;
+}
 
 export interface EmailAttachment {
   filename: string;
@@ -18,10 +25,12 @@ export interface EmailProvider {
 }
 
 export class ResendEmailProvider implements EmailProvider {
+  private readonly logger = new Logger(ResendEmailProvider.name);
+
   async send(payload: EmailPayload): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey || apiKey.startsWith('re_placeholder')) {
-      console.log(`[Email stub] To: ${payload.to} | Subject: ${payload.subject}`);
+      this.logger.debug(`[Email stub] to: ${maskEmail(payload.to)} subject: ${payload.subject}`);
       return;
     }
 
@@ -64,7 +73,7 @@ export class ResendEmailProvider implements EmailProvider {
         shouldRedirect ? `[→ ${payload.to}] ${payload.subject}` : payload.subject,
         finalHtml,
       );
-      console.log(`[Email sent] id=${id} from=${fromEmail} to=${actualTo}`);
+      this.logger.log(`[Email sent] id=${id} from=${fromEmail} to=${maskEmail(actualTo)}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
 
@@ -76,7 +85,7 @@ export class ResendEmailProvider implements EmailProvider {
         msg.toLowerCase().includes('testing emails to your own email address');
 
       if (verifiedFrom && isDomainError && adminEmail) {
-        console.warn(`[Email fallback] ${verifiedFrom} not yet verified — redirecting to admin: ${adminEmail}`);
+        this.logger.warn(`[Email fallback] ${verifiedFrom} not yet verified — redirecting to admin`);
         try {
           const id = await attempt(
             sharedFrom,
@@ -87,13 +96,13 @@ export class ResendEmailProvider implements EmailProvider {
               `$1<tr><td style="padding:8px 32px;background:#FEF3C7"><p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ DNS PENDING — would go to: ${payload.to}</p></td></tr>$2`
             ),
           );
-          console.log(`[Email fallback sent] id=${id} to=${adminEmail} (intended: ${payload.to})`);
+          this.logger.log(`[Email fallback sent] id=${id} to=${maskEmail(adminEmail)} (intended: ${maskEmail(payload.to)})`);
         } catch (fallbackErr) {
-          console.error('[Email fallback also failed]', fallbackErr);
+          this.logger.error('[Email fallback also failed]', fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
           throw fallbackErr;
         }
       } else {
-        console.error('[Resend Error]', msg);
+        this.logger.error('[Resend Error]', msg);
         throw err;
       }
     }

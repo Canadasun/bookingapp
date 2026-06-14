@@ -16,9 +16,11 @@ import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, ref
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
+import { useHaptics } from '../hooks/useHaptics';
 
 function BookScreen() {
   const nav = useNavigation<any>();
+  const haptics = useHaptics();
   type Step = 'service'|'staff'|'date'|'time'|'details'|'done';
   const [step, setStep]               = useState<Step>('service');
   const [services, setServices]       = useState<Service[]>([]);
@@ -86,6 +88,7 @@ function BookScreen() {
   },[]);
 
   function toggleSvc(sv: Service) {
+    haptics.selection();
     setSelectedSvcs(p => p.find(s=>s.id===sv.id) ? p.filter(s=>s.id!==sv.id) : [...p, sv]);
   }
 
@@ -111,6 +114,7 @@ function BookScreen() {
   }
 
   async function pickDate(d: string) {
+    haptics.impact();
     setDate(d); setLoading(true); setSlots([]);
     try {
       const serviceId = selectedSvcs[0]?.id ?? '';
@@ -175,6 +179,7 @@ function BookScreen() {
         const res = await api<{ groupId:string; created:{id:string}[]; skipped:string[] }>(`/businesses/${bizId()}/bookings/recurring`, {
           method:'POST', body: JSON.stringify({ ...basePayload, frequency: repeat.frequency, count: repeat.count }),
         });
+        haptics.notification();
         setBookedId(res.created[0]?.id ?? '');
         setStep('done');
         Alert.alert(
@@ -185,6 +190,7 @@ function BookScreen() {
         const apt = await api<{id:string}>(`/businesses/${bizId()}/bookings/manual`, {
           method:'POST', body: JSON.stringify(basePayload),
         });
+        haptics.notification();
         if (client.matched) {
           Alert.alert('Existing client', 'We matched this booking to an existing client profile and synced their details.');
         }

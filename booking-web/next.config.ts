@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
     // object-src 'none' and base-uri 'self' are the most impactful restrictions.
     const dashboardCsp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.clarity.ms",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.clarity.ms",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "connect-src 'self' https://api.pulseappointments.com wss://api.pulseappointments.com https://bookingapp-production-32f8.up.railway.app wss://bookingapp-production-32f8.up.railway.app https://api.stripe.com https://js.stripe.com https://www.clarity.ms https://c.clarity.ms",

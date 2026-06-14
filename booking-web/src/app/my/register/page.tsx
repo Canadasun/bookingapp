@@ -53,7 +53,7 @@ function RegisterForm() {
       const regRes = await fetch("/proxy/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name.trim(), email, password: form.password, role: "CLIENT", privacyConsentAccepted: true, consentVersion: "2026-06-08" }),
+        body: JSON.stringify({ name: form.name.trim(), email, password: form.password, role: "CLIENT", privacyConsentAccepted: true, consentVersion: "2026-06-13" }),
       });
       if (!regRes.ok) {
         const body = await readJson<{ message?: string }>(regRes);

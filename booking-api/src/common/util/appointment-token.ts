@@ -12,8 +12,11 @@ import { createHmac, timingSafeEqual } from 'crypto';
  * HMAC(appointmentId) with JWT_SECRET → stable per appointment, no DB needed.
  */
 function secret(): string {
-  const s = process.env.JWT_SECRET;
-  if (!s) throw new Error('JWT_SECRET is not set — cannot sign manage tokens.');
+  // Prefer a dedicated secret so a compromise of appointment tokens does not
+  // affect JWT session security. Falls back to JWT_SECRET for deployments that
+  // have not yet provisioned the separate variable.
+  const s = process.env.APPOINTMENT_TOKEN_SECRET ?? process.env.JWT_SECRET;
+  if (!s) throw new Error('APPOINTMENT_TOKEN_SECRET (or JWT_SECRET) is not set — cannot sign manage tokens.');
   return s;
 }
 

@@ -4,7 +4,17 @@ import { signCookieValue } from "@/lib/cookie-sign";
 
 const API = apiBase();
 
+function assertSameOrigin(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  if (!origin) return;
+  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
+  if (expected && origin !== expected) {
+    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
+  }
+}
+
 export async function POST(req: NextRequest) {
+  assertSameOrigin(req);
   const refreshToken = req.cookies.get("booking_refresh")?.value;
   if (!refreshToken) return NextResponse.json({ error: "No refresh token" }, { status: 401 });
 

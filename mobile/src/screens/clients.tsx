@@ -1,10 +1,12 @@
 // Extracted from App.tsx (Phase 0b). Behavior unchanged.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, SectionList,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
   ActivityIndicator, Alert, SafeAreaView, Platform, Modal, StatusBar,
   KeyboardAvoidingView, RefreshControl, BackHandler, Linking, Switch, Share,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -17,52 +19,44 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
-function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
+function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   const nav = useNavigation<any>();
-  const [clients, setClients]   = useState<Client[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const [profile, setProfile]   = useState<Client|null>(null);
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [profile, setProfile] = useState<Client | null>(null);
   const [tagInput, setTagInput] = useState('');
-  const [savingTags, setSavingTags] = useState(false);
 
-  // Persist a client's tag list, then reflect it in the open profile + the list.
-  async function saveTags(client: Client, tags: string[]) {
-    setSavingTags(true);
-    try {
-      const updated = await api<Client>(`/businesses/${bizId()}/clients/${client.id}`, { method:'PATCH', body: JSON.stringify({ tags }) });
-      const next = updated.tags ?? tags;
-      setProfile(p => p && p.id===client.id ? { ...p, tags: next } : p);
-      setClients(cs => cs.map(c => c.id===client.id ? { ...c, tags: next } : c));
-    } catch (e) { Alert.alert('Could not update tags', e instanceof Error ? e.message : 'Please try again.'); }
-    finally { setSavingTags(false); }
-  }
+  const { data: clients = [], isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['clients', search],
+    queryFn: () => api<{ data: Client[] }>(`/businesses/${bizId()}/clients${search ? `?search=${encodeURIComponent(search)}` : ''}`).then(res => res.data),
+  });
+
+  const updateClientMutation = useMutation({
+    mutationFn: ({ id, tags }: { id: string, tags: string[] }) =>
+      api<Client>(`/businesses/${bizId()}/clients/${id}`, { method: 'PATCH', body: JSON.stringify({ tags }) }),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      if (profile && profile.id === updated.id) {
+        setProfile(updated);
+      }
+    },
+    onError: (e) => {
+      Alert.alert('Could not update tags', e instanceof Error ? e.message : 'Please try again.');
+    }
+  });
+
   function addTag(client: Client) {
     const t = tagInput.trim();
     if (!t) return;
     const existing = client.tags ?? [];
     if (existing.some(x => x.toLowerCase() === t.toLowerCase())) { setTagInput(''); return; }
-    saveTags(client, [...existing, t]); setTagInput('');
+    updateClientMutation.mutate({ id: client.id, tags: [...existing, t] });
+    setTagInput('');
   }
+
   function removeTag(client: Client, tag: string) {
-    saveTags(client, (client.tags ?? []).filter(x => x !== tag));
+    updateClientMutation.mutate({ id: client.id, tags: (client.tags ?? []).filter(x => x !== tag) });
   }
-
-  const load = useCallback(async (silent=false, q='') => {
-    if (!silent) setLoading(true);
-    try {
-      const res = await api<{data: Client[]}>(`/businesses/${bizId()}/clients${q?`?search=${encodeURIComponent(q)}`:''}`);
-      setClients(res.data);
-    } catch {}
-    finally { setLoading(false); setRefreshing(false); }
-  }, []);
-
-  useEffect(()=>{ load(); },[load]);
-  useEffect(()=>{
-    const t = setTimeout(()=>load(true,search),400);
-    return ()=>clearTimeout(t);
-  },[search, load]);
 
   // Hardware back closes the open profile instead of leaving the app.
   useEffect(() => {
@@ -73,45 +67,46 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
     return () => sub.remove();
   }, [profile]);
 
-  function initials(name:string){ return name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(); }
+  function initials(name: string) { return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(); }
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND}/></View>;
+  if (isLoading && !isFetching) return <View style={s.center}><ActivityIndicator size="large" color={BRAND} /></View>;
 
   return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}><Text style={s.headerTitle}>Customers</Text></View>
       <View style={s.searchBox}>
-        <Ionicons name="search" size={16} color={GRAY_400} style={{marginRight:8}}/>
+        <Ionicons name="search" size={16} color={GRAY_400} style={{ marginRight: 8 }} />
         <TextInput style={s.searchInput} placeholder="Search by name, email…"
-          placeholderTextColor={GRAY_400} value={search} onChangeText={setSearch}/>
+          placeholderTextColor={GRAY_400} value={search} onChangeText={setSearch} />
       </View>
-      <FlatList
+      <FlashList
         data={clients}
-        keyExtractor={c=>c.id}
+        keyExtractor={c => c.id}
+        estimatedItemSize={100}
         contentContainerStyle={s.listContent}
         ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No customers found</Text></View>}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load(true,search);}} tintColor={BRAND}/>}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={BRAND} />}
         showsVerticalScrollIndicator={false}
-        renderItem={({item:c})=>(
-          <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={()=>setProfile(c)}>
+        renderItem={({ item: c }) => (
+          <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={() => setProfile(c)}>
             <View style={s.avatar}><Text style={s.avatarText}>{initials(c.name)}</Text></View>
-            <View style={{flex:1}}>
+            <View style={{ flex: 1 }}>
               <Text style={s.clientName}>{c.name}</Text>
               <Text style={s.sub}>{c.email}</Text>
-              {c.phone&&<Text style={s.sub}>{formatPhoneDisplay(c.phone)}</Text>}
-              {c.totalVisits!==undefined&&<Text style={s.sub}>{c.totalVisits} visit{c.totalVisits!==1?'s':''}</Text>}
-              {c.tags&&c.tags.length>0&&(
-                <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4 }}>
-                  {c.tags.slice(0,3).map(t=>(
-                    <View key={t} style={{ backgroundColor:GRAY_100, borderRadius:6, paddingHorizontal:6, paddingVertical:2 }}>
-                      <Text style={{ fontSize:10, fontWeight:'700', color:GRAY_500 }}>{t}</Text>
+              {c.phone && <Text style={s.sub}>{formatPhoneDisplay(c.phone)}</Text>}
+              {c.totalVisits !== undefined && <Text style={s.sub}>{c.totalVisits} visit{c.totalVisits !== 1 ? 's' : ''}</Text>}
+              {c.tags && c.tags.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                  {c.tags.slice(0, 3).map(t => (
+                    <View key={t} style={{ backgroundColor: GRAY_100, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: GRAY_500 }}>{t}</Text>
                     </View>
                   ))}
                 </View>
               )}
             </View>
-            <TouchableOpacity style={s.msgBtn} onPress={()=>onMessage(c)}>
-              <Ionicons name="chatbubble-outline" size={18} color={BRAND}/>
+            <TouchableOpacity style={s.msgBtn} onPress={() => onMessage(c)}>
+              <Ionicons name="chatbubble-outline" size={18} color={BRAND} />
             </TouchableOpacity>
           </TouchableOpacity>
         )}
@@ -119,53 +114,53 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
 
       {/* Customer profile */}
       {profile && (
-        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={()=>setProfile(null)}>
-          <TouchableOpacity style={s.sheet} activeOpacity={1} onPress={()=>{}}>
-            <View style={s.sheetHandle}/>
-            <View style={{ alignItems:'center', marginBottom:16 }}>
-              <View style={[s.avatarLg,{ marginBottom:10 }]}><Text style={s.avatarLgText}>{initials(profile.name)}</Text></View>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setProfile(null)}>
+          <TouchableOpacity style={s.sheet} activeOpacity={1} onPress={() => { }}>
+            <View style={s.sheetHandle} />
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={[s.avatarLg, { marginBottom: 10 }]}><Text style={s.avatarLgText}>{initials(profile.name)}</Text></View>
               <Text style={s.sheetTitle}>{profile.name}</Text>
             </View>
             {[
-              { l:'Email', v:profile.email },
-              { l:'Phone', v:profile.phone ? formatPhoneDisplay(profile.phone) : '—' },
-              { l:'Visits', v: profile.totalVisits!==undefined ? String(profile.totalVisits) : '—' },
-              { l:'Last visit', v: profile.lastVisit ? new Date(profile.lastVisit).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—' },
-            ].map(({l,v})=>(
+              { l: 'Email', v: profile.email },
+              { l: 'Phone', v: profile.phone ? formatPhoneDisplay(profile.phone) : '—' },
+              { l: 'Visits', v: profile.totalVisits !== undefined ? String(profile.totalVisits) : '—' },
+              { l: 'Last visit', v: profile.lastVisit ? new Date(profile.lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
+            ].map(({ l, v }) => (
               <View key={l} style={s.detailRow}>
                 <Text style={s.detailLabel}>{l}</Text>
                 <Text style={s.detailValue}>{v}</Text>
               </View>
             ))}
-            <View style={{ marginTop:10 }}>
-              <Text style={[s.detailLabel,{ marginBottom:6 }]}>Tags</Text>
-              <View style={{ flexDirection:'row', flexWrap:'wrap', gap:6 }}>
-                {(profile.tags ?? []).map(tag=>(
-                  <TouchableOpacity key={tag} disabled={savingTags} onPress={()=>removeTag(profile, tag)}
-                    style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:BRAND_LT, borderRadius:99, paddingHorizontal:10, paddingVertical:5 }}>
-                    <Text style={{ fontSize:12, fontWeight:'700', color:BRAND }}>{tag}</Text>
-                    <Ionicons name="close" size={12} color={BRAND}/>
+            <View style={{ marginTop: 10 }}>
+              <Text style={[s.detailLabel, { marginBottom: 6 }]}>Tags</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {(profile.tags ?? []).map(tag => (
+                  <TouchableOpacity key={tag} disabled={updateClientMutation.isPending} onPress={() => removeTag(profile, tag)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: BRAND_LT, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND }}>{tag}</Text>
+                    <Ionicons name="close" size={12} color={BRAND} />
                   </TouchableOpacity>
                 ))}
-                {(profile.tags ?? []).length===0 && <Text style={s.sub}>No tags yet</Text>}
+                {(profile.tags ?? []).length === 0 && <Text style={s.sub}>No tags yet</Text>}
               </View>
-              <View style={{ flexDirection:'row', gap:8, marginTop:8 }}>
-                <TextInput style={[s.input,{ flex:1 }]} placeholder="Add a tag (e.g. VIP)" placeholderTextColor={GRAY_400}
-                  value={tagInput} onChangeText={setTagInput} autoCapitalize="none" returnKeyType="done" onSubmitEditing={()=>addTag(profile)}/>
-                <TouchableOpacity style={[s.btnSecondary,{ paddingHorizontal:18, justifyContent:'center' }]} disabled={savingTags||!tagInput.trim()} onPress={()=>addTag(profile)}>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <TextInput style={[s.input, { flex: 1 }]} placeholder="Add a tag (e.g. VIP)" placeholderTextColor={GRAY_400}
+                  value={tagInput} onChangeText={setTagInput} autoCapitalize="none" returnKeyType="done" onSubmitEditing={() => addTag(profile)} />
+                <TouchableOpacity style={[s.btnSecondary, { paddingHorizontal: 18, justifyContent: 'center' }]} disabled={updateClientMutation.isPending || !tagInput.trim()} onPress={() => addTag(profile)}>
                   <Text style={s.btnSecondaryText}>Add</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={s.sheetActions}>
-              <TouchableOpacity style={s.btnPrimary} onPress={()=>{ const c=profile; setProfile(null); onMessage(c); nav.navigate('Messages'); }}>
+              <TouchableOpacity style={s.btnPrimary} onPress={() => { const c = profile; setProfile(null); onMessage(c); nav.navigate('Messages'); }}>
                 <Text style={s.btnPrimaryText}>Message</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.btnSecondary} onPress={()=>{ setProfile(null); nav.navigate('Calendar', { screen: 'Book' }); }}>
+              <TouchableOpacity style={s.btnSecondary} onPress={() => { setProfile(null); nav.navigate('Calendar', { screen: 'Book' }); }}>
                 <Text style={s.btnSecondaryText}>Book appointment</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.btnGhost} onPress={()=>setProfile(null)}><Text style={s.btnGhostText}>Close</Text></TouchableOpacity>
+              <TouchableOpacity style={s.btnGhost} onPress={() => setProfile(null)}><Text style={s.btnGhostText}>Close</Text></TouchableOpacity>
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -173,5 +168,6 @@ function ClientsScreen({ onMessage }: { onMessage:(c:Client)=>void }) {
     </SafeAreaView>
   );
 }
+
 
 export { ClientsScreen };

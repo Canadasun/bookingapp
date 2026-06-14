@@ -16,7 +16,7 @@ export const RegisterSchema = z.object({
   privacyConsentAccepted: z.literal(true),
   marketingConsent: z.boolean().default(false),
   trackingConsent: z.boolean().default(false),
-  consentVersion: z.string().trim().min(1).max(40).default('2026-06-08'),
+  consentVersion: z.string().trim().min(1).max(40).default('2026-06-13'),
 });
 
 export const LoginSchema = z.object({

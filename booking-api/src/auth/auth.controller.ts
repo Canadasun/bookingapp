@@ -120,6 +120,7 @@ export class AuthController {
   // Only active when BOOTSTRAP_ADMIN_SECRET env var is set. Remove the env var to disable.
   @Post('bootstrap-admin')
   @HttpCode(200)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async bootstrapAdmin(@Body() body: { secret: string; email: string }) {
     const expected = process.env.BOOTSTRAP_ADMIN_SECRET;
     if (!expected || body.secret !== expected) throw new ForbiddenException('Invalid bootstrap secret');

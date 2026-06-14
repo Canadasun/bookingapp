@@ -24,7 +24,17 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
   return fallback;
 }
 
+function assertSameOrigin(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  if (!origin) return; // server-to-server calls have no Origin header
+  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
+  if (expected && origin !== expected) {
+    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
+  }
+}
+
 export async function POST(req: NextRequest) {
+  assertSameOrigin(req);
   const input = await req.json() as { email: string; password: string };
   // A prior "remember this device" token lets a 2FA user skip the OTP here.
   const trustedDeviceToken = req.cookies.get("booking_td")?.value;

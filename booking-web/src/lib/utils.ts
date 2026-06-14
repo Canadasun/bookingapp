@@ -57,9 +57,9 @@ export function normalizePhoneE164(display: string): string {
   return digits.length === 0 ? "" : display;
 }
 
-// Only allow same-origin internal paths as post-login redirect targets.
-// Rejects protocol-relative ("//evil.com") and "/\\evil.com" open-redirect tricks.
+// Only allow same-origin page paths as post-login redirect targets.
+// Rejects protocol-relative ("//evil.com"), "/\\evil.com", and internal /api/ routes.
 export function safeNextPath(next: string | null | undefined, fallback: string): string {
-  if (next && /^\/(?![/\\])/.test(next)) return next;
+  if (next && /^\/(?![/\\])/.test(next) && !next.startsWith('/api/')) return next;
   return fallback;
 }

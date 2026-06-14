@@ -27,6 +27,9 @@ export class CalendarSyncController {
   ) {}
 
   @Get('google/last-attempt')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   lastAttempt() {
     return CalendarSyncController.lastAttempt ?? { at: null, ok: null, reason: 'no callback received yet' };
   }
@@ -77,7 +80,11 @@ export class CalendarSyncController {
       const reason = e instanceof Error ? e.message : 'unknown';
       logger.warn(`Google callback FAILED: ${reason}`);
       CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: false, reason, query: queryInfo };
-      return res.redirect(`${web}/dashboard/settings?tab=calendar&calendar=error&reason=${encodeURIComponent(reason)}`);
+      // Map raw error messages to safe codes so internal detail never appears in the browser URL.
+      const safeCode = reason.startsWith('google_denied') ? 'denied'
+        : reason === 'missing_code' ? 'missing_code'
+        : 'error';
+      return res.redirect(`${web}/dashboard/settings?tab=calendar&calendar=error&reason=${safeCode}`);
     }
   }
 

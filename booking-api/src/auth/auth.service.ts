@@ -149,22 +149,28 @@ export class AuthService {
   }
 
   // ── Email verification ──────────────────────────────────────────────────────
-  // Short-lived JWT signed with JWT_SECRET; carries the userId and a 'verify'
-  // kind. Not single-use (re-clicking is harmless — it just re-sets the flag).
+  // Short-lived JWT signed with JWT_SECRET; carries the userId, a 'verify' kind,
+  // and a random jti. The jti is stored in Redis after first use, making the link
+  // single-use — a replayed link is rejected even within the 7-day validity window.
   private async sendVerification(userId: string) {
-    const token = this.jwt.sign({ sub: userId, kind: 'verify' }, { secret: process.env.JWT_SECRET, expiresIn: '7d' });
+    const jti = randomBytes(16).toString('hex');
+    const token = this.jwt.sign({ sub: userId, kind: 'verify', jti }, { secret: process.env.JWT_SECRET, expiresIn: '7d' });
     await this.notifications.sendVerifyEmail(userId, token);
   }
 
   async verifyEmail(token: string) {
-    let decoded: { sub?: string; kind?: string } | null = null;
+    let decoded: { sub?: string; kind?: string; jti?: string; exp?: number } | null = null;
     try {
-      decoded = this.jwt.verify(token, { secret: process.env.JWT_SECRET }) as { sub?: string; kind?: string };
+      decoded = this.jwt.verify(token, { secret: process.env.JWT_SECRET }) as { sub?: string; kind?: string; jti?: string; exp?: number };
     } catch {
       throw new BadRequestException('Invalid or expired verification link');
     }
-    if (!decoded?.sub || decoded.kind !== 'verify') throw new BadRequestException('Invalid verification link');
+    if (!decoded?.sub || decoded.kind !== 'verify' || !decoded.jti) throw new BadRequestException('Invalid verification link');
+    const used = await this.redis.client.exists(`auth:verify:used:${decoded.jti}`);
+    if (used) throw new BadRequestException('This verification link has already been used');
     const user = await this.prisma.user.update({ where: { id: decoded.sub }, data: { emailVerified: true } });
+    const ttl = decoded.exp ? Math.max(1, decoded.exp - Math.floor(Date.now() / 1000)) : 7 * 24 * 3600;
+    await this.redis.client.set(`auth:verify:used:${decoded.jti}`, '1', 'EX', ttl).catch(() => {});
     // Return the role so the verify page can send them to the right home
     // (owners/staff → /dashboard, clients → /my/dashboard).
     return { ok: true, role: user.role };

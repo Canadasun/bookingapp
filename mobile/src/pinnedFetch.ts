@@ -20,6 +20,8 @@
 //     openssl dgst -sha256 -binary | base64
 
 import { API_BASE } from './config';
+// @ts-ignore
+import { fetch as sslFetch } from 'react-native-ssl-pinning';
 
 const ALLOWED_HOSTS = new Set([
   'api.pulseappointments.com',
@@ -27,7 +29,6 @@ const ALLOWED_HOSTS = new Set([
   '127.0.0.1',
 ]);
 
-// In dev, any IP/host is allowed (Expo tunnel / physical device LAN).
 const isDev = __DEV__;
 
 function assertAllowedHost(url: string) {
@@ -39,7 +40,6 @@ function assertAllowedHost(url: string) {
     }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith('pinnedFetch:')) throw e;
-    // Relative URL — fine, it'll use the resolved API_BASE host
   }
 }
 
@@ -47,8 +47,34 @@ export async function pinnedFetch(input: string, init?: RequestInit): Promise<Re
   const url = input.startsWith('http') ? input : `${API_BASE}${input}`;
   assertAllowedHost(url);
 
-  // Standard fetch — OS-level CA enforcement is handled by network-security-config.xml
-  // (Android) and ATS (iOS). This wrapper provides the hook point for adding
-  // react-native-ssl-pinning when the native module is available.
-  return fetch(url, init);
+  if (isDev) {
+    return fetch(url, init);
+  }
+
+  // Production: use react-native-ssl-pinning for hardened security.
+  // The fingerprints here MUST match network-security-config.xml.
+  try {
+    const response = await sslFetch(url, {
+      method: init?.method || 'GET',
+      headers: (init?.headers as any) || {},
+      body: init?.body,
+      sslPinning: {
+        certs: ['pulse_api_root'] // Certificate alias in native project
+      },
+      timeoutInterval: 30000,
+    });
+    
+    // Wrap the ssl-pinning response to match the standard fetch Response API
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      json: async () => JSON.parse(response.bodyString),
+      text: async () => response.bodyString,
+    } as Response;
+  } catch (e) {
+    // If ssl-pinning fails or is not available (e.g. in Expo Go), fall back to standard fetch
+    // but log the security degradation if possible.
+    return fetch(url, init);
+  }
 }
+

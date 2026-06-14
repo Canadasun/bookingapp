@@ -10,9 +10,6 @@ export function useBusinessId() {
     const user = getUser();
     if (user?.businessId) {
       setBizId(user.businessId);
-    } else {
-      // Fallback to env for local dev if not logged in (e.g. initial setup)
-      setBizId(process.env.NEXT_PUBLIC_BUSINESS_ID ?? "");
     }
   }, []);
 
@@ -33,7 +30,9 @@ export function useEvents(
     // directly. Instead fetch a short-lived ticket over the authenticated proxy
     // and present it in the handshake; the gateway verifies it and scopes the
     // connection to our business.
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    // NEXT_PUBLIC_WS_URL must point to the public API hostname (not the internal
+    // Railway address) since this runs in the browser.
+    const apiUrl = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
     let socket: Socket | null = null;
     let cancelled = false;
 

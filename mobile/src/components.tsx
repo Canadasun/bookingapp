@@ -1,9 +1,36 @@
 // Shared, presentational building blocks used across screens.
 import React, { Component } from 'react';
-import { View, Text, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { s } from './styles';
+
+// ── Network Banner ────────────────────────────────────────────────────────────
+export function NetworkBanner({ isOffline }: { isOffline: boolean }) {
+  if (!isOffline) return null;
+  return (
+    <View style={styles.offlineBanner}>
+      <Ionicons name="cloud-offline" size={14} color="#fff" />
+      <Text style={styles.offlineText}>You're offline. Reconnecting...</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  offlineBanner: {
+    backgroundColor: '#374151',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  offlineText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+});
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; error?: Error }

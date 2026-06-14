@@ -79,7 +79,7 @@ export async function proxy(req: NextRequest) {
   // /change-password and out of the dashboard area.
   if (
     authed && user?.mustResetPassword && pathname !== "/change-password" &&
-    pathname.startsWith("/dashboard")
+    (pathname.startsWith("/dashboard") || pathname.startsWith("/my/dashboard") || pathname.startsWith("/admin"))
   ) {
     return NextResponse.redirect(new URL("/change-password", req.url));
   }

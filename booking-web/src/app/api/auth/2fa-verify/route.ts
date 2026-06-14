@@ -24,9 +24,19 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
   return fallback;
 }
 
+function assertSameOrigin(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  if (!origin) return;
+  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
+  if (expected && origin !== expected) {
+    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
+  }
+}
+
 // Second factor: exchange the OTP from the login challenge for session cookies.
 // Mirrors /api/auth/login's cookie handling exactly.
 export async function POST(req: NextRequest) {
+  assertSameOrigin(req);
   const body = await req.json() as { challengeId: string; code: string; rememberDevice?: boolean };
   const upstream = await fetch(`${API}/auth/2fa/verify`, {
     method: "POST",
