@@ -139,7 +139,7 @@ export class PaymentsService {
     try {
       await this.prisma.payment.create({ data });
     } catch (err) {
-      console.error('[ledger] failed to record payment', err);
+      console.error('[ledger] failed to record payment', err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -486,7 +486,7 @@ export class PaymentsService {
             // Surface unresolved requirements so the owner knows to take action.
             const pastDue = account.requirements?.past_due ?? [];
             if (pastDue.length > 0) {
-              this.logger.warn(`Stripe account ${account.id} has past_due requirements: ${pastDue.join(', ')}`);
+              this.logger.warn(`Stripe account ${account.id} has ${pastDue.length} past_due requirement(s)`);
               await this.prisma.systemError?.create?.({
                 data: {
                   businessId: biz.id,
@@ -524,7 +524,7 @@ export class PaymentsService {
         const payout = event.data.object as Stripe.Payout;
         this.logger.log(`Payout paid: ${payout.id} amount=${payout.amount} ${payout.currency}`);
         // Notify the business owner that the payout landed
-        const stripeAcct = (event as any).account as string | undefined;
+        const stripeAcct = (event as Stripe.Event & { account?: string }).account;
         if (stripeAcct) {
           const biz = await this.prisma.business.findFirst({
             where: { stripeConnectAccountId: stripeAcct },
@@ -547,7 +547,7 @@ export class PaymentsService {
       case 'payout.failed': {
         const payout = event.data.object as Stripe.Payout;
         this.logger.warn(`Payout failed: ${payout.id} reason=${payout.failure_message}`);
-        const stripeAcct = (event as any).account as string | undefined;
+        const stripeAcct = (event as Stripe.Event & { account?: string }).account;
         if (stripeAcct) {
           const biz = await this.prisma.business.findFirst({
             where: { stripeConnectAccountId: stripeAcct },

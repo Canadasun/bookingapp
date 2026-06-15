@@ -3,6 +3,26 @@ import { PrismaClient } from '@prisma/client';
 import { tenantContext } from '../common/util/tenant-context';
 import { encryptProviderToken } from '../common/util/provider-token-crypto';
 
+// Models included here get automatic businessId injection on every Prisma
+// operation when a tenant context is active. A model may only be listed if it
+// has a direct `businessId` column — the middleware injects it into WHERE
+// clauses and CREATE data using that field name.
+//
+// Models intentionally excluded because they have NO direct businessId column:
+//
+//   GiftCardRedemption  — scoped exclusively via giftCard.businessId.
+//                         Every create/read goes through GiftCard (always
+//                         filtered by businessId). Never queried directly.
+//
+//   PackageRedemption   — scoped exclusively via clientPackage.businessId.
+//                         Every create/read goes through ClientPackage (always
+//                         filtered by businessId). Never queried directly.
+//
+//   AvailabilityRule / TimeOff / StaffService
+//                       — scoped via staff.businessId (service layer enforces).
+//
+// Do NOT add these models here without first adding a real businessId column
+// to the schema — the middleware would silently fail to inject any filter.
 export const TENANT_MODELS = [
   'Appointment', 'BusinessClosure', 'BusinessHours', 'Campaign', 'Client',
   'ClientMembership', 'ClientPackage', 'DataErasureRequest', 'FollowUpPolicy',

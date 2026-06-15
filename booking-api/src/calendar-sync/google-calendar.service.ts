@@ -27,9 +27,13 @@ export class GoogleCalendarService {
     const publicApi =
       process.env.API_PUBLIC_URL
       ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : undefined);
-    return publicApi
-      ? `${publicApi.replace(/\/+$/, '').replace(/\/api$/, '')}/api/calendar-sync/google/callback`
-      : 'https://bookingapp-production-32f8.up.railway.app/api/calendar-sync/google/callback';
+    if (publicApi) {
+      return `${publicApi.replace(/\/+$/, '').replace(/\/api$/, '')}/api/calendar-sync/google/callback`;
+    }
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Google Calendar redirect URI cannot be determined: set GOOGLE_REDIRECT_URI or API_PUBLIC_URL');
+    }
+    return 'http://localhost:3001/api/calendar-sync/google/callback';
   }
   configured() { return !!this.clientId() && !!this.clientSecret(); }
 
