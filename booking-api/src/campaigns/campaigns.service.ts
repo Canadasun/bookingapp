@@ -84,6 +84,7 @@ export class CampaignsService {
     const recipients = await this.prisma.client.findMany({
       where: this.recipientWhere(businessId, c.channel, c.audience),
       select: { id: true },
+      take: 5000,
     });
 
     await this.prisma.campaign.update({
@@ -91,9 +92,7 @@ export class CampaignsService {
       data: { status: 'SENDING', recipientCount: recipients.length, sentCount: 0, sentAt: new Date() },
     });
 
-    for (const r of recipients) {
-      await this.notifications.sendCampaignMessage(id, r.id);
-    }
+    await this.notifications.sendCampaignBulk(id, recipients.map((r) => r.id));
 
     return this.prisma.campaign.update({
       where: { id },

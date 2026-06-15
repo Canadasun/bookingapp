@@ -394,6 +394,7 @@ export class NotificationProcessor extends WorkerHost {
         try {
           const res = await fetch('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
+            signal: AbortSignal.timeout(10_000),
             headers: {
               Accept: 'application/json',
               'Accept-Encoding': 'gzip, deflate',
@@ -634,8 +635,8 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       ]);
       if (!campaign || !client) return;
       this.currentBusinessId = campaign.businessId;
-      const merge = (t: string) => t.replace(/\{name\}/g, client.name).replace(/\{business\}/g, campaign.business.name); // raw: SMS + subject
-      const mergeHtml = (t: string) => esc(t).replace(/\{name\}/g, esc(client.name)).replace(/\{business\}/g, esc(campaign.business.name));
+      const merge = (t: string) => t.replace(/\{name\}/g, () => client.name).replace(/\{business\}/g, () => campaign.business.name); // raw: SMS + subject; function replacer prevents re-expansion
+      const mergeHtml = (t: string) => esc(t).replace(/\{name\}/g, () => esc(client.name)).replace(/\{business\}/g, () => esc(campaign.business.name));
 
       if (campaign.channel === 'SMS') {
         if (client.phone) await this.sms.send({ to: client.phone, body: merge(campaign.body) });
@@ -664,7 +665,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         subject: `A spot just opened at ${entry.business.name}`,
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A spot just opened up! 🎉</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${entry.name}, a time just became available at <strong>${entry.business.name}</strong>. Book now before someone else grabs it.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(entry.name)}, a time just became available at <strong>${esc(entry.business.name)}</strong>. Book now before someone else grabs it.</p>
 <a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book now →</a>
 `),
       });
@@ -991,7 +992,7 @@ ${aptDetails(apt)}
           subject: `Thanks for visiting ${apt.business.name}!`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Thanks for your visit!</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, we hope you enjoyed your ${apt.service.name} with ${apt.staff.user.name}. It was great to see you!</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, we hope you enjoyed your ${esc(apt.service.name)} with ${esc(apt.staff.user.name)}. It was great to see you!</p>
 <p style="margin:0 0 20px;color:#374151;font-size:14px">Ready to book your next appointment? You can do it in seconds online.</p>
 <a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
           `),
@@ -1039,7 +1040,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
           subject: `Your appointment was cancelled by ${apt.business.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled by business</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, ${apt.business.name} has cancelled your appointment. We apologise for the inconvenience.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, ${esc(apt.business.name)} has cancelled your appointment. We apologise for the inconvenience.</p>
 ${aptDetails(apt)}
 ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>Reason:</strong> ${esc(apt.cancelReason)}</p></div>` : ''}
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>

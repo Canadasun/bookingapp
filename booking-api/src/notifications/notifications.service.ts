@@ -272,12 +272,15 @@ export class NotificationsService implements OnModuleInit {
     await this.queue.add('verify-email', { userId, resetToken: token }, { jobId: `${this.dedupe('verify-email', userId)}-${Date.now()}`, removeOnComplete: true, attempts: 1 });
   }
 
-  // Marketing campaign — one job per recipient so the queue can retry individually.
-  async sendCampaignMessage(campaignId: string, clientId: string) {
-    await this.queue.add(
-      'campaign-message',
-      { campaignId, clientId },
-      { jobId: `campaign-message-${campaignId}-${clientId}`, removeOnComplete: true, attempts: 1 },
+  // Marketing campaign — bulk-enqueue all recipients in a single Redis round-trip.
+  async sendCampaignBulk(campaignId: string, clientIds: string[]) {
+    if (!clientIds.length) return;
+    await this.queue.addBulk(
+      clientIds.map((clientId) => ({
+        name: 'campaign-message',
+        data: { campaignId, clientId },
+        opts: { jobId: `campaign-message-${campaignId}-${clientId}`, removeOnComplete: true, attempts: 1 },
+      })),
     );
   }
 
