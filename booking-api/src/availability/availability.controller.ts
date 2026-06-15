@@ -1,10 +1,11 @@
-import { Controller, Get, Query, Req } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Request } from 'express';
 import { AvailabilityService } from './availability.service';
 import { GetSlotsSchema, GetSlotsDto } from './dto/availability.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('availability')
 @Controller('availability')
@@ -12,13 +13,15 @@ export class AvailabilityController {
   constructor(private availabilityService: AvailabilityService) {}
 
   @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('slots')
   getSlots(
     @Query(new ZodValidationPipe(GetSlotsSchema)) dto: GetSlotsDto,
-    @Req() req: Request,
+    @CurrentUser() user: { id: string } | null,
   ) {
-    const isAuthenticated = !!(req.headers['authorization']);
-    if (!isAuthenticated && dto.enforceNotice === 'false') {
+    // Only a verified authenticated user may bypass the min-notice window.
+    // Previously checked header presence alone, which any caller could fake.
+    if (!user && dto.enforceNotice === 'false') {
       dto = { ...dto, enforceNotice: undefined };
     }
     return this.availabilityService.getAvailableSlots(dto);
