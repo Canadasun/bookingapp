@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SkeletonList, SkeletonCard } from "@/components/Skeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ClientMergeModal } from "@/components/ClientMergeModal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatPrice, cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 
 const DAY_MS = 86_400_000;
@@ -45,6 +46,7 @@ export default function ClientsPage() {
   const [dueSet, setDueSet] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [tagBusy, setTagBusy] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
 
   const router = useRouter();
   const user = getUser();
@@ -114,10 +116,12 @@ export default function ClientsPage() {
 
   async function deleteClient() {
     if (!bizId || !selected) return;
-    const ok = window.confirm(
-      `Delete ${selected.name}? This removes the client profile and appointment history from the log. Payments remain in reporting.`,
-    );
-    if (!ok) return;
+    setDeleteDialog(true);
+  }
+
+  async function confirmDeleteClient() {
+    if (!bizId || !selected) return;
+    setDeleteDialog(false);
     setDeletingClient(true);
     try {
       const res = await api.clients.delete(bizId, selected.id);
@@ -214,6 +218,16 @@ export default function ClientsPage() {
   }) | null;
 
   return (
+    <>
+    <ConfirmDialog
+      open={deleteDialog}
+      title={`Delete ${selected?.name ?? "client"}?`}
+      description="This removes the client profile and appointment history from the log. Payments remain in reporting."
+      confirmLabel="Delete client"
+      variant="destructive"
+      onConfirm={confirmDeleteClient}
+      onCancel={() => setDeleteDialog(false)}
+    />
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -560,5 +574,6 @@ export default function ClientsPage() {
         <ClientMergeModal bizId={bizId} onClose={() => setShowMerge(false)} onMerged={() => load(search, 1)} />
       )}
     </div>
+    </>
   );
 }

@@ -292,12 +292,12 @@ export class NotificationsService implements OnModuleInit {
   async sendAdminBookingAlert(appointmentId: string) {
     const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
     if (!adminEmail) {
-      console.warn('ADMIN_ALERT_EMAIL not configured — admin alert skipped');
+      this.logger.warn('ADMIN_ALERT_EMAIL not configured — admin alert skipped');
       return;
     }
     const key = this.configService.get<string>('RESEND_API_KEY') ?? '';
     if (!key || key.startsWith('re_placeholder')) {
-      console.warn('RESEND_API_KEY not configured — admin alert skipped');
+      this.logger.warn('RESEND_API_KEY not configured — admin alert skipped');
       return;
     }
     await this.queue.add(

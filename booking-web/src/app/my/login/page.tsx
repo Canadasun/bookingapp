@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -153,8 +154,7 @@ export default function ClientLoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/book" className="inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Pulse Booking" className="w-20 h-auto mx-auto" />
+            <Image src="/logo.png" alt="Pulse Booking" width={80} height={80} className="w-20 h-auto mx-auto" />
           </Link>
           <p className="text-gray-600 mt-2 text-sm">Sign in to manage your appointments</p>
         </div>

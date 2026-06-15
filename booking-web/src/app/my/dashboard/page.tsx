@@ -12,6 +12,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 type Section = "upcoming" | "past" | "offers";
@@ -31,9 +32,9 @@ export default function ClientDashboard() {
   const [resending, setResending] = useState(false);
   const [hasCard, setHasCard] = useState(false);
   const [removingCard, setRemovingCard] = useState(false);
+  const [removeCardDialog, setRemoveCardDialog] = useState(false);
 
   async function removeCard() {
-    if (!window.confirm("Remove your saved card? It will be deleted and can no longer be charged for deposits, no-shows or late cancellations.")) return;
     setRemovingCard(true);
     try {
       await api.clientPortal.removeCard();
@@ -144,6 +145,16 @@ export default function ClientDashboard() {
   ];
 
   return (
+    <>
+    <ConfirmDialog
+      open={removeCardDialog}
+      title="Remove saved card?"
+      description="Your card will be deleted and can no longer be charged for deposits, no-shows, or late cancellations."
+      confirmLabel="Remove card"
+      variant="destructive"
+      onConfirm={() => { setRemoveCardDialog(false); removeCard(); }}
+      onCancel={() => setRemoveCardDialog(false)}
+    />
     <div className="min-h-screen bg-[#F8F9FA]">
 
       {/* Header */}
@@ -199,7 +210,7 @@ export default function ClientDashboard() {
               <p className="text-sm font-semibold text-gray-900">Card on file</p>
               <p className="text-xs text-gray-500 mt-0.5">A business has saved your card for deposits or no-show / late-cancellation protection. You can remove it anytime.</p>
             </div>
-            <button onClick={removeCard} disabled={removingCard}
+            <button onClick={() => setRemoveCardDialog(true)} disabled={removingCard}
               className="shrink-0 text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-60 transition-colors">
               {removingCard ? "Removing…" : "Remove card"}
             </button>
@@ -303,6 +314,7 @@ export default function ClientDashboard() {
         )}
       </main>
     </div>
+    </>
   );
 }
 

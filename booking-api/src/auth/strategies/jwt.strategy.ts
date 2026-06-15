@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -32,6 +32,8 @@ function cookieExtractor(req: { headers?: { cookie?: string } }): string | null 
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(private prisma: PrismaService, private redis: RedisService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -68,7 +70,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`).catch((err) => {
         // Change to Fail-Closed in production
         if (process.env.NODE_ENV === 'production') {
-          console.error(`[auth] Revocation check failed (FAIL-CLOSED):`, err);
+          this.logger.error(`[auth] Revocation check failed (FAIL-CLOSED): ${err instanceof Error ? err.message : String(err)}`);
           throw new ServiceUnavailableException('Security service unavailable');
         }
         return 0;

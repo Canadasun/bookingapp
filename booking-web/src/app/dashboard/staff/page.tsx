@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2, MapPin } from "lucide-react";
 import { toast } from "sonner";
@@ -302,10 +303,9 @@ export default function StaffPage() {
           {staff.map((s) => (
             <Card key={s.id} className={!s.active ? "opacity-60" : ""}>
               <CardContent className="py-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-violet-100 overflow-hidden flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">
+                <div className="relative w-10 h-10 rounded-full bg-violet-100 overflow-hidden flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">
                   {s.avatarUrl
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={s.avatarUrl} alt={`${s.user.name} profile photo`} className="w-full h-full object-cover" />
+                    ? <Image src={s.avatarUrl} alt={`${s.user.name} profile photo`} fill className="object-cover" />
                     : initials(s.user.name)}
                 </div>
                 <div className="flex-1 min-w-0">

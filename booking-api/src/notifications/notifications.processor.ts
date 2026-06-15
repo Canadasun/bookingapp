@@ -439,7 +439,7 @@ export class NotificationProcessor extends WorkerHost {
 
   async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number }>) {
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
-      console.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
+      this.logger.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;
     }
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
@@ -1160,6 +1160,6 @@ ${aptDetails(apt)}
   private async addInAppMessage(businessId: string, clientId: string, content: string) {
     await this.prisma.message.create({
       data: { businessId, clientId, content, fromClient: false },
-    }).catch(err => console.error('Failed to add in-app message:', err instanceof Error ? err.message : String(err)));
+    }).catch(err => this.logger.error(`Failed to add in-app message: ${err instanceof Error ? err.message : String(err)}`));
   }
 }

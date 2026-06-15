@@ -1,7 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Accessibility, Keyboard, Eye, Volume2, RefreshCw, Mail, CheckCircle2 } from "lucide-react";
 
-export const metadata = { title: "Accessibility Statement — Pulse" };
+export const metadata: Metadata = {
+  title: "Accessibility Statement — Pulse",
+  description: "Pulse Appointments is committed to WCAG 2.2 AA accessibility. Learn about our standards, known limitations, and how to report an issue.",
+  openGraph: {
+    title: "Accessibility Statement — Pulse Appointments",
+    description: "Pulse Appointments is committed to WCAG 2.2 AA accessibility.",
+  },
+  twitter: {
+    card: "summary",
+    title: "Accessibility Statement — Pulse Appointments",
+    description: "Pulse Appointments is committed to WCAG 2.2 AA accessibility.",
+  },
+};
 
 export default function AccessibilityPage() {
   return (

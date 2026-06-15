@@ -139,7 +139,7 @@ export class PaymentsService {
     try {
       await this.prisma.payment.create({ data });
     } catch (err) {
-      console.error('[ledger] failed to record payment', err instanceof Error ? err.message : String(err));
+      this.logger.error(`[ledger] failed to record payment: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

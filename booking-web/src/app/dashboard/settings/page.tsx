@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type } from "lucide-react";
@@ -1370,8 +1371,7 @@ function SettingsPage() {
                     <div className="rounded-xl overflow-hidden border border-gray-100">
                       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100" style={{ backgroundColor: brandHex + "18" }}>
                         {biz?.logoUrl
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={biz.logoUrl} alt="" className="w-6 h-6 rounded-lg object-cover shrink-0" />
+                          ? <Image src={biz.logoUrl} alt="" width={24} height={24} className="w-6 h-6 rounded-lg object-cover shrink-0" />
                           : <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: brandHex }}>
                               <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                             </div>

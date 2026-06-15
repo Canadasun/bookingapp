@@ -4,6 +4,15 @@ import { Activity, ExternalLink, CheckCircle2, Clock } from "lucide-react";
 export const metadata = {
   title: "System Status — Pulse",
   description: "Live uptime and incident information for Pulse Appointments.",
+  openGraph: {
+    title: "System Status — Pulse Appointments",
+    description: "Live uptime and incident information for Pulse Appointments.",
+  },
+  twitter: {
+    card: "summary",
+    title: "System Status — Pulse Appointments",
+    description: "Live uptime and incident information for Pulse Appointments.",
+  },
 };
 
 const STATUS_PAGE_URL =

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { apiBase } from "@/lib/server-api";
 
 const API = apiBase();
@@ -15,7 +16,8 @@ interface BizPublic {
 async function getBusiness(slug: string): Promise<BizPublic | null> {
   try {
     const res = await fetch(`${API}/businesses/slug/${slug}`, { next: { revalidate: 300 } });
-    if (!res.ok) return null;
+    if (res.status === 404) return null; // triggers notFound() in layout below
+    if (!res.ok) return null;            // other errors: degrade gracefully
     return (await res.json()) as BizPublic;
   } catch {
     return null;
@@ -47,6 +49,11 @@ export default async function BookLayout({
 }) {
   const { slug } = await params;
   const biz = await getBusiness(slug);
+
+  // Render the branded not-found page when the slug is unknown or the business
+  // is suspended (API returns 404 for both). This replaces the half-rendered
+  // client skeleton that showed before when the page.tsx handled the error.
+  if (!biz) notFound();
 
   const jsonLd = biz?.name
     ? {
