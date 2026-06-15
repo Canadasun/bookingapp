@@ -26,9 +26,9 @@ export interface ICalAppointment {
 /** Single-event iCal for client/owner calendar invite (METHOD:REQUEST). */
 export function generateICalEvent(apt: ICalAppointment): string {
   const desc = [
-    `Service: ${apt.service.name} (${apt.service.durationMinutes} min)`,
-    `Provider: ${apt.staff.user.name}`,
-    apt.notes ? `Notes: ${apt.notes}` : '',
+    `Service: ${esc(apt.service.name)} (${apt.service.durationMinutes} min)`,
+    `Provider: ${esc(apt.staff.user.name)}`,
+    apt.notes ? `Notes: ${esc(apt.notes)}` : '',
   ].filter(Boolean).join('\\n');
 
   const lines: string[] = [

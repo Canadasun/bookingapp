@@ -8,6 +8,30 @@ function isValidAvatarUrl(url: string): boolean {
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { z } from 'zod';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+
+const UpdateMeSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  phone: z.string().trim().max(30).optional(),
+  avatarUrl: z.string().nullable().optional().refine(
+    (v) => v == null || isValidAvatarUrl(v),
+    { message: 'avatarUrl must be an https:// URL or an internal /uploads/ path' },
+  ),
+});
+
+const UpdatePrivacySchema = z.object({
+  marketingConsent: z.boolean().optional(),
+  trackingConsent: z.boolean().optional(),
+  version: z.string().max(50).optional(),
+}).refine(
+  (d) => d.marketingConsent !== undefined || d.trackingConsent !== undefined,
+  { message: 'At least one privacy preference is required' },
+);
+
+const ErasureSchema = z.object({
+  reason: z.string().max(1000).optional(),
+});
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -20,13 +44,13 @@ export class UsersController {
   }
 
   @Patch('me')
-  updateMe(@CurrentUser() user: { id: string }, @Body() data: { name?: string; phone?: string; avatarUrl?: string | null }) {
-    if (data.avatarUrl != null && !isValidAvatarUrl(data.avatarUrl)) {
-      throw new BadRequestException('avatarUrl must be an https:// URL or an internal /uploads/ path');
-    }
+  updateMe(
+    @CurrentUser() user: { id: string },
+    @Body(new ZodValidationPipe(UpdateMeSchema)) data: z.infer<typeof UpdateMeSchema>,
+  ) {
     return this.usersService.update(user.id, {
-      ...(typeof data.name === 'string' ? { name: data.name.trim() } : {}),
-      ...(typeof data.phone === 'string' ? { phone: data.phone.trim() } : {}),
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone } : {}),
       ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
     });
   }
@@ -71,21 +95,15 @@ export class UsersController {
   @Patch('me/privacy')
   updatePrivacyPreferences(
     @CurrentUser() user: { id: string },
-    @Body() data: { marketingConsent?: boolean; trackingConsent?: boolean; version?: string },
+    @Body(new ZodValidationPipe(UpdatePrivacySchema)) data: z.infer<typeof UpdatePrivacySchema>,
   ) {
-    if (
-      typeof data.marketingConsent !== 'boolean'
-      && typeof data.trackingConsent !== 'boolean'
-    ) {
-      throw new BadRequestException('At least one privacy preference is required');
-    }
     return this.usersService.updatePrivacyPreferences(user.id, data);
   }
 
   @Post('me/data-erasure')
   requestErasure(
     @CurrentUser() user: { id: string },
-    @Body() data: { reason?: string },
+    @Body(new ZodValidationPipe(ErasureSchema)) data: z.infer<typeof ErasureSchema>,
   ) {
     return this.usersService.requestErasure(user.id, data.reason);
   }

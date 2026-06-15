@@ -2,14 +2,14 @@ import { z } from 'zod';
 
 export const CreateStaffSchema = z.object({
   userId: z.string().min(1),
-  bio: z.string().optional(),
+  bio: z.string().max(1000).optional(),
   avatarUrl: z.string().url().optional(),
 });
 
 export const STAFF_PERMISSIONS = ['VIEW_MONEY', 'MANAGE_SERVICES', 'MANAGE_STAFF'] as const;
 
 export const UpdateStaffSchema = z.object({
-  bio: z.string().optional(),
+  bio: z.string().max(1000).optional(),
   avatarUrl: z.string().url().optional(),
   active: z.boolean().optional(),
   permissions: z.array(z.enum(STAFF_PERMISSIONS)).max(10).optional(),
@@ -26,18 +26,18 @@ export const AvailabilityRuleSchema = z.object({
 export const TimeOffSchema = z.object({
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
-  reason: z.string().optional(),
+  reason: z.string().max(500).optional(),
 });
 
 export const AssignServicesSchema = z.object({
-  serviceIds: z.array(z.string().min(1)),
+  serviceIds: z.array(z.string().min(1)).max(50),
 });
 
 export const InviteStaffSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(200),
   email: z.string().email(),
-  bio: z.string().optional(),
-  serviceIds: z.array(z.string().min(1)).optional(),
+  bio: z.string().max(1000).optional(),
+  serviceIds: z.array(z.string().min(1)).max(50).optional(),
 });
 
 export type CreateStaffDto = z.infer<typeof CreateStaffSchema>;
