@@ -11,8 +11,8 @@ export const IssueGiftCardSchema = z.object({
 export type IssueGiftCardDto = z.infer<typeof IssueGiftCardSchema>;
 
 export const RedeemGiftCardSchema = z.object({
-  code: z.string().min(1),
-  amountCents: z.number().int().min(1),
+  code: z.string().min(1).max(32),
+  amountCents: z.number().int().min(1).max(10_000_00),
   appointmentId: z.string().optional(),
 });
 export type RedeemGiftCardDto = z.infer<typeof RedeemGiftCardSchema>;
