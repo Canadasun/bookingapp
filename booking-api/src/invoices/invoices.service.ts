@@ -136,7 +136,13 @@ export class InvoicesService {
   }
 
   async updateStatus(id: string, businessId: string, dto: UpdateInvoiceStatusDto) {
-    await this.get(id, businessId);
+    const invoice = await this.get(id, businessId);
+    if (
+      (invoice.status === 'PAID' || invoice.status === 'VOID') &&
+      (dto.status === 'DRAFT' || dto.status === 'SENT')
+    ) {
+      throw new BadRequestException(`A ${invoice.status} invoice cannot be reverted to ${dto.status}`);
+    }
     return this.prisma.invoice.update({ where: { id }, data: { status: dto.status } });
   }
 
@@ -148,7 +154,8 @@ export class InvoicesService {
 
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-    const bizName = invoice.business?.name ?? 'Your Business';
+    const bizNameRaw = invoice.business?.name ?? 'Your Business';
+    const bizName = esc(bizNameRaw);
     const currency = (invoice.currency ?? 'CAD').toUpperCase();
     const fmt = (cents: number) =>
       new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(cents / 100);
@@ -167,7 +174,7 @@ export class InvoicesService {
 
     const discountRow =
       (invoice.discountCents ?? 0) > 0
-        ? `<tr><td colspan="3" style="padding:6px 12px;text-align:right;color:#6B7280">${invoice.discountLabel ?? 'Discount'}</td>
+        ? `<tr><td colspan="3" style="padding:6px 12px;text-align:right;color:#6B7280">${esc(invoice.discountLabel ?? 'Discount')}</td>
              <td style="padding:6px 12px;text-align:right;color:#DC2626">−${fmt(invoice.discountCents ?? 0)}</td></tr>`
         : '';
 
@@ -178,12 +185,12 @@ export class InvoicesService {
         : '';
 
     const poRow = invoice.poNumber
-      ? `<p style="margin:4px 0;font-size:13px;color:#6B7280">PO # ${invoice.poNumber}</p>`
+      ? `<p style="margin:4px 0;font-size:13px;color:#6B7280">PO # ${esc(invoice.poNumber ?? '')}</p>`
       : '';
 
     const termsRow = invoice.paymentTerms
       ? `<tr><td colspan="4" style="padding:12px;background:#F9FAFB;border-top:1px solid #E5E7EB;font-size:12px;color:#6B7280">
-           <strong>Payment Terms:</strong> ${invoice.paymentTerms}</td></tr>`
+           <strong>Payment Terms:</strong> ${esc(invoice.paymentTerms ?? '')}</td></tr>`
       : '';
 
     const billingBlock = invoice.billingAddress
@@ -265,9 +272,9 @@ export class InvoicesService {
         <!-- Footer -->
         <tr><td style="padding:28px 32px;border-top:1px solid #E5E7EB;margin-top:24px">
           <p style="margin:0;font-size:12px;color:#9CA3AF;text-align:center">
-            ${bizName} &bull; ${invoice.business?.email ?? ''} &bull; ${invoice.business?.phone ?? ''}
-            ${invoice.business?.address ? `<br>${invoice.business.address}` : ''}
-            ${invoice.business?.taxNumber ? `<br>Tax #: ${invoice.business.taxNumber}` : ''}
+            ${bizName} &bull; ${esc(invoice.business?.email ?? '')} &bull; ${esc(invoice.business?.phone ?? '')}
+            ${invoice.business?.address ? `<br>${esc(invoice.business.address)}` : ''}
+            ${invoice.business?.taxNumber ? `<br>Tax #: ${esc(invoice.business.taxNumber)}` : ''}
           </p>
         </td></tr>
 
@@ -279,7 +286,7 @@ export class InvoicesService {
 
     await this.email.send({
       to: invoice.client.email,
-      subject: `Invoice #${invoice.number} from ${bizName}`,
+      subject: `Invoice #${invoice.number} from ${bizNameRaw}`,
       html,
     });
 

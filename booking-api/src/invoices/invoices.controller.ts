@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { InvoicesService } from './invoices.service';
 import {
@@ -57,6 +58,7 @@ export class InvoicesController {
   }
 
   @Post(':id/send')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   sendByEmail(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

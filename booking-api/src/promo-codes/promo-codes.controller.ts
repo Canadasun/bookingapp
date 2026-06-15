@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import { PromoCodesService } from './promo-codes.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -46,11 +47,13 @@ export class PromoCodesController {
 
   // Public — booking page calls this to validate a code without auth
   @Get('validate')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   validate(
     @Param('businessId') businessId: string,
     @Query('code') code: string,
     @Query('priceCents') priceCents: string,
   ) {
+    if (!code || code.length > 60) throw new BadRequestException('Invalid promo code');
     const price = Number(priceCents);
     if (!Number.isInteger(price) || price < 0 || price > 100_000_000) throw new BadRequestException('Invalid price');
     return this.svc.validate(businessId, code, price);

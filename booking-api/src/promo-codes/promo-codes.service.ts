@@ -59,7 +59,7 @@ export class PromoCodesService {
     const pc = await this.prisma.promoCode.findFirst({
       where: { businessId, code: code.toUpperCase().trim(), active: true },
     });
-    if (!pc) throw new NotFoundException('Invalid or expired promo code');
+    if (!pc) throw new BadRequestException('Invalid or expired promo code');
     if (pc.expiresAt && pc.expiresAt < new Date()) throw new BadRequestException('Invalid or expired promo code');
     if (pc.maxUsages !== null && pc.usageCount >= pc.maxUsages) throw new BadRequestException('Invalid or expired promo code');
 
