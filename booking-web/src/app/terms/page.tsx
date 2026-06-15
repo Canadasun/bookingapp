@@ -23,7 +23,7 @@ export default function TermsPage() {
           <div className="space-y-10 px-7 py-9 text-sm leading-7 text-slate-600 sm:px-12 sm:py-12">
             <div className="flex gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-slate-800">
               <FileText className="mt-0.5 h-6 w-6 shrink-0 text-amber-600" />
-              <p>These Terms form a binding agreement between you and <strong>Najat S., operating Pulse Appointments</strong> (&quot;Pulse,&quot; &quot;we,&quot; or &quot;us&quot;). By creating an account, booking through Pulse, or otherwise using the service, you agree to these Terms and our <Link href="/privacy" className="font-semibold text-amber-700 hover:underline">Privacy Policy</Link>.</p>
+              <p>These Terms form a binding agreement between you and <strong>Idowu Ayeni, operating Pulse Appointments</strong> (&quot;Pulse,&quot; &quot;we,&quot; or &quot;us&quot;). By creating an account, booking through Pulse, or otherwise using the service, you agree to these Terms and our <Link href="/privacy" className="font-semibold text-amber-700 hover:underline">Privacy Policy</Link>.</p>
             </div>
 
             <section>
@@ -113,7 +113,7 @@ export default function TermsPage() {
             <section>
               <h2 className="mb-4 text-lg font-bold text-slate-950">12. Contact</h2>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <p className="font-bold text-slate-900">Najat S., operating Pulse Appointments</p>
+                <p className="font-bold text-slate-900">Idowu Ayeni, operating Pulse Appointments</p>
                 <p>3 St. SE, Calgary, Alberta T2G 0T9, Canada</p>
                 <p>Email: <a className="font-semibold text-amber-700 hover:underline" href="mailto:support@pulseappointments.com">support@pulseappointments.com</a></p>
               </div>

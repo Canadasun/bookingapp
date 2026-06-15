@@ -105,7 +105,7 @@ export default function PrivacyPage() {
           <div className="space-y-10 px-7 py-9 text-sm leading-7 text-slate-600 sm:px-12 sm:py-12">
             <div className="flex gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
               <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-amber-700" />
-              <p>Pulse Appointments is operated by <strong>Najat S.</strong> This policy explains how Pulse collects, uses, discloses, protects, and retains personal information when businesses and clients use our website, mobile applications, booking pages, and related services.</p>
+              <p>Pulse Appointments is operated by <strong>Idowu Ayeni</strong>. This policy explains how Pulse collects, uses, discloses, protects, and retains personal information when businesses and clients use our website, mobile applications, booking pages, and related services.</p>
             </div>
 
             {sections.map(({ icon: Icon, title, content }) => (
@@ -128,7 +128,7 @@ export default function PrivacyPage() {
               <div className="space-y-3">
                 <p>We may update this policy as Pulse, our providers, or legal requirements change. Material changes will be communicated through the service or by email where appropriate. The effective date above identifies the current version.</p>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm">
-                  <p className="font-bold text-slate-900">Privacy Officer: Najat S.</p>
+                  <p className="font-bold text-slate-900">Privacy Officer: Idowu Ayeni</p>
                   <p>Pulse Appointments</p>
                   <p>3 St. SE, Calgary, Alberta T2G 0T9, Canada</p>
                   <p>Email: <a className="font-semibold text-amber-700 hover:underline" href="mailto:support@pulseappointments.com">support@pulseappointments.com</a></p>
