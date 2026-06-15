@@ -25,7 +25,7 @@ const PaginationSchema = z.object({
 
 function pagination(page?: string, limit?: string) {
   const result = PaginationSchema.safeParse({ page, limit });
-  if (!result.success) throw new BadRequestException('Invalid pagination parameters');
+  if (!result.success) throw new BadRequestException('Please provide a valid page number and a limit between 1 and 200.');
   return result.data;
 }
 

@@ -85,7 +85,7 @@ export default function OverviewPage() {
     setLoading(true); setError("");
     try {
       const [aptsRes, clsRes, notifRes, threadsRes, paymentsRes, waitlistRes, deliveryRes] = await Promise.all([
-        api.appointments.list(bizId, 1, 1000),
+        api.appointments.list(bizId, 1, 200),
         isStaff ? Promise.resolve({ data: [] as ClientWithStats[] }) : api.clients.list(bizId),
         api.notifications.unreadCount().catch(() => ({ count: 0 })),
         api.messages.threads(bizId).catch(() => []),
