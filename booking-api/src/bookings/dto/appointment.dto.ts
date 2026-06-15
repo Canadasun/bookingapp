@@ -3,9 +3,9 @@ import { z } from 'zod';
 const AppointmentFieldsSchema = z.object({
   staffId: z.string().min(1),
   serviceId: z.string().min(1),
-  additionalServiceIds: z.array(z.string().min(1)).optional(),
+  additionalServiceIds: z.array(z.string().min(1)).max(10).optional(),
   startsAt: z.string().datetime(),
-  notes: z.string().optional(),
+  notes: z.string().max(5000).optional(),
   allowOverride: z.boolean().optional(),
   // Answers to the business intake questions, captured at booking.
   intakeAnswers: z.array(z.object({
@@ -39,7 +39,7 @@ export const RescheduleSchema = z.object({
 
 export const StatusSchema = z.object({
   status: z.enum(['CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW']),
-  cancelReason: z.string().optional(),
+  cancelReason: z.string().max(1000).optional(),
   // Owner-only: when cancelling, also charge the business's configured
   // cancellation fee to the client's card on file (Pro). Ignored unless the
   // status is CANCELLED and a card + fee are in place.
@@ -48,10 +48,10 @@ export const StatusSchema = z.object({
 
 export const UpdateAppointmentSchema = z.object({
   startsAt: z.string().datetime().optional(),
-  clientName: z.string().min(1).optional(),
+  clientName: z.string().min(1).max(200).optional(),
   clientEmail: z.string().email().optional(),
   clientPhone: z.string().optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(5000).optional(),
   notifyClient: z.boolean().default(true),
 });
 
@@ -60,7 +60,7 @@ export const UpdateAppointmentSchema = z.object({
 // being used to bypass the approval flow or fake completions.
 export const PublicStatusSchema = z.object({
   status: z.literal('CANCELLED'),
-  cancelReason: z.string().optional(),
+  cancelReason: z.string().max(1000).optional(),
   token: z.string().optional(),
 });
 

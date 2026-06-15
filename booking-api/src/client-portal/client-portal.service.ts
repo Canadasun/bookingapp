@@ -17,6 +17,7 @@ export class ClientPortalService {
             staff: { include: { user: { select: { name: true } } } },
           },
           orderBy: { startsAt: 'desc' },
+          take: 200,
         },
       },
     });

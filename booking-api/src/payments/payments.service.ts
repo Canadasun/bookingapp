@@ -536,7 +536,7 @@ export class PaymentsService {
               data: {
                 businessId: biz.id,
                 category: 'PAYMENT',
-                severity: 'WARN',
+                severity: 'INFO',
                 message: `Payout of ${(payout.amount / 100).toFixed(2)} ${payout.currency.toUpperCase()} arrived in your bank account.`,
                 context: { payoutId: payout.id, status: 'paid' },
               },
