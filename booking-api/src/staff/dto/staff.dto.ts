@@ -1,16 +1,22 @@
 import { z } from 'zod';
 
+const INTERNAL_UPLOAD = /^\/uploads\/[a-zA-Z0-9-]+$/;
+const avatarUrlSchema = z.string().max(2048).refine((v) => {
+  if (INTERNAL_UPLOAD.test(v)) return true;
+  try { return new URL(v).protocol === 'https:'; } catch { return false; }
+}, 'avatarUrl must be an https:// URL or an internal /uploads/ path').optional();
+
 export const CreateStaffSchema = z.object({
   userId: z.string().min(1),
   bio: z.string().max(1000).optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: avatarUrlSchema,
 });
 
 export const STAFF_PERMISSIONS = ['VIEW_MONEY', 'MANAGE_SERVICES', 'MANAGE_STAFF'] as const;
 
 export const UpdateStaffSchema = z.object({
   bio: z.string().max(1000).optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: avatarUrlSchema,
   active: z.boolean().optional(),
   permissions: z.array(z.enum(STAFF_PERMISSIONS)).max(10).optional(),
   locationId: z.string().nullable().optional(),

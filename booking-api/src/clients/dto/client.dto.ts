@@ -7,6 +7,7 @@ const nameSchema = z
   .string()
   .trim()
   .min(2, 'Enter the full name')
+  .max(200)
   .refine((v) => /\p{L}/u.test(v), 'Enter a valid name');
 
 // Optional phone, normalized to E.164. Empty → omitted; anything present must be
@@ -29,7 +30,7 @@ const ClientFieldsSchema = z.object({
   name: nameSchema,
   email: z.preprocess((v) => v === '' || v === null ? undefined : v, z.string().trim().toLowerCase().email().optional()),
   phone: phoneSchema,
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   // "MM-DD" (empty clears it).
   birthday: z.preprocess(
@@ -52,7 +53,7 @@ export const UpdateClientSchema = ClientFieldsSchema.partial().refine(
 export const MergeClientsSchema = z.object({
   primaryId: z.string().min(1),
   dupeIds: z.array(z.string().min(1)).min(1).max(20),
-  name: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).max(200).optional(),
   email: z.string().trim().toLowerCase().email().optional(),
   phone: z.string().trim().optional().nullable(),
 });
