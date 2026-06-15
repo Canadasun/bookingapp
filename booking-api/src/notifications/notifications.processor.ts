@@ -494,7 +494,7 @@ export class NotificationProcessor extends WorkerHost {
           subject: `Your Pulse verification code: ${code}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Your verification code</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, enter this code to finish signing in. It expires in 10 minutes.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, enter this code to finish signing in. It expires in 10 minutes.</p>
 <div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:18px;text-align:center;margin:0 0 8px">
   <p style="margin:0;color:#E9A23C;font-size:30px;font-weight:800;letter-spacing:6px">${code}</p>
 </div>
@@ -516,7 +516,7 @@ export class NotificationProcessor extends WorkerHost {
         subject: 'Verify your email for Pulse',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Confirm your email</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, please confirm this is your email address so you can view your bookings and messages.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, please confirm this is your email address so you can view your bookings and messages.</p>
 <a href="${link}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Verify email →</a>
 <p style="margin:16px 0 0;color:#9CA3AF;font-size:12px">This link expires in 7 days. If you didn't create a Pulse account, you can ignore this email.</p>
 `),
@@ -538,7 +538,7 @@ export class NotificationProcessor extends WorkerHost {
         subject: `Welcome to Pulse, ${user.name.split(' ')[0]}! 🎉`,
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Welcome aboard! 🎉</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, your account for <strong>${bizName}</strong> is ready. Here's how to get set up:</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, your account for <strong>${esc(bizName)}</strong> is ready. Here's how to get set up:</p>
 <ol style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.7">
   <li>Add your services and prices</li>
   <li>Add your team and their availability</li>
@@ -561,7 +561,7 @@ export class NotificationProcessor extends WorkerHost {
         subject: 'Reset your Pulse password',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Reset your password</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${user.name}, we received a request to reset your password. This link expires in 15 minutes. If you didn't ask for this, you can safely ignore this email.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, we received a request to reset your password. This link expires in 15 minutes. If you didn't ask for this, you can safely ignore this email.</p>
 <a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset password →</a>
 `),
       });
@@ -574,14 +574,14 @@ export class NotificationProcessor extends WorkerHost {
       if (!user) return;
       this.currentBusinessId = user.businessId;
       const resetUrl = job.data.resetToken ? `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}` : `${baseUrl}/forgot-password`;
-      const device = (job.data.userAgent || 'an unrecognized device').slice(0, 120);
-      const ip = job.data.ip ? ` (IP ${job.data.ip})` : '';
+      const device = esc((job.data.userAgent || 'an unrecognized device').slice(0, 120));
+      const ip = job.data.ip ? ` (IP ${esc(job.data.ip)})` : '';
       await this.email.send({
         to: user.email,
         subject: '🔐 New sign-in to your Pulse account',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">New sign-in detected</h2>
-<p style="margin:0 0 12px;color:#6B7280;font-size:14px">Hi ${user.name}, your Pulse account was just signed into from a device we haven't seen before:</p>
+<p style="margin:0 0 12px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, your Pulse account was just signed into from a device we haven't seen before:</p>
 <p style="margin:0 0 16px;color:#374151;font-size:13px;background:#F8F9FA;border-radius:10px;padding:12px">${device}${ip}</p>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px"><strong>If this was you</strong>, you can ignore this email. <strong>If it wasn't</strong>, reset your password right away to secure your account.</p>
 <a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset my password →</a>
@@ -1150,6 +1150,6 @@ ${aptDetails(apt)}
   private async addInAppMessage(businessId: string, clientId: string, content: string) {
     await this.prisma.message.create({
       data: { businessId, clientId, content, fromClient: false },
-    }).catch(err => console.error('Failed to add in-app message:', err));
+    }).catch(err => console.error('Failed to add in-app message:', err instanceof Error ? err.message : String(err)));
   }
 }
