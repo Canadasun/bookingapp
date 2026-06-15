@@ -20,6 +20,7 @@ export class TasksService {
       where,
       include: taskInclude,
       orderBy: [{ status: 'asc' }, { dueAt: 'asc' }, { createdAt: 'desc' }],
+      take: 500,
     });
   }
 

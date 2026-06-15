@@ -53,7 +53,7 @@ export class ReviewsService {
 
   // Owner — all reviews (incl. hidden).
   ownerList(businessId: string) {
-    return this.prisma.review.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.review.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' }, take: 200 });
   }
 
   async setPublished(businessId: string, id: string, published: boolean) {

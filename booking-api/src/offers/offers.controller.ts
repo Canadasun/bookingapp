@@ -17,10 +17,10 @@ function assertOwnsBusiness(user: AuthUser, businessId: string) {
 }
 
 const OfferSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().min(1),
-  imageUrl: z.string().url().optional(),
-  discount: z.string().optional(),
+  title: z.string().min(1).max(120),
+  description: z.string().min(1).max(2000),
+  imageUrl: z.string().url().refine((u) => u.startsWith('https://'), 'imageUrl must use HTTPS').optional(),
+  discount: z.string().max(50).optional(),
   expiresAt: z.string().datetime().optional(),
   active: z.boolean().default(true),
 });
