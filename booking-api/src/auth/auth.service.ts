@@ -232,7 +232,7 @@ export class AuthService {
   private isTrustedDevice(user: User, token?: string, ctx?: { ip?: string; userAgent?: string }): boolean {
     if (!token) return false;
     try {
-      const p = this.jwt.verify(token, { secret: this.trustedDeviceSecret(user) }) as { sub?: string; kind?: string; deviceKey?: string };
+      const p = this.jwt.verify(token, { secret: this.trustedDeviceSecret(user), algorithms: ['HS256'] }) as { sub?: string; kind?: string; deviceKey?: string };
       if (p?.sub !== user.id || p?.kind !== 'td') return false;
       const currentKey = this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip);
       // Require both sides to have a resolvable key; tokens without deviceKey (no

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 export const RegisterSchema = z.object({
-  name: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(200),
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(1024),
   // Public self-signup is restricted to business owners and clients only.
   // STAFF are created by an owner via the staff-invite endpoint; ADMIN via seed.
   role: z.enum(['OWNER', 'CLIENT']).default('CLIENT'),
@@ -20,7 +20,7 @@ export const RegisterSchema = z.object({
 
 export const LoginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(1),
+  password: z.string().min(1).max(1024),
   // Trusted-device token from a prior "remember this device" — lets a 2FA user
   // skip the OTP on a known device.
   trustedDeviceToken: z.string().optional(),
