@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -163,9 +163,33 @@ function commandItems(nav: NavItem[]) {
 function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[]; onClose: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) setQuery("");
+  }, [open]);
+
+  // Focus trap: prevent Tab from leaving the dialog.
+  useEffect(() => {
+    if (!open) return;
+    function trapFocus(e: KeyboardEvent) {
+      if (e.key !== "Tab") return;
+      const el = dialogRef.current;
+      if (!el) return;
+      const focusable = [...el.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+      )];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    document.addEventListener("keydown", trapFocus);
+    return () => document.removeEventListener("keydown", trapFocus);
   }, [open]);
 
   if (!open) return null;
@@ -182,7 +206,14 @@ function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[];
 
   return (
     <div className="fixed inset-0 z-50 bg-black/25 p-3 sm:p-8" onClick={onClose}>
-      <div className="mx-auto mt-16 w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Jump to a page"
+        className="mx-auto mt-16 w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
           <Search className="h-4 w-4 text-gray-400" />
           <input
@@ -300,6 +331,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [commandOpen, setCommandOpen] = useState(false);
   const [biz, setBiz] = useState<Business | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // useCurrentUser() is the authoritative auth check. It calls /api/auth/me on
   // first mount (result is module-level cached), redirects to /login on 401, and
@@ -360,6 +392,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const nav = user?.role === "STAFF" ? staffNav : user?.role === "OWNER" ? OWNER_NAV : [];
 
   useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    setIsMobile(mq.matches);
+    const onMq = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", onMq);
+    return () => mq.removeEventListener("change", onMq);
+  }, []);
+
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -410,10 +450,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} />
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-60 max-w-[85vw] bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5 dashboard-safe-bottom",
-        open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-      )}>
+      <aside
+        aria-hidden={isMobile && !open}
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 w-60 max-w-[85vw] bg-white/88 backdrop-blur-xl border-r border-[#E9DDCB] flex flex-col transition-transform duration-200 shadow-xl shadow-amber-900/5 dashboard-safe-bottom",
+          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
         {/* Business Logo/Name — Clicking leads to settings.
             Tapping it on mobile previously dumped owners onto "/", which reads as a
             sign-out. Keep them in the dashboard. */}
@@ -429,7 +472,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Link>
 
         {/* Nav */}
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        <nav aria-label="Main navigation" className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {nav.map((item) => (
             <NavLink key={item.href} item={item} onClose={() => setOpen(false)} unreadMessages={unreadMessages} />
           ))}

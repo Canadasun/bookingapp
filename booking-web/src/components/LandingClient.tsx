@@ -79,6 +79,7 @@ export function LandingBottomCta() {
 const SOLUTIONS_LIVE = [
   { icon: CalendarCheck, title: "24/7 online booking", desc: "Clients book themselves, day or night.", href: "/dashboard/services" },
   { icon: CreditCard, title: "Deposits & no-show protection", desc: "Take a card at booking, charge no-shows.", href: "/dashboard/settings" },
+  { icon: MessageSquare, title: "2-way client messaging", desc: "Chat with booked clients without sharing your number.", href: "/dashboard/messages" },
   { icon: Star, title: "Reviews that build trust", desc: "Collect and showcase 5-star feedback.", href: "/dashboard/reviews" },
   { icon: Gift, title: "Gift cards & packages", desc: "Sell ahead and lock in repeat visits.", href: "/dashboard/gift-cards" },
   { icon: Megaphone, title: "Offers & marketing", desc: "Win-backs and promos to fill your book.", href: "/dashboard/marketing" },
@@ -88,7 +89,6 @@ const SOLUTIONS_SOON = [
   { icon: Globe, title: "Your own website", desc: "A booking-ready site for your business in minutes." },
   { icon: ShoppingBag, title: "Online store", desc: "Sell products and bundles right from your page." },
   { icon: Heart, title: "Loyalty & rewards", desc: "Points and perks that keep clients coming back." },
-  { icon: MessageSquare, title: "2-way client texting", desc: "Chat with booked clients without sharing your number." },
 ];
 
 // Logged-in owners: a "grow your business" section that sells what's live and
@@ -144,11 +144,18 @@ export function LandingFooterLinks() {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
+  const legalLinks = (
+    <>
+      <Link href="/terms" className="hover:text-indigo-600 transition-colors">Terms</Link>
+      <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
+    </>
+  );
   if (user && home) {
     return (
       <div className="flex gap-6 text-sm text-slate-500">
         <Link href={home} className="hover:text-indigo-600 transition-colors">Dashboard</Link>
         <Link href="/book" className="hover:text-indigo-600 transition-colors">Book</Link>
+        {legalLinks}
       </div>
     );
   }
@@ -156,6 +163,7 @@ export function LandingFooterLinks() {
     <div className="flex gap-6 text-sm text-slate-500">
       <Link href="/register" className="hover:text-indigo-600 transition-colors">Get started</Link>
       <Link href="/login" className="hover:text-indigo-600 transition-colors">Sign in</Link>
+      {legalLinks}
     </div>
   );
 }

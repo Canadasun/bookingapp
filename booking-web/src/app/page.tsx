@@ -80,7 +80,7 @@ export default async function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white/90 border border-[#E9DDCB] text-sm font-semibold text-ink px-4 py-1.5 rounded-full mb-8 shadow-sm">
             <CheckCircle2 className="w-4 h-4 text-violet-600" />
-            Trusted by 10,000+ professionals
+            Built for independent professionals
           </div>
 
           {/* Headline */}

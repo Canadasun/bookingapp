@@ -310,6 +310,7 @@ export class PaymentsService {
       throw new BadRequestException('Invalid Stripe webhook signature');
     }
 
+    try {
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const intent = event.data.object as Stripe.PaymentIntent;
@@ -567,6 +568,19 @@ export class PaymentsService {
         }
         break;
       }
+    }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Stripe webhook processing failed for event ${event.type} (${event.id}): ${msg}`);
+      await this.prisma.systemError.create({
+        data: {
+          category: 'PAYMENT',
+          severity: 'ERROR',
+          message: `Stripe webhook processing failed: ${msg}`.slice(0, 2000),
+          context: { eventType: event.type, eventId: event.id },
+        },
+      }).catch(() => {});
+      throw err;
     }
 
     return { received: true, eventId: event.id };

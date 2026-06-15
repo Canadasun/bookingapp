@@ -1,4 +1,5 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
+import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -103,6 +104,7 @@ function policyWindowLabel(minutes: number) {
   },
 })
 export class NotificationProcessor extends WorkerHost {
+  private readonly logger = new Logger(NotificationProcessor.name);
   private email = new ResendEmailProvider();
   private sms   = new TwilioSmsProvider();
   // The job name currently being processed, used to label delivery-log rows.
@@ -118,6 +120,14 @@ export class NotificationProcessor extends WorkerHost {
   ) {
     super();
     this.installDeliveryLogging();
+  }
+
+  @OnWorkerEvent('failed')
+  onFailed(job: Job | undefined, error: Error) {
+    this.logger.error(
+      `Notification job ${job?.id ?? '?'} (${job?.name ?? 'unknown'}) failed after ${job?.attemptsMade ?? 0} attempt(s): ${error.message}`,
+      error.stack,
+    );
   }
 
   // Wrap the providers so every email/SMS send is recorded in NotificationDelivery

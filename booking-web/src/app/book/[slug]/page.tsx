@@ -86,8 +86,8 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
         {services.map((s) => (
           <span key={s.id} className="inline-flex items-center gap-1 bg-white border border-violet-200 rounded-lg px-2.5 py-1 text-xs text-violet-700 font-medium">
             {s.name}
-            <button onClick={() => onClear(s.id)} className="ml-0.5 hover:text-red-500 transition-colors">
-              <X className="w-3 h-3" />
+            <button onClick={() => onClear(s.id)} aria-label={`Remove ${s.name}`} className="ml-0.5 hover:text-red-500 transition-colors">
+              <X className="w-3 h-3" aria-hidden="true" />
             </button>
           </span>
         ))}
@@ -114,7 +114,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   // the iframe with no inner scrollbar.
   useEffect(() => {
     if (!isEmbed || typeof window === "undefined") return;
-    const post = () => window.parent?.postMessage({ type: "bookingapp:height", height: document.body.scrollHeight }, "*");
+    const post = () => window.parent?.postMessage({ type: "bookingapp:height", height: document.documentElement.scrollHeight }, "*");
     post();
     const ro = new ResizeObserver(post);
     ro.observe(document.body);
@@ -686,7 +686,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                           {svcs.map((svc) => {
                             const selected = selectedServices.some((s) => s.id === svc.id);
                             return (
-                              <button key={svc.id} onClick={() => toggleService(svc)}
+                              <button key={svc.id} onClick={() => toggleService(svc)} aria-pressed={selected}
                                 className={cn(
                                   "w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all",
                                   selected ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50",
@@ -857,6 +857,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                               {s.map((sl) => (
                                 <button key={`${sl.staffId ?? "staff"}-${sl.startsAt}`}
                                   onClick={() => { setSelectedSlot(sl); setStep(3); }}
+                                  aria-pressed={selectedSlot?.startsAt === sl.startsAt}
                                   className={cn(
                                     "py-2.5 rounded-xl border text-xs font-semibold transition-all",
                                     selectedSlot?.startsAt === sl.startsAt
@@ -913,11 +914,14 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     { k: "notes", label: "Notes (optional)", type: "text", ph: "Anything we should know?" },
                   ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+                      <label htmlFor={`field-${k}`} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
                       <input
+                        id={`field-${k}`}
                         type={type}
                         placeholder={ph}
                         value={form[k]}
+                        aria-invalid={!!errs[k]}
+                        aria-describedby={errs[k] ? `error-${k}` : undefined}
                         onChange={(e) => {
                           const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                           setForm((p) => ({ ...p, [k]: val }));
@@ -928,7 +932,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                           errs[k] ? "border-red-400" : "border-gray-200",
                         )}
                       />
-                      {errs[k] && <p className="text-xs text-red-500 mt-1">{errs[k]}</p>}
+                      {errs[k] && <p id={`error-${k}`} role="alert" className="text-xs text-red-500 mt-1">{errs[k]}</p>}
                     </div>
                   ))}
 

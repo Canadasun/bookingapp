@@ -569,7 +569,7 @@ export default function AdminPage() {
                                 Open full size <ExternalLink className="h-3 w-3" />
                               </a>
                             </div>
-                            <iframe src={b.verificationDocUrl} title={`${b.name} verification`} className="h-80 w-full bg-white" />
+                            <iframe src={b.verificationDocUrl} title={`${b.name} verification`} sandbox="" className="h-80 w-full bg-white" />
                           </div>
                         )}
                       </div>

@@ -6,17 +6,13 @@ export const metadata = {
   description: "Live uptime and incident information for Pulse Appointments.",
 };
 
-// Redirect to the external status dashboard after a short delay.
-// Replace the href below with your BetterStack / Statuspage URL when provisioned.
-const STATUS_PAGE_URL = "https://pulse-appointments.betteruptime.com";
+const STATUS_PAGE_URL =
+  process.env.NEXT_PUBLIC_STATUS_PAGE_URL ?? "https://pulse-appointments.betteruptime.com";
 
 export default function StatusPage() {
   return (
     <>
-      {/* Meta refresh — browser redirects automatically after 4 s */}
-      <meta httpEquiv="refresh" content={`4; url=${STATUS_PAGE_URL}`} />
-
-      <div className="min-h-screen bg-slate-50">
+<div className="min-h-screen bg-slate-50">
         <div className="max-w-3xl mx-auto px-6 py-16">
           <Link href="/" className="inline-flex items-center gap-2 mb-10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
