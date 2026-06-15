@@ -31,7 +31,7 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       const [a, c, p, b] = await Promise.all([
-        api.appointments.list(bizId, 1, 1000),
+        api.appointments.listRange(bizId, "2000-01-01T00:00:00.000Z", "2100-01-01T00:00:00.000Z"),
         api.clients.list(bizId, undefined, 1, 500).catch(() => ({ data: [] as ClientWithStats[] })),
         api.payments.list().catch(() => [] as Payment[]),
         api.business.get(bizId).catch(() => null as Business | null),
