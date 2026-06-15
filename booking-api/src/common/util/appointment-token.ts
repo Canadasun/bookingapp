@@ -20,7 +20,7 @@ function secret(): string {
   return s;
 }
 
-const DEFAULT_TTL_SECONDS = 400 * 24 * 60 * 60;
+const DEFAULT_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export function signAppointmentToken(appointmentId: string, ttlSeconds = DEFAULT_TTL_SECONDS): string {
   const exp = Math.floor(Date.now() / 1000) + ttlSeconds;

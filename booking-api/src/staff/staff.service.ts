@@ -35,12 +35,9 @@ export class StaffService {
     });
   }
 
-  async findOne(id: string, businessId?: string) {
+  async findOne(id: string, businessId: string) {
     const staff = await this.prisma.staff.findFirst({
-      where: {
-        id,
-        ...(businessId ? { businessId } : {})
-      },
+      where: { id, businessId },
       include: {
         user: { select: { name: true, email: true, role: true } },
         staffServices: { include: { service: true } },
@@ -109,10 +106,10 @@ export class StaffService {
       return s;
     });
 
-    return { staff: await this.findOne(staff.id), tempPassword };
+    return { staff: await this.findOne(staff.id, businessId), tempPassword };
   }
 
-  async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null }, businessId?: string) {
+  async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null }, businessId: string) {
     const staff = await this.findOne(id, businessId);
     if (dto.locationId && businessId) {
       const location = await this.prisma.location.findFirst({
@@ -137,7 +134,7 @@ export class StaffService {
     });
   }
 
-  async deactivate(id: string, businessId?: string) {
+  async deactivate(id: string, businessId: string) {
     const staff = await this.findOne(id, businessId);
     return this.prisma.staff.update({ where: { id: staff.id }, data: { active: false } });
   }
@@ -147,7 +144,7 @@ export class StaffService {
   // Restrict, to protect history) — but with { force } the owner can delete them
   // anyway: their bookings are first moved to the owner's own provider record
   // (created if needed), so nothing is lost.
-  async remove(id: string, businessId?: string, opts: { force?: boolean } = {}) {
+  async remove(id: string, businessId: string, opts: { force?: boolean } = {}) {
     const staff = await this.findOne(id, businessId);
     const user = await this.prisma.user.findUnique({ where: { id: staff.userId }, select: { role: true } });
     if (user?.role === 'OWNER') {
@@ -214,7 +211,7 @@ export class StaffService {
     });
   }
 
-  async assignServices(staffId: string, dto: AssignServicesDto, businessId?: string) {
+  async assignServices(staffId: string, dto: AssignServicesDto, businessId: string) {
     const staff = await this.findOne(staffId, businessId);
     // Every service must belong to the staff member's business — no assigning
     // another business's services.
@@ -230,10 +227,10 @@ export class StaffService {
     await this.prisma.staffService.createMany({
       data: dto.serviceIds.map((serviceId) => ({ staffId: staff.id, serviceId })),
     });
-    return this.findOne(staff.id);
+    return this.findOne(staff.id, staff.businessId);
   }
 
-  async setAvailabilityRules(staffId: string, rules: AvailabilityRuleDto[], businessId?: string) {
+  async setAvailabilityRules(staffId: string, rules: AvailabilityRuleDto[], businessId: string) {
     const staff = await this.findOne(staffId, businessId);
     await this.prisma.availabilityRule.deleteMany({ where: { staffId: staff.id } });
     await this.prisma.availabilityRule.createMany({
@@ -242,19 +239,19 @@ export class StaffService {
     return this.prisma.availabilityRule.findMany({ where: { staffId: staff.id } });
   }
 
-  async createTimeOff(staffId: string, dto: TimeOffDto, businessId?: string) {
+  async createTimeOff(staffId: string, dto: TimeOffDto, businessId: string) {
     const staff = await this.findOne(staffId, businessId);
     return this.prisma.timeOff.create({
       data: { staffId: staff.id, startsAt: new Date(dto.startsAt), endsAt: new Date(dto.endsAt), reason: dto.reason },
     });
   }
 
-  async getTimeOffs(staffId: string, businessId?: string) {
+  async getTimeOffs(staffId: string, businessId: string) {
     const staff = await this.findOne(staffId, businessId);
     return this.prisma.timeOff.findMany({ where: { staffId: staff.id }, orderBy: { startsAt: 'asc' } });
   }
 
-  async deleteTimeOff(id: string, businessId?: string) {
+  async deleteTimeOff(id: string, businessId: string) {
     const timeOff = await this.prisma.timeOff.findFirst({
       where: {
         id,

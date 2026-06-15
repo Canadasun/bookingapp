@@ -28,12 +28,9 @@ export class ServicesService {
     });
   }
 
-  async findOne(id: string, businessId?: string) {
+  async findOne(id: string, businessId: string) {
     const service = await this.prisma.service.findFirst({
-      where: { 
-        id,
-        ...(businessId ? { businessId } : {})
-      },
+      where: { id, businessId },
       include: { category: { select: { id: true, name: true, color: true, sortOrder: true } } },
     });
     if (!service) throw new NotFoundException('Service not found');
@@ -53,10 +50,10 @@ export class ServicesService {
     });
   }
 
-  async update(id: string, dto: UpdateServiceDto, businessId?: string) {
+  async update(id: string, dto: UpdateServiceDto, businessId: string) {
     const service = await this.findOne(id, businessId);
     const { categoryId, ...rest } = dto;
-    if (businessId) await this.assertCategoryOwnership(businessId, categoryId);
+    await this.assertCategoryOwnership(businessId, categoryId);
     return this.prisma.service.update({
       where: { id: service.id },
       data: {
@@ -67,7 +64,7 @@ export class ServicesService {
     });
   }
 
-  async remove(id: string, businessId?: string) {
+  async remove(id: string, businessId: string) {
     const service = await this.findOne(id, businessId);
     const appointments = await this.prisma.appointment.count({ where: { serviceId: service.id } });
     if (appointments > 0) {
@@ -99,12 +96,9 @@ export class ServicesService {
     });
   }
 
-  async updateCategory(id: string, dto: UpdateCategoryDto, businessId?: string) {
-    const cat = await this.prisma.serviceCategory.findFirst({ 
-      where: { 
-        id,
-        ...(businessId ? { businessId } : {})
-      }
+  async updateCategory(id: string, dto: UpdateCategoryDto, businessId: string) {
+    const cat = await this.prisma.serviceCategory.findFirst({
+      where: { id, businessId }
     });
     if (!cat) throw new NotFoundException('Category not found');
     return this.prisma.serviceCategory.update({
@@ -114,12 +108,9 @@ export class ServicesService {
     });
   }
 
-  async removeCategory(id: string, businessId?: string) {
-    const cat = await this.prisma.serviceCategory.findFirst({ 
-      where: { 
-        id,
-        ...(businessId ? { businessId } : {})
-      }
+  async removeCategory(id: string, businessId: string) {
+    const cat = await this.prisma.serviceCategory.findFirst({
+      where: { id, businessId }
     });
     if (!cat) throw new NotFoundException('Category not found');
     await this.prisma.service.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
