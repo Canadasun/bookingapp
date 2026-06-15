@@ -88,6 +88,13 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
     ].join("; ");
 
+    // Admin needs 'self' in frame-src to preview uploaded verification documents
+    // (served via /proxy/uploads/:id — same-origin but blocked by the default frame-src).
+    const adminCsp = dashboardCsp.replace(
+      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+    );
+
     return [
       {
         source: "/:path*",
@@ -109,7 +116,7 @@ const nextConfig: NextConfig = {
       {
         source: "/admin/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: dashboardCsp },
+          { key: "Content-Security-Policy", value: adminCsp },
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },

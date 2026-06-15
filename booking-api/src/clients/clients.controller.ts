@@ -13,7 +13,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 const MAX_IMPORT_ROWS = 1000;
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(25),
+  limit: z.coerce.number().int().min(1).max(1000).default(25),
 });
 
 function pagination(page?: string, limit?: string) {
