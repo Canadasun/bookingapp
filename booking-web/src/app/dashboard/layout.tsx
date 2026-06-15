@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -465,11 +466,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             sign-out. Keep them in the dashboard. */}
         <Link href="/dashboard" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Home">
           {biz?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={biz.logoUrl} alt="Business logo" className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />
+            <Image src={biz.logoUrl} alt="Business logo" width={36} height={36} className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src="/logo-icon.png" alt="Pulse" className="w-9 h-9 object-contain rounded-xl shrink-0" />
+            <Image src="/logo-icon.png" alt="Pulse" width={36} height={36} className="w-9 h-9 object-contain rounded-xl shrink-0" />
           )}
           <span className="font-bold text-ink tracking-tight truncate">{biz?.name ?? "Pulse"}</span>
         </Link>
@@ -486,10 +485,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {user && (
             <Link href="/dashboard/account" onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3 py-2 mb-1 rounded-xl hover:bg-gray-50 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
+              <div className="relative w-8 h-8 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs shrink-0">
                 {avatar
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={avatar} alt={`${user.name} profile photo`} className="w-full h-full object-cover" />
+                  ? <Image src={avatar} alt={`${user.name} profile photo`} fill className="object-cover" />
                   : user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
@@ -568,10 +566,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Link>
             {user && (
               <Link href="/dashboard/account" className="flex min-h-11 items-center gap-2 rounded-full pr-2 transition-colors hover:bg-gray-100" title="Your account">
-                <div className="w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs">
+                <div className="relative w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs">
                   {avatar
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={avatar} alt={`${user.name} profile photo`} className="w-full h-full object-cover" />
+                    ? <Image src={avatar} alt={`${user.name} profile photo`} fill className="object-cover" />
                     : user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <span className="hidden sm:inline text-sm font-medium text-gray-700">{user.name}</span>

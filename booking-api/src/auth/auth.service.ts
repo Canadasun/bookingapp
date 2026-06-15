@@ -524,11 +524,27 @@ export class AuthService {
 
   // Rotate the CURRENT device's session in place (identified by the presented
   // refresh token) so other devices' sessions are untouched.
+  // Redis lock: if the same token arrives concurrently (e.g. two inflight requests
+  // on the same device), only one rotation wins; the other falls back to creating
+  // a fresh session instead of racing to replace the same DB row.
   async refresh(user: User, presentedToken?: string, userAgent?: string) {
-    return this.issueTokens(user, {
-      replaceTokenHash: presentedToken ? hashRefreshToken(presentedToken) : undefined,
-      userAgent,
-    });
+    if (!presentedToken) {
+      return this.issueTokens(user, { userAgent });
+    }
+    const tokenHash = hashRefreshToken(presentedToken);
+    const lockKey = `auth:refresh-lock:${tokenHash}`;
+    const acquired = await this.redis.client.set(lockKey, '1', 'EX', 10, 'NX').catch(() => null);
+    if (!acquired) {
+      // Concurrent rotation for this token is already in progress on another pod.
+      // Issue a brand-new session to avoid the duplicate-row race; the old session
+      // row will be swept by the expired-session GC on the next successful refresh.
+      return this.issueTokens(user, { userAgent });
+    }
+    try {
+      return await this.issueTokens(user, { replaceTokenHash: tokenHash, userAgent });
+    } finally {
+      await this.redis.client.del(lockKey).catch(() => {});
+    }
   }
 
   async logout(userId: string, refreshToken?: string) {

@@ -89,8 +89,11 @@ export class VerificationService {
   }
 
   // Admin dismisses a duplicate flag (keeps the business; clears it from the queue).
-  async resolveDuplicate(id: string) {
+  async resolveDuplicate(id: string, adminId?: string) {
     await this.prisma.business.update({ where: { id }, data: { duplicateReviewedAt: new Date() } });
+    await this.prisma.auditLog.create({
+      data: { entityType: 'BUSINESS', entityId: id, action: 'DUPLICATE_FLAG_DISMISSED', userId: adminId ?? null },
+    }).catch(() => {});
     return { ok: true };
   }
 
@@ -180,24 +183,32 @@ export class VerificationService {
     };
   }
 
-  async approve(businessId: string) {
+  async approve(businessId: string, adminId?: string) {
     const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
     if (!biz) throw new NotFoundException('Business not found');
-    return this.prisma.business.update({
+    const result = await this.prisma.business.update({
       where: { id: businessId },
       data: { verificationStatus: 'VERIFIED', verifiedAt: new Date(), verificationNote: null },
       select: { verificationStatus: true, verifiedAt: true },
     });
+    await this.prisma.auditLog.create({
+      data: { entityType: 'BUSINESS', entityId: businessId, action: 'VERIFICATION_APPROVED', userId: adminId ?? null },
+    }).catch(() => {});
+    return result;
   }
 
-  async reject(businessId: string, note?: string) {
+  async reject(businessId: string, note?: string, adminId?: string) {
     const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
     if (!biz) throw new NotFoundException('Business not found');
-    return this.prisma.business.update({
+    const result = await this.prisma.business.update({
       where: { id: businessId },
       data: { verificationStatus: 'REJECTED', verificationNote: note?.trim() || 'Document could not be verified.' },
       select: { verificationStatus: true, verificationNote: true },
     });
+    await this.prisma.auditLog.create({
+      data: { entityType: 'BUSINESS', entityId: businessId, action: 'VERIFICATION_REJECTED', userId: adminId ?? null, ...(note ? { changes: { note } } : {}) },
+    }).catch(() => {});
+    return result;
   }
 
   /**

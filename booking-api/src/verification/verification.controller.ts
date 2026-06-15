@@ -10,7 +10,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
@@ -79,20 +79,20 @@ export class AdminVerificationController {
 
   // Dismiss a duplicate flag (keep the business, clear it from the queue).
   @Post(':id/duplicate-reviewed')
-  duplicateReviewed(@Param('id') id: string) {
+  duplicateReviewed(@Param('id') id: string, @CurrentUser() user: User) {
     if (!id) throw new BadRequestException('Business id required');
-    return this.svc.resolveDuplicate(id);
+    return this.svc.resolveDuplicate(id, user.id);
   }
 
   @Post(':id/approve')
-  approve(@Param('id') id: string) {
-    return this.svc.approve(id);
+  approve(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.svc.approve(id, user.id);
   }
 
   @Post(':id/reject')
-  reject(@Param('id') id: string, @Body(new ZodValidationPipe(RejectSchema)) dto: { note?: string }) {
+  reject(@Param('id') id: string, @Body(new ZodValidationPipe(RejectSchema)) dto: { note?: string }, @CurrentUser() user: User) {
     if (!id) throw new BadRequestException('Business id required');
-    return this.svc.reject(id, dto.note);
+    return this.svc.reject(id, dto.note, user.id);
   }
 }
 
@@ -123,13 +123,21 @@ export class AdminOverviewController {
   }
 
   @Post('businesses/:id/suspend')
-  suspend(@Param('id') id: string) {
-    return this.biz.deactivate(id);
+  async suspend(@Param('id') id: string, @CurrentUser() user: User) {
+    const result = await this.biz.deactivate(id);
+    await this.prisma.auditLog.create({
+      data: { entityType: 'BUSINESS', entityId: id, action: 'ADMIN_SUSPENDED', userId: user.id },
+    }).catch(() => {});
+    return result;
   }
 
   @Post('businesses/:id/unsuspend')
-  unsuspend(@Param('id') id: string) {
-    return this.biz.reactivate(id);
+  async unsuspend(@Param('id') id: string, @CurrentUser() user: User) {
+    const result = await this.biz.reactivate(id);
+    await this.prisma.auditLog.create({
+      data: { entityType: 'BUSINESS', entityId: id, action: 'ADMIN_REACTIVATED', userId: user.id },
+    }).catch(() => {});
+    return result;
   }
 
   /** Look up a user by email — returns basic profile + lock status. */

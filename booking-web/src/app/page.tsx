@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { verifyCookieValue } from "@/lib/cookie-sign";
 import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap } from "lucide-react";
 import {
@@ -58,15 +59,32 @@ export default async function LandingPage() {
   if (role === "CLIENT") redirect("/my/dashboard");
   if ((role && role !== "CLIENT") || (authed && !role)) redirect("/dashboard");
 
+  const jsonLdOrg = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Pulse Appointments",
+    url: "https://www.pulseappointments.com",
+    logo: "https://www.pulseappointments.com/logo-icon.png",
+    contactPoint: { "@type": "ContactPoint", email: "support@pulseappointments.com", contactType: "customer support" },
+  };
+  const jsonLdSite = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    url: "https://www.pulseappointments.com",
+    name: "Pulse Appointments",
+  };
+
   return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSite) }} />
     <div className="flex flex-col min-h-screen brand-shell">
 
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#E9DDCB]">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
+            <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
             <span className="text-base font-bold text-ink tracking-tight">Pulse Booking</span>
           </div>
           <LandingAuthCta />
@@ -203,13 +221,13 @@ export default async function LandingPage() {
       <footer className="py-8 border-t border-[#E9DDCB] bg-white/80">
         <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-slate-400">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.png" alt="" className="w-4 h-4 object-contain opacity-60" aria-hidden="true" />
+            <Image src="/logo-icon.png" alt="" width={16} height={16} className="w-4 h-4 object-contain opacity-60" aria-hidden="true" />
             <span className="text-sm">© {new Date().getFullYear()} Pulse Appointments</span>
           </div>
           <LandingFooterLinks />
         </div>
       </footer>
     </div>
+    </>
   );
 }

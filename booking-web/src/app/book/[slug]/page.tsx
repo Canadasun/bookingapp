@@ -8,6 +8,7 @@ import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
 import { cn, formatPhoneInput, normalizePhoneE164 } from "@/lib/utils";
+import Image from "next/image";
 import Link from "next/link";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -176,24 +177,19 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       });
   }, [slug, isBusinessIdRef]);
 
-  // Load services
-  useEffect(() => {
-    if (!bizId) return;
-    api.services.list(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
-  }, [bizId]);
-
-  // Load reviews (social proof)
-  useEffect(() => {
-    if (!bizId) return;
-    api.reviews.list(bizId).then(setRevStats).catch(() => {});
-  }, [bizId]);
-
-  // Load the business's active providers once (the public endpoint returns active
-  // only). Their count decides whether this is a sole-proprietor (show the salon
-  // name, no provider step) or a multi-provider business (let the client choose).
+  // Load catalogue in parallel once bizId is known.
+  // Three separate requests but issued simultaneously so they don't waterfall.
   useEffect(() => {
     if (!bizId) { setActiveStaff([]); return; }
-    api.staff.list(bizId).then(setActiveStaff).catch(() => {});
+    Promise.all([
+      api.services.list(bizId).catch(() => [] as Service[]),
+      api.reviews.list(bizId).catch(() => null),
+      api.staff.list(bizId).catch(() => [] as StaffMember[]),
+    ]).then(([services, reviews, staff]) => {
+      setAllServices(services.filter((x) => x.active));
+      setRevStats(reviews);
+      setActiveStaff(staff);
+    });
   }, [bizId]);
 
   // Service-filtered providers for the picker: a provider with no explicit service
@@ -454,8 +450,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             {biz?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={biz.logoUrl} alt="" className="w-7 h-7 rounded-xl object-cover shrink-0" />
+              <Image src={biz.logoUrl} alt="" width={28} height={28} className="w-7 h-7 rounded-xl object-cover shrink-0" />
             ) : (
               <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bk-accent">
                 <Calendar className="w-3.5 h-3.5 text-white" />
