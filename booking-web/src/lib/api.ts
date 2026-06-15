@@ -820,6 +820,10 @@ export const api = {
       req<{ data: Appointment[]; total: number; page: number; pages: number }>(
         `/businesses/${businessId}/bookings?page=${page}&limit=${limit}`
       ),
+    listRange: (businessId: string, from: string, to: string) =>
+      req<{ data: Appointment[]; total: number }>(
+        `/businesses/${businessId}/bookings?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      ),
     // Public-by-id — requires the HMAC manage token from the emailed link.
     // Token in X-Manage-Token header so it never appears in URL logs or Sentry.
     get: (id: string, token?: string) =>

@@ -113,9 +113,16 @@ export class BookingsController {
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('Access denied to this business resource');
+    }
+    if (from || to) {
+      if (from && isNaN(Date.parse(from))) throw new BadRequestException('Invalid "from" date');
+      if (to && isNaN(Date.parse(to))) throw new BadRequestException('Invalid "to" date');
+      return this.appointmentService.findAllInRange(businessId, from, to, user);
     }
     const paging = pagination(page, limit);
     return this.appointmentService.findAll(businessId, paging.page, paging.limit, user);

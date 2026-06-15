@@ -889,15 +889,29 @@ function AppointmentsPage() {
     }
     setLoading(true); setError("");
     try {
-      const res = await api.appointments.list(bizId, 1, 200);
-      const filtered = isStaff && user?.staffId
-        ? res.data.filter((a) => a.staff.id === user.staffId)
-        : res.data;
-      setAppointments(filtered);
+      let data: Appointment[];
+      if (viewMode === "calendar") {
+        const from = startOfWeek(startOfMonth(calMonth), { weekStartsOn: 0 });
+        const to = addDays(endOfWeek(endOfMonth(calMonth), { weekStartsOn: 0 }), 1);
+        const res = await api.appointments.listRange(bizId, from.toISOString(), to.toISOString());
+        data = res.data;
+      } else if (viewMode === "week") {
+        const from = weekStart;
+        const to = addDays(weekStart, 7);
+        const res = await api.appointments.listRange(bizId, from.toISOString(), to.toISOString());
+        data = res.data;
+      } else {
+        const res = await api.appointments.list(bizId, 1, 200);
+        data = res.data;
+      }
+      const staffFiltered = isStaff && user?.staffId
+        ? data.filter((a) => a.staff.id === user.staffId)
+        : data;
+      setAppointments(staffFiltered);
     }
     catch (e) { setError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
-  }, [isStaff, user?.staffId, bizId]);
+  }, [isStaff, user?.staffId, bizId, viewMode, calMonth, weekStart]);
 
   useEffect(() => { load(); }, [load]);
 

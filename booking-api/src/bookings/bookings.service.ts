@@ -65,6 +65,38 @@ export class BookingsService {
     return { data, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
+  async findAllInRange(
+    businessId: string,
+    from?: string,
+    to?: string,
+    user?: { id: string; role: string },
+  ) {
+    const where: Prisma.AppointmentWhereInput = { businessId };
+
+    if (user?.role === 'STAFF') {
+      const staff = await this.prisma.staff.findFirst({
+        where: { userId: user.id, businessId },
+        select: { id: true },
+      });
+      where.staffId = staff?.id ?? '__no_staff__';
+    }
+
+    if (from || to) {
+      where.startsAt = {
+        ...(from ? { gte: new Date(from) } : {}),
+        ...(to ? { lt: new Date(to) } : {}),
+      };
+    }
+
+    const data = await this.prisma.appointment.findMany({
+      where,
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
+      orderBy: { startsAt: 'asc' },
+      take: 1000,
+    });
+    return { data, total: data.length };
+  }
+
   async findOne(id: string, businessId?: string) {
     const apt = await this.prisma.appointment.findFirst({
       where: {
