@@ -28,7 +28,9 @@ export class UploadsController {
     @CurrentUser() user: { businessId: string | null },
   ) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
-    const k = (['LOGO', 'AVATAR', 'COVER'].includes(kind ?? '') ? kind : 'OTHER') as UploadKind;
+    const VALID_KINDS = ['LOGO', 'AVATAR', 'COVER', 'OTHER'];
+    if (!VALID_KINDS.includes(kind ?? '')) throw new ForbiddenException(`Invalid upload kind; must be one of: ${VALID_KINDS.join(', ')}`);
+    const k = (kind ?? 'OTHER') as UploadKind;
     return this.uploads.create(user.businessId, file, k);
   }
 
@@ -43,7 +45,8 @@ export class UploadsController {
     res.setHeader('Content-Type', r.contentType);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Disposition', 'inline');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    // Documents (verification uploads) must never be cached by proxies or browsers.
+    res.setHeader('Cache-Control', r.isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable');
     res.send(r.buffer);
   }
 }

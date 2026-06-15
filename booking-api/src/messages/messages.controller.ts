@@ -19,6 +19,7 @@ export class MessagesController {
   constructor(private svc: MessagesService) {}
 
   // Protected or Public-with-token — reads thread
+  // Token accepted via x-manage-token header (preferred) or legacy query param.
   @Get()
   @ApiBearerAuth()
   @UseGuards(OptionalJwtAuthGuard)
@@ -26,9 +27,11 @@ export class MessagesController {
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
     @Query('appointmentId') appointmentId?: string,
-    @Query('token') token?: string,
+    @Headers('x-manage-token') headerToken?: string,
+    @Query('token') queryToken?: string,
     @CurrentUser() user?: { id: string; role: string; businessId: string | null },
   ) {
+    const token = headerToken ?? queryToken;
     if (user && (user.role === 'ADMIN' || user.businessId === businessId)) {
       return this.svc.getThread(businessId, clientId);
     }
@@ -47,7 +50,7 @@ export class MessagesController {
   }
 
   // Public — client sends message from manage page or mobile
-  // Secured by appointment token for guests
+  // Secured by appointment token for guests; token in header (not URL) to avoid logs.
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
   async clientSend(
@@ -55,9 +58,11 @@ export class MessagesController {
     @Param('clientId') clientId: string,
     @Body(new ZodValidationPipe(SendSchema)) dto: SendDto,
     @Query('appointmentId') appointmentId?: string,
-    @Query('token') token?: string,
+    @Headers('x-manage-token') headerToken?: string,
+    @Query('token') queryToken?: string,
     @CurrentUser() user?: { id: string; role: string },
   ) {
+    const token = headerToken ?? queryToken;
     // 1. If logged in as a client, verify it's their own clientId
     if (user && user.role === 'CLIENT') {
       const ok = await this.svc.verifyUserClient(user.id, businessId, clientId);

@@ -33,8 +33,9 @@ describe('security regressions', () => {
       'victim-business',
       'victim-client',
       { content: 'Forged client message' },
-      undefined,
-      undefined,
+      undefined,  // appointmentId
+      undefined,  // headerToken (x-manage-token)
+      undefined,  // queryToken (?token=)
       { id: 'attacker', role: 'OWNER' },
     )).rejects.toThrow(ForbiddenException);
     expect(service.send).not.toHaveBeenCalled();

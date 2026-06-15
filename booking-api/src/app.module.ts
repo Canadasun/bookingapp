@@ -52,7 +52,12 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
         transport: process.env.NODE_ENV !== 'production'
           ? { target: 'pino-pretty', options: { colorize: true } }
           : undefined,
-        genReqId: (req) => req.headers['x-request-id'] ?? crypto.randomUUID(),
+        genReqId: (req) => {
+          const provided = req.headers['x-request-id'];
+          // Only trust UUID-shaped IDs from clients; reject everything else to prevent log injection.
+          if (typeof provided === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(provided)) return provided;
+          return crypto.randomUUID();
+        },
       },
     }),
     ThrottlerModule.forRoot([{
@@ -60,7 +65,7 @@ import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
       limit: 100,
     }]),
     BullModule.forRoot({
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+      connection: { url: process.env.REDIS_URL },
     }),
     RedisModule,
     PrismaModule,

@@ -636,10 +636,40 @@ export class BookingsService {
     return updated;
   }
 
+  // Allowed status transitions. Any move not listed is rejected so COMPLETED /
+  // NO_SHOW / CANCELLED appointments can't be reversed via the status endpoint.
+  private static readonly VALID_TRANSITIONS: Record<string, string[]> = {
+    PENDING:   ['CONFIRMED', 'CANCELLED'],
+    CONFIRMED: ['COMPLETED', 'NO_SHOW', 'CANCELLED'],
+    COMPLETED: [],
+    NO_SHOW:   [],
+    CANCELLED: [],
+  };
+
   async updateStatus(id: string, dto: StatusDto, businessId?: string, byStaff = false, userId?: string) {
     const existing = await this.findOne(id, businessId);
-    if (dto.status === 'CANCELLED' && !['PENDING', 'CONFIRMED'].includes(existing.status)) {
-      throw new BadRequestException('Only pending or confirmed appointments can be cancelled');
+    const allowed = BookingsService.VALID_TRANSITIONS[existing.status] ?? [];
+    if (!allowed.includes(dto.status)) {
+      throw new BadRequestException(`Cannot transition appointment from ${existing.status} to ${dto.status}`);
+    }
+
+    // Mirror the deposit check from confirm() so the status endpoint can't be
+    // used to bypass the deposit requirement by sending status=CONFIRMED directly.
+    if (dto.status === 'CONFIRMED') {
+      const biz = existing.business;
+      if (isPaidPlan(biz.plan) && biz.requireDeposit && existing.status === 'PENDING') {
+        const paidDeposit = await this.prisma.payment.findFirst({
+          where: {
+            appointmentId: id,
+            businessId: existing.businessId,
+            kind: 'DEPOSIT',
+            status: 'SUCCEEDED',
+          },
+        });
+        if (!paidDeposit) {
+          throw new BadRequestException('This booking requires a paid deposit before it can be confirmed.');
+        }
+      }
     }
 
     // Strict cancellation-window enforcement. A client (byStaff=false) may only
@@ -688,7 +718,6 @@ export class BookingsService {
         biz && new Date() > this.cancellationCutoff(updated.startsAt, biz)
           ? 'late'
           : 'early';
-      auditChanges.cancelReason = dto.cancelReason ?? null;
       auditChanges.cancelledBy = byStaff ? 'staff' : 'client';
       auditChanges.cancellationTiming = cancellationTiming;
       auditChanges.cancellationWindowHours = biz?.cancellationWindowHours ?? null;
@@ -806,7 +835,6 @@ export class BookingsService {
 
     await this.logAction('APPOINTMENT', id, 'LATE_CANCEL_REQUEST', {
       status: existing.status,
-      cancelReason: cancelReason ?? null,
       cancellationWindowHours: existing.business.cancellationWindowHours,
       cancellationWindowMinutes: this.cancellationWindowMinutes(existing.business),
     });

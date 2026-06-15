@@ -60,7 +60,11 @@ export class BusinessesController {
     if (user.role !== 'ADMIN' && user.businessId !== id) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.businessService.update(id, dto);
+    // Defense-in-depth: non-admin owners must never set plan even if the DTO
+    // schema is changed in future. ADMIN can set it for provisioning.
+    const { plan: _plan, ...safeDto } = dto as UpdateBusinessDto & { plan?: unknown };
+    const update = user.role === Role.ADMIN ? dto : safeDto;
+    return this.businessService.update(id, update as UpdateBusinessDto);
   }
 
   // Pause the business (reversible) — hides the public booking page, keeps data.

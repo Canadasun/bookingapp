@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, Headers, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
@@ -42,8 +42,15 @@ export class PublicBookingsController {
     }
   }
 
+  // Token accepted from x-manage-token header (preferred — not logged) or query
+  // param (legacy — still accepted so old emailed links keep working).
   @Get(':id')
-  findOne(@Param('id') id: string, @Query('token') token?: string) {
+  findOne(
+    @Param('id') id: string,
+    @Headers('x-manage-token') headerToken?: string,
+    @Query('token') queryToken?: string,
+  ) {
+    const token = headerToken ?? queryToken;
     this.assertToken(id, token);
     return this.bookingsService.findOnePublic(id, token!);
   }
@@ -51,13 +58,16 @@ export class PublicBookingsController {
   // Public cancel — used by the client manage page (no login required).
   // PublicStatusSchema enforces status === 'CANCELLED', so this endpoint can't be
   // used to confirm/complete/no-show a booking even with a valid token.
+  // Token in body (not URL) so it stays out of access logs.
   @Patch(':id/status')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async updateStatus(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(PublicStatusSchema)) dto: PublicStatusDto,
-    @Query('token') token?: string,
+    @Headers('x-manage-token') headerToken?: string,
+    @Query('token') queryToken?: string,
   ) {
+    const token = dto.token ?? headerToken ?? queryToken;
     this.assertToken(id, token);
     const appointment = await this.bookingsService.updateStatus(id, dto);
     return this.bookingsService.toPublicAppointment(appointment, token!);
@@ -70,8 +80,10 @@ export class PublicBookingsController {
   requestLateCancel(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(LateCancelRequestSchema)) dto: LateCancelRequestDto,
-    @Query('token') token?: string,
+    @Headers('x-manage-token') headerToken?: string,
+    @Query('token') queryToken?: string,
   ) {
+    const token = dto.token ?? headerToken ?? queryToken;
     this.assertToken(id, token);
     return this.bookingsService.requestLateCancellation(id, dto.cancelReason);
   }
@@ -82,8 +94,10 @@ export class PublicBookingsController {
   async reschedule(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
-    @Query('token') token?: string,
+    @Headers('x-manage-token') headerToken?: string,
+    @Query('token') queryToken?: string,
   ) {
+    const token = dto.token ?? headerToken ?? queryToken;
     this.assertToken(id, token);
     const appointment = await this.bookingsService.reschedule(id, dto, undefined, { byClient: true });
     return this.bookingsService.toPublicAppointment(appointment, token!);
@@ -141,8 +155,10 @@ export class BookingsController {
   createManual(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateAppointmentSchema)) dto: CreateAppointmentDto,
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: dto.allowOverride === true });
+    const canOverride = dto.allowOverride === true && (user.role === 'OWNER' || user.role === 'ADMIN');
+    return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: canOverride });
   }
 
   // Owner/staff-initiated recurring series (dashboard). Creates N confirmed
@@ -153,8 +169,10 @@ export class BookingsController {
   createRecurring(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(CreateRecurringSchema)) dto: CreateRecurringDto,
+    @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    return this.appointmentService.createRecurring(businessId, dto, { confirmed: true });
+    const canOverride = dto.allowOverride === true && (user.role === 'OWNER' || user.role === 'ADMIN');
+    return this.appointmentService.createRecurring(businessId, { ...dto, allowOverride: canOverride }, { confirmed: true });
   }
 
   @Patch(':id/confirm')

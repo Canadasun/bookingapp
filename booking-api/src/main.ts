@@ -1,7 +1,22 @@
 import 'reflect-metadata';
 import * as Sentry from '@sentry/node';
 if (process.env.SENTRY_DSN) {
-  Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV ?? 'development', tracesSampleRate: 0.1 });
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 0.1,
+    beforeSend(event) {
+      if (event.request?.url) event.request.url = event.request.url.split('?')[0];
+      if (event.request?.cookies) event.request.cookies = {};
+      if (event.request?.headers) {
+        delete event.request.headers['cookie'];
+        delete event.request.headers['Cookie'];
+        delete event.request.headers['authorization'];
+        delete event.request.headers['Authorization'];
+      }
+      return event;
+    },
+  });
 }
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -12,7 +27,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   // Fail fast if any secret env var is missing — prevents silent fallback to empty
   // strings (which would allow token forgery in misconfigured deploys).
-  const required = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
+  const required = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'REDIS_URL'];
   for (const key of required) {
     if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
   }
@@ -45,7 +60,7 @@ async function bootstrap() {
     origin: corsOrigins.length ? corsOrigins : !isProd,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'X-Manage-Token'],
   });
 
   // Swagger exposes the full API surface — only mount it outside production.
@@ -61,7 +76,5 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
-  console.log(`\n🚀  API running on http://localhost:${port}/api`);
-  console.log(`📖  Swagger   http://localhost:${port}/docs\n`);
 }
 bootstrap();

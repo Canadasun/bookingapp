@@ -34,6 +34,7 @@ export const CreateRecurringSchema = CreateAppointmentSchema.extend({
 export const RescheduleSchema = z.object({
   startsAt: z.string().datetime(),
   staffId: z.string().optional(),
+  token: z.string().optional(),
 });
 
 export const StatusSchema = z.object({
@@ -60,10 +61,12 @@ export const UpdateAppointmentSchema = z.object({
 export const PublicStatusSchema = z.object({
   status: z.literal('CANCELLED'),
   cancelReason: z.string().optional(),
+  token: z.string().optional(),
 });
 
 export const LateCancelRequestSchema = z.object({
   cancelReason: z.string().max(1000).optional(),
+  token: z.string().optional(),
 });
 
 export type CreateAppointmentDto = z.infer<typeof CreateAppointmentSchema>;

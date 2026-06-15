@@ -16,6 +16,13 @@ type RefreshData = {
 // token). Without this, both tabs race to POST /auth/refresh; the first
 // rotates the session row and the second's token is now stale — it gets a 401,
 // clears cookies, and the user is logged out in that tab.
+// NOTE: This Map is process-local and does NOT dedup across multiple Next.js
+// worker processes (e.g. multi-instance Vercel/Railway deployments). In those
+// environments the API's own idempotent refresh behaviour (the DB row update is
+// conditional on the hash matching) prevents data corruption, but the secondary
+// worker may still issue a redundant refresh call and get a 401 on the first
+// try. A proper fix requires a distributed lock (Redis); add if jitter under
+// load becomes a problem.
 const pendingRefreshes = new Map<string, Promise<RefreshData | null>>();
 
 async function silentRefresh(refreshToken: string): Promise<RefreshData | null> {

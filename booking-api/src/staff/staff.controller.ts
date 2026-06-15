@@ -52,7 +52,8 @@ export class StaffController {
 
   @Get(':id/time-off')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   getTimeOffs(@Param('id') id: string, @Param('businessId') businessId: string) {
     return this.staffService.getTimeOffs(id, businessId);
   }
@@ -151,7 +152,8 @@ export class StaffController {
 
   @Delete(':id/time-off/:timeOffId')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   deleteTimeOff(
     @Param('timeOffId') timeOffId: string,
     @Param('businessId') businessId: string,

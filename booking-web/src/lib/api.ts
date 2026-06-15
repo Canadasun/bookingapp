@@ -406,16 +406,22 @@ export const api = {
     // Turn two-factor sign-in on/off and pick the delivery method. Enabling
     // returns one-time recovery codes (shown once) for lockout recovery.
     setTwoFactor: async (enabled: boolean, method?: "EMAIL" | "SMS") => {
-      const res = await fetch("/api/auth/2fa", {
+      type TwoFactorResult = { ok: boolean; twoFactorEnabled: boolean; recoveryCodes?: string[]; user?: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: "EMAIL" | "SMS" } };
+      const doFetch = () => fetch("/api/auth/2fa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled, method }),
       });
+      let res = await doFetch();
+      if (res.status === 401) {
+        const refreshed = await tryRefresh();
+        if (refreshed) res = await doFetch();
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string };
         throw new Error(body.message ?? "Could not update two-factor");
       }
-      return res.json() as Promise<{ ok: boolean; twoFactorEnabled: boolean; recoveryCodes?: string[]; user?: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: "EMAIL" | "SMS" } }>;
+      return res.json() as Promise<TwoFactorResult>;
     },
   },
 
@@ -588,7 +594,7 @@ export const api = {
       req<void>(`/businesses/${businessId}/packages/${id}`, { method: "DELETE" }),
     // Issued client packages
     listIssued: (businessId: string, clientId?: string) =>
-      req<ClientPackage[]>(`/businesses/${businessId}/packages/issued/list${clientId ? `?clientId=${clientId}` : ""}`),
+      req<ClientPackage[]>(`/businesses/${businessId}/packages/issued/list${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`),
     issue: (businessId: string, data: { clientId: string; packageId?: string; name?: string; serviceId?: string; credits?: number; expiresAt?: string }) =>
       req<ClientPackage>(`/businesses/${businessId}/packages/issued`, { method: "POST", body: JSON.stringify(data) }),
     redeem: (businessId: string, id: string, appointmentId?: string) =>
@@ -614,8 +620,10 @@ export const api = {
   campaigns: {
     list: (businessId: string) =>
       req<Campaign[]>(`/businesses/${businessId}/campaigns`),
-    audienceCount: (businessId: string, channel: CampaignChannel, audience: CampaignAudience) =>
-      req<{ count: number }>(`/businesses/${businessId}/campaigns/audience?channel=${channel}&audience=${audience}`),
+    audienceCount: (businessId: string, channel: CampaignChannel, audience: CampaignAudience) => {
+      const q = new URLSearchParams({ channel, audience });
+      return req<{ count: number }>(`/businesses/${businessId}/campaigns/audience?${q}`);
+    },
     create: (businessId: string, data: { name: string; channel: CampaignChannel; audience: CampaignAudience; subject?: string; body: string }) =>
       req<Campaign>(`/businesses/${businessId}/campaigns`, { method: "POST", body: JSON.stringify(data) }),
     send: (businessId: string, id: string) =>
@@ -628,7 +636,7 @@ export const api = {
     get: (id: string) => req<Business>(`/businesses/${id}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),
     getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
-    update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt">>) =>
+    update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt" | "plan" | "planExpiresAt" | "suspended" | "verificationStatus" | "stripeConnectOnboarded" | "capabilities" | "suspectedDuplicateOfId">>) =>
       req<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deactivate: (id: string) => req<Business>(`/businesses/${id}/deactivate`, { method: "POST" }),
     reactivate: (id: string) => req<Business>(`/businesses/${id}/reactivate`, { method: "POST" }),
@@ -817,7 +825,9 @@ export const api = {
         `/businesses/${businessId}/bookings?page=${page}&limit=${limit}`
       ),
     // Public-by-id — requires the HMAC manage token from the emailed link.
-    get: (id: string, token?: string) => req<Appointment>(`/bookings/${id}${token ? `?token=${encodeURIComponent(token)}` : ""}`, undefined, null),
+    // Token in X-Manage-Token header so it never appears in URL logs or Sentry.
+    get: (id: string, token?: string) =>
+      req<Appointment>(`/bookings/${id}`, token ? { headers: { "X-Manage-Token": token } } : undefined, null),
     // Owner-scoped single appointment (for receipts/detail).
     getOne: (businessId: string, id: string) => req<Appointment>(`/businesses/${businessId}/bookings/${id}`),
     create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientToken: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string }) =>
@@ -845,21 +855,22 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
-    // Public — used by the client-facing manage page (no auth; HMAC token required)
+    // Public — used by the client-facing manage page (no auth; HMAC token required).
+    // Token is sent in the request body so it never appears in URL logs or Sentry.
     publicCancel: (id: string, cancelReason?: string, token?: string) =>
-      req<Appointment>(`/bookings/${id}/status${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
+      req<Appointment>(`/bookings/${id}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status: "CANCELLED", ...(cancelReason ? { cancelReason } : {}) }),
+        body: JSON.stringify({ status: "CANCELLED", ...(cancelReason ? { cancelReason } : {}), ...(token ? { token } : {}) }),
       }, null),
     publicLateCancelRequest: (id: string, cancelReason?: string, token?: string) =>
-      req<{ ok: boolean; code: string; message: string }>(`/bookings/${id}/late-cancel-request${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
+      req<{ ok: boolean; code: string; message: string }>(`/bookings/${id}/late-cancel-request`, {
         method: "POST",
-        body: JSON.stringify({ ...(cancelReason ? { cancelReason } : {}) }),
+        body: JSON.stringify({ ...(cancelReason ? { cancelReason } : {}), ...(token ? { token } : {}) }),
       }, null),
     publicReschedule: (id: string, startsAt: string, token?: string) =>
-      req<Appointment>(`/bookings/${id}/reschedule${token ? `?token=${encodeURIComponent(token)}` : ""}`, {
+      req<Appointment>(`/bookings/${id}/reschedule`, {
         method: "PATCH",
-        body: JSON.stringify({ startsAt }),
+        body: JSON.stringify({ startsAt, ...(token ? { token } : {}) }),
       }, null),
   },
 
@@ -875,16 +886,22 @@ export const api = {
     thread: (businessId: string, clientId: string, appointmentId?: string, token?: string) => {
       const q = new URLSearchParams();
       if (appointmentId) q.set("appointmentId", appointmentId);
-      if (token) q.set("token", token);
       const qs = q.toString();
-      return req<Array<{ id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }>>(`/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`, undefined, token === undefined ? undefined : null);
+      return req<Array<{ id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }>>(
+        `/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`,
+        token ? { headers: { "X-Manage-Token": token } } : undefined,
+        token === undefined ? undefined : null,
+      );
     },
     send: (businessId: string, clientId: string, content: string, appointmentId?: string, token?: string) => {
       const q = new URLSearchParams();
       if (appointmentId) q.set("appointmentId", appointmentId);
-      if (token) q.set("token", token);
       const qs = q.toString();
-      return req<unknown>(`/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`, { method: "POST", body: JSON.stringify({ content }) }, token === undefined ? undefined : null);
+      return req<unknown>(
+        `/businesses/${businessId}/clients/${clientId}/messages${qs ? `?${qs}` : ""}`,
+        { method: "POST", body: JSON.stringify({ content }), ...(token ? { headers: { "X-Manage-Token": token } } : {}) },
+        token === undefined ? undefined : null,
+      );
     },
     reply: (businessId: string, clientId: string, content: string) =>
       req<{ id: string; sms?: { sent: boolean; reason?: string } }>(`/businesses/${businessId}/clients/${clientId}/messages/reply`, { method: "POST", body: JSON.stringify({ content }) }),

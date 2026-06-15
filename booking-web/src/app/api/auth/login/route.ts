@@ -27,8 +27,13 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
 function assertSameOrigin(req: NextRequest) {
   const origin = req.headers.get("origin");
   if (!origin) return; // server-to-server calls have no Origin header
-  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
-  if (expected && origin !== expected) {
+  const expected = process.env.NEXT_PUBLIC_WEB_URL;
+  // Fail closed: if the env var is missing in production, reject all cross-origin
+  // requests rather than silently accepting them (empty string is falsy → bypass).
+  if (!expected) {
+    throw new Response(JSON.stringify({ message: "Server misconfiguration" }), { status: 500 });
+  }
+  if (origin !== expected) {
     throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
   }
 }

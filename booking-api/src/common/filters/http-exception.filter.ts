@@ -37,7 +37,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (exception instanceof Error) Sentry.captureException(exception);
       const err = exception instanceof Error ? exception : null;
       const bizId: string | undefined = (request as any)?.user?.businessId ?? undefined;
-      this.logger.error(`${request.method} ${request.url} → ${status}: ${err?.message ?? String(message)}`);
+      const logPath = request.url.split('?')[0];
+      this.logger.error(`${request.method} ${logPath} → ${status}: ${err?.message ?? String(message)}`);
       if (this.prisma) {
         this.prisma.systemError.create({
           data: {
@@ -48,7 +49,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             stack: err?.stack?.slice(0, 5000) ?? null,
             context: {
               method: request.method,
-              path: request.url,
+              path: logPath,
               statusCode: status,
             },
           },
@@ -56,10 +57,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    // Strip query params before echoing the path — tokens passed as ?token= must
+    // never appear in error bodies returned to the client or logged by Sentry.
+    const safePath = request.url.split('?')[0];
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: safePath,
       message,
     });
   }

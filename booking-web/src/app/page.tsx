@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { verifyCookieValue } from "@/lib/cookie-sign";
 import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap } from "lucide-react";
 import {
   LandingAuthCta,
@@ -16,11 +17,12 @@ async function sessionInfo(): Promise<{ role?: string; authed: boolean }> {
   const raw = jar.get("booking_user")?.value;
   let role: string | undefined;
   if (raw) {
-    for (let v of [raw, decodeURIComponent(raw)]) {
-      // Strip HMAC signature if present (payload is base64, no dots)
-      const dot = v.lastIndexOf(".");
-      if (dot !== -1) v = v.slice(0, dot);
-      try { role = JSON.parse(Buffer.from(v, "base64").toString("utf8"))?.role; break; } catch { /* try next */ }
+    // Verify the HMAC before trusting the payload. On COOKIE_SIGN_SECRET mismatch
+    // (e.g. a forged or stale cookie) verifyCookieValue returns null and we skip.
+    for (const encoded of [raw, decodeURIComponent(raw)]) {
+      const verified = verifyCookieValue(encoded);
+      if (!verified) continue;
+      try { role = JSON.parse(Buffer.from(verified, "base64").toString("utf8"))?.role; break; } catch { /* try next */ }
     }
   }
   return { role, authed };

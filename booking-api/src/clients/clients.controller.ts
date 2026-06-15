@@ -8,7 +8,10 @@ import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDt
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Role } from '@prisma/client';
 
 const MAX_IMPORT_ROWS = 1000;
 const PaginationSchema = z.object({
@@ -64,7 +67,8 @@ export class ClientsController {
 
   // CSV export — before :id so the literal path isn't consumed as a param
   @Get('export-csv')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   async exportCsv(
     @Param('businessId') businessId: string,
     @Res() res: Response,
@@ -82,7 +86,8 @@ export class ClientsController {
   // CSV import — bulk upsert clients from uploaded CSV
   @Post('import-csv')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   importCsv(
     @Param('businessId') businessId: string,
@@ -100,13 +105,15 @@ export class ClientsController {
 
   // Declared before @Get(':id') so "duplicates" isn't swallowed as a client id.
   @Get('duplicates')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   duplicates(@Param('businessId') businessId: string) {
     return this.clientService.findDuplicates(businessId);
   }
 
   @Post('merge')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   merge(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(MergeClientsSchema)) dto: MergeClientsDto,
@@ -160,7 +167,8 @@ export class ClientsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   remove(
     @Param('id') id: string,
     @Param('businessId') businessId: string,

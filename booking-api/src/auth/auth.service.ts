@@ -161,16 +161,22 @@ export class AuthService {
   async verifyEmail(token: string) {
     let decoded: { sub?: string; kind?: string; jti?: string; exp?: number } | null = null;
     try {
-      decoded = this.jwt.verify(token, { secret: process.env.JWT_SECRET }) as { sub?: string; kind?: string; jti?: string; exp?: number };
+      decoded = this.jwt.verify(token, { secret: process.env.JWT_SECRET, algorithms: ['HS256'] }) as { sub?: string; kind?: string; jti?: string; exp?: number };
     } catch {
       throw new BadRequestException('Invalid or expired verification link');
     }
     if (!decoded?.sub || decoded.kind !== 'verify' || !decoded.jti) throw new BadRequestException('Invalid verification link');
-    const used = await this.redis.client.exists(`auth:verify:used:${decoded.jti}`);
-    if (used) throw new BadRequestException('This verification link has already been used');
-    const user = await this.prisma.user.update({ where: { id: decoded.sub }, data: { emailVerified: true } });
     const ttl = decoded.exp ? Math.max(1, decoded.exp - Math.floor(Date.now() / 1000)) : 7 * 24 * 3600;
-    await this.redis.client.set(`auth:verify:used:${decoded.jti}`, '1', 'EX', ttl).catch(() => {});
+    let alreadyUsed = false;
+    try {
+      // Atomic SET NX: returns 'OK' if the key was newly set, null if it already existed.
+      const claimed = await this.redis.client.set(`auth:verify:used:${decoded.jti}`, '1', 'EX', ttl, 'NX');
+      alreadyUsed = (claimed === null);
+    } catch {
+      // Redis unavailable: accept small replay risk rather than blocking all verification.
+    }
+    if (alreadyUsed) throw new BadRequestException('This verification link has already been used');
+    const user = await this.prisma.user.update({ where: { id: decoded.sub }, data: { emailVerified: true } });
     // Return the role so the verify page can send them to the right home
     // (owners/staff → /dashboard, clients → /my/dashboard).
     return { ok: true, role: user.role };
@@ -195,14 +201,15 @@ export class AuthService {
 
   // Trusted-device ("remember this device") token for 2FA. Bound to the user's
   // password, current 2FA setup, and a version-stable browser/OS signature.
-  private normalizedDeviceKey(userAgent?: string, ip?: string): string {
+  private normalizedDeviceKey(userAgent?: string, ip?: string): string | null {
     const normalizedUa = (userAgent ?? '')
       .toLowerCase()
       .replace(/([a-z][a-z0-9._-]*)\/[\d._]+/g, '$1')
       .replace(/\b(os(?: x)?|android) [\d._]+/g, '$1')
       .replace(/\s+/g, ' ')
       .trim();
-    const source = normalizedUa || `ip:${ip ?? 'unknown'}`;
+    const source = normalizedUa || (ip ? `ip:${ip}` : null);
+    if (!source) return null;
     return createHash('sha256').update(source).digest('hex').slice(0, 32);
   }
 
@@ -212,8 +219,9 @@ export class AuthService {
     return `td:${process.env.JWT_SECRET!}${user.passwordHash}:${user.twoFactorRecoveryCodes.join(':')}`;
   }
   private mintTrustedDeviceToken(user: User, ctx?: { ip?: string; userAgent?: string }): string {
+    const deviceKey = this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip);
     return this.jwt.sign(
-      { sub: user.id, kind: 'td', deviceKey: this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip) },
+      { sub: user.id, kind: 'td', ...(deviceKey ? { deviceKey } : {}) },
       { secret: this.trustedDeviceSecret(user), expiresIn: '30d' },
     );
   }
@@ -221,8 +229,12 @@ export class AuthService {
     if (!token) return false;
     try {
       const p = this.jwt.verify(token, { secret: this.trustedDeviceSecret(user) }) as { sub?: string; kind?: string; deviceKey?: string };
-      return p?.sub === user.id && p?.kind === 'td' &&
-        (!p.deviceKey || p.deviceKey === this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip));
+      if (p?.sub !== user.id || p?.kind !== 'td') return false;
+      const currentKey = this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip);
+      // Require both sides to have a resolvable key; tokens without deviceKey (no
+      // UA or IP at mint time) are always rejected to prevent unbound device trust.
+      if (!p.deviceKey || !currentKey) return false;
+      return p.deviceKey === currentKey;
     } catch { return false; }
   }
 
@@ -248,7 +260,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: decoded.sub } });
     if (!user) throw new BadRequestException('Invalid or expired reset link');
     try {
-      this.jwt.verify(token, { secret: this.resetSecret(user.passwordHash) });
+      this.jwt.verify(token, { secret: this.resetSecret(user.passwordHash), algorithms: ['HS256'] });
     } catch {
       throw new BadRequestException('Invalid or expired reset link');
     }
@@ -456,13 +468,16 @@ export class AuthService {
       const ua = ctx?.userAgent ?? '';
       const ip = ctx?.ip?.slice(0, 64) || null;
       const deviceKey = this.normalizedDeviceKey(ua, ip ?? undefined);
+      const storedDeviceKey = deviceKey ?? '';
       const [priorSameDevice, priorSameIp, total] = await Promise.all([
-        this.prisma.loginEvent.findFirst({ where: { userId: user.id, deviceKey } }),
+        deviceKey
+          ? this.prisma.loginEvent.findFirst({ where: { userId: user.id, deviceKey } })
+          : Promise.resolve(null),
         ip ? this.prisma.loginEvent.findFirst({ where: { userId: user.id, ip } }) : Promise.resolve(null),
         this.prisma.loginEvent.count({ where: { userId: user.id } }),
       ]);
       await this.prisma.loginEvent.create({
-        data: { userId: user.id, deviceKey, ip, userAgent: ua.slice(0, 256) || null },
+        data: { userId: user.id, deviceKey: storedDeviceKey, ip, userAgent: ua.slice(0, 256) || null },
       });
       if (total > 0 && !priorSameDevice && !priorSameIp) {
         const resetToken = this.jwt.sign(
@@ -508,6 +523,8 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash: await bcrypt.hash(newPassword, 12), mustResetPassword: false },
     });
+    // Revoke all sessions so concurrent devices are logged out after a password change.
+    await this.prisma.refreshSession.deleteMany({ where: { userId } });
     return { ok: true };
   }
 
@@ -549,6 +566,17 @@ export class AuthService {
     }
     // Opportunistic cleanup of this user's expired sessions.
     await this.prisma.refreshSession.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
+    // Enforce session cap: evict oldest sessions beyond the limit.
+    const MAX_SESSIONS = 10;
+    const allSessions = await this.prisma.refreshSession.findMany({
+      where: { userId: user.id },
+      orderBy: { expiresAt: 'asc' },
+      select: { id: true },
+    });
+    if (allSessions.length > MAX_SESSIONS) {
+      const excess = allSessions.slice(0, allSessions.length - MAX_SESSIONS);
+      await this.prisma.refreshSession.deleteMany({ where: { id: { in: excess.map((s) => s.id) } } });
+    }
 
     let staffId: string | null = null;
     let permissions: string[] = [];

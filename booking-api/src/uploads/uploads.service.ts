@@ -77,19 +77,24 @@ export class UploadsService {
 
   // Resolve an upload for serving: either a redirect URL (public bucket / CDN) or
   // the raw bytes (DB storage, or streamed from a private bucket).
-  async resolve(id: string, user?: { role: string; businessId: string | null } | null): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string }> {
+  // isPrivate=true is returned for documents so the controller can set
+  // Cache-Control: private, no-store instead of the public immutable header.
+  async resolve(id: string, user?: { role: string; businessId: string | null } | null): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string; isPrivate?: boolean }> {
     const file = await this.get(id);
-    if (file.kind === 'OTHER' && (!user || (user.role !== 'ADMIN' && user.businessId !== file.businessId))) {
+    const isDocument = file.kind === 'OTHER';
+    // Documents (verification uploads) are restricted to ADMIN (platform) or
+    // OWNER of the specific business — STAFF must not access them.
+    if (isDocument && (!user || (user.role !== 'ADMIN' && (user.role !== 'OWNER' || user.businessId !== file.businessId)))) {
       throw new ForbiddenException('Document access requires authentication');
     }
     if (file.storageKey) {
       const pub = publicUrlFor(file.storageKey);
-      if (pub) return { redirectUrl: pub, contentType: file.mimeType };
+      if (pub) return { redirectUrl: pub, contentType: file.mimeType, isPrivate: isDocument };
       const obj = await getObjectBytes(file.storageKey);
       if (!obj) throw new NotFoundException('File not found');
-      return { buffer: obj.buffer, contentType: obj.contentType || file.mimeType };
+      return { buffer: obj.buffer, contentType: obj.contentType || file.mimeType, isPrivate: isDocument };
     }
     if (!file.data) throw new NotFoundException('File not found');
-    return { buffer: Buffer.from(file.data), contentType: file.mimeType };
+    return { buffer: Buffer.from(file.data), contentType: file.mimeType, isPrivate: isDocument };
   }
 }

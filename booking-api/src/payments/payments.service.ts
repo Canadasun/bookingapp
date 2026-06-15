@@ -135,12 +135,14 @@ export class PaymentsService {
    *  - else                   → nothing required.
    * Returns the Stripe client secret + publishable key for Stripe.js on the client.
    */
-  async createBookingIntent(appointmentId: string, businessId: string) {
+  async createBookingIntent(appointmentId: string) {
     const apt = await this.prisma.appointment.findFirst({
-      where: { id: appointmentId, businessId },
+      where: { id: appointmentId },
       include: { service: true, client: true, business: true },
     });
     if (!apt) throw new BadRequestException('Appointment not found');
+    if (apt.status !== 'PENDING') throw new BadRequestException('Payment can only be initiated for PENDING appointments');
+    const businessId = apt.businessId;
 
     const b = apt.business;
     // Free never collects money at booking. Basic+ can collect deposits; Pro
@@ -193,10 +195,12 @@ export class PaymentsService {
     return { required: false, mode: 'none' as const };
   }
 
-  // Owner-initiated deposit (kept for dashboard use); same logic, ownership checked
-  // by the controller passing the business.
+  // Owner-initiated deposit (dashboard). businessId comes from the authenticated
+  // JWT — verify the appointment belongs to this business before proceeding.
   async createDepositIntent(appointmentId: string, businessId: string) {
-    return this.createBookingIntent(appointmentId, businessId);
+    const check = await this.prisma.appointment.findFirst({ where: { id: appointmentId, businessId } });
+    if (!check) throw new BadRequestException('Appointment not found');
+    return this.createBookingIntent(appointmentId);
   }
 
   /** Create an in-person PaymentIntent for confirmation in mobile PaymentSheet. */
@@ -336,7 +340,7 @@ export class PaymentsService {
         const appointmentId = intent.metadata.appointmentId;
         if (appointmentId) {
           const { count } = await this.prisma.appointment.updateMany({
-            where: { id: appointmentId, stripePaymentIntentId: intent.id },
+            where: { id: appointmentId, stripePaymentIntentId: intent.id, status: 'PENDING' },
             data: { status: 'CANCELLED' },
           });
           if (count > 0) await this.notifications.sendDepositFailed(appointmentId).catch(() => {});
@@ -1027,6 +1031,7 @@ export class PaymentsService {
       include: { service: true, client: true, business: true },
     });
     if (!apt) throw new BadRequestException('Appointment not found');
+    if (apt.status !== 'CONFIRMED') throw new BadRequestException(`Cannot mark as NO_SHOW: appointment is ${apt.status}`);
     if (!isProPlan(apt.business.plan)) {
       await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
       return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. Automatic no-show charging requires Pro; collect manually on Basic.' };

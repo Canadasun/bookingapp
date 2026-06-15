@@ -17,7 +17,6 @@ import { verifyAppointmentToken } from '../common/util/appointment-token';
 
 const BookingIntentSchema = z.object({
   appointmentId: z.string().min(1),
-  businessId: z.string().min(1),
   manageToken: z.string().min(1),
 });
 
@@ -49,11 +48,11 @@ export class PaymentsController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   bookingIntent(@Body() body: unknown) {
     const parsed = BookingIntentSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException('appointmentId, businessId and manageToken are required');
+    if (!parsed.success) throw new BadRequestException('appointmentId and manageToken are required');
     if (!verifyAppointmentToken(parsed.data.appointmentId, parsed.data.manageToken)) {
       throw new ForbiddenException('Invalid or missing manage token');
     }
-    return this.paymentService.createBookingIntent(parsed.data.appointmentId, parsed.data.businessId);
+    return this.paymentService.createBookingIntent(parsed.data.appointmentId);
   }
 
   // Owner-initiated deposit (dashboard). Scoped to the owner's business.
@@ -128,12 +127,14 @@ export class PaymentsController {
   }
 
   @Post('webhook/stripe')
-  @Throttle({ default: { limit: 120, ttl: 60000 } })
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   stripeWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') sig: string,
   ) {
-    return this.paymentService.handleWebhook(req.rawBody!, sig);
+    if (!req.rawBody) throw new BadRequestException('Missing raw body — ensure rawBody:true is set in NestFactory.create');
+    if (!sig) throw new BadRequestException('Missing stripe-signature header');
+    return this.paymentService.handleWebhook(req.rawBody, sig);
   }
 
   // ── Stripe Connect Express (business payouts) ────────────────────────────────

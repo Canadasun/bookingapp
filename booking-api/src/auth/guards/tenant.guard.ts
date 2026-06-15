@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { SetMetadata } from '@nestjs/common';
+import { Role } from '@prisma/client';
 
 export const SKIP_TENANT_GUARD_KEY = 'skipTenantGuard';
 
@@ -47,15 +48,15 @@ export class TenantGuard implements CanActivate {
     }>();
 
     const user = request.user;
-    // No user means the JWT guard has not run (opt-in auth route or public).
-    // Defer — let the inner guard or service handle it.
-    if (!user) return true;
-
     const businessId = request.params?.businessId;
+
     // Route has no :businessId path param — not a tenant-scoped endpoint.
     if (!businessId) return true;
 
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+    // If the JWT guard has not run and a businessId is required, fail closed.
+    if (!user) throw new ForbiddenException('Authentication required');
+
+    if (user.role !== Role.ADMIN && user.businessId !== businessId) {
       throw new ForbiddenException('Access denied to this business resource');
     }
 

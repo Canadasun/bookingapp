@@ -62,7 +62,9 @@ export const CreateBusinessSchema = z.object({
   plan: z.enum(['FREE', 'BASIC', 'PRO']).optional(),
 });
 
-export const UpdateBusinessSchema = CreateBusinessSchema.partial();
+// plan is server-controlled (via Stripe or admin); omit it so owners can never
+// self-upgrade by sending plan in a PATCH body.
+export const UpdateBusinessSchema = CreateBusinessSchema.omit({ plan: true }).partial();
 
 export type CreateBusinessDto = z.infer<typeof CreateBusinessSchema>;
 export type UpdateBusinessDto = z.infer<typeof UpdateBusinessSchema>;
