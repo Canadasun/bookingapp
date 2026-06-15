@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { GiftCardsService } from './gift-cards.service';
 import { IssueGiftCardSchema, IssueGiftCardDto, RedeemGiftCardSchema, RedeemGiftCardDto } from './dto/gift-cards.dto';
@@ -16,6 +17,7 @@ export class GiftCardsController {
 
   // Public — a client checks their gift card balance by code.
   @Get('balance')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   balance(@Param('businessId') businessId: string, @Query('code') code: string) {
     return this.svc.balance(businessId, code ?? '');
   }

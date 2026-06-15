@@ -6,6 +6,10 @@ import type { NextRequest } from "next/server";
 // NestJS layer (which also throttles, but at the cost of an internal round-trip).
 // Railway deploys Next.js as a Node.js process — globalThis persists across
 // requests for the lifetime of the process, so the counter is accurate per worker.
+// NOTE: This counter is process-local. Under horizontal scaling (multiple Node.js
+// workers or containers) each process tracks its own window, so the effective limit
+// per client IP is limit × worker-count. The NestJS throttler acts as the authoritative
+// backend-side guard; this middleware is a cheap early-exit, not a strict ceiling.
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS: Record<string, number> = {
   "/api/auth/login":          10,

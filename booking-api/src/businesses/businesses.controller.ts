@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { z } from 'zod';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessSchema, UpdateBusinessSchema, CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -9,6 +10,20 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User, Role } from '@prisma/client';
+
+const HoursSchema = z.object({
+  hours: z.array(z.object({
+    dayOfWeek: z.number().int().min(0).max(6),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm'),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm'),
+  })).max(7),
+});
+
+const ClosureSchema = z.object({
+  startsAt: z.string().datetime({ message: 'startsAt must be a valid ISO 8601 datetime' }),
+  endsAt: z.string().datetime({ message: 'endsAt must be a valid ISO 8601 datetime' }),
+  reason: z.string().max(500).optional(),
+});
 
 @ApiTags('business')
 @ApiBearerAuth()
@@ -128,11 +143,11 @@ export class BusinessesController {
   @Roles(Role.OWNER, Role.ADMIN)
   setHours(
     @Param('id') id: string,
-    @Body() body: { hours: { dayOfWeek: number; startTime: string; endTime: string }[] },
+    @Body(new ZodValidationPipe(HoursSchema)) body: z.infer<typeof HoursSchema>,
     @CurrentUser() user: User,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
-    return this.businessService.setHours(id, body.hours ?? []);
+    return this.businessService.setHours(id, body.hours);
   }
 
   // ── Business closures ───────────────────────────────────────────────────────
@@ -142,11 +157,10 @@ export class BusinessesController {
   @Roles(Role.OWNER, Role.ADMIN)
   addClosure(
     @Param('id') id: string,
-    @Body() body: { startsAt: string; endsAt: string; reason?: string },
+    @Body(new ZodValidationPipe(ClosureSchema)) body: z.infer<typeof ClosureSchema>,
     @CurrentUser() user: User,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
-    if (!body.startsAt || !body.endsAt) throw new BadRequestException('startsAt and endsAt are required');
     return this.businessService.addClosure(id, body);
   }
 

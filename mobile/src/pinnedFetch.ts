@@ -64,6 +64,7 @@ export async function pinnedFetch(input: string, init?: RequestInit): Promise<Re
   return {
     ok: response.status >= 200 && response.status < 300,
     status: response.status,
+    headers: new Headers((response.headers as Record<string, string>) ?? {}),
     json: async () => body ? JSON.parse(body) : null,
     text: async () => body,
   } as Response;
