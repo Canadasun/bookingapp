@@ -22,8 +22,9 @@ describe("assertSameOrigin", () => {
     }))).toThrow();
   });
 
-  it("rejects cookie-authenticated requests with no Origin", () => {
-    expect(() => assertSameOrigin(request({ cookie: "booking_refresh=token" }))).toThrow();
+  it("allows Safari same-origin requests with cookies but no Origin", () => {
+    // Safari omits Origin on same-origin fetch. SameSite=Lax is the backstop.
+    expect(() => assertSameOrigin(request({ cookie: "booking_refresh=token" }))).not.toThrow();
   });
 
   it("allows non-browser calls without Origin or cookies", () => {

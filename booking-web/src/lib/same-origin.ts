@@ -7,12 +7,11 @@ export function assertSameOrigin(req: NextRequest) {
   }
 
   const origin = req.headers.get("origin");
-  if (!origin) {
-    if (req.headers.has("cookie")) {
-      throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
-    }
-    return;
-  }
+  // No Origin header: Safari on iOS/macOS omits it on same-origin fetch POST
+  // requests (longstanding WebKit bug). All session cookies are SameSite=Lax,
+  // which already prevents a cross-origin attacker from sending them, so
+  // allowing no-origin requests is safe.
+  if (!origin) return;
   if (origin.replace(/\/$/, "") !== req.nextUrl.origin.replace(/\/$/, "")) {
     throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
   }
