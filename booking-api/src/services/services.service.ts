@@ -9,6 +9,15 @@ import {
 export class ServicesService {
   constructor(private prisma: PrismaService) {}
 
+  private async assertCategoryOwnership(businessId: string, categoryId?: string | null) {
+    if (!categoryId) return;
+    const category = await this.prisma.serviceCategory.findFirst({
+      where: { id: categoryId, businessId },
+      select: { id: true },
+    });
+    if (!category) throw new NotFoundException('Category not found');
+  }
+
   // ── Services ────────────────────────────────────────────────────────────────
 
   findAll(businessId: string, includeInactive = false) {
@@ -31,8 +40,9 @@ export class ServicesService {
     return service;
   }
 
-  create(businessId: string, dto: CreateServiceDto) {
+  async create(businessId: string, dto: CreateServiceDto) {
     const { categoryId, ...rest } = dto;
+    await this.assertCategoryOwnership(businessId, categoryId);
     return this.prisma.service.create({
       data: {
         ...rest,
@@ -46,6 +56,7 @@ export class ServicesService {
   async update(id: string, dto: UpdateServiceDto, businessId?: string) {
     const service = await this.findOne(id, businessId);
     const { categoryId, ...rest } = dto;
+    if (businessId) await this.assertCategoryOwnership(businessId, categoryId);
     return this.prisma.service.update({
       where: { id: service.id },
       data: {

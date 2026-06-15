@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { tenantContext } from '../common/util/tenant-context';
+import { encryptProviderToken } from '../common/util/provider-token-crypto';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -13,7 +14,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         $allModels: {
           async $allOperations({ model, operation, args, query }) {
             const ctx = tenantContext.getStore();
-            const tenantModels = ['Client', 'Appointment', 'Payment', 'StaffMember', 'ClientMembership', 'Invoice', 'Message', 'GiftCard', 'UploadedFile', 'Service'];
+            const tenantModels = [
+              'Appointment', 'BusinessClosure', 'BusinessHours', 'Campaign', 'Client',
+              'ClientMembership', 'ClientPackage', 'DataErasureRequest', 'FollowUpPolicy',
+              'GiftCard', 'GoogleCalendarConnection', 'Invoice', 'Location', 'MembershipPlan',
+              'Message', 'MessageThreadState', 'NotificationDelivery', 'Offer', 'Package',
+              'Payment', 'PrivacyConsent', 'PromoCode', 'Refund', 'Resource', 'Review',
+              'Service', 'ServiceCategory', 'ServiceDue', 'SquareConnection', 'Staff',
+              'StaffTask', 'Subscription', 'SystemError', 'Transaction', 'UploadedFile',
+              'WaitlistEntry',
+            ];
             
             if (ctx?.businessId && tenantModels.includes(model)) {
               const a = args as any;
@@ -54,6 +64,30 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
+    const [googleConnections, squareConnections] = await Promise.all([
+      this.googleCalendarConnection.findMany({ select: { id: true, accessToken: true, refreshToken: true } }),
+      this.squareConnection.findMany({ select: { id: true, accessToken: true, refreshToken: true } }),
+    ]);
+    await this.$transaction([
+      ...googleConnections
+        .filter((connection) => !connection.refreshToken.startsWith('enc:v1:') || (connection.accessToken && !connection.accessToken.startsWith('enc:v1:')))
+        .map((connection) => this.googleCalendarConnection.update({
+          where: { id: connection.id },
+          data: {
+            refreshToken: encryptProviderToken(connection.refreshToken),
+            ...(connection.accessToken ? { accessToken: encryptProviderToken(connection.accessToken) } : {}),
+          },
+        })),
+      ...squareConnections
+        .filter((connection) => !connection.refreshToken.startsWith('enc:v1:') || !connection.accessToken.startsWith('enc:v1:'))
+        .map((connection) => this.squareConnection.update({
+          where: { id: connection.id },
+          data: {
+            refreshToken: encryptProviderToken(connection.refreshToken),
+            accessToken: encryptProviderToken(connection.accessToken),
+          },
+        })),
+    ]);
   }
 
   async onModuleDestroy() {

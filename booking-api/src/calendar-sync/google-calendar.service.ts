@@ -1,6 +1,8 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { createHmac } from 'crypto';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../common/redis/redis.service';
+import { decryptProviderToken, encryptProviderToken } from '../common/util/provider-token-crypto';
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -13,7 +15,7 @@ const SCOPE = 'https://www.googleapis.com/auth/calendar.events openid email';
 export class GoogleCalendarService {
   private readonly logger = new Logger(GoogleCalendarService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private redis: RedisService) {}
 
   private clientId() { return process.env.GOOGLE_CLIENT_ID ?? ''; }
   private clientSecret() { return process.env.GOOGLE_CLIENT_SECRET ?? ''; }
@@ -31,27 +33,37 @@ export class GoogleCalendarService {
   }
   configured() { return !!this.clientId() && !!this.clientSecret(); }
 
-  // ── Signed state (so the OAuth callback can't be forged) ───────────────────
-  private signState(businessId: string): string {
-    const payload = Buffer.from(JSON.stringify({ b: businessId, t: Date.now() })).toString('base64url');
-    const sig = createHmac('sha256', process.env.JWT_SECRET ?? '').update(payload).digest('base64url');
-    return `${payload}.${sig}`;
+  private async createState(businessId: string, userId: string): Promise<string> {
+    const state = randomBytes(32).toString('base64url');
+    const stored = await this.redis.client.set(
+      `oauth:google:${state}`,
+      JSON.stringify({ businessId, userId }),
+      'EX', 15 * 60,
+      'NX',
+    );
+    if (stored !== 'OK') throw new BadRequestException('Unable to start Google authorization');
+    return state;
   }
-  private verifyState(state: string): string | null {
-    const [payload, sig] = (state ?? '').split('.');
-    if (!payload || !sig) return null;
-    const expected = createHmac('sha256', process.env.JWT_SECRET ?? '').update(payload).digest('base64url');
-    if (sig !== expected) return null;
+
+  private async consumeState(state: string, browserState: string): Promise<{ businessId: string; userId: string }> {
+    if (!state || !browserState || state !== browserState) {
+      throw new BadRequestException('Invalid or expired OAuth state.');
+    }
+    const raw = await this.redis.client.getdel(`oauth:google:${state}`);
+    if (!raw) throw new BadRequestException('Invalid or expired OAuth state.');
     try {
-      const { b, t } = JSON.parse(Buffer.from(payload, 'base64url').toString());
-      if (Date.now() - t > 15 * 60 * 1000) return null; // 15-minute window
-      return b as string;
-    } catch { return null; }
+      const parsed = JSON.parse(raw) as { businessId?: string; userId?: string };
+      if (!parsed.businessId || !parsed.userId) throw new Error('invalid state');
+      return { businessId: parsed.businessId, userId: parsed.userId };
+    } catch {
+      throw new BadRequestException('Invalid or expired OAuth state.');
+    }
   }
 
   // ── OAuth flow ─────────────────────────────────────────────────────────────
-  authUrl(businessId: string): string {
+  async authUrl(businessId: string, userId: string): Promise<{ url: string; state: string }> {
     if (!this.configured()) throw new BadRequestException('Google Calendar is not configured on the server.');
+    const state = await this.createState(businessId, userId);
     const params = new URLSearchParams({
       client_id: this.clientId(),
       redirect_uri: this.redirectUri(),
@@ -60,15 +72,14 @@ export class GoogleCalendarService {
       access_type: 'offline',
       prompt: 'consent',          // force a refresh_token every time
       include_granted_scopes: 'true',
-      state: this.signState(businessId),
+      state,
     });
-    return `${AUTH_URL}?${params.toString()}`;
+    return { url: `${AUTH_URL}?${params.toString()}`, state };
   }
 
   // Exchange the callback code for tokens and persist the connection.
-  async handleCallback(code: string, state: string): Promise<{ businessId: string }> {
-    const businessId = this.verifyState(state);
-    if (!businessId) throw new BadRequestException('Invalid or expired OAuth state.');
+  async handleCallback(code: string, state: string, browserState: string): Promise<{ businessId: string }> {
+    const { businessId } = await this.consumeState(state, browserState);
 
     const tokenRes = await fetch(TOKEN_URL, {
       method: 'POST',
@@ -82,8 +93,8 @@ export class GoogleCalendarService {
       }),
     });
     if (!tokenRes.ok) {
-      const body = await tokenRes.text().catch(() => '');
-      this.logger.warn(`token exchange ${tokenRes.status}: ${body.slice(0, 300)}`);
+      await tokenRes.body?.cancel().catch(() => undefined);
+      this.logger.warn(`Google token exchange failed with status ${tokenRes.status}`);
       throw new BadRequestException(`token_exchange_${tokenRes.status}`);
     }
     const tok = await tokenRes.json() as { access_token: string; refresh_token?: string; expires_in: number };
@@ -102,8 +113,8 @@ export class GoogleCalendarService {
     const expiresAt = new Date(Date.now() + (tok.expires_in - 60) * 1000);
     await this.prisma.googleCalendarConnection.upsert({
       where: { businessId },
-      update: { accessToken: tok.access_token, expiresAt, ...(tok.refresh_token ? { refreshToken: tok.refresh_token } : {}), ...(email ? { email } : {}) },
-      create: { businessId, accessToken: tok.access_token, expiresAt, refreshToken: tok.refresh_token!, email },
+      update: { accessToken: encryptProviderToken(tok.access_token), expiresAt, ...(tok.refresh_token ? { refreshToken: encryptProviderToken(tok.refresh_token) } : {}), ...(email ? { email } : {}) },
+      create: { businessId, accessToken: encryptProviderToken(tok.access_token), expiresAt, refreshToken: encryptProviderToken(tok.refresh_token!), email },
     });
     return { businessId };
   }
@@ -125,7 +136,7 @@ export class GoogleCalendarService {
     const conn = await this.prisma.googleCalendarConnection.findUnique({ where: { businessId } });
     if (!conn) return null;
     if (conn.accessToken && conn.expiresAt && conn.expiresAt > new Date()) {
-      return { token: conn.accessToken, calendarId: conn.calendarId };
+      return { token: decryptProviderToken(conn.accessToken), calendarId: conn.calendarId };
     }
     const res = await fetch(TOKEN_URL, {
       method: 'POST',
@@ -133,14 +144,21 @@ export class GoogleCalendarService {
       body: new URLSearchParams({
         client_id: this.clientId(),
         client_secret: this.clientSecret(),
-        refresh_token: conn.refreshToken,
+        refresh_token: decryptProviderToken(conn.refreshToken),
         grant_type: 'refresh_token',
       }),
     });
     if (!res.ok) { this.logger.warn(`Google token refresh failed for ${businessId}`); return null; }
     const tok = await res.json() as { access_token: string; expires_in: number };
     const expiresAt = new Date(Date.now() + (tok.expires_in - 60) * 1000);
-    await this.prisma.googleCalendarConnection.update({ where: { businessId }, data: { accessToken: tok.access_token, expiresAt } });
+    await this.prisma.googleCalendarConnection.update({
+      where: { businessId },
+      data: {
+        accessToken: encryptProviderToken(tok.access_token),
+        refreshToken: encryptProviderToken(decryptProviderToken(conn.refreshToken)),
+        expiresAt,
+      },
+    });
     return { token: tok.access_token, calendarId: conn.calendarId };
   }
 

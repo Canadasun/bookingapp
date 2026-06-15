@@ -20,13 +20,32 @@ function makePayment(overrides = {}) {
 }
 
 async function build(paymentRow: unknown) {
+  let currentPayment = paymentRow as ReturnType<typeof makePayment> | null;
   const prisma = {
     payment: {
       findFirst: jest.fn().mockResolvedValue(paymentRow),
-      update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...makePayment(), ...data })),
+      findUnique: jest.fn().mockResolvedValue(paymentRow),
+      findUniqueOrThrow: jest.fn().mockImplementation(() => Promise.resolve(currentPayment)),
+      update: jest.fn().mockImplementation(({ data }) => {
+        if (!currentPayment) throw new Error('payment missing');
+        const increment = typeof data.refundedCents === 'object' ? data.refundedCents.increment : undefined;
+        currentPayment = {
+          ...currentPayment,
+          ...data,
+          ...(increment !== undefined ? { refundedCents: currentPayment.refundedCents + increment } : {}),
+        };
+        return Promise.resolve(currentPayment);
+      }),
     },
-    refund: { create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'ref1', ...data })) },
-    $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
+    refund: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'ref1', ...data })),
+      upsert: jest.fn().mockImplementation(({ create }) => Promise.resolve({ id: 'ref1', ...create })),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amountCents: 1000 } }),
+    },
+    $transaction: jest.fn().mockImplementation((operation: any) =>
+      typeof operation === 'function' ? operation(prisma) : Promise.all(operation),
+    ),
   };
   const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -52,7 +71,7 @@ describe('PaymentsService.refundPayment', () => {
     expect(res.status).toBe('PARTIALLY_REFUNDED');
     expect(res.refundedCents).toBe(2000);
     expect(prisma.payment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { refundedCents: 2000, status: 'PARTIALLY_REFUNDED' } }),
+      expect.objectContaining({ data: { refundedCents: { increment: 2000 } } }),
     );
   });
 
@@ -81,6 +100,16 @@ describe('PaymentsService.refundPayment', () => {
     const { svc } = await build(null);
     await expect(svc.refundPayment('biz1', 'missing', {})).rejects.toThrow(NotFoundException);
   });
+
+  it('records a pending refund without changing settled payment totals', async () => {
+    const { svc, prisma, refundsCreate } = await build(makePayment());
+    refundsCreate.mockResolvedValue({ id: 're_pending', status: 'pending' });
+
+    const result = await svc.refundPayment('biz1', 'pay1', { amountCents: 1000 });
+
+    expect(result).toMatchObject({ refundedCents: 0, status: 'SUCCEEDED' });
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('PaymentsService.handleWebhook', () => {
@@ -105,6 +134,25 @@ describe('PaymentsService.handleWebhook', () => {
       received: true,
       skipped: expect.stringContaining('not configured'),
     });
+  });
+});
+
+describe('PaymentsService refund webhook reconciliation', () => {
+  it('reconciles a pending refund when Stripe later marks it succeeded', async () => {
+    const { svc, prisma } = await build(makePayment());
+
+    await (svc as any).reconcileStripeRefund({
+      id: 're_pending', payment_intent: 'pi_123', amount: 1000,
+      status: 'succeeded', reason: null,
+    });
+
+    expect(prisma.refund.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { stripeRefundId: 're_pending' },
+      update: { status: 'SUCCEEDED' },
+    }));
+    expect(prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { refundedCents: 1000, status: 'PARTIALLY_REFUNDED' },
+    }));
   });
 });
 

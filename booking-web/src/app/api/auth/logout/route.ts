@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
+import { assertSameOrigin } from "@/lib/same-origin";
 
 const API = apiBase();
-
-function assertSameOrigin(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  if (!origin) return;
-  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
-  if (expected && origin !== expected) {
-    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
-  }
-}
 
 export async function POST(req: NextRequest) {
   assertSameOrigin(req);

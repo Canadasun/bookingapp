@@ -78,6 +78,14 @@ export class StaffService {
     if (existing) throw new ConflictException('Email already registered');
     await this.enforceStaffLimit(businessId);
 
+    const serviceIds = [...new Set(dto.serviceIds ?? [])];
+    if (serviceIds.length) {
+      const serviceCount = await this.prisma.service.count({
+        where: { id: { in: serviceIds }, businessId },
+      });
+      if (serviceCount !== serviceIds.length) throw new NotFoundException('Service not found');
+    }
+
     const tempPassword = randomBytes(9).toString('base64url').slice(0, 12);
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
@@ -93,9 +101,9 @@ export class StaffService {
         },
       });
       const s = await tx.staff.create({ data: { businessId, userId: user.id, bio: dto.bio } });
-      if (dto.serviceIds?.length) {
+      if (serviceIds.length) {
         await tx.staffService.createMany({
-          data: dto.serviceIds.map((serviceId) => ({ staffId: s.id, serviceId })),
+          data: serviceIds.map((serviceId) => ({ staffId: s.id, serviceId })),
         });
       }
       return s;
@@ -106,6 +114,13 @@ export class StaffService {
 
   async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null }, businessId?: string) {
     const staff = await this.findOne(id, businessId);
+    if (dto.locationId && businessId) {
+      const location = await this.prisma.location.findFirst({
+        where: { id: dto.locationId, businessId },
+        select: { id: true },
+      });
+      if (!location) throw new NotFoundException('Location not found');
+    }
     return this.prisma.staff.update({
       where: { id: staff.id },
       data: {

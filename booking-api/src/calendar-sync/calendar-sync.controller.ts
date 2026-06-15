@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Param, Query, Res, UseGuards, ForbiddenException, Logger } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Post, Param, Query, Req, Res, UseGuards, ForbiddenException, Logger } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CalendarSyncService } from './calendar-sync.service';
 import { GoogleCalendarService } from './google-calendar.service';
@@ -16,23 +16,11 @@ type AuthUser = { id: string; role: string; businessId: string | null };
 @ApiTags('calendar-sync')
 @Controller('calendar-sync')
 export class CalendarSyncController {
-  // In-memory record of the last OAuth callback outcome (diagnostics — survives
-  // within the running process; readable via google/last-attempt).
-  private static lastAttempt: { at: string; ok: boolean; reason?: string; query?: string } | null = null;
-
   constructor(
     private readonly calendarSyncService: CalendarSyncService,
     private readonly google: GoogleCalendarService,
     private readonly prisma: PrismaService,
   ) {}
-
-  @Get('google/last-attempt')
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.OWNER, Role.ADMIN)
-  lastAttempt() {
-    return CalendarSyncController.lastAttempt ?? { at: null, ok: null, reason: 'no callback received yet' };
-  }
 
   // ── Google Calendar OAuth ───────────────────────────────────────────────────
   // Owner — get the consent URL to connect their Google Calendar.
@@ -40,9 +28,20 @@ export class CalendarSyncController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
-  connect(@CurrentUser() user: AuthUser) {
+  async connect(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
-    return { url: this.google.authUrl(user.businessId) };
+    const { url, state } = await this.google.authUrl(user.businessId, user.id);
+    res.cookie('google_oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+      path: '/api/calendar-sync/google/callback',
+      ...(process.env.NODE_ENV === 'production'
+        ? { domain: process.env.OAUTH_COOKIE_DOMAIN ?? '.pulseappointments.com' }
+        : {}),
+    });
+    return { url };
   }
 
   // Public — Google redirects here after consent. Verifies the signed state,
@@ -53,6 +52,7 @@ export class CalendarSyncController {
     @Query('state') state: string,
     @Query('error') oauthError: string,
     @Query('iss') iss: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     // Use a hard-coded production fallback so a missing env var doesn't redirect
@@ -68,18 +68,25 @@ export class CalendarSyncController {
       return res.status(200).send('OK');
     }
 
-    const queryInfo = `code=${code ? 'yes' : 'no'} error=${oauthError ?? 'none'} state=${state ? 'yes' : 'no'}`;
+    const browserState = req.headers.cookie
+      ?.split(';')
+      .map((part) => part.trim().split('='))
+      .find(([name]) => name === 'google_oauth_state')?.[1] ?? '';
+    res.clearCookie('google_oauth_state', {
+      path: '/api/calendar-sync/google/callback',
+      ...(process.env.NODE_ENV === 'production'
+        ? { domain: process.env.OAUTH_COOKIE_DOMAIN ?? '.pulseappointments.com' }
+        : {}),
+    });
     try {
-      if (oauthError) throw new Error(`google_denied:${oauthError}`); // e.g. access_denied
+      if (oauthError) throw new Error('google_denied');
       if (!code) throw new Error('missing_code');
-      await this.google.handleCallback(code, state);
+      await this.google.handleCallback(code, state, browserState);
       logger.log('Google Calendar connected successfully');
-      CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: true, query: queryInfo };
       return res.redirect(`${web}/dashboard/settings?tab=calendar&calendar=connected`);
     } catch (e) {
       const reason = e instanceof Error ? e.message : 'unknown';
-      logger.warn(`Google callback FAILED: ${reason}`);
-      CalendarSyncController.lastAttempt = { at: new Date().toISOString(), ok: false, reason, query: queryInfo };
+      logger.warn(`Google callback failed: ${reason === 'google_denied' || reason === 'missing_code' ? reason : 'oauth_error'}`);
       // Map raw error messages to safe codes so internal detail never appears in the browser URL.
       const safeCode = reason.startsWith('google_denied') ? 'denied'
         : reason === 'missing_code' ? 'missing_code'

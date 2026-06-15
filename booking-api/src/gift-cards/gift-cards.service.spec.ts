@@ -24,6 +24,7 @@ function build(prismaOver: Record<string, unknown> = {}) {
       update: jest.fn(),
     },
     giftCardRedemption: { create: jest.fn() },
+    appointment: { findFirst: jest.fn() },
     ...prismaOver,
   };
   prisma.$transaction = jest.fn().mockImplementation((operation: unknown) =>
@@ -101,6 +102,17 @@ describe('GiftCardsService.redeem', () => {
     (prisma.giftCard.findFirst as jest.Mock).mockResolvedValue(null);
     const svc = await svcWith(prisma, notifications);
     await expect(svc.redeem(BIZ, { code: 'nope', amountCents: 100 })).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects a redemption linked to another tenant appointment', async () => {
+    const { prisma, notifications } = build();
+    (prisma.giftCard.findFirst as jest.Mock).mockResolvedValue(makeCard());
+    (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(null);
+    const svc = await svcWith(prisma, notifications);
+
+    await expect(svc.redeem(BIZ, { code: 'x', amountCents: 100, appointmentId: 'foreign' }))
+      .rejects.toThrow(NotFoundException);
+    expect(prisma.giftCardRedemption.create as jest.Mock).not.toHaveBeenCalled();
   });
 });
 

@@ -185,8 +185,9 @@ export class PaymentsController {
       amountCents: z.number().int().min(100),
       currency: z.string().length(3).optional(),
       instant: z.boolean().optional(),
+      idempotencyKey: z.string().uuid(),
     }).safeParse(body);
-    if (!parsed.success) throw new BadRequestException('amountCents (>= 100) is required');
+    if (!parsed.success) throw new BadRequestException('amountCents and a UUID idempotencyKey are required');
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     return this.paymentService.createConnectPayout(user.businessId, parsed.data);
   }

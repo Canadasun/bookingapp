@@ -546,10 +546,10 @@ export const api = {
     // Open the Stripe Express dashboard.
     dashboard: () => req<{ url: string }>("/payments/connect/dashboard", { method: "POST" }),
     // Trigger a manual or instant payout.
-    payout: (amountCents: number, instant = false, currency?: string) =>
+    payout: (amountCents: number, instant = false, currency?: string, idempotencyKey = crypto.randomUUID()) =>
       req<{ payoutId: string; status: string; amountCents: number; currency: string }>("/payments/connect/payout", {
         method: "POST",
-        body: JSON.stringify({ amountCents, instant, ...(currency ? { currency } : {}) }),
+        body: JSON.stringify({ amountCents, instant, idempotencyKey, ...(currency ? { currency } : {}) }),
       }),
   },
 

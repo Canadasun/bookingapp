@@ -18,6 +18,8 @@ function makeCP(over: Partial<Record<string, unknown>> = {}) {
 function build() {
   const prisma: Record<string, any> = {
     package: { findFirst: jest.fn() },
+    service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1' }) },
+    appointment: { findFirst: jest.fn() },
     client: { findFirst: jest.fn() },
     clientPackage: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
     packageRedemption: { create: jest.fn() },
@@ -77,6 +79,16 @@ describe('PackagesService.redeem', () => {
     await expect(svc.redeem(BIZ, 'cp1', {})).rejects.toThrow(BadRequestException);
   });
 
+  it('rejects a redemption linked to another tenant or client appointment', async () => {
+    const prisma = build();
+    (prisma.clientPackage.findFirst as jest.Mock).mockResolvedValue(makeCP());
+    (prisma.appointment.findFirst as jest.Mock).mockResolvedValue(null);
+    const svc = await svcWith(prisma);
+
+    await expect(svc.redeem(BIZ, 'cp1', { appointmentId: 'foreign-apt' })).rejects.toThrow(NotFoundException);
+    expect(prisma.packageRedemption.create as jest.Mock).not.toHaveBeenCalled();
+  });
+
   it('rejects an expired package', async () => {
     const prisma = build();
     (prisma.clientPackage.findFirst as jest.Mock).mockResolvedValue(makeCP({ expiresAt: new Date('2020-01-01') }));
@@ -105,5 +117,15 @@ describe('PackagesService.issue', () => {
     (prisma.client.findFirst as jest.Mock).mockResolvedValue(null);
     const svc = await svcWith(prisma);
     await expect(svc.issue(BIZ, { clientId: 'nope', name: 'X', credits: 3 })).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects a service from another business', async () => {
+    const prisma = build();
+    (prisma.client.findFirst as jest.Mock).mockResolvedValue({ id: 'c1' });
+    (prisma.service.findFirst as jest.Mock).mockResolvedValue(null);
+    const svc = await svcWith(prisma);
+
+    await expect(svc.issue(BIZ, { clientId: 'c1', name: 'X', credits: 3, serviceId: 'foreign' }))
+      .rejects.toThrow(NotFoundException);
   });
 });

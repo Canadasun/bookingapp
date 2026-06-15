@@ -9,6 +9,15 @@ export class InvoicesService {
 
   constructor(private prisma: PrismaService) {}
 
+  private async assertClientOwnership(businessId: string, clientId?: string | null) {
+    if (!clientId) return;
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, businessId },
+      select: { id: true },
+    });
+    if (!client) throw new NotFoundException('Client not found');
+  }
+
   private calcTotals(
     lineItems: { quantity: number; unitCents: number }[],
     taxRatePercent: number,
@@ -27,6 +36,7 @@ export class InvoicesService {
   }
 
   async create(businessId: string, dto: CreateInvoiceDto) {
+    await this.assertClientOwnership(businessId, dto.clientId);
     const biz = await this.prisma.business.findUniqueOrThrow({
       where: { id: businessId },
       select: { taxRatePercent: true, currency: true },
@@ -71,6 +81,7 @@ export class InvoicesService {
     if (existing.status !== 'DRAFT') {
       throw new BadRequestException('Only DRAFT invoices can be edited');
     }
+    await this.assertClientOwnership(businessId, dto.clientId);
 
     const biz = await this.prisma.business.findUniqueOrThrow({
       where: { id: businessId },

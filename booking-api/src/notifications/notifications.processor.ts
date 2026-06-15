@@ -95,7 +95,8 @@ function policyWindowLabel(minutes: number) {
 }
 
 @Processor(NOTIFICATION_QUEUE, {
-  concurrency: Number(process.env.NOTIFICATION_WORKER_CONCURRENCY ?? 1),
+  // Delivery logging uses per-instance job context, so this worker must remain serial.
+  concurrency: 1,
   limiter: {
     max: Number(process.env.NOTIFICATION_RATE_MAX ?? 10),
     duration: Number(process.env.NOTIFICATION_RATE_DURATION_MS ?? 60_000),
@@ -204,13 +205,13 @@ export class NotificationProcessor extends WorkerHost {
     for (const c of birthdayClients) {
       if (!c.email) continue;
       const already = await this.prisma.notificationDelivery.findFirst({
-        where: { recipient: c.email, type: 'birthday', status: 'SENT', createdAt: { gt: sixMonthsAgo } },
+        where: { businessId: c.businessId, recipient: c.email, type: 'birthday', status: 'SENT', createdAt: { gt: sixMonthsAgo } },
         select: { id: true },
       });
       if (already) continue;
       this.currentType = 'birthday';
       this.currentBusinessId = c.businessId;
-      const bookUrl = `${baseUrl}/book/${c.business.slug}`;
+      const bookUrl = `${baseUrl}/book/${encodeURIComponent(c.business.slug)}`;
       await this.email.send({
         to: c.email,
         subject: `Happy birthday from ${c.business.name}! 🎉`,
@@ -248,13 +249,13 @@ export class NotificationProcessor extends WorkerHost {
     for (const c of lapsed) {
       if (!c.email) continue;
       const already = await this.prisma.notificationDelivery.findFirst({
-        where: { recipient: c.email, type: 'rebook-reminder', status: 'SENT', createdAt: { gt: sixMonthsAgo } },
+        where: { businessId: c.businessId, recipient: c.email, type: 'rebook-reminder', status: 'SENT', createdAt: { gt: sixMonthsAgo } },
         select: { id: true },
       });
       if (already) continue;
       this.currentType = 'rebook-reminder';
       this.currentBusinessId = c.businessId;
-      const bookUrl = `${baseUrl}/book/${c.business.slug}`;
+      const bookUrl = `${baseUrl}/book/${encodeURIComponent(c.business.slug)}`;
       await this.email.send({
         to: c.email,
         subject: `We haven't seen you in a while — ${c.business.name}`,
@@ -603,13 +604,13 @@ export class NotificationProcessor extends WorkerHost {
         subject: `You've received a ${amount} gift card for ${card.business.name}! 🎁`,
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A gift just for you 🎁</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${card.purchaserName ? `${card.purchaserName} sent you` : "You've received"} a <strong>${amount}</strong> gift card for <strong>${card.business.name}</strong>.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${card.purchaserName ? `${esc(card.purchaserName)} sent you` : "You've received"} a <strong>${esc(amount)}</strong> gift card for <strong>${esc(card.business.name)}</strong>.</p>
 ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">"${esc(card.message)}"</p>` : ''}
 <div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:16px;text-align:center;margin:0 0 16px">
   <p style="margin:0 0 4px;color:#6B7280;font-size:12px">Your gift card code</p>
-  <p style="margin:0;color:#E9A23C;font-size:22px;font-weight:700;letter-spacing:1px">${card.code}</p>
+  <p style="margin:0;color:#E9A23C;font-size:22px;font-weight:700;letter-spacing:1px">${esc(card.code)}</p>
 </div>
-<p style="margin:0;color:#6B7280;font-size:13px">Present this code when you book or visit ${card.business.name}.</p>
+<p style="margin:0;color:#6B7280;font-size:13px">Present this code when you book or visit ${esc(card.business.name)}.</p>
 `),
       });
       return;
@@ -624,7 +625,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       if (!campaign || !client) return;
       this.currentBusinessId = campaign.businessId;
       const merge = (t: string) => t.replace(/\{name\}/g, client.name).replace(/\{business\}/g, campaign.business.name); // raw: SMS + subject
-      const mergeHtml = (t: string) => t.replace(/\{name\}/g, esc(client.name)).replace(/\{business\}/g, esc(campaign.business.name)); // escaped merge values for HTML
+      const mergeHtml = (t: string) => esc(t).replace(/\{name\}/g, esc(client.name)).replace(/\{business\}/g, esc(campaign.business.name));
 
       if (campaign.channel === 'SMS') {
         if (client.phone) await this.sms.send({ to: client.phone, body: merge(campaign.body) });

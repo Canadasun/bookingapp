@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
+import { assertSameOrigin } from "@/lib/same-origin";
 
 const API = apiBase();
 
@@ -22,15 +23,6 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
     if (typeof nested === "string") return nested;
   }
   return fallback;
-}
-
-function assertSameOrigin(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  if (!origin) return;
-  const expected = process.env.NEXT_PUBLIC_WEB_URL ?? "";
-  if (expected && origin !== expected) {
-    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
-  }
 }
 
 // Second factor: exchange the OTP from the login challenge for session cookies.

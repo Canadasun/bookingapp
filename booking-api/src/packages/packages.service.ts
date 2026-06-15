@@ -51,6 +51,13 @@ export class PackagesService {
       credits = credits ?? tmpl.credits;
     }
     if (!name || !credits) throw new BadRequestException('Package name and credits are required');
+    if (serviceId) {
+      const service = await this.prisma.service.findFirst({
+        where: { id: serviceId, businessId },
+        select: { id: true },
+      });
+      if (!service) throw new NotFoundException('Service not found');
+    }
 
     return this.prisma.clientPackage.create({
       data: {
@@ -99,6 +106,13 @@ export class PackagesService {
       if (cp.status === 'VOID') throw new BadRequestException('This package has been voided');
       if (cp.expiresAt && cp.expiresAt < new Date()) throw new BadRequestException('This package has expired');
       if (cp.creditsRemaining <= 0) throw new BadRequestException('No credits remaining on this package');
+      if (dto.appointmentId) {
+        const appointment = await tx.appointment.findFirst({
+          where: { id: dto.appointmentId, businessId, clientId: cp.clientId },
+          select: { id: true },
+        });
+        if (!appointment) throw new NotFoundException('Appointment not found');
+      }
 
       const remaining = cp.creditsRemaining - 1;
       await tx.packageRedemption.create({

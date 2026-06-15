@@ -5,6 +5,7 @@ import {
   ConflictException,
   BadRequestException,
   HttpException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,7 +14,7 @@ import { AuthLockService } from './auth-lock.service';
 import { RedisService } from '../common/redis/redis.service';
 import { RegisterDto, LoginDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { hashRefreshToken, refreshTokenTtlMs } from '../common/util/refresh-token';
 import { normalizePhone } from '../common/util/phone';
 import { User } from '@prisma/client';
@@ -208,7 +209,10 @@ export class AuthService {
       .replace(/\b(os(?: x)?|android) [\d._]+/g, '$1')
       .replace(/\s+/g, ' ')
       .trim();
-    const source = normalizedUa || (ip ? `ip:${ip}` : null);
+    const ipPrefix = ip
+      ? (ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip.split('.').slice(0, 3).join('.'))
+      : '';
+    const source = [normalizedUa, ipPrefix ? `ip:${ipPrefix}` : ''].filter(Boolean).join('|') || null;
     if (!source) return null;
     return createHash('sha256').update(source).digest('hex').slice(0, 32);
   }
@@ -280,7 +284,12 @@ export class AuthService {
   private static readonly DUMMY_HASH = '$2a$12$AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
   async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string }) {
-    const locked = await this.authLock.isLocked(dto.email).catch(() => false);
+    const locked = await this.authLock.isLocked(dto.email).catch(() => {
+      if (process.env.NODE_ENV === 'production') {
+        throw new ServiceUnavailableException('Authentication temporarily unavailable');
+      }
+      return false;
+    });
     if (locked) {
       throw new HttpException({ message: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.', statusCode: 429 }, 429);
     }
@@ -353,11 +362,14 @@ export class AuthService {
 
   private async createLoginChallenge(user: User): Promise<{ id: string; method: 'EMAIL' | 'SMS' }> {
     const code = String(randomInt(100000, 1000000)); // 6 digits, CSPRNG (not Math.random)
-    const codeHash = createHash('sha256').update(code).digest('hex');
+    const id = randomUUID();
+    const codeHash = createHmac('sha256', process.env.OTP_PEPPER ?? process.env.JWT_SECRET!)
+      .update(`${id}:${code}`)
+      .digest('hex');
     const smsPhone = user.twoFactorMethod === 'SMS' ? await this.resolveTwoFactorSmsPhone(user) : null;
     const method: 'EMAIL' | 'SMS' = user.twoFactorMethod === 'SMS' && smsPhone ? 'SMS' : 'EMAIL';
     const ch = await this.prisma.otpChallenge.create({
-      data: { userId: user.id, codeHash, method, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      data: { id, userId: user.id, codeHash, method, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
     });
     await this.notifications.sendOtp(user.id, code, method, smsPhone);
     return { id: ch.id, method };
@@ -369,15 +381,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired code');
     }
     // Constant-time compare so a wrong code can't be teased out by response timing.
-    const computedOtp = createHash('sha256').update(code).digest('hex');
-    const otpOk = computedOtp.length === ch.codeHash.length &&
-      timingSafeEqual(Buffer.from(computedOtp), Buffer.from(ch.codeHash));
+    const computedOtp = createHmac('sha256', process.env.OTP_PEPPER ?? process.env.JWT_SECRET!)
+      .update(`${challengeId}:${code}`)
+      .digest('hex');
+    const legacyOtp = createHash('sha256').update(code).digest('hex');
+    const otpOk = [computedOtp, legacyOtp].some((candidate) =>
+      candidate.length === ch.codeHash.length && timingSafeEqual(Buffer.from(candidate), Buffer.from(ch.codeHash)),
+    );
 
     // Recovery-code fallback: if the OTP didn't match, the user may have entered
     // one of their one-time recovery codes (which bypass the email/SMS channel
     // entirely — the whole point of recovery). Consume it on use.
     // Codes may be stored as bcrypt hashes (new) or legacy SHA-256 hex (old).
     let recoveryOk = false;
+    let recoveryHash: string | undefined;
     if (!otpOk) {
       const u = await this.prisma.user.findUnique({ where: { id: ch.userId } });
       if (u) {
@@ -391,10 +408,7 @@ export class AuthService {
         }
         if (matchingHash) {
           recoveryOk = true;
-          await this.prisma.user.update({
-            where: { id: u.id },
-            data: { twoFactorRecoveryCodes: u.twoFactorRecoveryCodes.filter((h) => h !== matchingHash) },
-          });
+          recoveryHash = matchingHash;
         }
       }
     }
@@ -403,7 +417,23 @@ export class AuthService {
       await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { attempts: { increment: 1 } } });
       throw new UnauthorizedException('Invalid or expired code');
     }
-    await this.prisma.otpChallenge.update({ where: { id: challengeId }, data: { consumedAt: new Date() } });
+    const consumed = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.otpChallenge.updateMany({
+        where: { id: challengeId, consumedAt: null, expiresAt: { gt: new Date() }, attempts: { lt: 5 } },
+        data: { consumedAt: new Date() },
+      });
+      if (result.count !== 1) return false;
+      if (recoveryHash) {
+        const recoveryUser = await tx.user.findUnique({ where: { id: ch.userId } });
+        if (!recoveryUser?.twoFactorRecoveryCodes.includes(recoveryHash)) return false;
+        await tx.user.update({
+          where: { id: ch.userId },
+          data: { twoFactorRecoveryCodes: recoveryUser.twoFactorRecoveryCodes.filter((hash) => hash !== recoveryHash) },
+        });
+      }
+      return true;
+    });
+    if (!consumed) throw new UnauthorizedException('Invalid or expired code');
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ch.userId } });
     await this.recordLoginAndMaybeAlert(user, ctx);
     const tokens = await this.issueTokens(user, { userAgent: ctx?.userAgent });

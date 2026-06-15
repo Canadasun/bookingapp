@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
+import { assertSameOrigin } from "@/lib/same-origin";
 
 const API = apiBase();
 
@@ -22,20 +23,6 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
     if (typeof nested === "string") return nested;
   }
   return fallback;
-}
-
-function assertSameOrigin(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  if (!origin) return; // server-to-server calls have no Origin header
-  const expected = process.env.NEXT_PUBLIC_WEB_URL;
-  // Fail closed: if the env var is missing in production, reject all cross-origin
-  // requests rather than silently accepting them (empty string is falsy → bypass).
-  if (!expected) {
-    throw new Response(JSON.stringify({ message: "Server misconfiguration" }), { status: 500 });
-  }
-  if (origin !== expected) {
-    throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
-  }
 }
 
 export async function POST(req: NextRequest) {

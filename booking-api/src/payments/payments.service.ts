@@ -36,6 +36,37 @@ export class PaymentsService {
     return this.stripe;
   }
 
+  private async reconcileStripeRefund(stripeRefund: Stripe.Refund) {
+    const intentId = typeof stripeRefund.payment_intent === 'string'
+      ? stripeRefund.payment_intent
+      : stripeRefund.payment_intent?.id;
+    if (!intentId) return;
+    const payment = await this.prisma.payment.findUnique({ where: { stripePaymentIntentId: intentId } });
+    if (!payment) return;
+    const refundStatus = stripeRefund.status === 'succeeded' ? 'SUCCEEDED' : stripeRefund.status === 'failed' ? 'FAILED' : 'PENDING';
+    await this.prisma.refund.upsert({
+      where: { stripeRefundId: stripeRefund.id },
+      update: { status: refundStatus },
+      create: {
+        businessId: payment.businessId,
+        paymentId: payment.id,
+        stripeRefundId: stripeRefund.id,
+        amountCents: stripeRefund.amount,
+        reason: stripeRefund.reason ?? undefined,
+        status: refundStatus,
+      },
+    });
+    if (refundStatus === 'SUCCEEDED') {
+      const successful = await this.prisma.refund.aggregate({
+        where: { paymentId: payment.id, status: 'SUCCEEDED' },
+        _sum: { amountCents: true },
+      });
+      const refundedCents = Math.min(successful._sum.amountCents ?? 0, payment.amountCents);
+      const status: PaymentStatus = refundedCents >= payment.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+      await this.prisma.payment.update({ where: { id: payment.id }, data: { refundedCents, status } });
+    }
+  }
+
   private publishableKey(): string {
     return this.configService.get<string>('STRIPE_PUBLISHABLE_KEY') ?? '';
   }
@@ -373,6 +404,12 @@ export class PaymentsService {
             }
           }
         }
+        break;
+      }
+      case 'refund.updated':
+      case 'refund.failed':
+      case 'charge.refund.updated': {
+        await this.reconcileStripeRefund(event.data.object as Stripe.Refund);
         break;
       }
       case 'checkout.session.completed': {
@@ -987,23 +1024,34 @@ export class PaymentsService {
       ]),
     });
 
-    const refundedTotal = payment.refundedCents + amount;
-    const newStatus: PaymentStatus = refundedTotal >= payment.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
-
-    const [refund] = await this.prisma.$transaction([
-      this.prisma.refund.create({
+    const refundStatus = stripeRefund.status === 'succeeded' ? 'SUCCEEDED' : stripeRefund.status === 'failed' ? 'FAILED' : 'PENDING';
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existingRefund = await tx.refund.findUnique({ where: { stripeRefundId: stripeRefund.id } });
+      if (existingRefund) {
+        const currentPayment = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+        return { refund: existingRefund, refundedCents: currentPayment.refundedCents, status: currentPayment.status };
+      }
+      const refund = await tx.refund.create({
         data: {
           businessId, paymentId: payment.id, stripeRefundId: stripeRefund.id,
           amountCents: amount, reason: input.reason,
-          status: stripeRefund.status === 'succeeded' ? 'SUCCEEDED' : stripeRefund.status === 'failed' ? 'FAILED' : 'PENDING',
+          status: refundStatus,
         },
-      }),
-      this.prisma.payment.update({
+      });
+      if (refundStatus !== 'SUCCEEDED') {
+        return { refund, refundedCents: payment.refundedCents, status: payment.status };
+      }
+      const updated = await tx.payment.update({
         where: { id: payment.id },
-        data: { refundedCents: refundedTotal, status: newStatus },
-      }),
-    ]);
-    return { refund, paymentId: payment.id, refundedCents: refundedTotal, status: newStatus };
+        data: { refundedCents: { increment: amount } },
+      });
+      const status: PaymentStatus = updated.refundedCents >= updated.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+      if (updated.status !== status) {
+        await tx.payment.update({ where: { id: payment.id }, data: { status } });
+      }
+      return { refund, refundedCents: updated.refundedCents, status };
+    });
+    return { ...result, paymentId: payment.id };
   }
 
   // Owner-scoped payment ledger for the business (newest first).
@@ -1209,7 +1257,7 @@ export class PaymentsService {
    */
   async createConnectPayout(
     businessId: string,
-    input: { amountCents: number; currency?: string; instant?: boolean },
+    input: { amountCents: number; currency?: string; instant?: boolean; idempotencyKey: string },
   ) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     if (!business.stripeConnectAccountId || !business.stripeConnectOnboarded) {
@@ -1224,7 +1272,10 @@ export class PaymentsService {
         ...(input.instant ? { method: 'instant' as const } : {}),
         metadata: { businessId },
       },
-      { stripeAccount: business.stripeConnectAccountId },
+      {
+        stripeAccount: business.stripeConnectAccountId,
+        idempotencyKey: this.idempotencyKey(['connect-payout', businessId, input.idempotencyKey]),
+      },
     );
     return { payoutId: payout.id, status: payout.status, amountCents: payout.amount, currency: payout.currency };
   }

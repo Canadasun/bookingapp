@@ -98,6 +98,13 @@ export class GiftCardsService {
             `Only ${(card.balanceCents / 100).toFixed(2)} remaining on this card`,
           );
         }
+        if (dto.appointmentId) {
+          const appointment = await tx.appointment.findFirst({
+            where: { id: dto.appointmentId, businessId },
+            select: { id: true },
+          });
+          if (!appointment) throw new NotFoundException('Appointment not found');
+        }
         const newBalance = card.balanceCents - dto.amountCents;
         await tx.giftCardRedemption.create({
           data: {

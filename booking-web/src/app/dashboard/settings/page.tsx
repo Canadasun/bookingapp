@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from "react";
+import { useEffect, useState, Suspense, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type } from "lucide-react";
@@ -288,6 +288,7 @@ function SettingsPage() {
   const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
   const [connectBusy, setConnectBusy] = useState<string | null>(null);
   const [payoutAmount, setPayoutAmount] = useState("");
+  const payoutIdempotencyKey = useRef<string | null>(null);
   function loadConnect() {
     api.connect.status().then(setConnectStatus).catch(() => {});
   }
@@ -1588,17 +1589,22 @@ function SettingsPage() {
                       <div className="flex gap-2">
                         <Input
                           type="number" min="1" step="0.01" placeholder="Amount (e.g. 100.00)"
-                          value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)}
+                          value={payoutAmount} onChange={(e) => {
+                            setPayoutAmount(e.target.value);
+                            payoutIdempotencyKey.current = null;
+                          }}
                           className="flex-1"
                         />
                         <Button type="button" loading={connectBusy === "payout"}
                           onClick={async () => {
                             const cents = Math.round(parseFloat(payoutAmount) * 100);
                             if (!cents || cents < 100) { toast.error("Minimum payout is $1.00"); return; }
+                            payoutIdempotencyKey.current ??= crypto.randomUUID();
                             setConnectBusy("payout");
                             try {
-                              await api.connect.payout(cents, false, biz?.currency?.toLowerCase());
+                              await api.connect.payout(cents, false, biz?.currency?.toLowerCase(), payoutIdempotencyKey.current);
                               toast.success("Payout initiated — funds will arrive in 1–2 business days");
+                              payoutIdempotencyKey.current = null;
                               setPayoutAmount(""); loadConnect();
                             } catch (e) { toast.error(e instanceof Error ? e.message : "Payout failed"); }
                             finally { setConnectBusy(null); }
