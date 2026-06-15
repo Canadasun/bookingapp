@@ -1,11 +1,6 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
 export function assertSameOrigin(req: NextRequest) {
-  const expected = process.env.NEXT_PUBLIC_WEB_URL?.replace(/\/$/, "");
-  if (!expected && process.env.NODE_ENV === "production") {
-    throw new Response(JSON.stringify({ message: "Server misconfiguration" }), { status: 500 });
-  }
-
   const fetchSite = req.headers.get("sec-fetch-site");
   if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
     throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
@@ -18,7 +13,7 @@ export function assertSameOrigin(req: NextRequest) {
     }
     return;
   }
-  if (origin.replace(/\/$/, "") !== (expected ?? req.nextUrl.origin)) {
+  if (origin.replace(/\/$/, "") !== req.nextUrl.origin.replace(/\/$/, "")) {
     throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
   }
 }

@@ -1,30 +1,32 @@
 import { describe, it, expect } from "vitest";
+import type { NextRequest } from "next/server";
+import { assertSameOrigin } from "@/lib/same-origin";
 
-// Replicate the assertSameOrigin logic here so we can test it independently of
-// the Next.js runtime (NextRequest is not available in jsdom).
-function assertSameOrigin(originHeader: string | null, webUrl: string | undefined): void {
-  if (!originHeader) return;
-  const expected = webUrl ?? "";
-  if (expected && originHeader !== expected) {
-    throw new Error("Forbidden");
-  }
+function request(headers: Record<string, string> = {}, origin = "http://localhost:3000") {
+  return { headers: new Headers(headers), nextUrl: { origin } } as unknown as NextRequest;
 }
 
 describe("assertSameOrigin", () => {
-  it("passes when no Origin header is present (server-to-server)", () => {
-    expect(() => assertSameOrigin(null, "https://www.pulseappointments.com")).not.toThrow();
+  it("accepts matching browser requests", () => {
+    expect(() => assertSameOrigin(request({
+      origin: "http://localhost:3000",
+      "sec-fetch-site": "same-origin",
+      cookie: "booking_refresh=token",
+    }))).not.toThrow();
   });
 
-  it("passes when Origin matches NEXT_PUBLIC_WEB_URL", () => {
-    expect(() => assertSameOrigin("https://www.pulseappointments.com", "https://www.pulseappointments.com")).not.toThrow();
+  it("rejects cross-site browser requests", () => {
+    expect(() => assertSameOrigin(request({
+      origin: "https://evil.example",
+      "sec-fetch-site": "cross-site",
+    }))).toThrow();
   });
 
-  it("throws when Origin does not match", () => {
-    expect(() => assertSameOrigin("https://evil.com", "https://www.pulseappointments.com")).toThrow("Forbidden");
+  it("rejects cookie-authenticated requests with no Origin", () => {
+    expect(() => assertSameOrigin(request({ cookie: "booking_refresh=token" }))).toThrow();
   });
 
-  it("passes when NEXT_PUBLIC_WEB_URL is not set (dev fallback)", () => {
-    expect(() => assertSameOrigin("https://anything.com", undefined)).not.toThrow();
-    expect(() => assertSameOrigin("https://anything.com", "")).not.toThrow();
+  it("allows non-browser calls without Origin or cookies", () => {
+    expect(() => assertSameOrigin(request())).not.toThrow();
   });
 });

@@ -30,6 +30,7 @@ export class CalendarSyncController {
   @Roles(Role.OWNER, Role.ADMIN)
   async connect(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
+    const cookieDomain = this.google.oauthCookieDomain();
     const { url, state } = await this.google.authUrl(user.businessId, user.id);
     res.cookie('google_oauth_state', state, {
       httpOnly: true,
@@ -37,9 +38,7 @@ export class CalendarSyncController {
       sameSite: 'lax',
       maxAge: 15 * 60 * 1000,
       path: '/api/calendar-sync/google/callback',
-      ...(process.env.NODE_ENV === 'production'
-        ? { domain: process.env.OAUTH_COOKIE_DOMAIN ?? '.pulseappointments.com' }
-        : {}),
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     return { url };
   }
@@ -72,11 +71,10 @@ export class CalendarSyncController {
       ?.split(';')
       .map((part) => part.trim().split('='))
       .find(([name]) => name === 'google_oauth_state')?.[1] ?? '';
+    const cookieDomain = this.google.oauthCookieDomain();
     res.clearCookie('google_oauth_state', {
       path: '/api/calendar-sync/google/callback',
-      ...(process.env.NODE_ENV === 'production'
-        ? { domain: process.env.OAUTH_COOKIE_DOMAIN ?? '.pulseappointments.com' }
-        : {}),
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
     });
     try {
       if (oauthError) throw new Error('google_denied');

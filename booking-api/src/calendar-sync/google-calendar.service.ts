@@ -33,6 +33,18 @@ export class GoogleCalendarService {
   }
   configured() { return !!this.clientId() && !!this.clientSecret(); }
 
+  oauthCookieDomain(): string | undefined {
+    if (process.env.NODE_ENV !== 'production') return undefined;
+    const domain = (process.env.OAUTH_COOKIE_DOMAIN ?? '.pulseappointments.com').replace(/^\./, '');
+    const callbackHost = new URL(this.redirectUri()).hostname;
+    const webHost = new URL(process.env.NEXT_PUBLIC_WEB_URL ?? 'https://pulseappointments.com').hostname;
+    const belongsToDomain = (host: string) => host === domain || host.endsWith(`.${domain}`);
+    if (!belongsToDomain(callbackHost) || !belongsToDomain(webHost)) {
+      throw new BadRequestException('Google OAuth cookie domain does not match the web and callback hosts');
+    }
+    return `.${domain}`;
+  }
+
   private async createState(businessId: string, userId: string): Promise<string> {
     const state = randomBytes(32).toString('base64url');
     const stored = await this.redis.client.set(
