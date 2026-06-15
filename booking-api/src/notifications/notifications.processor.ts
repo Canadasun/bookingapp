@@ -846,7 +846,7 @@ ${aptDetails(apt)}
           subject: `How was your visit to ${apt.business.name}?`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">How did we do? ⭐</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, thanks for visiting <strong>${apt.business.name}</strong>. We'd love your feedback on your ${apt.service.name} with ${apt.staff.user.name}.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, thanks for visiting <strong>${esc(apt.business.name)}</strong>. We'd love your feedback on your ${esc(apt.service.name)} with ${esc(apt.staff.user.name)}.</p>
 <a href="${baseUrl}/review/${apt.id}#token=${encodeURIComponent(signAppointmentToken(apt.id, 7 * 24 * 60 * 60))}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
 `),
         });
@@ -1137,7 +1137,7 @@ ${aptDetails(apt)}
             subject: `Late cancellation request — ${apt.client.name}`,
             html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#D97706;font-size:20px;font-weight:700">Late cancellation request</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${apt.client.name} asked to cancel <strong>after</strong> your ${policyWindowLabel(apt.business.cancellationWindowMinutes ?? ((apt.business.cancellationWindowHours ?? 0) * 60))} cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${esc(apt.client.name)} asked to cancel <strong>after</strong> your ${policyWindowLabel(apt.business.cancellationWindowMinutes ?? ((apt.business.cancellationWindowHours ?? 0) * 60))} cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
 ${aptDetails(apt)}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>
