@@ -12,7 +12,12 @@ export function assertSameOrigin(req: NextRequest) {
   // which already prevents a cross-origin attacker from sending them, so
   // allowing no-origin requests is safe.
   if (!origin) return;
-  if (origin.replace(/\/$/, "") !== req.nextUrl.origin.replace(/\/$/, "")) {
+  // Behind Railway's reverse proxy req.nextUrl.origin resolves to the internal
+  // host, not the public domain. Use NEXT_PUBLIC_WEB_URL as the authoritative
+  // expected origin and fall back to req.nextUrl.origin in dev where the env
+  // var isn't set.
+  const expected = (process.env.NEXT_PUBLIC_WEB_URL ?? req.nextUrl.origin).replace(/\/$/, "");
+  if (origin.replace(/\/$/, "") !== expected) {
     throw new Response(JSON.stringify({ message: "Forbidden" }), { status: 403 });
   }
 }

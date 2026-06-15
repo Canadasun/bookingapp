@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { NextRequest } from "next/server";
 import { assertSameOrigin } from "@/lib/same-origin";
 
-function request(headers: Record<string, string> = {}, origin = "http://localhost:3000") {
-  return { headers: new Headers(headers), nextUrl: { origin } } as unknown as NextRequest;
+function request(headers: Record<string, string> = {}, nextUrlOrigin = "http://localhost:3000") {
+  return { headers: new Headers(headers), nextUrl: { origin: nextUrlOrigin } } as unknown as NextRequest;
 }
 
 describe("assertSameOrigin", () => {
@@ -29,5 +29,25 @@ describe("assertSameOrigin", () => {
 
   it("allows non-browser calls without Origin or cookies", () => {
     expect(() => assertSameOrigin(request())).not.toThrow();
+  });
+
+  it("accepts www origin when NEXT_PUBLIC_WEB_URL is set with www", () => {
+    // Behind Railway's proxy, req.nextUrl.origin is the internal host.
+    // NEXT_PUBLIC_WEB_URL is the authoritative public origin.
+    const orig = process.env.NEXT_PUBLIC_WEB_URL;
+    process.env.NEXT_PUBLIC_WEB_URL = "https://www.pulseappointments.com";
+    try {
+      expect(() => assertSameOrigin(request(
+        { origin: "https://www.pulseappointments.com" },
+        "https://pulseappointments.com", // internal Railway host
+      ))).not.toThrow();
+      expect(() => assertSameOrigin(request(
+        { origin: "https://evil.example" },
+        "https://pulseappointments.com",
+      ))).toThrow();
+    } finally {
+      if (orig === undefined) delete process.env.NEXT_PUBLIC_WEB_URL;
+      else process.env.NEXT_PUBLIC_WEB_URL = orig;
+    }
   });
 });
