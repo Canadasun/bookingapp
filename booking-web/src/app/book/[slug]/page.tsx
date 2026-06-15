@@ -302,7 +302,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       // showing the confirmation. Otherwise (default) go straight to success.
       const requiresDeposit = !!biz?.requireDeposit;
       const requiresCard = !!biz?.collectCardOnFile;
-      const intent = await api.payments.bookingIntent(apt.id, bizId).catch((e) => {
+      if (!apt.manageToken) throw new Error("Booking session token missing — cannot set up payment");
+      const intent = await api.payments.bookingIntent(apt.id, bizId, apt.manageToken).catch((e) => {
         if (requiresDeposit || requiresCard) {
           throw e;
         }

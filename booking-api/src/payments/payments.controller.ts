@@ -13,10 +13,12 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { verifyAppointmentToken } from '../common/util/appointment-token';
 
 const BookingIntentSchema = z.object({
   appointmentId: z.string().min(1),
   businessId: z.string().min(1),
+  manageToken: z.string().min(1),
 });
 
 const CustomChargeSchema = z.object({
@@ -47,7 +49,10 @@ export class PaymentsController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   bookingIntent(@Body() body: unknown) {
     const parsed = BookingIntentSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException('appointmentId and businessId are required');
+    if (!parsed.success) throw new BadRequestException('appointmentId, businessId and manageToken are required');
+    if (!verifyAppointmentToken(parsed.data.appointmentId, parsed.data.manageToken)) {
+      throw new ForbiddenException('Invalid or missing manage token');
+    }
     return this.paymentService.createBookingIntent(parsed.data.appointmentId, parsed.data.businessId);
   }
 

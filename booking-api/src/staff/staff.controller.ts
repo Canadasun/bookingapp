@@ -127,7 +127,8 @@ export class StaffController {
 
   @Post(':id/availability')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   setAvailability(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -138,7 +139,8 @@ export class StaffController {
 
   @Post(':id/time-off')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   createTimeOff(
     @Param('id') id: string,
     @Param('businessId') businessId: string,

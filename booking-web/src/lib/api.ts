@@ -520,9 +520,9 @@ export const api = {
   },
 
   payments: {
-    bookingIntent: (appointmentId: string, businessId: string) =>
+    bookingIntent: (appointmentId: string, businessId: string, manageToken: string) =>
       req<{ required: boolean; mode?: "payment" | "setup" | "none"; clientSecret?: string; amountCents?: number; publishableKey?: string; currency?: "CAD" | "USD" }>(
-        "/payments/booking-intent", { method: "POST", body: JSON.stringify({ appointmentId, businessId }) }, null),
+        "/payments/booking-intent", { method: "POST", body: JSON.stringify({ appointmentId, businessId, manageToken }) }, null),
     // Owner — charge the configured no-show fee on the saved card.
     chargeNoShow: (appointmentId: string) =>
       req<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${appointmentId}`, { method: "POST" }),
