@@ -1,4 +1,4 @@
-import { getToken } from "./utils";
+import { getUserHint } from "./utils";
 
 const BASE = "/proxy";
 
@@ -13,12 +13,12 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 async function req<T>(path: string, init?: RequestInit, token?: string | null): Promise<T> {
-  const t = token === null ? null : (token ?? getToken());
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(t ? { Authorization: `Bearer ${t}` } : {}),
+      "X-Requested-With": "XMLHttpRequest", // Enforce custom header for CSRF protection
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -27,12 +27,11 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
   if (res.status === 401 && token === undefined) {
     const refreshed = await tryRefresh();
     if (refreshed) {
-      const newToken = getToken();
       const retry = await fetch(`${BASE}${path}`, {
         ...init,
         headers: {
           "Content-Type": "application/json",
-          ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
+          "X-Requested-With": "XMLHttpRequest",
           ...(init?.headers ?? {}),
         },
       });
@@ -407,9 +406,9 @@ export const api = {
     // returns one-time recovery codes (shown once) for lockout recovery.
     setTwoFactor: async (enabled: boolean, method?: "EMAIL" | "SMS") => {
       type TwoFactorResult = { ok: boolean; twoFactorEnabled: boolean; recoveryCodes?: string[]; user?: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: "EMAIL" | "SMS" } };
-      const doFetch = () => fetch("/api/auth/2fa", {
+      const doFetch = () => fetch("/proxy/auth/2fa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ enabled, method }),
       });
       let res = await doFetch();
@@ -432,11 +431,10 @@ export const api = {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("kind", kind);
-      const token = getToken();
       const res = await fetch("/proxy/uploads", {
         method: "POST",
         body: fd, // let the browser set the multipart boundary
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { "X-Requested-With": "XMLHttpRequest" },
       });
       if (!res.ok) {
         const b = await res.json().catch(() => ({})) as { message?: string };

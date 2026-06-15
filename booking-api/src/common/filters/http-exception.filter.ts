@@ -40,17 +40,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const logPath = request.url.split('?')[0];
       this.logger.error(`${request.method} ${logPath} → ${status}: ${err?.message ?? String(message)}`);
       if (this.prisma) {
+        // Tenants see these errors in their dashboard — NEVER leak stack traces,
+        // PII, or internal system details here.
         this.prisma.systemError.create({
           data: {
             businessId: bizId ?? null,
             category: 'GENERAL',
             severity: 'ERROR',
-            message: (err?.message ?? String(message)).slice(0, 2000),
-            stack: err?.stack?.slice(0, 5000) ?? null,
+            message: 'A system error occurred. Please contact support.',
+            stack: null, // Detailed stack is in Sentry, never in the DB
             context: {
               method: request.method,
               path: logPath,
               statusCode: status,
+              requestId: request.headers['x-request-id'] || null,
             },
           },
         }).catch(() => {});

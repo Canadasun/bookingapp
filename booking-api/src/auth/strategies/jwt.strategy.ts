@@ -43,14 +43,39 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { 
+        id: true, 
+        email: true, 
+        name: true,
+        phone: true,
+        role: true, 
+        businessId: true,
+        avatarUrl: true,
+        emailVerified: true,
+        mustResetPassword: true,
+        twoFactorEnabled: true,
+        twoFactorMethod: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
     if (!user) throw new UnauthorizedException();
-    // Fail-open: if Redis is unavailable treat the token as not-revoked so a
-    // Redis outage doesn't log everyone out of the app.
+
     if (payload.jti) {
-      const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`).catch(() => 0);
+      const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`).catch((err) => {
+        // Change to Fail-Closed in production
+        if (process.env.NODE_ENV === 'production') {
+          console.error(`[auth] Revocation check failed (FAIL-CLOSED):`, err);
+          throw new ServiceUnavailableException('Security service unavailable');
+        }
+        return 0;
+      });
       if (revoked) throw new UnauthorizedException();
     }
+
     return { ...user, _jti: payload.jti, _tokenExp: payload.exp };
   }
 }

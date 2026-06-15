@@ -41,6 +41,25 @@ async function bootstrap() {
   // the real client IP — required for per-IP rate limiting to work correctly.
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(helmet());
+
+  // Global CSRF Protection: When the browser sends a request to the /proxy, it 
+  // automatically attaches cookies. Since the API accepts cookies for auth, 
+  // we must verify that the request was intentional (not a cross-site form 
+  // submission) by requiring a custom header that cannot be set cross-origin 
+  // without CORS preflight approval.
+  app.use((req: any, res: any, next: any) => {
+    const hasCookie = !!(req.headers.cookie || req.headers.Cookie);
+    const hasAuthHeader = !!(req.headers.authorization || req.headers.Authorization);
+    // If authenticated via cookie but missing the custom header, reject it.
+    if (hasCookie && !hasAuthHeader && !req.headers['x-requested-with']) {
+      return res.status(403).json({ 
+        statusCode: 403, 
+        message: 'CSRF Protection: X-Requested-With header required' 
+      });
+    }
+    next();
+  });
+
   app.setGlobalPrefix('api', { exclude: ['/'] });
   // Drain connections + run onModuleDestroy (Prisma disconnect, BullMQ workers)
   // on SIGTERM/SIGINT (e.g. Railway redeploys) for a graceful shutdown.
@@ -60,7 +79,7 @@ async function bootstrap() {
     origin: corsOrigins.length ? corsOrigins : !isProd,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'X-Manage-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'X-Manage-Token', 'X-Requested-With'],
   });
 
   // Swagger exposes the full API surface — only mount it outside production.

@@ -19,14 +19,15 @@ export function formatDateTime(iso: string) {
   });
 }
 
-export function getToken(): string | null {
+export function getUserHint(): string | null {
   if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/(?:^|;\s*)booking_token=([^;]+)/);
+  const match = document.cookie.match(/(?:^|;\s*)booking_user=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 
 export function clearToken() {
-  document.cookie = "booking_token=; Max-Age=0; path=/";
+  // We can't clear HttpOnly cookies via JS, but we can clear the hint cookie
+  // and the session will be terminated by the next 401 response or explicit logout.
   document.cookie = "booking_user=; Max-Age=0; path=/";
 }
 
