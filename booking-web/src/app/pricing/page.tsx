@@ -91,7 +91,7 @@ function Cell({ value }: { value: boolean | string }) {
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen bg-[#F8F5EF]">
+    <main id="main-content" className="min-h-screen bg-[#F8F5EF]">
       {/* Nav */}
       <nav className="bg-white/80 backdrop-blur-xl border-b border-[#E9DDCB] sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">

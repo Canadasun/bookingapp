@@ -71,7 +71,7 @@ export default function ClientMessagesPage() {
       </header>
 
       {!selected ? (
-        <main className="max-w-2xl mx-auto px-5 py-6 space-y-3">
+        <main id="main-content" className="max-w-2xl mx-auto px-5 py-6 space-y-3">
           {threads.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <p className="font-medium">No messages yet</p>
@@ -93,7 +93,7 @@ export default function ClientMessagesPage() {
           ))}
         </main>
       ) : (
-        <main className="max-w-2xl mx-auto flex flex-col" style={{ height: "calc(100vh - 65px)" }}>
+        <main id="main-content" className="max-w-2xl mx-auto flex flex-col" style={{ height: "calc(100vh - 65px)" }}>
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3">
             {selected.messages.map((m) => (
               <div key={m.id} className={cn("flex", m.fromClient ? "justify-end" : "justify-start")}>

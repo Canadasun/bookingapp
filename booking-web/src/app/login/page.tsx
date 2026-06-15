@@ -184,7 +184,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center brand-shell px-4">
+    <main id="main-content" className="min-h-screen flex flex-col items-center justify-center brand-shell px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">

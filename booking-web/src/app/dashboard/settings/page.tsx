@@ -1546,7 +1546,7 @@ function SettingsPage() {
                     <button type="button" disabled={connectBusy !== null}
                       onClick={async () => {
                         setConnectBusy("dashboard");
-                        try { const { url } = await api.connect.dashboard(); window.open(url, "_blank"); }
+                        try { const { url } = await api.connect.dashboard(); window.open(url, "_blank", "noopener,noreferrer"); }
                         catch (e) { toast.error(e instanceof Error ? e.message : "Could not open dashboard"); }
                         finally { setConnectBusy(null); }
                       }}
@@ -1617,7 +1617,7 @@ function SettingsPage() {
                     <button type="button" disabled={connectBusy !== null}
                       onClick={async () => {
                         setConnectBusy("dashboard");
-                        try { const { url } = await api.connect.dashboard(); window.open(url, "_blank"); }
+                        try { const { url } = await api.connect.dashboard(); window.open(url, "_blank", "noopener,noreferrer"); }
                         catch (e) { toast.error(e instanceof Error ? e.message : "Could not open dashboard"); }
                         finally { setConnectBusy(null); }
                       }}

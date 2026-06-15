@@ -10,7 +10,8 @@ import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
 import { cn, formatPhoneInput, normalizePhoneE164 } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
-import { AddToCalendar } from "@/components/AddToCalendar";
+import dynamic from "next/dynamic";
+const AddToCalendar = dynamic(() => import("@/components/AddToCalendar").then(m => m.AddToCalendar), { ssr: false });
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { BookingPayment } from "@/components/BookingPayment";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -1035,9 +1036,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     </p>
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
                       By confirming, your name, contact details, and appointment information are collected and stored by this business and processed by{" "}
-                      <a href="/privacy" target="_blank" className="underline hover:text-violet-500">Pulse</a>{" "}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-violet-500">Pulse</a>{" "}
                       as its booking platform. View Pulse&apos;s{" "}
-                      <a href="/privacy" target="_blank" className="underline hover:text-violet-500">Privacy Policy</a>.
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-violet-500">Privacy Policy</a>.
                     </p>
                   </div>
                 </div>

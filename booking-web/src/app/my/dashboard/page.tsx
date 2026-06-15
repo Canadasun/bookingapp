@@ -186,7 +186,7 @@ export default function ClientDashboard() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-5 py-6 space-y-5">
+      <main id="main-content" className="max-w-2xl mx-auto px-5 py-6 space-y-5">
 
         {/* Book new CTA */}
         <Link href="/book"

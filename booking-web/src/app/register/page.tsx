@@ -82,7 +82,7 @@ export default function RegisterPage() {
   const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); if (k === "email") setEmailExists(false); };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center brand-shell px-4 py-10">
+    <main id="main-content" className="min-h-screen flex flex-col items-center justify-center brand-shell px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
@@ -146,9 +146,9 @@ export default function RegisterPage() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-violet-600" />
                 <span className="text-xs text-slate-500 leading-relaxed">
                   I agree to the{" "}
-                  <Link href="/terms" target="_blank" className="text-violet-600 hover:underline">Terms of Service</Link>{" "}
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Terms of Service</Link>{" "}
                   and{" "}
-                  <Link href="/privacy" target="_blank" className="text-violet-600 hover:underline">Privacy Policy</Link>.
+                  <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Privacy Policy</Link>.
                 </span>
               </label>
 

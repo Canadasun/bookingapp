@@ -75,7 +75,7 @@ function RegisterForm() {
   const f = (k: keyof typeof form, v: string) => { setForm((p) => ({ ...p, [k]: v })); setErrs((p) => ({ ...p, [k]: "" })); };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
+    <main id="main-content" className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
 
         <div className="text-center mb-8">
@@ -120,9 +120,9 @@ function RegisterForm() {
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-violet-600" />
                 <span className="text-xs text-gray-500 leading-relaxed">
                   I agree to the{" "}
-                  <Link href="/terms" target="_blank" className="text-violet-600 hover:underline">Terms of Service</Link>{" "}
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Terms of Service</Link>{" "}
                   and{" "}
-                  <Link href="/privacy" target="_blank" className="text-violet-600 hover:underline">Privacy Policy</Link>.
+                  <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">Privacy Policy</Link>.
                 </span>
               </label>
               <Button type="submit" loading={loading} disabled={!terms} className="w-full" size="lg">Create account</Button>

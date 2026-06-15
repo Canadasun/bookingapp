@@ -24,6 +24,8 @@ async function getBusiness(slug: string): Promise<BizPublic | null> {
   }
 }
 
+const SITE_URL = "https://www.pulseappointments.com";
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const biz = await getBusiness(slug);
@@ -33,12 +35,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title,
     description,
+    alternates: { canonical: `${SITE_URL}/book/${slug}` },
     openGraph: { title, description },
     twitter: { title, description },
   };
 }
-
-const SITE_URL = "https://www.pulseappointments.com";
 
 export default async function BookLayout({
   children,

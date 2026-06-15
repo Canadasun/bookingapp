@@ -150,7 +150,7 @@ function LoginForm() {
 
 export default function ClientLoginPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
+    <main id="main-content" className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/book" className="inline-block">

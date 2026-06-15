@@ -95,6 +95,20 @@ const nextConfig: NextConfig = {
       "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
     );
 
+    // Public booking pages: same Stripe requirements as dashboard but no WebSocket
+    // and no X-Frame-Options (the embed widget is iframed on customer sites).
+    const bookingCsp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://www.clarity.ms",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      `connect-src 'self' https://api.pulseappointments.com ${apiConnectSrc} https://api.stripe.com https://js.stripe.com https://www.clarity.ms https://c.clarity.ms`.trim(),
+      "font-src 'self' data:",
+      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join("; ");
+
     return [
       {
         source: "/:path*",
@@ -138,6 +152,22 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       })),
+      // Marketing / legal pages: no Stripe, no framing.
+      ...["/", "/pricing", "/terms", "/privacy", "/accessibility", "/status"].map((source) => ({
+        source,
+        headers: [
+          { key: "Content-Security-Policy", value: authCsp },
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      })),
+      // Booking pages: Stripe CSP required; X-Frame-Options intentionally omitted
+      // so the embed widget can be loaded inside an iframe on customer sites.
+      {
+        source: "/book/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: bookingCsp },
+        ],
+      },
     ];
   },
 };
