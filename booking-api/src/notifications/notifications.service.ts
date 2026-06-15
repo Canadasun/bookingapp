@@ -56,6 +56,11 @@ export class NotificationsService implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: true,
       });
+      await this.queue.add('cleanup-stale-rows', {}, {
+        repeat: { pattern: '0 3 * * 0' }, // 03:00 UTC every Sunday
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     } catch (e) {
       this.logger.warn(`Could not schedule scans: ${e instanceof Error ? e.message : e}`);
     }

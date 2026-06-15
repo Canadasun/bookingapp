@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, UseGuards, HttpCode, Req, ForbiddenException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
@@ -148,18 +149,25 @@ export class AuthController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   async bootstrapAdmin(@Body() body: { secret: string; email: string }) {
     const expected = process.env.BOOTSTRAP_ADMIN_SECRET;
-    if (!expected || body.secret !== expected) throw new ForbiddenException('Invalid bootstrap secret');
+    const provided = body.secret ?? '';
+    const secretOk = !!expected &&
+      expected.length === provided.length &&
+      timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+    if (!secretOk) throw new ForbiddenException('Invalid bootstrap secret');
     const allowed = process.env.BOOTSTRAP_ADMIN_EMAIL;
     if (!allowed || body.email.toLowerCase().trim() !== allowed.toLowerCase()) throw new ForbiddenException('Email not authorised for bootstrap');
     const existingAdmins = await this.prisma.user.count({ where: { role: 'ADMIN' } });
     if (existingAdmins > 0) throw new ForbiddenException('Admin bootstrap has already been completed');
-    const user = await this.prisma.user.update({
-      where: { email: body.email.toLowerCase().trim() },
-      data: { role: 'ADMIN' },
-      select: { id: true, email: true, role: true },
-    });
-    // Disable the capability in this process immediately after successful use.
-    delete process.env.BOOTSTRAP_ADMIN_SECRET;
-    return { ok: true, user };
+    try {
+      const user = await this.prisma.user.update({
+        where: { email: body.email.toLowerCase().trim() },
+        data: { role: 'ADMIN' },
+        select: { id: true, email: true, role: true },
+      });
+      return { ok: true, user };
+    } finally {
+      // Always clear the secret so a DB error can't leave the endpoint open for retry.
+      delete process.env.BOOTSTRAP_ADMIN_SECRET;
+    }
   }
 }

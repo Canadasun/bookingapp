@@ -149,7 +149,7 @@ export class BusinessMessagesController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.getBusinessThreads(businessId, user.id, { unreadOnly: unread === 'true', archived: archived === 'true', search, channel });
+    return this.svc.getBusinessThreads(businessId, user.id, { unreadOnly: unread === 'true', archived: archived === 'true', search: search?.slice(0, 100), channel });
   }
 
   @Get('unread-count')

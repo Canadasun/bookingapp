@@ -801,6 +801,18 @@ ${aptDetails(apt)}
       return;
     }
 
+    // Weekly maintenance: prune expired OTP challenges and old login events.
+    // Keeps both tables bounded and satisfies data-minimisation obligations.
+    if (job.name === 'cleanup-stale-rows') {
+      const ninety = new Date(Date.now() - 90 * 86_400_000);
+      const [otpResult, loginResult] = await Promise.all([
+        this.prisma.otpChallenge.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+        this.prisma.loginEvent.deleteMany({ where: { createdAt: { lt: ninety } } }),
+      ]);
+      this.logger.log(`cleanup-stale-rows: deleted ${otpResult.count} OTP challenges, ${loginResult.count} login events`);
+      return;
+    }
+
     // Subscription plan changed → email + in-app confirmation to the owner.
     if (job.name === 'plan-changed') {
       await this.sendPlanChangedEmail(String(job.data.businessId ?? ''), String(job.data.plan ?? 'FREE'));
