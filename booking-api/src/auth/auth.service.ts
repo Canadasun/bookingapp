@@ -418,8 +418,11 @@ export class AuthService {
     return `${raw.slice(0, 5)}-${raw.slice(5)}`;
   }
 
-  async setTwoFactor(userId: string, enabled: boolean, method?: 'EMAIL' | 'SMS') {
+  async setTwoFactor(userId: string, enabled: boolean, method: 'EMAIL' | 'SMS' | undefined, currentPassword: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!await bcrypt.compare(currentPassword, user.passwordHash)) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
     const data: { twoFactorEnabled: boolean; twoFactorMethod?: string; twoFactorRecoveryCodes?: string[] } = {
       twoFactorEnabled: enabled,
       ...(method ? { twoFactorMethod: method } : {}),

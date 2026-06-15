@@ -1,5 +1,3 @@
-import { getUserHint } from "./utils";
-
 const BASE = "/proxy";
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -404,12 +402,12 @@ export const api = {
       req<{ ok: boolean }>("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
     // Turn two-factor sign-in on/off and pick the delivery method. Enabling
     // returns one-time recovery codes (shown once) for lockout recovery.
-    setTwoFactor: async (enabled: boolean, method?: "EMAIL" | "SMS") => {
+    setTwoFactor: async (enabled: boolean, method: "EMAIL" | "SMS" | undefined, currentPassword: string) => {
       type TwoFactorResult = { ok: boolean; twoFactorEnabled: boolean; recoveryCodes?: string[]; user?: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: "EMAIL" | "SMS" } };
       const doFetch = () => fetch("/proxy/auth/2fa", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ enabled, method }),
+        body: JSON.stringify({ enabled, method, currentPassword }),
       });
       let res = await doFetch();
       if (res.status === 401) {

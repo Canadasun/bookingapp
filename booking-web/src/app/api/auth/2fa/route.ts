@@ -15,7 +15,7 @@ function assertSameOrigin(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   assertSameOrigin(req);
-  const body = await req.json() as { enabled: boolean; method?: "EMAIL" | "SMS" };
+  const body = await req.json() as { enabled: boolean; method?: "EMAIL" | "SMS"; currentPassword: string };
   const token = req.cookies.get("booking_token")?.value;
   const callSetTwoFactor = (accessToken?: string) => fetch(`${API}/auth/2fa`, {
     method: "POST",

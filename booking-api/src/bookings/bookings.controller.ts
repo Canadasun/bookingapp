@@ -42,15 +42,13 @@ export class PublicBookingsController {
     }
   }
 
-  // Token accepted from x-manage-token header (preferred — not logged) or query
-  // param (legacy — still accepted so old emailed links keep working).
+  // Token is accepted only from x-manage-token so it cannot leak through URLs.
   @Get(':id')
   findOne(
     @Param('id') id: string,
     @Headers('x-manage-token') headerToken?: string,
-    @Query('token') queryToken?: string,
   ) {
-    const token = headerToken ?? queryToken;
+    const token = headerToken;
     this.assertToken(id, token);
     return this.bookingsService.findOnePublic(id, token!);
   }
@@ -65,9 +63,8 @@ export class PublicBookingsController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(PublicStatusSchema)) dto: PublicStatusDto,
     @Headers('x-manage-token') headerToken?: string,
-    @Query('token') queryToken?: string,
   ) {
-    const token = dto.token ?? headerToken ?? queryToken;
+    const token = dto.token ?? headerToken;
     this.assertToken(id, token);
     const appointment = await this.bookingsService.updateStatus(id, dto);
     return this.bookingsService.toPublicAppointment(appointment, token!);
@@ -81,9 +78,8 @@ export class PublicBookingsController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(LateCancelRequestSchema)) dto: LateCancelRequestDto,
     @Headers('x-manage-token') headerToken?: string,
-    @Query('token') queryToken?: string,
   ) {
-    const token = dto.token ?? headerToken ?? queryToken;
+    const token = dto.token ?? headerToken;
     this.assertToken(id, token);
     return this.bookingsService.requestLateCancellation(id, dto.cancelReason);
   }
@@ -95,9 +91,8 @@ export class PublicBookingsController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
     @Headers('x-manage-token') headerToken?: string,
-    @Query('token') queryToken?: string,
   ) {
-    const token = dto.token ?? headerToken ?? queryToken;
+    const token = dto.token ?? headerToken;
     this.assertToken(id, token);
     const appointment = await this.bookingsService.reschedule(id, dto, undefined, { byClient: true });
     return this.bookingsService.toPublicAppointment(appointment, token!);

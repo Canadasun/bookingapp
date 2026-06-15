@@ -71,8 +71,9 @@ export class AuthController {
   @Post('2fa')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   setTwoFactor(@CurrentUser() user: User, @Body(new ZodValidationPipe(SetTwoFactorSchema)) dto: SetTwoFactorDto) {
-    return this.authService.setTwoFactor(user.id, dto.enabled, dto.method);
+    return this.authService.setTwoFactor(user.id, dto.enabled, dto.method, dto.currentPassword);
   }
 
   @Post('refresh')

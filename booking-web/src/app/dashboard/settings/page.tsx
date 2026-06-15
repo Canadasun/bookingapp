@@ -196,20 +196,26 @@ function SettingsPage() {
   const [twoFA, setTwoFA] = useState<boolean>(user?.twoFactorEnabled ?? false);
   const [twoFAMethod, setTwoFAMethod] = useState<"EMAIL" | "SMS">(user?.twoFactorMethod ?? "EMAIL");
   const [twoFASaving, setTwoFASaving] = useState(false);
+  const [twoFAPassword, setTwoFAPassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null); // shown once after enabling
 
   async function saveTwoFactor(enabled: boolean, method: "EMAIL" | "SMS") {
+    if (!twoFAPassword) {
+      toast.error("Enter your current password to change two-factor settings");
+      return;
+    }
     setTwoFASaving(true);
     const prev = { enabled: twoFA, method: twoFAMethod };
     setTwoFA(enabled); setTwoFAMethod(method);
     try {
-      const res = await api.auth.setTwoFactor(enabled, method);
+      const res = await api.auth.setTwoFactor(enabled, method, twoFAPassword);
       if (res.user) {
         setTwoFA(!!res.user.twoFactorEnabled);
         setTwoFAMethod(res.user.twoFactorMethod ?? method);
       }
       if (res.recoveryCodes?.length) setRecoveryCodes(res.recoveryCodes);
       if (!enabled) setRecoveryCodes(null);
+      setTwoFAPassword("");
       toast.success(enabled ? "Two-factor sign-in enabled" : "Two-factor sign-in turned off");
     } catch (err) {
       setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
@@ -1741,6 +1747,17 @@ function SettingsPage() {
                   <p className="text-xs text-gray-400 mt-0.5">Protect your account with a second step at sign-in.</p>
                 </div>
                 <hr className="border-gray-100" />
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Current password</label>
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    value={twoFAPassword}
+                    onChange={(e) => setTwoFAPassword(e.target.value)}
+                    placeholder="Required to change two-factor settings"
+                  />
+                </div>
 
                 <div className="flex flex-col gap-3 py-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>

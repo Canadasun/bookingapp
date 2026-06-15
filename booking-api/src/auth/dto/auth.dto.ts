@@ -58,6 +58,7 @@ export const VerifyTwoFactorSchema = z.object({
 export const SetTwoFactorSchema = z.object({
   enabled: z.boolean(),
   method: z.enum(['EMAIL', 'SMS']).optional(),
+  currentPassword: z.string().min(1),
 });
 
 export const VerifyEmailSchema = z.object({

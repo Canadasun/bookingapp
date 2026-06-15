@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { format, isBefore, subMinutes } from 'date-fns';
 import { Calendar, Clock, User, Scissors, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AddToCalendar } from '@/components/AddToCalendar';
@@ -12,6 +12,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ClientMessaging } from '@/components/ClientMessaging';
 import { toast } from 'sonner';
+import { consumeFragmentToken } from '@/lib/fragment-token';
 
 function formatHHMM(totalMinutes: number) {
   const h = Math.floor(totalMinutes / 60);
@@ -23,12 +24,19 @@ function formatHHMM(totalMinutes: number) {
 function ManageAppointmentInner() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const token = useSearchParams().get('token') ?? undefined;
+  const [token, setToken] = useState<string | undefined>();
+  const [tokenReady, setTokenReady] = useState(false);
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
 
+  useEffect(() => {
+    setToken(consumeFragmentToken(`appointment-manage:${id}`));
+    setTokenReady(true);
+  }, [id]);
+
   const load = useCallback(async () => {
+    if (!tokenReady) return;
     setLoading(true);
     try {
       const data = await api.appointments.get(id, token);
@@ -38,7 +46,7 @@ function ManageAppointmentInner() {
     } finally {
       setLoading(false);
     }
-  }, [id, token]);
+  }, [id, token, tokenReady]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -185,7 +193,7 @@ function ManageAppointmentInner() {
                       toast.error(`It's past the ${formatHHMM(windowMinutes)} change window. Please contact ${appointment.business.name} to reschedule.`);
                       return;
                     }
-                    router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `&token=${encodeURIComponent(token)}` : ''}`);
+                    router.push(`/book/${appointment.business.slug}?reschedule=${id}${token ? `#token=${encodeURIComponent(token)}` : ''}`);
                   }}
                 >
                   Reschedule

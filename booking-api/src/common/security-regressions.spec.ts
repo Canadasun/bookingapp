@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterSchema } from '../auth/dto/auth.dto';
 import { BookingsService } from '../bookings/bookings.service';
 import { signPublicClientToken, verifyPublicClientToken } from './util/public-client-token';
+import { signAppointmentToken, verifyAppointmentToken } from './util/appointment-token';
 
 describe('security regressions', () => {
   const originalJwtSecret = process.env.JWT_SECRET;
@@ -35,10 +36,20 @@ describe('security regressions', () => {
       { content: 'Forged client message' },
       undefined,  // appointmentId
       undefined,  // headerToken (x-manage-token)
-      undefined,  // queryToken (?token=)
       { id: 'attacker', role: 'OWNER' },
     )).rejects.toThrow(ForbiddenException);
     expect(service.send).not.toHaveBeenCalled();
+  });
+
+  it('rejects expired appointment capability tokens', () => {
+    const expired = signAppointmentToken('apt-expired', -1);
+    expect(verifyAppointmentToken('apt-expired', expired)).toBe(false);
+  });
+
+  it('accepts a live appointment token only for its signed appointment', () => {
+    const token = signAppointmentToken('apt-1', 60);
+    expect(verifyAppointmentToken('apt-1', token)).toBe(true);
+    expect(verifyAppointmentToken('apt-2', token)).toBe(false);
   });
 
   it('does not let public booking overwrite an existing client profile', async () => {

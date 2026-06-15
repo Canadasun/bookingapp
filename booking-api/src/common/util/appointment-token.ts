@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
  * the manage link carries an HMAC of the id. Only someone who received the email
  * (or the owner, who can mint it) has a valid token.
  *
- * HMAC(appointmentId) with JWT_SECRET → stable per appointment, no DB needed.
+ * The signed expiry bounds the lifetime of a leaked link without requiring DB state.
  */
 function secret(): string {
   // Prefer a dedicated secret so a compromise of appointment tokens does not
@@ -20,14 +20,27 @@ function secret(): string {
   return s;
 }
 
-export function signAppointmentToken(appointmentId: string): string {
-  return createHmac('sha256', secret()).update(appointmentId).digest('base64url');
+const DEFAULT_TTL_SECONDS = 400 * 24 * 60 * 60;
+
+export function signAppointmentToken(appointmentId: string, ttlSeconds = DEFAULT_TTL_SECONDS): string {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const signature = createHmac('sha256', secret())
+    .update(`${appointmentId}.${exp}`)
+    .digest('base64url');
+  return `${exp}.${signature}`;
 }
 
 export function verifyAppointmentToken(appointmentId: string, token?: string | null): boolean {
   if (!token) return false;
-  const expected = signAppointmentToken(appointmentId);
-  const a = Buffer.from(token);
+  const [rawExp, signature, extra] = token.split('.');
+  const exp = Number(rawExp);
+  if (!rawExp || !signature || extra || !Number.isSafeInteger(exp) || exp < Math.floor(Date.now() / 1000)) {
+    return false;
+  }
+  const expected = createHmac('sha256', secret())
+    .update(`${appointmentId}.${exp}`)
+    .digest('base64url');
+  const a = Buffer.from(signature);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }

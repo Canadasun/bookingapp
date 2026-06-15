@@ -60,8 +60,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
-    // Strip query params before echoing the path — tokens passed as ?token= must
-    // never appear in error bodies returned to the client or logged by Sentry.
+    // Strip query params before echoing the path so sensitive URL data never
+    // appears in error bodies returned to the client or logged by Sentry.
     const safePath = request.url.split('?')[0];
     response.status(status).json({
       statusCode: status,

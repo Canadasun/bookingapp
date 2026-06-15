@@ -811,7 +811,7 @@ ${aptDetails(apt)}
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     // HMAC manage token so the link proves the recipient got the email (the
     // public booking endpoints reject an id without a valid token).
-    const manageUrl = `${webUrl}/appointments/${apt.id}/manage?token=${signAppointmentToken(apt.id)}`;
+    const manageUrl = `${webUrl}/appointments/${apt.id}/manage#token=${encodeURIComponent(signAppointmentToken(apt.id))}`;
 
     switch (job.name) {
 
@@ -823,7 +823,7 @@ ${aptDetails(apt)}
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">How did we do? ⭐</h2>
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, thanks for visiting <strong>${apt.business.name}</strong>. We'd love your feedback on your ${apt.service.name} with ${apt.staff.user.name}.</p>
-<a href="${baseUrl}/review/${apt.id}?token=${signAppointmentToken(apt.id)}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
+<a href="${baseUrl}/review/${apt.id}#token=${encodeURIComponent(signAppointmentToken(apt.id, 7 * 24 * 60 * 60))}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
 `),
         });
         break;

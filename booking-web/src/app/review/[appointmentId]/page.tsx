@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api, Appointment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { consumeFragmentToken } from "@/lib/fragment-token";
 
 export default function ReviewPage({ params }: { params: Promise<{ appointmentId: string }> }) {
   const { appointmentId } = use(params);
@@ -19,11 +20,9 @@ export default function ReviewPage({ params }: { params: Promise<{ appointmentId
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // The signed token rides in the email link's query string and authorizes both
-    // loading the appointment and submitting the review.
-    const t = new URLSearchParams(window.location.search).get("token");
-    setToken(t);
-    api.appointments.get(appointmentId, t ?? undefined).then(setApt).catch(() => {}).finally(() => setLoading(false));
+    const t = consumeFragmentToken(`appointment-review:${appointmentId}`);
+    setToken(t ?? null);
+    api.appointments.get(appointmentId, t).then(setApt).catch(() => {}).finally(() => setLoading(false));
   }, [appointmentId]);
 
   async function submit() {

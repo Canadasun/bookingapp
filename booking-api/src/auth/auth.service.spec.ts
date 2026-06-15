@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuthLockService } from './auth-lock.service';
 import { RedisService } from '../common/redis/redis.service';
+import * as bcrypt from 'bcryptjs';
 
 async function build(decoded: unknown | 'throw') {
   const prisma = { user: { update: jest.fn().mockResolvedValue({ role: 'OWNER' }) } };
@@ -125,5 +126,45 @@ describe('AuthService trusted device recognition', () => {
     );
 
     expect(after).toBe(before);
+  });
+});
+
+describe('AuthService.setTwoFactor', () => {
+  async function buildTwoFactorService() {
+    const passwordHash = await bcrypt.hash('current-password', 4);
+    const user = {
+      id: 'u1', role: 'OWNER', passwordHash, twoFactorEnabled: false,
+      twoFactorRecoveryCodes: [], twoFactorMethod: 'EMAIL',
+    };
+    const prisma = {
+      user: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue(user),
+        update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...user, ...data })),
+      },
+    };
+    const svc = new AuthService(
+      prisma as unknown as PrismaService,
+      {} as JwtService,
+      {} as NotificationsService,
+      {} as AuthLockService,
+      {} as RedisService,
+    );
+    return { svc, prisma };
+  }
+
+  it('rejects a 2FA change when the current password is wrong', async () => {
+    const { svc, prisma } = await buildTwoFactorService();
+
+    await expect(svc.setTwoFactor('u1', true, 'EMAIL', 'wrong-password'))
+      .rejects.toThrow(UnauthorizedException);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('allows a 2FA change after current-password verification', async () => {
+    const { svc, prisma } = await buildTwoFactorService();
+
+    await expect(svc.setTwoFactor('u1', true, 'EMAIL', 'current-password'))
+      .resolves.toMatchObject({ ok: true, twoFactorEnabled: true });
+    expect(prisma.user.update).toHaveBeenCalled();
   });
 });

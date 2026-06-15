@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, Headers, HttpCode, Header } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, Headers, HttpCode, Header, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -19,7 +19,7 @@ export class MessagesController {
   constructor(private svc: MessagesService) {}
 
   // Protected or Public-with-token — reads thread
-  // Token accepted via x-manage-token header (preferred) or legacy query param.
+  // Token is accepted only via x-manage-token so it cannot leak through URLs.
   @Get()
   @ApiBearerAuth()
   @UseGuards(OptionalJwtAuthGuard)
@@ -28,10 +28,9 @@ export class MessagesController {
     @Param('clientId') clientId: string,
     @Query('appointmentId') appointmentId?: string,
     @Headers('x-manage-token') headerToken?: string,
-    @Query('token') queryToken?: string,
     @CurrentUser() user?: { id: string; role: string; businessId: string | null },
   ) {
-    const token = headerToken ?? queryToken;
+    const token = headerToken;
     if (user && (user.role === 'ADMIN' || user.businessId === businessId)) {
       return this.svc.getThread(businessId, clientId);
     }
@@ -59,10 +58,9 @@ export class MessagesController {
     @Body(new ZodValidationPipe(SendSchema)) dto: SendDto,
     @Query('appointmentId') appointmentId?: string,
     @Headers('x-manage-token') headerToken?: string,
-    @Query('token') queryToken?: string,
     @CurrentUser() user?: { id: string; role: string },
   ) {
-    const token = headerToken ?? queryToken;
+    const token = headerToken;
     // 1. If logged in as a client, verify it's their own clientId
     if (user && user.role === 'CLIENT') {
       const ok = await this.svc.verifyUserClient(user.id, businessId, clientId);
@@ -190,15 +188,17 @@ export class SmsWebhookController {
   @Header('Content-Type', 'text/xml')
   @Throttle({ default: { limit: 120, ttl: 60000 } })
   async inbound(@Headers('x-twilio-signature') sig: string, @Body() body: Record<string, string>) {
-    const authToken = process.env.TWILIO_AUTH_TOKEN ?? process.env.TWILIO_API_CLIENT_SECRET;
-    // Verify the request really came from Twilio (skipped only in stub/dev where
-    // no real token is set). The URL must match the configured webhook exactly.
-    if (authToken && !authToken.startsWith('AC_placeholder')) {
-      const base = (process.env.API_PUBLIC_URL ?? 'https://bookingapp-production-32f8.up.railway.app').replace(/\/+$/, '').replace(/\/api$/, '');
-      const url = `${base}/api/messages/sms/inbound`;
-      if (!twilio.validateRequest(authToken, sig ?? '', url, body ?? {})) {
-        throw new ForbiddenException('Invalid Twilio signature');
-      }
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!authToken) {
+      throw new ServiceUnavailableException('Twilio webhook verification is not configured');
+    }
+    const base = (process.env.API_PUBLIC_URL ?? '').replace(/\/+$/, '').replace(/\/api$/, '');
+    if (!base) {
+      throw new ServiceUnavailableException('API_PUBLIC_URL is required for Twilio webhook verification');
+    }
+    const url = `${base}/api/messages/sms/inbound`;
+    if (!twilio.validateRequest(authToken, sig ?? '', url, body ?? {})) {
+      throw new ForbiddenException('Invalid Twilio signature');
     }
     await this.svc.handleInboundSms(String(body?.From ?? ''), String(body?.Body ?? ''));
     // Empty TwiML — we handle the reply in-app, so Twilio shouldn't auto-respond.

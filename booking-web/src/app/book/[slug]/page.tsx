@@ -14,6 +14,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { BookingPayment } from "@/components/BookingPayment";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { getUser, type SessionUser } from "@/lib/auth";
+import { consumeFragmentToken } from "@/lib/fragment-token";
 import "react-day-picker/style.css";
 
 type PayInfo = { mode?: "payment" | "setup" | "none"; amountCents?: number; currency?: "CAD" | "USD"; applicationId?: string; locationId?: string; saveCard?: boolean };
@@ -98,10 +99,16 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
 export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?: "slug" | "id" }) {
   const searchParams  = useSearchParams();
   const rescheduleId  = searchParams.get("reschedule");
-  const rescheduleToken = searchParams.get("token") ?? undefined; // HMAC manage token for the public reschedule
+  const [rescheduleToken, setRescheduleToken] = useState<string | undefined>();
+  const [fragmentReady, setFragmentReady] = useState(false);
   const isEmbed       = searchParams.get("embed") === "1"; // rendered inside the embeddable widget iframe
   const isBusinessIdRef = lookup === "id" || searchParams.get("ref") === "business-id";
   const rescheduleLoaded = useRef(false);
+
+  useEffect(() => {
+    setRescheduleToken(rescheduleId ? consumeFragmentToken(`appointment-manage:${rescheduleId}`) : undefined);
+    setFragmentReady(true);
+  }, [rescheduleId]);
 
   // When embedded, report content height to the host page so embed.js can size
   // the iframe with no inner scrollbar.
@@ -201,7 +208,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
   // Reschedule prefill
   useEffect(() => {
-    if (!rescheduleId || rescheduleLoaded.current || allServices.length === 0) return;
+    if (!fragmentReady || !rescheduleId || !rescheduleToken || rescheduleLoaded.current || allServices.length === 0) return;
     rescheduleLoaded.current = true;
     api.appointments.get(rescheduleId, rescheduleToken).then((apt) => {
       const svc = allServices.find((s) => s.id === apt.service.id);
@@ -211,7 +218,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       setStep(2);
       toast.success("Select a new date and time");
     }).catch(() => {});
-  }, [rescheduleId, rescheduleToken, allServices]);
+  }, [fragmentReady, rescheduleId, rescheduleToken, allServices]);
 
   function toggleService(svc: Service) {
     setSelectedServices((prev) =>
@@ -586,7 +593,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             </div>
 
             <div className="flex gap-3 mb-4">
-              <Link href={`/appointments/${booking.id}/manage${booking.manageToken ? `?token=${encodeURIComponent(booking.manageToken)}` : ''}`}
+              <Link href={`/appointments/${booking.id}/manage${booking.manageToken ? `#token=${encodeURIComponent(booking.manageToken)}` : ''}`}
                 className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 text-center transition-colors">
                 Manage booking
               </Link>
