@@ -44,7 +44,7 @@ export class UploadsController {
     if (r.redirectUrl) return res.redirect(302, r.redirectUrl);
     res.setHeader('Content-Type', r.contentType);
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Content-Disposition', r.isPrivate ? 'attachment' : 'inline');
     // Documents (verification uploads) must never be cached by proxies or browsers.
     res.setHeader('Cache-Control', r.isPrivate ? 'private, no-store' : 'public, max-age=31536000, immutable');
     res.send(r.buffer);
