@@ -174,9 +174,10 @@ export class BusinessesService {
     // Send farewell email to the owner before wiping data (best-effort)
     const owner = users.find((u) => u.email);
     if (owner?.email) {
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       this.email.send({
         to: owner.email,
-        subject: `Your ${business.name} account has been deleted`,
+        subject: `Your ${esc(business.name)} account has been deleted`,
         html: `<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
           <tr><td align="center">
             <table width="560" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
@@ -184,9 +185,9 @@ export class BusinessesService {
                 <h1 style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF">Account Deleted</h1>
               </td></tr>
               <tr><td style="padding:32px">
-                <p style="margin:0 0 16px;font-size:15px;color:#374151">Hi ${owner.name ?? 'there'},</p>
+                <p style="margin:0 0 16px;font-size:15px;color:#374151">Hi ${esc(owner.name ?? 'there')},</p>
                 <p style="margin:0 0 16px;font-size:15px;color:#374151">
-                  Your <strong>${business.name}</strong> account and all associated data have been permanently deleted from Pulse Appointments.
+                  Your <strong>${esc(business.name)}</strong> account and all associated data have been permanently deleted from Pulse Appointments.
                 </p>
                 <p style="margin:0 0 16px;font-size:15px;color:#374151">
                   This action is irreversible. All bookings, client records, invoices, and staff accounts have been removed.

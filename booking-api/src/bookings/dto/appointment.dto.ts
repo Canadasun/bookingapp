@@ -50,7 +50,7 @@ export const UpdateAppointmentSchema = z.object({
   startsAt: z.string().datetime().optional(),
   clientName: z.string().min(1).max(200).optional(),
   clientEmail: z.string().email().optional(),
-  clientPhone: z.string().optional(),
+  clientPhone: z.string().max(30).optional(),
   notes: z.string().max(5000).optional(),
   notifyClient: z.boolean().default(true),
 });

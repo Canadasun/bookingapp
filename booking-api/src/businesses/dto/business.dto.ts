@@ -26,12 +26,12 @@ const optionalHttpsUrl = z.preprocess(
 );
 
 export const CreateBusinessSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(200),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
   email: z.string().email(),
   phone: phoneSchema,
   timezone: z.string().default('America/New_York'),
-  address: optionalString(),
+  address: optionalString(500),
   logoUrl: optionalHttpsUrl,
   websiteUrl: optionalHttpsUrl,
   instagramUrl: optionalHttpsUrl,
@@ -57,7 +57,7 @@ export const CreateBusinessSchema = z.object({
   cancellationFeeCents: z.number().int().nonnegative().default(0),
   collectCardOnFile: z.boolean().default(false),
   allowClientReschedule: z.boolean().default(true),
-  cancellationPolicy: optionalString(),
+  cancellationPolicy: optionalString(5000),
   currency: z.enum(['CAD', 'USD']).default('CAD'),
   plan: z.enum(['FREE', 'BASIC', 'PRO']).optional(),
 });
