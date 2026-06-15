@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Patch, Query, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Query, Param, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { z } from 'zod';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SystemErrorsService } from './system-errors.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -57,7 +59,8 @@ export class SystemErrorsController {
     @Param('id') id: string,
     @CurrentUser() user: { role: string; businessId: string | null },
   ) {
-    const bizId = user.role === 'ADMIN' ? undefined : (user.businessId ?? undefined);
+    if (user.role !== 'ADMIN' && !user.businessId) throw new ForbiddenException('No business on this account');
+    const bizId = user.role === 'ADMIN' ? undefined : user.businessId!;
     return this.svc.resolve(id, bizId);
   }
 
@@ -71,7 +74,7 @@ export class SystemErrorsController {
   /** Call OpenAI to explain a batch of recent error patterns (requires OPENAI_API_KEY). */
   @Post('ai-explain')
   @Roles(Role.ADMIN)
-  aiExplain(@Body() body: { category?: string }) {
+  aiExplain(@Body(new ZodValidationPipe(z.object({ category: z.string().max(50).optional() }))) body: { category?: string }) {
     return this.svc.aiExplain(body.category);
   }
 }

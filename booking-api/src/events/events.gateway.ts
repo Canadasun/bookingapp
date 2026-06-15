@@ -42,7 +42,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       (client.handshake.auth?.ticket as string | undefined) ||
       (client.handshake.auth?.token as string | undefined);
     try {
-      const p = this.jwt.verify(ticket ?? '', { secret: process.env.JWT_SECRET }) as {
+      const p = this.jwt.verify(ticket ?? '', { secret: process.env.JWT_SECRET, algorithms: ['HS256'] }) as {
         sub?: string; role?: string; businessId?: string | null; kind?: string;
       };
       if (p.kind !== 'ws' || !p.sub) throw new Error('not a ws ticket');
