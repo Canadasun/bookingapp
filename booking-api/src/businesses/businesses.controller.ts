@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { BusinessesService } from './businesses.service';
 import { CreateBusinessSchema, UpdateBusinessSchema, CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
@@ -23,6 +24,14 @@ export class BusinessesController {
     @CurrentUser() user: User,
   ) {
     return this.businessService.create(dto, user.id);
+  }
+
+  // Public endpoint for sitemap generation — returns slugs of all active businesses.
+  // No auth required; rate-limited to prevent enumeration abuse.
+  @Get('public-slugs')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  publicSlugs() {
+    return this.businessService.getPublicSlugs();
   }
 
   @Get('slug/:slug')

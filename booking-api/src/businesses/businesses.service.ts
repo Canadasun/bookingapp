@@ -132,6 +132,17 @@ export class BusinessesService {
     return this.publicBusiness(business);
   }
 
+  // Sitemap: public slugs for all active, non-suspended businesses.
+  // Rate-limited at the controller layer; no auth required.
+  async getPublicSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {
+    return this.prisma.business.findMany({
+      where: { suspended: false },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 10_000,
+    });
+  }
+
   // Owner pauses their business: keeps all data, hides the public booking page,
   // and stops new public bookings. Fully reversible via reactivate().
   async deactivate(id: string) {

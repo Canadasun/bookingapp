@@ -362,18 +362,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => {});
   }, [user]);
 
+  const { connected: wsConnected } = useEvents(user?.businessId, useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]));
+
+  // Poll for unread messages only when the WebSocket is not connected.
+  // When the socket is live, real-time events drive refreshes instead,
+  // eliminating 30-second interval noise on healthy connections.
   useEffect(() => {
     refreshUnreadMessages();
-    const interval = window.setInterval(refreshUnreadMessages, 30_000);
+    const interval = wsConnected ? null : window.setInterval(refreshUnreadMessages, 30_000);
     const onVisibility = () => { if (document.visibilityState === "visible") refreshUnreadMessages(); };
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      window.clearInterval(interval);
+      if (interval) window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [pathname, refreshUnreadMessages]);
-
-  useEvents(user?.businessId, useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]));
+  }, [pathname, refreshUnreadMessages, wsConnected]);
 
   // Staff get the base nav plus anything their granted permissions unlock.
   const perms = user?.permissions ?? [];

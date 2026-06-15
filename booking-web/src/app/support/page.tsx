@@ -51,9 +51,9 @@ export default function SupportPage() {
                     <Clock className="w-4 h-4 text-violet-500" /> Response Times
                   </div>
                   <ul className="text-xs text-slate-500 space-y-1 leading-relaxed">
-                    <li>Mon–Fri: within 4 business hours</li>
+                    <li>Mon–Fri: we aim to respond within 1 business day</li>
                     <li>Weekends: next business day</li>
-                    <li>Billing disputes: escalated within 2 hours</li>
+                    <li>Billing questions: prioritized response</li>
                   </ul>
                 </div>
               </div>

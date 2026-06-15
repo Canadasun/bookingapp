@@ -32,6 +32,7 @@ import { api, AdminOverview, FlaggedDuplicate, VerificationStatus, SystemError }
 import { getUser, clearSession } from "@/lib/auth";
 import { formatPrice, cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Tab = "overview" | "verifications" | "businesses" | "duplicates" | "errors" | "users" | "funnel" | "health";
 
@@ -112,6 +113,19 @@ export default function AdminPage() {
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [passwordBusy, setPasswordBusy] = useState(false);
 
+  type DialogState = {
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    inputPlaceholder?: string;
+    variant?: "default" | "destructive";
+    onConfirm: (val?: string) => void;
+  };
+  const [dialog, setDialog] = useState<DialogState>({ open: false, title: "", description: "", onConfirm: () => {} });
+  const closeDialog = () => setDialog((d) => ({ ...d, open: false }));
+
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
@@ -182,12 +196,20 @@ export default function AdminPage() {
     finally { setErrBusy(false); }
   }
 
-  async function resolveAllErrors() {
-    if (!window.confirm("Mark all unresolved errors as resolved?")) return;
-    setErrBusy(true);
-    try { await api.systemErrors.resolveAll(); await loadErrors(); toast.success("All errors resolved"); }
-    catch { toast.error("Failed"); }
-    finally { setErrBusy(false); }
+  function resolveAllErrors() {
+    setDialog({
+      open: true,
+      title: "Resolve all errors",
+      description: "Mark every unresolved error as resolved? This cannot be undone in bulk.",
+      confirmLabel: "Resolve all",
+      onConfirm: async () => {
+        closeDialog();
+        setErrBusy(true);
+        try { await api.systemErrors.resolveAll(); await loadErrors(); toast.success("All errors resolved"); }
+        catch { toast.error("Failed"); }
+        finally { setErrBusy(false); }
+      },
+    });
   }
 
   const planTotal = useMemo(() => {
@@ -195,63 +217,99 @@ export default function AdminPage() {
     return overview.planCounts.FREE + overview.planCounts.BASIC + overview.planCounts.PRO;
   }, [overview]);
 
-  async function approve(b: Pending) {
-    if (!window.confirm(`Verify "${b.name}"? They'll receive a Verified badge.`)) return;
-    setBusy(b.id);
-    try {
-      await api.adminVerifications.approve(b.id);
-      toast.success(`${b.name} is now verified`);
-      load(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setBusy(null);
-    }
+  function approve(b: Pending) {
+    setDialog({
+      open: true,
+      title: `Verify "${b.name}"?`,
+      description: "They'll receive a Verified badge visible on their public booking page.",
+      confirmLabel: "Approve verification",
+      onConfirm: async () => {
+        closeDialog();
+        setBusy(b.id);
+        try {
+          await api.adminVerifications.approve(b.id);
+          toast.success(`${b.name} is now verified`);
+          load(false);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(null);
+        }
+      },
+    });
   }
 
-  async function reject(b: Pending) {
-    const note = window.prompt(`Reject "${b.name}"? Optional reason the owner will see:`);
-    if (note === null) return;
-    setBusy(b.id);
-    try {
-      await api.adminVerifications.reject(b.id, note || undefined);
-      toast.success("Rejected");
-      load(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setBusy(null);
-    }
+  function reject(b: Pending) {
+    setDialog({
+      open: true,
+      title: `Reject "${b.name}"?`,
+      description: "The business owner will be notified. You can optionally include a reason.",
+      confirmLabel: "Reject",
+      variant: "destructive",
+      inputPlaceholder: "Optional reason the owner will see…",
+      onConfirm: async (note) => {
+        closeDialog();
+        setBusy(b.id);
+        try {
+          await api.adminVerifications.reject(b.id, note || undefined);
+          toast.success("Rejected");
+          load(false);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(null);
+        }
+      },
+    });
   }
 
-  async function toggleSuspend(biz: AdminOverview["recentBusinesses"][0]) {
-    const action = biz.suspended ? "unsuspend" : "suspend";
-    if (!window.confirm(`${action === "suspend" ? "Suspend" : "Unsuspend"} "${biz.name}"? ${action === "suspend" ? "This hides their public booking page." : "This restores their booking page."}`)) return;
-    setBusy(biz.id);
-    try {
-      if (biz.suspended) await api.admin.unsuspendBusiness(biz.id);
-      else await api.admin.suspendBusiness(biz.id);
-      toast.success(`${biz.name} ${action === "suspend" ? "suspended" : "reactivated"}`);
-      load(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setBusy(null);
-    }
+  function toggleSuspend(biz: AdminOverview["recentBusinesses"][0]) {
+    const isSuspending = !biz.suspended;
+    setDialog({
+      open: true,
+      title: isSuspending ? `Suspend "${biz.name}"?` : `Reactivate "${biz.name}"?`,
+      description: isSuspending
+        ? "Their public booking page will be hidden and new bookings will be blocked."
+        : "Their booking page will be restored and new bookings will be allowed.",
+      confirmLabel: isSuspending ? "Suspend business" : "Reactivate business",
+      variant: isSuspending ? "destructive" : "default",
+      onConfirm: async () => {
+        closeDialog();
+        setBusy(biz.id);
+        try {
+          if (biz.suspended) await api.admin.unsuspendBusiness(biz.id);
+          else await api.admin.suspendBusiness(biz.id);
+          toast.success(`${biz.name} ${isSuspending ? "suspended" : "reactivated"}`);
+          load(false);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(null);
+        }
+      },
+    });
   }
 
-  async function dismissDuplicate(id: string, name: string) {
-    if (!window.confirm(`Mark "${name}" as reviewed (not a duplicate)?`)) return;
-    setBusy(id);
-    try {
-      await api.adminVerifications.dismissDuplicate(id);
-      toast.success("Duplicate flag cleared");
-      load(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setBusy(null);
-    }
+  function dismissDuplicate(id: string, name: string) {
+    setDialog({
+      open: true,
+      title: `Clear duplicate flag for "${name}"?`,
+      description: "Mark this account as reviewed — it will no longer appear in the duplicates queue.",
+      confirmLabel: "Clear flag",
+      onConfirm: async () => {
+        closeDialog();
+        setBusy(id);
+        try {
+          await api.adminVerifications.dismissDuplicate(id);
+          toast.success("Duplicate flag cleared");
+          load(false);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(null);
+        }
+      },
+    });
   }
 
   async function changePassword(e: React.FormEvent) {
@@ -291,6 +349,18 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <ConfirmDialog
+        open={dialog.open}
+        title={dialog.title}
+        description={dialog.description}
+        confirmLabel={dialog.confirmLabel}
+        cancelLabel={dialog.cancelLabel}
+        inputPlaceholder={dialog.inputPlaceholder}
+        variant={dialog.variant}
+        onConfirm={dialog.onConfirm}
+        onCancel={closeDialog}
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">

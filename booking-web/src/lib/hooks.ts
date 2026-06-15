@@ -1,11 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 export function useEvents(
   businessId: string | null | undefined,
   onUpdate: (data: unknown) => void,
   onPlanUpdate?: (data: { plan: string; planExpiresAt: string | null }) => void,
-) {
+): { connected: boolean } {
+  const [connected, setConnected] = useState(false);
+
   useEffect(() => {
     if (!businessId) return;
 
@@ -25,8 +27,10 @@ export function useEvents(
         socket = io(apiUrl, { transports: ["websocket"], auth: { ticket } });
 
         socket.on("connect", () => {
+          setConnected(true);
           socket?.emit("joinBusiness", businessId);
         });
+        socket.on("disconnect", () => setConnected(false));
         socket.on("bookingUpdated", (data: unknown) => onUpdate(data));
         socket.on("messageUpdated", (data: unknown) => onUpdate(data));
         socket.on("planUpdated", (data: { plan: string; planExpiresAt: string | null }) => {
@@ -35,15 +39,18 @@ export function useEvents(
       })
       .catch(() => {
         // Not authenticated / ticket unavailable — skip realtime; the UI still
-        // works via normal fetches.
+        // works via normal fetches and the polling fallback stays active.
       });
 
     return () => {
       cancelled = true;
+      setConnected(false);
       if (socket) {
         socket.emit("leaveBusiness", businessId);
         socket.disconnect();
       }
     };
   }, [businessId, onUpdate, onPlanUpdate]);
+
+  return { connected };
 }

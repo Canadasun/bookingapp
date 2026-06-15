@@ -164,7 +164,23 @@ export class GoogleCalendarService {
         grant_type: 'refresh_token',
       }),
     });
-    if (!res.ok) { this.logger.warn(`Google token refresh failed for ${businessId}`); return null; }
+    if (!res.ok) {
+      const status = res.status;
+      this.logger.warn(`Google token refresh failed for ${businessId} (HTTP ${status})`);
+      // Permanent failures (401/400 = revoked or invalid refresh token) surface in
+      // the admin error dashboard so the operator knows the integration is broken.
+      if (status === 401 || status === 400) {
+        await this.prisma.systemError.create({
+          data: {
+            category: 'INTEGRATION',
+            severity: 'WARNING',
+            message: `Google Calendar token refresh permanently failed for business ${businessId} (HTTP ${status}). Owner must reconnect.`,
+            context: { businessId, httpStatus: status },
+          },
+        }).catch(() => {});
+      }
+      return null;
+    }
     const tok = await res.json() as { access_token: string; expires_in: number };
     const expiresAt = new Date(Date.now() + (tok.expires_in - 60) * 1000);
     await this.prisma.googleCalendarConnection.update({
