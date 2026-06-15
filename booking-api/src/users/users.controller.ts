@@ -1,4 +1,10 @@
 import { BadRequestException, Controller, Get, Body, Patch, Post, UseGuards } from '@nestjs/common';
+
+const INTERNAL_UPLOAD = /^\/uploads\/[a-zA-Z0-9-]+$/;
+function isValidAvatarUrl(url: string): boolean {
+  if (INTERNAL_UPLOAD.test(url)) return true;
+  try { return new URL(url).protocol === 'https:'; } catch { return false; }
+}
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -15,6 +21,9 @@ export class UsersController {
 
   @Patch('me')
   updateMe(@CurrentUser() user: { id: string }, @Body() data: { name?: string; phone?: string; avatarUrl?: string | null }) {
+    if (data.avatarUrl != null && !isValidAvatarUrl(data.avatarUrl)) {
+      throw new BadRequestException('avatarUrl must be an https:// URL or an internal /uploads/ path');
+    }
     return this.usersService.update(user.id, {
       ...(typeof data.name === 'string' ? { name: data.name.trim() } : {}),
       ...(typeof data.phone === 'string' ? { phone: data.phone.trim() } : {}),

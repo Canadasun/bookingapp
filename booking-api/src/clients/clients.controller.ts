@@ -57,7 +57,7 @@ export class ClientsController {
       throw new ForbiddenException('Access denied to this business resource');
     }
     const paging = pagination(page, limit);
-    return this.clientService.findAll(businessId, search, paging.page, paging.limit);
+    return this.clientService.findAll(businessId, search?.slice(0, 100), paging.page, paging.limit);
   }
 
   // (Removed) The unauthenticated guest "lookup by email/phone" endpoint was

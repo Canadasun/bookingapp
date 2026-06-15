@@ -15,12 +15,15 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string; role: string; businessId: string | null };
 
+const internalUploadPath = z.string().trim()
+  .refine((v) => /^\/uploads\/[a-zA-Z0-9-]+$/.test(v), 'Must be an internal /uploads/:id path');
+
 const SubmitSchema = z.object({
   legalName: z.string().trim().min(2).max(200),
   address: z.string().trim().min(5).max(500),
   phone: z.string().trim().min(7).max(30),
-  governmentIdUrl: z.string().trim().min(1).max(2048),
-  registrationDocUrl: z.string().trim().min(1).max(2048),
+  governmentIdUrl: internalUploadPath,
+  registrationDocUrl: internalUploadPath,
 });
 const RejectSchema = z.object({ note: z.string().trim().max(500).optional() });
 

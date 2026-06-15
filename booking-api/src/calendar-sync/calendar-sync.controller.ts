@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Param, Query, Req, Res, UseGuards, ForbiddenException, Logger } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CalendarSyncService } from './calendar-sync.service';
@@ -126,6 +127,7 @@ export class CalendarSyncController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 6, ttl: 60000 } })
   async icalFeed(@CurrentUser() user: AuthUser, @Res() res: Response) {
     if (!user.businessId) throw new ForbiddenException('No business on this account');
     const business = await this.prisma.business.findUnique({ where: { id: user.businessId }, select: { name: true } });

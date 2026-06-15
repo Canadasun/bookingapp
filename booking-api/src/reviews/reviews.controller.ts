@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ReviewsService } from './reviews.service';
 import { SubmitReviewSchema, SubmitReviewDto, ModerateReviewSchema, ModerateReviewDto } from './dto/reviews.dto';
@@ -23,6 +24,7 @@ export class ReviewsController {
 
   // Public — submit (from the post-visit email link).
   @Post()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   submit(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(SubmitReviewSchema)) dto: SubmitReviewDto,

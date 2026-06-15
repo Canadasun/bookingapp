@@ -32,7 +32,7 @@ export const CreateBusinessSchema = z.object({
   phone: phoneSchema,
   timezone: z.string().default('America/New_York'),
   address: optionalString(),
-  logoUrl: optionalString(2048),
+  logoUrl: optionalHttpsUrl,
   websiteUrl: optionalHttpsUrl,
   instagramUrl: optionalHttpsUrl,
   facebookUrl: optionalHttpsUrl,

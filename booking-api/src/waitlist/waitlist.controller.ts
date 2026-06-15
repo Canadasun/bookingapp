@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WaitlistService } from './waitlist.service';
 import { JoinWaitlistSchema, JoinWaitlistDto } from './dto/waitlist.dto';
@@ -20,6 +21,7 @@ export class WaitlistController {
 
   // Public — clients join the waitlist from the booking page when no slot fits.
   @Post()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   join(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(JoinWaitlistSchema)) dto: JoinWaitlistDto,
