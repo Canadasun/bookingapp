@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -28,6 +29,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toForm, setToForm] = useState({ startsAt: "", endsAt: "", reason: "" });
+  const [timeOffToDelete, setTimeOffToDelete] = useState<TimeOff | null>(null);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -95,13 +97,14 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
     finally { setSaving(false); }
   }
 
-  async function removeTimeOff(timeOffId: string) {
-    if (!bizId) return;
+  async function doRemoveTimeOff() {
+    if (!bizId || !timeOffToDelete) return;
     try {
-      await api.staff.deleteTimeOff(bizId, id, timeOffId);
+      await api.staff.deleteTimeOff(bizId, id, timeOffToDelete.id);
       toast.success("Removed");
-      setTimeOffs((t) => t.filter((x) => x.id !== timeOffId));
+      setTimeOffs((t) => t.filter((x) => x.id !== timeOffToDelete.id));
     } catch { toast.error("Failed to remove"); }
+    finally { setTimeOffToDelete(null); }
   }
 
   if (loading) return <LoadingSpinner />;
@@ -109,6 +112,15 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="max-w-2xl mx-auto">
+      <ConfirmDialog
+        open={timeOffToDelete !== null}
+        title="Remove time off?"
+        description={timeOffToDelete ? `${new Date(timeOffToDelete.startsAt).toLocaleDateString()} – ${new Date(timeOffToDelete.endsAt).toLocaleDateString()}${timeOffToDelete.reason ? ` · ${timeOffToDelete.reason}` : ""}` : ""}
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={doRemoveTimeOff}
+        onCancel={() => setTimeOffToDelete(null)}
+      />
       <div className="flex items-center gap-3 mb-6">
         <Link href="/dashboard/staff" className="text-gray-400 hover:text-gray-600"><ChevronLeft className="w-5 h-5" /></Link>
         <div>
@@ -131,11 +143,11 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
         <CardContent className="space-y-2">
           {rules.map((rule, i) => (
             <div key={i} className="flex flex-wrap items-center gap-3">
-              <input type="checkbox" checked={rule.enabled} onChange={(e) => setRule(i, { enabled: e.target.checked })}
+              <input id={`avail-${i}`} type="checkbox" checked={rule.enabled} onChange={(e) => setRule(i, { enabled: e.target.checked })}
                 className="accent-violet-600 w-4 h-4 shrink-0" />
-              <span className={cn("w-8 text-sm font-medium shrink-0", rule.enabled ? "text-gray-700" : "text-gray-400")}>
+              <label htmlFor={`avail-${i}`} className={cn("w-8 text-sm font-medium shrink-0 cursor-pointer", rule.enabled ? "text-gray-700" : "text-gray-400")}>
                 {SHORT[i]}
-              </span>
+              </label>
               {rule.enabled ? (
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <Input type="time" value={rule.startTime} className="min-w-0 flex-1 sm:w-28 sm:flex-none"
@@ -158,12 +170,12 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
           <div className="space-y-2">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
-                <Input type="datetime-local" value={toForm.startsAt} onChange={(e) => setToForm((p) => ({ ...p, startsAt: e.target.value }))} />
+                <label htmlFor="timeoff-start" className="block text-xs font-medium text-gray-600 mb-1">From</label>
+                <Input id="timeoff-start" type="datetime-local" value={toForm.startsAt} onChange={(e) => setToForm((p) => ({ ...p, startsAt: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
-                <Input type="datetime-local" value={toForm.endsAt} onChange={(e) => setToForm((p) => ({ ...p, endsAt: e.target.value }))} />
+                <label htmlFor="timeoff-end" className="block text-xs font-medium text-gray-600 mb-1">To</label>
+                <Input id="timeoff-end" type="datetime-local" value={toForm.endsAt} onChange={(e) => setToForm((p) => ({ ...p, endsAt: e.target.value }))} />
               </div>
             </div>
             <Input placeholder="Reason (optional)" value={toForm.reason} onChange={(e) => setToForm((p) => ({ ...p, reason: e.target.value }))} />
@@ -183,7 +195,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
                     </p>
                     {to.reason && <p className="text-xs text-gray-500">{to.reason}</p>}
                   </div>
-                  <button onClick={() => removeTimeOff(to.id)} className="text-gray-400 hover:text-red-600 p-1 rounded">
+                  <button onClick={() => setTimeOffToDelete(to)} aria-label="Remove time off" className="text-gray-400 hover:text-red-600 p-1 rounded">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

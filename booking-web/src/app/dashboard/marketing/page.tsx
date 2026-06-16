@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const AUDIENCES: { value: CampaignAudience; label: string; hint: string }[] = [
   { value: "ALL", label: "All clients", hint: "Everyone with a contact on file" },
@@ -23,6 +24,8 @@ export default function MarketingPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [composing, setComposing] = useState(false);
+  const [campaignToSend, setCampaignToSend] = useState<Campaign | null>(null);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
@@ -36,23 +39,42 @@ export default function MarketingPage() {
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
 
-  async function send(c: Campaign) {
-    if (!confirm(`Send "${c.name}" now? This can't be undone.`)) return;
+  async function doSend() {
+    if (!campaignToSend) return;
     try {
-      const res = await api.campaigns.send(bizId, c.id);
+      const res = await api.campaigns.send(bizId, campaignToSend.id);
       toast.success(`Sending to ${res.recipientCount} client${res.recipientCount === 1 ? "" : "s"}`);
+      setCampaignToSend(null);
       load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Send failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Send failed"); setCampaignToSend(null); }
   }
 
-  async function remove(c: Campaign) {
-    if (!confirm(`Delete "${c.name}"?`)) return;
-    try { await api.campaigns.remove(bizId, c.id); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  async function doRemove() {
+    if (!campaignToDelete) return;
+    try { await api.campaigns.remove(bizId, campaignToDelete.id); setCampaignToDelete(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setCampaignToDelete(null); }
   }
 
   return (
     <div className="max-w-3xl mx-auto">
+      <ConfirmDialog
+        open={campaignToSend !== null}
+        title={`Send "${campaignToSend?.name}" now?`}
+        description="This will send the message to all matching clients immediately. This cannot be undone."
+        confirmLabel="Send campaign"
+        variant="destructive"
+        onConfirm={doSend}
+        onCancel={() => setCampaignToSend(null)}
+      />
+      <ConfirmDialog
+        open={campaignToDelete !== null}
+        title={`Delete "${campaignToDelete?.name}"?`}
+        description="This draft will be permanently deleted."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={doRemove}
+        onCancel={() => setCampaignToDelete(null)}
+      />
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Marketing</h2>
@@ -95,8 +117,8 @@ export default function MarketingPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     {c.status === "DRAFT" && (
                       <>
-                        <button onClick={() => send(c)} className="text-violet-600 hover:bg-violet-50 p-2 rounded-lg" title="Send now"><Send className="w-4 h-4" /></button>
-                        <button onClick={() => remove(c)} className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setCampaignToSend(c)} aria-label="Send campaign now" className="text-violet-600 hover:bg-violet-50 p-2 rounded-lg"><Send className="w-4 h-4" /></button>
+                        <button onClick={() => setCampaignToDelete(c)} aria-label="Delete campaign" className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </>
                     )}
                     {c.status === "SENT" && <Check className="w-5 h-5 text-emerald-500" />}
@@ -125,7 +147,7 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
   const [channel, setChannel] = useState<CampaignChannel>("EMAIL");
   const [audience, setAudience] = useState<CampaignAudience>("ALL");
   const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("Hi {name}, ");
+  const [body, setBody] = useState("Hi {{name}}, ");
   const [count, setCount] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -185,7 +207,14 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
           <textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)}
             className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400"
             placeholder="Your message…" />
-          <p className="text-[11px] text-gray-400 mt-1">Use <code className="bg-gray-100 px-1 rounded">{"{name}"}</code> and <code className="bg-gray-100 px-1 rounded">{"{business}"}</code> as merge tags.</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-[11px] text-gray-400">Use <code className="bg-gray-100 px-1 rounded">{"{{name}}"}</code> and <code className="bg-gray-100 px-1 rounded">{"{{business}}"}</code> as merge tags.</p>
+            {channel === "SMS" && (
+              <p className={`text-[11px] tabular-nums shrink-0 ml-2 ${body.length > 160 ? "text-amber-600 font-semibold" : "text-gray-400"}`}>
+                {body.length} / 160 · {Math.ceil(body.length / 160) || 1} segment{Math.ceil(body.length / 160) > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between pt-1">

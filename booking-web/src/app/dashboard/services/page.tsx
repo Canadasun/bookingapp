@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SkeletonList } from "@/components/Skeleton";
 import { formatPrice, cn } from "@/lib/utils";
 import { OwnerOnly } from "@/components/OwnerOnly";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const COLORS = [
   "#E9A23C","#EFAA44","#8b5cf6","#ec4899","#f43f5e",
@@ -350,6 +351,9 @@ export default function ServicesPage() {
   const [showResources, setShowResources] = useState(false);
   const [editingResource, setEditingResource] = useState<{ id: string; name: string } | null>(null);
   const [savingResource, setSavingResource] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<ServiceCategory | null>(null);
+  const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -379,15 +383,16 @@ export default function ServicesPage() {
     catch { toast.error("Failed to update"); }
   }
 
-  async function deleteService(svc: Service) {
-    if (!bizId) return;
-    if (!confirm(`Delete "${svc.name}"? This cannot be undone.`)) return;
+  async function doDeleteService() {
+    if (!bizId || !serviceToDelete) return;
     try {
-      await api.services.remove(bizId, svc.id);
+      await api.services.remove(bizId, serviceToDelete.id);
       toast.success("Service deleted");
+      setServiceToDelete(null);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed");
+      setServiceToDelete(null);
     }
   }
 
@@ -399,11 +404,10 @@ export default function ServicesPage() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
     finally { setSavingResource(false); }
   }
-  async function removeResource(r: Resource) {
-    if (!bizId) return;
-    if (!confirm(`Delete "${r.name}"? Services using it will lose their room assignment.`)) return;
-    try { await api.resources.remove(bizId, r.id); load(); }
-    catch { toast.error("Failed to delete"); }
+  async function doRemoveResource() {
+    if (!bizId || !resourceToDelete) return;
+    try { await api.resources.remove(bizId, resourceToDelete.id); setResourceToDelete(null); load(); }
+    catch { toast.error("Failed to delete"); setResourceToDelete(null); }
   }
   async function toggleResourceActive(r: Resource) {
     if (!bizId) return;
@@ -420,11 +424,10 @@ export default function ServicesPage() {
     finally { setSavingResource(false); }
   }
 
-  async function deleteCategory(cat: ServiceCategory) {
-    if (!bizId) return;
-    if (!confirm(`Delete "${cat.name}"? Services in this category will become uncategorised.`)) return;
-    try { await api.serviceCategories.remove(bizId, cat.id); toast.success("Category deleted"); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
+  async function doDeleteCategory() {
+    if (!bizId || !categoryToDelete) return;
+    try { await api.serviceCategories.remove(bizId, categoryToDelete.id); toast.success("Category deleted"); setCategoryToDelete(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); setCategoryToDelete(null); }
   }
 
   // Group services: by category, then uncategorised
@@ -437,6 +440,33 @@ export default function ServicesPage() {
 
   return (
     <OwnerOnly>
+      <ConfirmDialog
+        open={serviceToDelete !== null}
+        title={`Delete "${serviceToDelete?.name}"?`}
+        description="This cannot be undone."
+        confirmLabel="Delete service"
+        variant="destructive"
+        onConfirm={doDeleteService}
+        onCancel={() => setServiceToDelete(null)}
+      />
+      <ConfirmDialog
+        open={categoryToDelete !== null}
+        title={`Delete "${categoryToDelete?.name}"?`}
+        description="Services in this category will become uncategorised."
+        confirmLabel="Delete category"
+        variant="destructive"
+        onConfirm={doDeleteCategory}
+        onCancel={() => setCategoryToDelete(null)}
+      />
+      <ConfirmDialog
+        open={resourceToDelete !== null}
+        title={`Delete "${resourceToDelete?.name}"?`}
+        description="Services using it will lose their room assignment."
+        confirmLabel="Delete resource"
+        variant="destructive"
+        onConfirm={doRemoveResource}
+        onCancel={() => setResourceToDelete(null)}
+      />
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
@@ -460,6 +490,7 @@ export default function ServicesPage() {
         {/* Rooms & resources */}
         <div className="mb-5 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
           <button onClick={() => setShowResources((s) => !s)}
+            aria-label={showResources ? "Hide rooms and resources" : "Manage rooms and resources"}
             className="flex w-full items-center justify-between px-4 py-3 text-left">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-900">Rooms &amp; resources</span>
@@ -540,7 +571,7 @@ export default function ServicesPage() {
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => removeResource(r)}
+                              onClick={() => setResourceToDelete(r)}
                               title="Delete"
                               className="p-1 text-gray-400 hover:text-red-600 rounded">
                               <Trash2 className="w-3.5 h-3.5" />
@@ -605,7 +636,7 @@ export default function ServicesPage() {
                         className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => deleteCategory(cat)}
+                      <button onClick={() => setCategoryToDelete(cat)}
                         className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -619,7 +650,7 @@ export default function ServicesPage() {
                         <ServiceRow key={svc.id} svc={svc}
                           onEdit={() => { setEditSvc(svc); setSvcModal(true); }}
                           onToggle={() => toggleActive(svc)}
-                          onDelete={() => deleteService(svc)} />
+                          onDelete={() => setServiceToDelete(svc)} />
                       ))}
                     </div>
                   )}
@@ -640,7 +671,7 @@ export default function ServicesPage() {
                     <ServiceRow key={svc.id} svc={svc}
                       onEdit={() => { setEditSvc(svc); setSvcModal(true); }}
                       onToggle={() => toggleActive(svc)}
-                      onDelete={() => deleteService(svc)} />
+                      onDelete={() => setServiceToDelete(svc)} />
                   ))}
                 </div>
               </div>
@@ -657,7 +688,7 @@ export default function ServicesPage() {
                     className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => deleteCategory(cat)}
+                  <button onClick={() => setCategoryToDelete(cat)}
                     className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -717,7 +748,8 @@ function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
         </div>
       </div>
       <div className="flex gap-1 shrink-0">
-        <button onClick={onToggle} title={svc.active ? "Hide" : "Show"}
+        <button onClick={onToggle}
+          aria-label={svc.active ? `Hide ${svc.name}` : `Show ${svc.name}`}
           className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
           {svc.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </button>

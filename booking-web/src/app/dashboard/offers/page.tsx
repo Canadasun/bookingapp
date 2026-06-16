@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Offer { id: string; title: string; description: string; discount?: string; expiresAt?: string; active: boolean }
 const EMPTY = { title: "", description: "", discount: "", expiresAt: "" };
@@ -23,6 +24,7 @@ export default function OffersPage() {
   const [editing, setEditing] = useState<Offer | null>(null);
   const [form, setForm]       = useState(EMPTY);
   const [saving, setSaving]   = useState(false);
+  const [offerToDelete, setOfferToDelete] = useState<Offer | null>(null);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -62,15 +64,23 @@ export default function OffersPage() {
     finally { setSaving(false); }
   }
 
-  async function remove(id: string) {
-    if (!bizId) return;
-    if (!confirm("Remove this offer?")) return;
-    try { await api.offers.remove(bizId, id); toast.success("Removed"); load(); }
-    catch { toast.error("Failed"); }
+  async function doRemove() {
+    if (!bizId || !offerToDelete) return;
+    try { await api.offers.remove(bizId, offerToDelete.id); toast.success("Removed"); setOfferToDelete(null); load(); }
+    catch { toast.error("Failed"); setOfferToDelete(null); }
   }
 
   return (
     <div className="max-w-3xl mx-auto">
+      <ConfirmDialog
+        open={offerToDelete !== null}
+        title={`Remove "${offerToDelete?.title}"?`}
+        description="This offer will be removed from the client portal."
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={doRemove}
+        onCancel={() => setOfferToDelete(null)}
+      />
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Offers &amp; Promotions</h2>
@@ -112,7 +122,7 @@ export default function OffersPage() {
                   <button onClick={() => openEdit(o)} aria-label="Edit" className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => remove(o.id)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+                  <button onClick={() => setOfferToDelete(o)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -142,8 +152,8 @@ export default function OffersPage() {
                 { k: "expiresAt",   label: "Expires (optional)",   type: "datetime-local", ph: "" },
               ].map(({ k, label, type, ph }, index) => (
                 <div key={k}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <Input type={type} placeholder={ph} value={form[k as keyof typeof form]}
+                  <label htmlFor={`offer-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                  <Input id={`offer-${k}`} type={type} placeholder={ph} value={form[k as keyof typeof form]}
                     autoFocus={index === 0}
                     onChange={(e) => setForm((p) => ({ ...p, [k]: e.target.value }))} />
                 </div>

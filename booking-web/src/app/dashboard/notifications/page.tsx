@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Filter = "all" | "unread" | NotificationKind;
 type View = "inbox" | "deliveries" | "templates" | "devices";
@@ -59,6 +60,8 @@ export default function NotificationsPage() {
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>("ALL");
   const [deliveryChannel, setDeliveryChannel] = useState<DeliveryChannel>("ALL");
   const [deliverySearch, setDeliverySearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showClearHistory, setShowClearHistory] = useState(false);
   const [devices, setDevices] = useState<DeviceToken[]>([]);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [preview, setPreview] = useState<{ title: string; desc: string; body: string } | null>(null);
@@ -68,6 +71,11 @@ export default function NotificationsPage() {
     const u = getUser();
     if (u?.businessId) api.business.get(u.businessId).then((b) => setBizName(b.name)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(deliverySearch), 300);
+    return () => clearTimeout(t);
+  }, [deliverySearch]);
 
   // Fill the {{tokens}} with realistic sample data so the owner sees exactly what
   // a client receives.
@@ -94,13 +102,13 @@ export default function NotificationsPage() {
       setDeliveries(await api.notifications.deliveries({
         status: deliveryStatus,
         channel: deliveryChannel,
-        search: deliverySearch,
+        search: debouncedSearch,
         limit: 100,
       }));
     }
     catch { /* delivery log errors are non-critical; silently reset to empty */ setDeliveries([]); }
     finally { setLogsLoading(false); }
-  }, [deliveryChannel, deliverySearch, deliveryStatus]);
+  }, [deliveryChannel, debouncedSearch, deliveryStatus]);
 
   useEffect(() => { load(); loadDeliveries(); }, [load, loadDeliveries]);
 
@@ -127,7 +135,6 @@ export default function NotificationsPage() {
   }
 
   async function clearHistory() {
-    if (!confirm("Clear your notification history? This cannot be undone.")) return;
     try {
       await api.notifications.clear();
       setItems([]);
@@ -147,6 +154,15 @@ export default function NotificationsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
+      <ConfirmDialog
+        open={showClearHistory}
+        title="Clear notification history?"
+        description="All notifications will be permanently removed. This cannot be undone."
+        confirmLabel="Clear history"
+        variant="destructive"
+        onConfirm={() => { setShowClearHistory(false); clearHistory(); }}
+        onCancel={() => setShowClearHistory(false)}
+      />
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Notifications</h2>
@@ -156,7 +172,7 @@ export default function NotificationsPage() {
         </div>
         <div className="flex gap-2">
           {unread > 0 && <Button variant="outline" size="sm" onClick={markAll}><CheckCheck className="w-4 h-4 mr-1.5" /> Mark all read</Button>}
-          {items.length > 0 && <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7" onClick={clearHistory}><Trash2 className="w-4 h-4 mr-1.5" /> Clear history</Button>}
+          {items.length > 0 && <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7" onClick={() => setShowClearHistory(true)}><Trash2 className="w-4 h-4 mr-1.5" /> Clear history</Button>}
         </div>
       </div>
 
@@ -363,13 +379,13 @@ export default function NotificationsPage() {
 
       {/* Template preview — shows the message rendered with realistic data */}
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setPreview(null)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="template-preview-title">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setPreview(null)} />
           <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-violet-500" />
-                <p className="text-sm font-semibold text-gray-900">{preview.title}</p>
+                <p id="template-preview-title" className="text-sm font-semibold text-gray-900">{preview.title}</p>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">{preview.desc}</p>
             </div>

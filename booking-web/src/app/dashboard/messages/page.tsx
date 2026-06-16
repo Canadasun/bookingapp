@@ -26,10 +26,16 @@ export default function MessagesPage() {
   const [filter, setFilter]     = useState<"all" | "unread" | "archived">("all");
   const [channel, setChannel]   = useState<"ALL" | "IN_APP" | "SMS">("ALL");
   const [search, setSearch]     = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const loadThreads = useCallback(async () => {
     if (!bizId) {
@@ -38,12 +44,12 @@ export default function MessagesPage() {
     }
     setLoadError("");
     try {
-      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: search.trim() || undefined, channel: channel !== "ALL" ? channel : undefined });
+      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: debouncedSearch.trim() || undefined, channel: channel !== "ALL" ? channel : undefined });
       setThreads(threadData);
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load messages"); }
     finally { setLoading(false); }
-  }, [bizId, filter, channel, search]);
+  }, [bizId, filter, channel, debouncedSearch]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
@@ -65,7 +71,7 @@ export default function MessagesPage() {
       setThreads((prev) => prev.map((thread) => thread.clientId === t.clientId ? { ...thread, read:true, unreadCount:0 } : thread));
       loadThreads();
     } catch (e) { setThreadError(e instanceof Error ? e.message : "Failed to load thread"); }
-    setTimeout(() => scrollRef.current?.scrollTo({ top: 9999 }), 80);
+    setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 80);
   }
 
   async function send() {
@@ -76,7 +82,7 @@ export default function MessagesPage() {
       setReply("");
       const data = await api.messages.thread(bizId, selected.clientId);
       setMsgs(data);
-      setTimeout(() => scrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 50);
+      setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), 50);
       // Surface how the reply was delivered (in-app always; SMS for Basic+ when eligible).
       if (res?.sms?.sent) toast.success("Sent and texted to the client");
       else if (res?.sms?.reason === "client_must_text_first") toast.success("Sent in-app. SMS is available after the client texts first.");
@@ -198,7 +204,7 @@ export default function MessagesPage() {
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-2 py-1 shrink-0">
                 <Mail className="w-3 h-3" /> In-app · <Smartphone className="w-3 h-3" /> SMS
               </span>
-              <button onClick={() => setSelectedArchived(!selected.archived)} className="text-xs font-semibold text-gray-500 hover:text-red-600">
+              <button onClick={() => setSelectedArchived(!selected.archived)} aria-label={selected.archived ? "Restore conversation" : "Archive conversation"} className="text-xs font-semibold text-gray-500 hover:text-red-600">
                 {selected.archived ? "Restore" : "Archive"}
               </button>
             </div>
@@ -233,18 +239,16 @@ export default function MessagesPage() {
 
             {/* Compose */}
             <div className="dashboard-safe-bottom px-3 sm:px-4 py-3 border-t border-gray-100 flex items-end gap-2">
-              <>
-                  <Input
-                    placeholder="Type a reply…"
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    className="flex-1"
-                  />
-                  <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()} aria-label="Send message">
-                    <Send className="w-4 h-4" />
-                  </Button>
-              </>
+              <Input
+                placeholder="Type a reply…"
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()} aria-label="Send message">
+                <Send className="w-4 h-4" />
+              </Button>
             </div>
           </>
         )}

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function PackagesPage() {
   const [tab, setTab] = useState<"products" | "issued">("products");
@@ -22,6 +23,8 @@ export default function PackagesPage() {
   const [loadError, setLoadError] = useState("");
   const [creating, setCreating] = useState(false);
   const [issuing, setIssuing] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Package | null>(null);
+  const [cpToVoid, setCpToVoid] = useState<ClientPackage | null>(null);
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
@@ -43,23 +46,41 @@ export default function PackagesPage() {
 
   const svcName = (id?: string | null) => services.find((s) => s.id === id)?.name ?? "Any service";
 
-  async function removeProduct(p: Package) {
-    if (!confirm(`Delete package "${p.name}"? Already-issued packages are kept.`)) return;
-    try { await api.packages.remove(bizId, p.id); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  async function doRemoveProduct() {
+    if (!productToDelete) return;
+    try { await api.packages.remove(bizId, productToDelete.id); setProductToDelete(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setProductToDelete(null); }
   }
   async function redeem(cp: ClientPackage) {
     try { const r = await api.packages.redeem(bizId, cp.id); toast.success(`Credit used — ${r.creditsRemaining} left`); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
   }
-  async function voidCP(cp: ClientPackage) {
-    if (!confirm(`Void ${cp.client?.name ?? "client"}'s "${cp.name}"?`)) return;
-    try { await api.packages.void(bizId, cp.id); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  async function doVoidCP() {
+    if (!cpToVoid) return;
+    try { await api.packages.void(bizId, cpToVoid.id); setCpToVoid(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setCpToVoid(null); }
   }
 
   return (
     <div className="max-w-3xl mx-auto">
+      <ConfirmDialog
+        open={productToDelete !== null}
+        title={`Delete "${productToDelete?.name}"?`}
+        description="Already-issued packages are kept. Only the product template is removed."
+        confirmLabel="Delete package"
+        variant="destructive"
+        onConfirm={doRemoveProduct}
+        onCancel={() => setProductToDelete(null)}
+      />
+      <ConfirmDialog
+        open={cpToVoid !== null}
+        title={`Void ${cpToVoid?.client?.name ?? "client"}'s "${cpToVoid?.name}"?`}
+        description="The remaining credits will be cancelled."
+        confirmLabel="Void"
+        variant="destructive"
+        onConfirm={doVoidCP}
+        onCancel={() => setCpToVoid(null)}
+      />
       <div className="mb-5">
         <h2 className="text-xl font-bold text-gray-900">Packages</h2>
         <p className="text-sm text-gray-500">Sell prepaid session bundles, then redeem credits as clients visit.</p>
@@ -105,7 +126,7 @@ export default function PackagesPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-gray-900">{formatPrice(p.priceCents)}</p>
-                    <button onClick={() => removeProduct(p)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1"><Trash2 className="w-3 h-3" /> Delete</button>
+                    <button onClick={() => setProductToDelete(p)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1"><Trash2 className="w-3 h-3" /> Delete</button>
                   </div>
                 </CardContent>
               </Card>
@@ -136,7 +157,7 @@ export default function PackagesPage() {
                       {cp.status === "ACTIVE" && (
                         <div className="flex gap-2 justify-end mt-1.5">
                           <button onClick={() => redeem(cp)} className="text-xs text-violet-600 hover:underline font-medium">Use credit</button>
-                          <button onClick={() => voidCP(cp)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1"><Ban className="w-3 h-3" /></button>
+                          <button onClick={() => setCpToVoid(cp)} aria-label="Void package" className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1"><Ban className="w-3 h-3" /></button>
                         </div>
                       )}
                     </div>
@@ -187,16 +208,16 @@ function ProductForm({ bizId, services, onDone, onCancel }: { bizId: string; ser
         <Input placeholder="Package name, e.g. “5x Haircut”" value={name} onChange={(e) => setName(e.target.value)} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label className="text-xs font-medium text-gray-500">Credits</label>
-            <Input type="number" min={1} value={credits} onChange={(e) => setCredits(e.target.value)} />
+            <label htmlFor="pkg-credits" className="text-xs font-medium text-gray-500">Credits</label>
+            <Input id="pkg-credits" type="number" min={1} value={credits} onChange={(e) => setCredits(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500">Price ($)</label>
-            <Input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
+            <label htmlFor="pkg-price" className="text-xs font-medium text-gray-500">Price ($)</label>
+            <Input id="pkg-price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-500">Service</label>
-            <select value={serviceId} onChange={(e) => setServiceId(e.target.value)}
+            <label htmlFor="pkg-service" className="text-xs font-medium text-gray-500">Service</label>
+            <select id="pkg-service" value={serviceId} onChange={(e) => setServiceId(e.target.value)}
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 bg-white">
               <option value="">Any service</option>
               {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

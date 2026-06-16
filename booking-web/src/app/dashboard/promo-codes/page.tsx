@@ -8,6 +8,7 @@ import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function PromoCodesPage() {
   const bizId = getUser()?.businessId ?? "";
@@ -15,6 +16,7 @@ export default function PromoCodesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [codeToDelete, setCodeToDelete] = useState<PromoCode | null>(null);
   const [form, setForm] = useState({ code: "", discountType: "PERCENT" as "PERCENT" | "FLAT", discountValue: "", maxUsages: "", expiresAt: "" });
 
   const load = useCallback(async () => {
@@ -28,7 +30,7 @@ export default function PromoCodesPage() {
   async function create(e: React.FormEvent) {
     e.preventDefault();
     if (!form.code.trim()) { toast.error("Code is required"); return; }
-    const val = parseInt(form.discountValue, 10);
+    const val = parseFloat(form.discountValue);
     if (!val || val <= 0) { toast.error("Enter a valid discount value"); return; }
     if (form.discountType === "PERCENT" && val > 100) { toast.error("Percentage must be 0–100"); return; }
     try {
@@ -53,19 +55,20 @@ export default function PromoCodesPage() {
     } catch { toast.error("Failed to update"); }
   }
 
-  async function remove(pc: PromoCode) {
-    if (!confirm(`Delete promo code "${pc.code}"?`)) return;
+  async function doRemove() {
+    if (!codeToDelete) return;
     try {
-      await api.promoCodes.remove(bizId!, pc.id);
-      setCodes(p => p.filter(c => c.id !== pc.id));
+      await api.promoCodes.remove(bizId!, codeToDelete.id);
+      setCodes(p => p.filter(c => c.id !== codeToDelete.id));
+      setCodeToDelete(null);
       toast.success("Deleted");
-    } catch { toast.error("Failed to delete"); }
+    } catch { toast.error("Failed to delete"); setCodeToDelete(null); }
   }
 
   function copyCode(code: string) {
-    navigator.clipboard.writeText(code);
-    setCopied(code);
-    setTimeout(() => setCopied(null), 1500);
+    navigator.clipboard.writeText(code)
+      .then(() => { setCopied(code); setTimeout(() => setCopied(null), 1500); })
+      .catch(() => toast.error("Could not copy code"));
   }
 
   function fmtDiscount(pc: PromoCode) {
@@ -76,6 +79,15 @@ export default function PromoCodesPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      <ConfirmDialog
+        open={codeToDelete !== null}
+        title={`Delete promo code "${codeToDelete?.code}"?`}
+        description="Any existing uses are already counted but new redemptions will no longer work."
+        confirmLabel="Delete code"
+        variant="destructive"
+        onConfirm={doRemove}
+        onCancel={() => setCodeToDelete(null)}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Tag className="w-6 h-6 text-violet-600" /> Promo Codes</h1>
@@ -144,10 +156,10 @@ export default function PromoCodesPage() {
                   {pc.expiresAt ? ` · expires ${new Date(pc.expiresAt).toLocaleDateString()}` : ""}
                 </p>
               </div>
-              <button onClick={() => toggle(pc)} className="text-gray-400 hover:text-violet-600" title={pc.active ? "Deactivate" : "Activate"}>
+              <button onClick={() => toggle(pc)} aria-label={pc.active ? "Deactivate promo code" : "Activate promo code"} className="text-gray-400 hover:text-violet-600">
                 {pc.active ? <ToggleRight className="w-5 h-5 text-violet-600" /> : <ToggleLeft className="w-5 h-5" />}
               </button>
-              <button onClick={() => remove(pc)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => setCodeToDelete(pc)} aria-label="Delete promo code" className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
         </div>

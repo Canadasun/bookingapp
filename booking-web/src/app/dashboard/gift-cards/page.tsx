@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function GiftCardsPage() {
   const [cards, setCards] = useState<GiftCard[]>([]);
@@ -19,6 +20,7 @@ export default function GiftCardsPage() {
   const [loadError, setLoadError] = useState("");
   const [mode, setMode] = useState<null | "issue" | "redeem">(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [cardToVoid, setCardToVoid] = useState<GiftCard | null>(null);
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
@@ -32,20 +34,31 @@ export default function GiftCardsPage() {
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
 
-  async function voidCard(c: GiftCard) {
-    if (!confirm(`Void gift card ${c.code}? Its remaining balance can no longer be used.`)) return;
-    try { await api.giftCards.void(bizId, c.id); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  async function doVoidCard() {
+    if (!cardToVoid) return;
+    try { await api.giftCards.void(bizId, cardToVoid.id); setCardToVoid(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setCardToVoid(null); }
   }
 
   function copy(code: string) {
-    navigator.clipboard.writeText(code).then(() => { setCopied(code); setTimeout(() => setCopied(null), 1500); });
+    navigator.clipboard.writeText(code)
+      .then(() => { setCopied(code); setTimeout(() => setCopied(null), 1500); })
+      .catch(() => toast.error("Could not copy to clipboard"));
   }
 
   const outstanding = cards.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + c.balanceCents, 0);
 
   return (
     <div className="max-w-3xl mx-auto">
+      <ConfirmDialog
+        open={cardToVoid !== null}
+        title={`Void gift card ${cardToVoid?.code}?`}
+        description="Its remaining balance can no longer be used."
+        confirmLabel="Void card"
+        variant="destructive"
+        onConfirm={doVoidCard}
+        onCancel={() => setCardToVoid(null)}
+      />
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Gift cards</h2>
@@ -98,7 +111,7 @@ export default function GiftCardsPage() {
                     <p className="text-lg font-bold text-gray-900">{formatPrice(c.balanceCents)}</p>
                     <p className="text-xs text-gray-400">of {formatPrice(c.initialCents)}</p>
                     {c.status === "ACTIVE" && (
-                      <button onClick={() => voidCard(c)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1.5">
+                      <button onClick={() => setCardToVoid(c)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1.5">
                         <Ban className="w-3 h-3" /> Void
                       </button>
                     )}
@@ -150,12 +163,12 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
     <Card className="border-violet-200">
       <CardContent className="py-5 space-y-3">
         <div>
-          <label className="text-xs font-medium text-gray-500">Amount ($)</label>
-          <Input type="number" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <label htmlFor="gc-issue-amount" className="text-xs font-medium text-gray-500">Amount ($)</label>
+          <Input id="gc-issue-amount" type="number" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input placeholder="Recipient name (optional)" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
-          <Input type="email" placeholder="Recipient email (optional)" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} />
+          <Input aria-label="Recipient name (optional)" placeholder="Recipient name (optional)" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
+          <Input aria-label="Recipient email (optional)" type="email" placeholder="Recipient email (optional)" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} />
         </div>
         <textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)}
           className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400"
@@ -212,8 +225,8 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
           </p>
         )}
         <div>
-          <label className="text-xs font-medium text-gray-500">Amount to redeem ($)</label>
-          <Input type="number" min={0} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <label htmlFor="gc-redeem-amount" className="text-xs font-medium text-gray-500">Amount to redeem ($)</label>
+          <Input id="gc-redeem-amount" type="number" min={0} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>

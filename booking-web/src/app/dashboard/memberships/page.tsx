@@ -8,6 +8,7 @@ import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Tab = "plans" | "members";
 
@@ -24,6 +25,7 @@ export default function MembershipsPage() {
   const [showEnrollForm, setShowEnrollForm] = useState(false);
   const [enrollForm, setEnrollForm] = useState({ clientId: "", planId: "" });
   const [enrolling, setEnrolling] = useState(false);
+  const [memberToCancel, setMemberToCancel] = useState<MembershipMember | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -78,19 +80,25 @@ export default function MembershipsPage() {
   }
 
   async function togglePlan(plan: MembershipPlan) {
+    const prev = plan.active;
+    setPlans(p => p.map(x => x.id === plan.id ? { ...x, active: !x.active } : x));
     try {
       const updated = await api.memberships.updatePlan(bizId!, plan.id, { active: !plan.active });
       setPlans(p => p.map(x => x.id === plan.id ? updated : x));
-    } catch { toast.error("Failed"); }
+    } catch (e) {
+      setPlans(p => p.map(x => x.id === plan.id ? { ...x, active: prev } : x));
+      toast.error(e instanceof Error ? e.message : "Failed to update plan");
+    }
   }
 
-  async function cancelMembership(m: MembershipMember) {
-    if (!confirm(`Cancel ${m.client.name}'s ${m.plan.name} membership?`)) return;
+  async function doCancelMembership() {
+    if (!memberToCancel) return;
     try {
-      await api.memberships.cancel(bizId!, m.id);
+      await api.memberships.cancel(bizId!, memberToCancel.id);
+      setMemberToCancel(null);
       await load();
       toast.success("Membership will cancel at the end of the billing period");
-    } catch { toast.error("Failed to cancel"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to cancel"); setMemberToCancel(null); }
   }
 
   async function enrollClient(e: React.FormEvent) {
@@ -114,6 +122,15 @@ export default function MembershipsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <ConfirmDialog
+        open={memberToCancel !== null}
+        title={`Cancel ${memberToCancel?.client.name}'s membership?`}
+        description={`Their ${memberToCancel?.plan.name} plan will remain active until the end of the current billing period.`}
+        confirmLabel="Cancel membership"
+        variant="destructive"
+        onConfirm={doCancelMembership}
+        onCancel={() => setMemberToCancel(null)}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Crown className="w-6 h-6 text-amber-500" /> Memberships</h1>
@@ -237,7 +254,7 @@ export default function MembershipsPage() {
                     {m.client.email && <p className="text-xs text-gray-400">{m.client.email}</p>}
                   </div>
                   {m.status === "ACTIVE" && !m.cancelAtPeriodEnd && (
-                    <button onClick={() => cancelMembership(m)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                    <button onClick={() => setMemberToCancel(m)} aria-label="Cancel membership" className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
                   )}
                 </div>
               ))}

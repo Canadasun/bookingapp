@@ -23,7 +23,7 @@ const NEXT_STATUS: Record<Invoice["status"], { label: string; to: Invoice["statu
 type LineItem = { description: string; quantity: number; unitCents: number };
 
 function money(cents: number, currency: string) {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency: currency as "CAD" }).format(cents / 100);
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: currency as "CAD" | "USD" }).format(cents / 100);
 }
 
 function StatusBadge({ status }: { status: Invoice["status"] }) {
@@ -180,7 +180,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       <div ref={printRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm print:shadow-none print:border-0 print:rounded-none overflow-hidden">
 
         {/* Header band */}
-        <div className="bg-amber-500 px-8 py-7 flex items-start justify-between gap-4">
+        <div className="px-8 py-7 flex items-start justify-between gap-4" style={{ backgroundColor: biz?.brandColor ?? "#f59e0b" }}>
           <div className="flex items-center gap-3">
             {biz?.logoUrl
               // eslint-disable-next-line @next/next/no-img-element
@@ -290,7 +290,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       className="h-7 text-xs text-right"
                     />
                     <span className="text-xs text-gray-500 text-right">{money(li.quantity * li.unitCents, curr)}</span>
-                    <button onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-400 transition-colors">
+                    <button onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} aria-label="Remove line item" className="text-gray-300 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

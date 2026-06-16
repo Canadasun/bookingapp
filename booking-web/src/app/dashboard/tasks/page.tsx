@@ -161,7 +161,7 @@ function TaskRow({ t, isOwner, onToggle, onRemove }: { t: TaskItem; isOwner: boo
           aria-label={t.status === "DONE" ? "Reopen task" : "Mark task done"}
           className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
             t.status === "DONE" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300 text-transparent hover:border-violet-400")}>
-          {t.status === "DONE" ? <Check className="w-3.5 h-3.5" /> : <Circle className="w-0 h-0" />}
+          {t.status === "DONE" && <Check className="w-3.5 h-3.5" />}
         </button>
         <div className="flex-1 min-w-0">
           <p className={cn("text-sm font-medium text-gray-900", t.status === "DONE" && "line-through text-gray-400")}>{t.title}</p>

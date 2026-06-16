@@ -38,8 +38,12 @@ export default function ReviewsPage() {
   useEffect(() => { load(); }, [load]);
 
   async function toggle(r: R) {
-    try { await api.reviews.moderate(bizId, r.id, !r.published); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    setReviews((prev) => prev.map((x) => x.id === r.id ? { ...x, published: !x.published } : x));
+    try { await api.reviews.moderate(bizId, r.id, !r.published); }
+    catch (e) {
+      setReviews((prev) => prev.map((x) => x.id === r.id ? { ...x, published: r.published } : x));
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
   }
 
   const published = reviews.filter((r) => r.published);
@@ -91,7 +95,7 @@ export default function ReviewsPage() {
               <CardContent className="py-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Public rating</p>
                 <div className="mt-3 flex items-end gap-2">
-                  <span className="text-5xl font-bold text-gray-900">{avg.toFixed(1)}</span>
+                  <span className="text-5xl font-bold text-gray-900">{published.length === 0 ? "—" : avg.toFixed(1)}</span>
                   <span className="pb-2 text-sm text-gray-400">/ 5</span>
                 </div>
                 <div className="mt-2 flex">
@@ -131,7 +135,7 @@ export default function ReviewsPage() {
                       </div>
                       <p className="text-xs text-gray-400 mt-1">{format(new Date(r.createdAt), "MMM d, yyyy")}{r.published ? " · public" : " · hidden"}</p>
                     </div>
-                    <button onClick={() => toggle(r)} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:border-violet-300 hover:text-violet-700 shrink-0">
+                    <button onClick={() => toggle(r)} aria-label={r.published ? "Hide review" : "Publish review"} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:border-violet-300 hover:text-violet-700 shrink-0">
                       {r.published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       {r.published ? "Hide" : "Publish"}
                     </button>

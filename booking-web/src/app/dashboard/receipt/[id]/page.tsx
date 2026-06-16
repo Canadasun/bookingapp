@@ -41,7 +41,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   const currency = (biz?.currency ?? "CAD") as "CAD" | "USD";
   const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(c / 100);
   const rate = biz?.taxRatePercent ?? 0;
-  const subtotal = apt.totalPriceCents || apt.service.priceCents;
+  const subtotal = apt.totalPriceCents ?? apt.service.priceCents;
   const taxCents = Math.round(subtotal * (rate / 100));
   const total = subtotal + taxCents;
   const tipsCollected = successfulPayments.reduce((s, p) => s + (p.tipCents ?? 0), 0);
@@ -125,7 +125,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-500 mt-8">Thank you for your business · Powered by Pulse</p>
+        <p className="text-center text-xs text-gray-500 mt-8">Thank you for your business{!((biz?.bookingPageSettings as Record<string, unknown> | null)?.hidePouredBy) && " · Powered by Pulse"}</p>
       </div>
     </div>
   );

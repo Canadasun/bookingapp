@@ -158,12 +158,12 @@ export default function CheckoutPage() {
   async function confirm() {
     if (!bizId || selectedServices.length === 0) return;
     const customStartsAt = customStartsAtValue();
-    const customDate = customStartsAt ? new Date(customStartsAt) : null;
-    if (customStartsAt && Number.isNaN(customDate?.getTime())) {
+    const customStartsAtDate = customStartsAt ? new Date(customStartsAt) : null;
+    if (customStartsAt && Number.isNaN(customStartsAtDate?.getTime())) {
       toast.error("Enter a valid custom date and time");
       return;
     }
-    const startsAt = customDate ? customDate.toISOString() : selectedSlot?.startsAt;
+    const startsAt = customStartsAtDate ? customStartsAtDate.toISOString() : selectedSlot?.startsAt;
     if (!startsAt) {
       toast.error("Choose an available time or enter a custom owner time");
       return;
@@ -206,7 +206,6 @@ export default function CheckoutPage() {
     setCustomDate(""); setCustomTime(""); setCustomStaffId(""); setOverrideCalendar(false);
     setRecurring({ enabled: false, frequency: "WEEKLY", count: 4 });
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
-    setClientSearch(""); setClientResults([]);
   }
 
 
@@ -478,8 +477,8 @@ export default function CheckoutPage() {
                   <p className="text-sm text-gray-500 text-center py-6">No availability on this date</p>
                 ) : (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                    {slots.map((sl) => (
-                      <button key={`${sl.staffId ?? "staff"}-${sl.startsAt}`}
+                    {slots.map((sl, idx) => (
+                      <button key={`${sl.staffId ?? "any"}-${sl.startsAt}-${idx}`}
                         onClick={() => { setSelectedSlot(sl); setCustomDate(""); setCustomTime(""); setOverrideCalendar(false); setStep("confirm"); }}
                         className={cn("py-2.5 rounded-xl border text-xs font-semibold transition-all",
                           selectedSlot?.startsAt === sl.startsAt

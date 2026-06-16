@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ImageUpload } from "@/components/ImageUpload";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const initials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
@@ -41,6 +42,10 @@ export default function StaffPage() {
   const [saving, setSaving] = useState(false);
   // One-time temp password to surface to the owner after inviting a staff member.
   const [invited, setInvited] = useState<{ email: string; password: string } | null>(null);
+  const [staffToDeactivate, setStaffToDeactivate] = useState<StaffMember | null>(null);
+  const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
+  const [staffDeleteWithMove, setStaffDeleteWithMove] = useState<{ member: StaffMember; msg: string } | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
@@ -99,11 +104,10 @@ export default function StaffPage() {
     finally { setSaving(false); }
   }
 
-  async function deactivate(s: StaffMember) {
-    if (!bizId) return;
-    if (!confirm(`Deactivate ${s.user.name}?`)) return;
-    try { await api.staff.update(bizId, s.id, { active: false }); toast.success("Deactivated"); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+  async function doDeactivate() {
+    if (!bizId || !staffToDeactivate) return;
+    try { await api.staff.update(bizId, staffToDeactivate.id, { active: false }); toast.success("Deactivated"); setStaffToDeactivate(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setStaffToDeactivate(null); }
   }
 
   async function reactivate(s: StaffMember) {
@@ -143,36 +147,39 @@ export default function StaffPage() {
     finally { setSavingLocation(false); }
   }
 
-  async function removeLocation(l: Location) {
-    if (!bizId) return;
-    if (!confirm(`Delete "${l.name}"? Staff there become unassigned.`)) return;
-    try { await api.locations.remove(bizId, l.id); load(); }
-    catch { toast.error("Failed to delete"); }
+  async function doRemoveLocation() {
+    if (!bizId || !locationToDelete) return;
+    try { await api.locations.remove(bizId, locationToDelete.id); setLocationToDelete(null); load(); }
+    catch { toast.error("Failed to delete"); setLocationToDelete(null); }
   }
 
-  async function removeStaff(s: StaffMember) {
-    if (!bizId) return;
-    if (!confirm(`Permanently delete ${s.user.name}? This removes their profile and login.`)) return;
+  async function doRemoveStaff() {
+    if (!bizId || !staffToDelete) return;
     try {
-      await api.staff.remove(bizId, s.id);
+      await api.staff.remove(bizId, staffToDelete.id);
       toast.success("Provider deleted");
+      setStaffToDelete(null);
       load();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed";
-      // If blocked only because they still have bookings, offer to move those
-      // bookings to the owner and delete anyway.
       if (/booking/i.test(msg)) {
-        if (confirm(msg)) {
-          try {
-            await api.staff.remove(bizId, s.id, true);
-            toast.success("Provider deleted — their bookings were moved to you");
-            load();
-          } catch (e2) { toast.error(e2 instanceof Error ? e2.message : "Failed"); }
-        }
+        setStaffDeleteWithMove({ member: staffToDelete, msg });
+        setStaffToDelete(null);
         return;
       }
       toast.error(msg);
+      setStaffToDelete(null);
     }
+  }
+
+  async function doRemoveStaffWithMove() {
+    if (!bizId || !staffDeleteWithMove) return;
+    try {
+      await api.staff.remove(bizId, staffDeleteWithMove.member.id, true);
+      toast.success("Provider deleted — their bookings were moved to you");
+      setStaffDeleteWithMove(null);
+      load();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setStaffDeleteWithMove(null); }
   }
 
   function toggleService(id: string) {
@@ -181,6 +188,42 @@ export default function StaffPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      <ConfirmDialog
+        open={staffToDeactivate !== null}
+        title={`Deactivate ${staffToDeactivate?.user.name}?`}
+        description="They won't appear in the booking flow but their data and bookings are kept."
+        confirmLabel="Deactivate"
+        variant="destructive"
+        onConfirm={doDeactivate}
+        onCancel={() => setStaffToDeactivate(null)}
+      />
+      <ConfirmDialog
+        open={staffToDelete !== null}
+        title={`Permanently delete ${staffToDelete?.user.name}?`}
+        description="This removes their profile and login. This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={doRemoveStaff}
+        onCancel={() => setStaffToDelete(null)}
+      />
+      <ConfirmDialog
+        open={staffDeleteWithMove !== null}
+        title="Move bookings and delete?"
+        description={staffDeleteWithMove?.msg ?? "This provider has existing bookings. Move them to you and delete this provider?"}
+        confirmLabel="Move bookings and delete"
+        variant="destructive"
+        onConfirm={doRemoveStaffWithMove}
+        onCancel={() => setStaffDeleteWithMove(null)}
+      />
+      <ConfirmDialog
+        open={locationToDelete !== null}
+        title={`Delete "${locationToDelete?.name}"?`}
+        description="Staff assigned to this location will become unassigned."
+        confirmLabel="Delete location"
+        variant="destructive"
+        onConfirm={doRemoveLocation}
+        onCancel={() => setLocationToDelete(null)}
+      />
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Staff</h2>
@@ -228,7 +271,7 @@ export default function StaffPage() {
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button onClick={() => openEditLocation(l)} className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" aria-label="Edit"><Pencil className="w-3.5 h-3.5"/></button>
-                    <button onClick={() => removeLocation(l)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label="Delete"><Trash2 className="w-3.5 h-3.5"/></button>
+                    <button onClick={() => setLocationToDelete(l)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label="Delete location"><Trash2 className="w-3.5 h-3.5"/></button>
                   </div>
                 </div>
               );
@@ -335,13 +378,13 @@ export default function StaffPage() {
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <Link href={`/dashboard/staff/${s.id}`}><Button size="sm" variant="ghost" className="text-xs">Schedule</Button></Link>
+                  <Link href={`/dashboard/staff/${s.id}`} aria-label={`View ${s.user.name}'s schedule`}><Button size="sm" variant="ghost" className="text-xs">Schedule</Button></Link>
                   <button onClick={() => openEdit(s)} aria-label="Edit" className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4"/></button>
                   {s.active
-                    ? <button onClick={() => deactivate(s)} aria-label="Deactivate" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"><UserX className="w-4 h-4"/></button>
+                    ? <button onClick={() => setStaffToDeactivate(s)} aria-label="Deactivate" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"><UserX className="w-4 h-4"/></button>
                     : <button onClick={() => reactivate(s)} aria-label="Reactivate" className="p-2 text-gray-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors"><Check className="w-4 h-4"/></button>
                   }
-                  <button onClick={() => removeStaff(s)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4"/></button>
+                  <button onClick={() => setStaffToDelete(s)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-700 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4"/></button>
                 </div>
               </CardContent>
             </Card>

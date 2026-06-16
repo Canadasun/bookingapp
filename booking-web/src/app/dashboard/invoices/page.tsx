@@ -137,12 +137,12 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="invoice-modal-title">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={onClose} />
       <div className="dashboard-safe-bottom relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-xl max-h-[90dvh] overflow-y-auto">
         <div className="sticky top-0 bg-white flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-violet-600" /><p className="text-sm font-semibold text-gray-900">New invoice</p></div>
-          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+          <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-violet-600" /><p id="invoice-modal-title" className="text-sm font-semibold text-gray-900">New invoice</p></div>
+          <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -168,7 +168,7 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
                   <Input placeholder="Description" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} className="flex-1" />
                   <Input type="number" min={1} placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className="w-16" />
                   <Input type="number" min={0} step="0.01" placeholder="Price" value={l.unitCents} onChange={(e) => setLine(i, { unitCents: e.target.value })} className="w-24" />
-                  <button onClick={() => removeLine(i)} disabled={lines.length === 1} className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => removeLine(i)} disabled={lines.length === 1} aria-label="Remove line item" className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>

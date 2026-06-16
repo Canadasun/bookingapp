@@ -156,13 +156,13 @@ function RefundForm({ paymentId, remainingCents, onDone, onCancel }: {
   return (
     <div className="mt-3 pt-3 border-t border-gray-100 grid gap-2 sm:grid-cols-[120px_1fr_auto] items-end">
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
-        <Input type="number" step="0.01" min="0.01" max={(remainingCents / 100).toFixed(2)}
+        <label htmlFor="refund-amount" className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
+        <Input id="refund-amount" type="number" step="0.01" min="0.01" max={(remainingCents / 100).toFixed(2)}
           value={amount} onChange={(e) => setAmount(e.target.value)} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>
-        <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. customer request" />
+        <label htmlFor="refund-reason" className="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>
+        <Input id="refund-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. customer request" />
       </div>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
