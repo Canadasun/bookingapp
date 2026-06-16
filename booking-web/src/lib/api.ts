@@ -303,6 +303,28 @@ export interface NotificationDelivery {
   canRetry?: boolean; retryReason?: string | null;
 }
 
+export interface DashboardOverview {
+  timezone: string;
+  verificationStatus: VerificationStatus;
+  today: Appointment[];
+  upcoming: Appointment[];
+  metrics: {
+    weekRevenue: number;
+    completedThisWeek: number;
+    newClientsThisMonth: number;
+    pendingBookings: number;
+    cancelledThisWeek: number;
+    noShowsThisMonth: number;
+    topService: string | null;
+    unreadNotifications: number;
+    unreadMessages: number;
+    unreadThreads: number;
+    failedPayments: number;
+    waitlistCount: number;
+    failedDeliveries: number;
+  };
+}
+
 export interface AdminOverview {
   generatedAt: string;
   metrics: {
@@ -630,6 +652,7 @@ export const api = {
 
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
+    dashboardOverview: (id: string) => req<DashboardOverview>(`/businesses/${id}/dashboard-overview`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),
     getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
     update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt" | "plan" | "planExpiresAt" | "suspended" | "verificationStatus" | "stripeConnectOnboarded" | "capabilities" | "suspectedDuplicateOfId">>) =>

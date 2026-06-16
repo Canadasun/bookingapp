@@ -5,6 +5,10 @@ import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { applyPlanLimits, isUnlimitedPlan } from '../common/util/plan-features';
 import { getCapabilities } from '../common/util/plan';
 import { ResendEmailProvider } from '../notifications/providers/email.provider';
+import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns';
+import { format as formatTZ, fromZonedTime, toZonedTime } from 'date-fns-tz';
+
+type DashboardUser = { id: string; role: string; businessId: string | null };
 
 @Injectable()
 export class BusinessesService {
@@ -69,6 +73,187 @@ export class BusinessesService {
     const business = await this.prisma.business.findUnique({ where: { id } });
     if (!business) throw new NotFoundException('Business not found');
     return { ...business, capabilities: getCapabilities(business.plan) };
+  }
+
+  private zonedBounds(now: Date, timezone: string) {
+    const localNow = toZonedTime(now, timezone);
+    const today = formatTZ(localNow, 'yyyy-MM-dd', { timeZone: timezone });
+    const weekStart = formatTZ(startOfWeek(localNow), 'yyyy-MM-dd', { timeZone: timezone });
+    const weekEnd = formatTZ(endOfWeek(localNow), 'yyyy-MM-dd', { timeZone: timezone });
+    const monthStart = formatTZ(startOfMonth(localNow), 'yyyy-MM-dd', { timeZone: timezone });
+    const monthEnd = formatTZ(endOfMonth(localNow), 'yyyy-MM-dd', { timeZone: timezone });
+
+    return {
+      todayStart: fromZonedTime(`${today}T00:00:00.000`, timezone),
+      todayEnd: fromZonedTime(`${today}T23:59:59.999`, timezone),
+      weekStart: fromZonedTime(`${weekStart}T00:00:00.000`, timezone),
+      weekEnd: fromZonedTime(`${weekEnd}T23:59:59.999`, timezone),
+      monthStart: fromZonedTime(`${monthStart}T00:00:00.000`, timezone),
+      monthEnd: fromZonedTime(`${monthEnd}T23:59:59.999`, timezone),
+    };
+  }
+
+  private async appointmentScope(businessId: string, user: DashboardUser): Promise<Prisma.AppointmentWhereInput> {
+    const where: Prisma.AppointmentWhereInput = { businessId };
+    if (user.role === 'STAFF') {
+      const staff = await this.prisma.staff.findFirst({
+        where: { userId: user.id, businessId, active: true },
+        select: { id: true },
+      });
+      where.staffId = staff?.id ?? '__no_staff__';
+    }
+    return where;
+  }
+
+  async dashboardOverview(id: string, user: DashboardUser) {
+    const business = await this.prisma.business.findUnique({
+      where: { id },
+      select: { id: true, timezone: true, verificationStatus: true },
+    });
+    if (!business) throw new NotFoundException('Business not found');
+    if (user.role !== 'ADMIN' && user.businessId !== id) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+
+    const isStaff = user.role === 'STAFF';
+    const now = new Date();
+    const bounds = this.zonedBounds(now, business.timezone ?? 'UTC');
+    const scopedAppointments = await this.appointmentScope(id, user);
+    const appointmentInclude = {
+      client: true,
+      service: true,
+      staff: { include: { user: true } },
+      business: true,
+      location: { select: { id: true, name: true } },
+    };
+
+    const [
+      todayAppointments,
+      upcomingAppointments,
+      pendingBookings,
+      weekCompletedAppointments,
+      cancelledThisWeek,
+      noShowsThisMonth,
+      unreadNotifications,
+      unreadMessageRows,
+    ] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: { ...scopedAppointments, startsAt: { gte: bounds.todayStart, lte: bounds.todayEnd } },
+        include: appointmentInclude,
+        orderBy: { startsAt: 'asc' },
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          ...scopedAppointments,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          startsAt: { gt: bounds.todayEnd },
+        },
+        include: appointmentInclude,
+        orderBy: { startsAt: 'asc' },
+        take: 5,
+      }),
+      this.prisma.appointment.count({ where: { ...scopedAppointments, status: 'PENDING' } }),
+      this.prisma.appointment.findMany({
+        where: {
+          ...scopedAppointments,
+          status: 'COMPLETED',
+          startsAt: { gte: bounds.weekStart, lte: bounds.weekEnd },
+        },
+        select: { service: { select: { name: true } } },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          ...scopedAppointments,
+          status: 'CANCELLED',
+          startsAt: { gte: bounds.weekStart, lte: bounds.weekEnd },
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          ...scopedAppointments,
+          status: 'NO_SHOW',
+          startsAt: { gte: bounds.monthStart, lte: bounds.monthEnd },
+        },
+      }),
+      this.prisma.notification.count({ where: { userId: user.id, read: false } }),
+      this.prisma.message.findMany({
+        where: {
+          businessId: id,
+          fromClient: true,
+          ...(isStaff
+            ? { client: { appointments: { some: { businessId: id, staff: { userId: user.id, active: true } } } } }
+            : {}),
+        },
+        select: { clientId: true, createdAt: true },
+      }),
+    ]);
+
+    const states = await this.prisma.messageThreadState.findMany({ where: { businessId: id, userId: user.id } });
+    const stateByClient = new Map(states.map((state) => [state.clientId, state]));
+    let unreadMessages = 0;
+    const unreadThreads = new Set<string>();
+    for (const message of unreadMessageRows) {
+      const state = stateByClient.get(message.clientId);
+      if (state?.archivedAt) continue;
+      if (!state?.lastReadAt || message.createdAt > state.lastReadAt) {
+        unreadMessages += 1;
+        unreadThreads.add(message.clientId);
+      }
+    }
+
+    let weekRevenue = 0;
+    let failedPayments = 0;
+    let waitlistCount = 0;
+    let failedDeliveries = 0;
+    let newClientsThisMonth = 0;
+    if (!isStaff) {
+      const [payments, waitlist, deliveries, clients] = await Promise.all([
+        this.prisma.payment.findMany({
+          where: {
+            businessId: id,
+            createdAt: { gte: bounds.weekStart, lte: bounds.weekEnd },
+            status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] },
+          },
+          select: { amountCents: true, refundedCents: true },
+        }),
+        this.prisma.waitlistEntry.count({ where: { businessId: id, status: 'WAITING' } }),
+        this.prisma.notificationDelivery.count({ where: { businessId: id, status: 'FAILED' } }),
+        this.prisma.client.count({ where: { businessId: id, createdAt: { gte: bounds.monthStart, lte: bounds.monthEnd } } }),
+      ]);
+      weekRevenue = payments.reduce((sum, payment) => sum + payment.amountCents - payment.refundedCents, 0);
+      failedPayments = await this.prisma.payment.count({ where: { businessId: id, status: 'FAILED' } });
+      waitlistCount = waitlist;
+      failedDeliveries = deliveries;
+      newClientsThisMonth = clients;
+    }
+
+    const serviceCounts = weekCompletedAppointments.reduce<Record<string, number>>((acc, apt) => {
+      acc[apt.service.name] = (acc[apt.service.name] ?? 0) + 1;
+      return acc;
+    }, {});
+    const topService = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+    return {
+      timezone: business.timezone,
+      verificationStatus: business.verificationStatus,
+      today: todayAppointments,
+      upcoming: upcomingAppointments,
+      metrics: {
+        weekRevenue,
+        completedThisWeek: weekCompletedAppointments.length,
+        newClientsThisMonth,
+        pendingBookings,
+        cancelledThisWeek,
+        noShowsThisMonth,
+        topService,
+        unreadNotifications,
+        unreadMessages,
+        unreadThreads: unreadThreads.size,
+        failedPayments,
+        waitlistCount,
+        failedDeliveries,
+      },
+    };
   }
 
   async findBySlug(slug: string) {

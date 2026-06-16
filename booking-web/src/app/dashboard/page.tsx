@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { format, isToday, isThisWeek, isThisMonth } from "date-fns";
 import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck } from "lucide-react";
-import { api, Appointment, ClientWithStats, NotificationDelivery, Payment } from "@/lib/api";
+import { api, Appointment, DashboardOverview } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
 import { formatPrice } from "@/lib/utils";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -29,14 +28,35 @@ function MetricCard({ label, value, icon: Icon, accent }: {
   );
 }
 
-function TimelineSlot({ apt }: { apt: Appointment }) {
+function formatTimeInZone(value: string | Date, timezone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(value));
+}
+
+function formatDateInZone(value: string | Date, timezone: string, options: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat("en-US", { timeZone: timezone, ...options }).format(new Date(value));
+}
+
+function hourInZone(value: Date, timezone: string) {
+  return Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hourCycle: "h23",
+  }).format(value));
+}
+
+function TimelineSlot({ apt, timezone }: { apt: Appointment; timezone: string }) {
   const start = new Date(apt.startsAt);
   const end   = new Date(apt.endsAt);
   const past  = end < new Date();
   return (
     <div className={`flex items-start gap-3 py-3 border-b border-gray-50 last:border-0 ${past ? "opacity-50" : ""}`}>
       <div className="w-14 shrink-0 text-right pt-0.5">
-        <span className="text-xs font-semibold text-gray-500">{format(start, "h:mm a")}</span>
+        <span className="text-xs font-semibold text-gray-500">{formatTimeInZone(start, timezone)}</span>
       </div>
       <div className="flex flex-col items-center pt-1.5 gap-1">
         <div className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
@@ -56,57 +76,26 @@ function TimelineSlot({ apt }: { apt: Appointment }) {
 }
 
 export default function OverviewPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [clients, setClients]   = useState<ClientWithStats[]>([]);
+  const { user, loading: userLoading } = useCurrentUser();
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [failedPayments, setFailedPayments] = useState(0);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [waitlistCount, setWaitlistCount] = useState(0);
-  const [failedDeliveries, setFailedDeliveries] = useState<NotificationDelivery[]>([]);
-  const [verifStatus, setVerifStatus] = useState<string | null>(null);
-
-  const user    = getUser();
   const isStaff = user?.role === "STAFF";
   const bizId   = user?.businessId ?? "";
 
-  useEffect(() => {
-    if (!bizId || isStaff) return;
-    api.verification.status(bizId).then((v) => setVerifStatus(v.verificationStatus)).catch(() => {});
-  }, [bizId, isStaff]);
-
   const load = useCallback(async () => {
+    if (userLoading) return;
     if (!bizId) {
       setLoading(false);
       return;
     }
     setLoading(true); setError("");
     try {
-      const [aptsRes, clsRes, notifRes, threadsRes, paymentsRes, waitlistRes, deliveryRes] = await Promise.all([
-        api.appointments.list(bizId, 1, 200),
-        isStaff ? Promise.resolve({ data: [] as ClientWithStats[] }) : api.clients.list(bizId),
-        api.notifications.unreadCount().catch(() => ({ count: 0 })),
-        api.messages.threads(bizId).catch(() => []),
-        isStaff ? Promise.resolve([]) : api.payments.list().catch(() => []),
-        isStaff ? Promise.resolve([]) : api.waitlist.list(bizId).catch(() => []),
-        api.notifications.deliveries({ status: "FAILED", limit: 10 }).catch(() => []),
-      ]);
-      const filtered = isStaff && user?.staffId
-        ? aptsRes.data.filter((a) => a.staff.id === user.staffId)
-        : aptsRes.data;
-      setAppointments(filtered); setClients(clsRes.data);
-      setUnreadNotifications(notifRes.count);
-      setUnreadMessages(threadsRes.filter((t) => t.fromClient && !t.read).length);
-      setFailedPayments(paymentsRes.filter((p) => p.status === "FAILED").length);
-      setPayments(paymentsRes);
-      setWaitlistCount(waitlistRes.length);
-      setFailedDeliveries(deliveryRes);
+      setOverview(await api.business.dashboardOverview(bizId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally { setLoading(false); }
-  }, [isStaff, user?.staffId, bizId]);
+  }, [userLoading, bizId]);
 
   useEvents(bizId || null, useCallback(() => {
     load();
@@ -114,7 +103,7 @@ export default function OverviewPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return (
+  if (userLoading || loading) return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /><SkeletonMetric /></div>
       <div className="grid md:grid-cols-5 gap-5">
@@ -134,42 +123,30 @@ export default function OverviewPage() {
     </div>
   );
 
-  const now    = new Date();
-  const today  = appointments
-    .filter((a) => isToday(new Date(a.startsAt)))
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  const upcoming = appointments
-    .filter((a) => ["PENDING","CONFIRMED"].includes(a.status) && !isToday(new Date(a.startsAt)) && new Date(a.startsAt) > now)
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
-    .slice(0, 5);
-  const weekCompleted = appointments
-    .filter((a) => a.status === "COMPLETED" && isThisWeek(new Date(a.startsAt)));
-  const weekRevenue = payments
-    .filter((p) => (p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED") && isThisWeek(new Date(p.createdAt)))
-    .reduce((sum, payment) => sum + payment.amountCents - (payment.refundedCents ?? 0), 0);
-  const newThisMonth = clients.filter((c) => isThisMonth(new Date(c.createdAt))).length;
-  const greeting = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
-  const pendingBookings = appointments.filter((a) => a.status === "PENDING").length;
-  const cancelledThisWeek = appointments.filter((a) => a.status === "CANCELLED" && isThisWeek(new Date(a.startsAt))).length;
-  const noShowsThisMonth = appointments.filter((a) => a.status === "NO_SHOW" && isThisMonth(new Date(a.startsAt))).length;
-  const serviceCounts = weekCompleted.reduce<Record<string, number>>((acc, apt) => {
-	    acc[apt.service.name] = (acc[apt.service.name] ?? 0) + 1;
-    return acc;
-  }, {});
-  const topService = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1])[0];
+  if (!overview) return null;
+
+  const now = new Date();
+  const timezone = overview.timezone || "UTC";
+  const hour = hourInZone(now, timezone);
+  const greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const today = overview.today;
+  const upcoming = overview.upcoming;
+  const metrics = overview.metrics;
   const actions = [
-    { label: "Pending bookings", value: pendingBookings, href: "/dashboard/appointments", icon: CalendarDays, tone: "bg-amber-50 text-amber-700" },
-    { label: "Unread messages", value: unreadMessages, href: "/dashboard/messages", icon: MessageSquare, tone: "bg-violet-50 text-violet-700" },
-    { label: "Unread alerts", value: unreadNotifications, href: "/dashboard/notifications", icon: Bell, tone: "bg-blue-50 text-blue-700" },
-    { label: "Failed payments", value: failedPayments, href: "/dashboard/transactions", icon: CreditCard, tone: "bg-red-50 text-red-700" },
-    { label: "Waiting clients", value: waitlistCount, href: "/dashboard/waitlist", icon: TimerReset, tone: "bg-emerald-50 text-emerald-700" },
-    { label: "Failed deliveries", value: failedDeliveries.length, href: "/dashboard/notifications", icon: MailWarning, tone: "bg-red-50 text-red-700" },
+    { label: "Pending bookings", value: metrics.pendingBookings, href: "/dashboard/appointments", icon: CalendarDays, tone: "bg-amber-50 text-amber-700" },
+    { label: "Unread messages", value: metrics.unreadMessages, href: "/dashboard/messages", icon: MessageSquare, tone: "bg-violet-50 text-violet-700" },
+    { label: "Unread alerts", value: metrics.unreadNotifications, href: "/dashboard/notifications", icon: Bell, tone: "bg-blue-50 text-blue-700" },
+    ...(!isStaff ? [
+      { label: "Failed payments", value: metrics.failedPayments, href: "/dashboard/transactions", icon: CreditCard, tone: "bg-red-50 text-red-700" },
+      { label: "Waiting clients", value: metrics.waitlistCount, href: "/dashboard/waitlist", icon: TimerReset, tone: "bg-emerald-50 text-emerald-700" },
+      { label: "Failed deliveries", value: metrics.failedDeliveries, href: "/dashboard/notifications", icon: MailWarning, tone: "bg-red-50 text-red-700" },
+    ] : []),
   ].filter((a) => a.value > 0);
 
   return (
     <div className="max-w-5xl mx-auto min-w-0 space-y-5 sm:space-y-6">
 
-      <ErrorBoundary><OnboardingWizard /></ErrorBoundary>
+      {!isStaff && <ErrorBoundary><OnboardingWizard /></ErrorBoundary>}
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -177,7 +154,9 @@ export default function OverviewPage() {
           <h2 className="text-xl font-bold text-gray-900">
             Good {greeting}{user ? `, ${user.name.split(" ")[0]}` : ""}
           </h2>
-          <p className="text-sm text-gray-400 mt-0.5">{format(now, "EEEE, MMMM d, yyyy")}</p>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {formatDateInZone(now, timezone, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          </p>
         </div>
         <Link href="/dashboard/appointments"
           className="text-sm text-violet-600 font-medium flex items-center gap-1 hover:underline">
@@ -208,7 +187,7 @@ export default function OverviewPage() {
       )}
 
       {/* Get verified — one-click request, lands the business in the admin queue */}
-      {!isStaff && (verifStatus === "UNVERIFIED" || verifStatus === "REJECTED") && (
+      {!isStaff && (overview.verificationStatus === "UNVERIFIED" || overview.verificationStatus === "REJECTED") && (
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <ShieldCheck className="w-6 h-6 text-violet-600 shrink-0" />
           <div className="flex-1 min-w-0">
@@ -221,7 +200,7 @@ export default function OverviewPage() {
           </Link>
         </div>
       )}
-      {!isStaff && verifStatus === "PENDING" && (
+      {!isStaff && overview.verificationStatus === "PENDING" && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
           <p className="text-sm text-amber-800">Verification requested — under review. We&apos;ll let you know once it&apos;s approved.</p>
@@ -231,13 +210,13 @@ export default function OverviewPage() {
       {/* Metrics */}
       {!isStaff && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <MetricCard label="Revenue this week" value={formatPrice(weekRevenue)}
+          <MetricCard label="Revenue this week" value={formatPrice(metrics.weekRevenue)}
             icon={TrendingUp} accent="bg-emerald-50 text-emerald-600" />
           <MetricCard label="Appointments today" value={today.length}
             icon={CalendarDays} accent="bg-blue-50 text-blue-600" />
-          <MetricCard label="Completed this week" value={weekCompleted.length}
+          <MetricCard label="Completed this week" value={metrics.completedThisWeek}
             icon={CheckCircle2} accent="bg-amber-50 text-amber-600" />
-          <MetricCard label="New clients this month" value={newThisMonth}
+          <MetricCard label="New clients this month" value={metrics.newClientsThisMonth}
             icon={Users} accent="bg-violet-50 text-violet-600" />
         </div>
       )}
@@ -253,13 +232,13 @@ export default function OverviewPage() {
               <p className="text-xs text-gray-400 mt-0.5">{today.length} appointment{today.length !== 1 ? "s" : ""}</p>
             </div>
             <span className="text-xs font-semibold text-white bg-violet-600 rounded-full px-2.5 py-1">
-              {format(now, "MMM d")}
+              {formatDateInZone(now, timezone, { month: "short", day: "numeric" })}
             </span>
           </div>
           <div className="px-5 max-h-80 overflow-y-auto">
             {today.length === 0 ? (
               <p className="py-10 text-sm text-gray-400 text-center">Nothing scheduled today</p>
-            ) : today.map((apt) => <TimelineSlot key={apt.id} apt={apt} />)}
+            ) : today.map((apt) => <TimelineSlot key={apt.id} apt={apt} timezone={timezone} />)}
           </div>
           <div className="px-5 py-3 border-t border-gray-50">
             <Link href="/dashboard/appointments"
@@ -278,10 +257,10 @@ export default function OverviewPage() {
           {!isStaff && (
             <div className="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
               {[
-                { label: "Cancelled (wk)", val: cancelledThisWeek },
-                { label: "No-shows (mo)",  val: noShowsThisMonth },
-                { label: "Top service",    val: topService ? topService[0] : "—" },
-                { label: "Waitlist",       val: waitlistCount },
+                { label: "Cancelled (wk)", val: metrics.cancelledThisWeek },
+                { label: "No-shows (mo)",  val: metrics.noShowsThisMonth },
+                { label: "Top service",    val: metrics.topService ?? "—" },
+                { label: "Waitlist",       val: metrics.waitlistCount },
               ].map((s) => (
                 <div key={s.label} className="bg-white px-4 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
@@ -295,7 +274,9 @@ export default function OverviewPage() {
               <p className="py-10 text-sm text-gray-400 text-center">No upcoming appointments</p>
             ) : upcoming.map((apt) => (
               <div key={apt.id} className="px-5 py-3">
-                <p className="text-xs font-semibold text-violet-600">{format(new Date(apt.startsAt), "EEE, MMM d · HH:mm")}</p>
+                <p className="text-xs font-semibold text-violet-600">
+                  {formatDateInZone(apt.startsAt, timezone, { weekday: "short", month: "short", day: "numeric" })} · {formatTimeInZone(apt.startsAt, timezone)}
+                </p>
                 <p className="text-sm font-medium text-gray-800 mt-0.5 truncate">{apt.client.name}</p>
                 <p className="text-xs text-gray-500 truncate">{apt.service.name} · {apt.staff.user.name}</p>
               </div>

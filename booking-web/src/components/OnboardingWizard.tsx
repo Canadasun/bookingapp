@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Circle, ChevronRight, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 interface Step {
@@ -18,7 +18,8 @@ interface Step {
 const DISMISSED_KEY = "pulse_onboarding_dismissed";
 
 export function OnboardingWizard() {
-  const bizId = getUser()?.businessId ?? "";
+  const { user, loading: userLoading } = useCurrentUser();
+  const bizId = user?.businessId ?? "";
   const router = useRouter();
   const [steps, setSteps] = useState<Step[]>([]);
   const [dismissed, setDismissed] = useState(true); // start hidden until check is done
@@ -54,10 +55,11 @@ export function OnboardingWizard() {
   }, [bizId]);
 
   useEffect(() => {
-    if (!bizId) return;
+    if (userLoading) return;
+    if (!bizId || user?.role === "STAFF") { setLoading(false); return; }
     if (typeof window !== "undefined" && localStorage.getItem(DISMISSED_KEY) === "1") { setLoading(false); return; }
     void check();
-  }, [bizId, check]);
+  }, [userLoading, bizId, user?.role, check]);
 
   function dismiss() {
     localStorage.setItem(DISMISSED_KEY, "1");
