@@ -16,8 +16,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { verifyAppointmentToken } from '../common/util/appointment-token';
 
 const BookingIntentSchema = z.object({
-  appointmentId: z.string().min(1),
-  manageToken: z.string().min(1),
+  appointmentId: z.string().min(1).max(100),
+  manageToken: z.string().min(1).max(200),
 });
 
 const CustomChargeSchema = z.object({
