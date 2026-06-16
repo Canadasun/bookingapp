@@ -69,12 +69,22 @@ export default async function BookLayout({
       }
     : null;
 
+  // JSON.stringify does not escape <, >, /, or & — any of these in user-controlled
+  // fields (name, address, phone) would close the <script> tag and allow XSS.
+  const safeJsonLd = jsonLd
+    ? JSON.stringify(jsonLd)
+        .replace(/</g, "\\u003c")
+        .replace(/>/g, "\\u003e")
+        .replace(/\//g, "\\u002f")
+        .replace(/&/g, "\\u0026")
+    : null;
+
   return (
     <>
-      {jsonLd && (
+      {safeJsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd }}
         />
       )}
       {children}
