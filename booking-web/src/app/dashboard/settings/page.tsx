@@ -17,6 +17,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
@@ -50,10 +51,10 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: str
   { id: "billing",       label: "Billing & plan",     icon: CreditCard,  desc: "Subscription plan, upgrade" },
 ];
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
       {children}
     </div>
   );
@@ -69,8 +70,8 @@ function formatPolicyDuration(totalMinutes: number) {
   return `${minutes} min`;
 }
 
-function PolicyNumberInput({ value, min = 0, unit, onChange }: {
-  value: number; min?: number; unit: "hours" | "days"; onChange: (minutes: number) => void;
+function PolicyNumberInput({ value, min = 0, unit, label, onChange }: {
+  value: number; min?: number; unit: "hours" | "days"; label: string; onChange: (minutes: number) => void;
 }) {
   const multiplier = unit === "days" ? 1440 : 60;
   const safe = Math.max(min, Math.floor(Number.isFinite(value) ? value : min));
@@ -84,6 +85,7 @@ function PolicyNumberInput({ value, min = 0, unit, onChange }: {
         step={unit === "days" ? 1 : 1}
         value={Number.isInteger(displayValue) ? displayValue : Number(displayValue.toFixed(1))}
         onChange={(e) => onChange(Math.max(min, Math.round((Number(e.target.value) || 0) * multiplier)))}
+        aria-label={label}
         className="h-8 w-20 border-0 bg-transparent p-0 text-base font-semibold tabular-nums shadow-none focus-visible:ring-0"
       />
       <span className="ml-2 text-sm font-medium text-gray-500">{unit}</span>
@@ -228,6 +230,7 @@ function SettingsPage() {
 
   useEffect(() => {
     if (!bizId) {
+      setLoadError("No business account is linked to your profile. Please contact support.");
       setLoading(false);
       return;
     }
@@ -258,11 +261,19 @@ function SettingsPage() {
     bookingPageSettings: { ...((p.bookingPageSettings ?? {}) as Record<string, unknown>), [k]: v },
   }));
 
+  const currentBrandColor = (form.bookingPageSettings as Record<string, unknown> | undefined)?.brandColor as string | undefined;
+  useEffect(() => {
+    const stored = currentBrandColor || "#7C3AED";
+    setHexInputValue(/^#[0-9a-f]{6}$/i.test(stored) ? stored.replace('#', '') : "7C3AED");
+  }, [currentBrandColor]);
+
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [referralInput, setReferralInput] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
   const [refCopied, setRefCopied] = useState(false);
+  const [locationToRemove, setLocationToRemove] = useState<Location | null>(null);
+  const [hexInputValue, setHexInputValue] = useState("");
 
   const loadSubscription = useCallback(async () => {
     const details = await api.subscriptions.get();
@@ -510,9 +521,9 @@ function SettingsPage() {
   }
 
   function copyUrl() {
-    navigator.clipboard.writeText(bookingUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(bookingUrl)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
+      .catch(() => toast.error("Could not copy link"));
   }
 
   if (loading) return <LoadingSpinner />;
@@ -538,12 +549,13 @@ function SettingsPage() {
     goSection("billing");
   }
   function copyEmbed() {
-    navigator.clipboard.writeText(embedSnippet);
-    setEmbedCopied(true);
-    setTimeout(() => setEmbedCopied(false), 2000);
+    navigator.clipboard.writeText(embedSnippet)
+      .then(() => { setEmbedCopied(true); setTimeout(() => setEmbedCopied(false), 2000); })
+      .catch(() => toast.error("Could not copy snippet"));
   }
 
   return (
+    <>
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">Settings</h2>
@@ -638,9 +650,9 @@ function SettingsPage() {
                               {verif.status === "REJECTED" && verif.note ? ` Previous submission declined: ${verif.note}` : ""}
                             </p>
                             <div className={cn("mt-3 space-y-3", verifBusy && "opacity-60 pointer-events-none")}>
-                              <Input placeholder="Full business name" value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
-                              <Input placeholder="Business address" value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
-                              <Input placeholder="Phone number" type="tel" value={verificationForm.phone} onChange={(e) => setVerificationForm((p) => ({ ...p, phone:e.target.value }))} />
+                              <Input aria-label="Full business legal name" placeholder="Full business name" value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
+                              <Input aria-label="Business address" placeholder="Business address" value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
+                              <Input aria-label="Business phone number for verification" placeholder="Phone number" type="tel" value={verificationForm.phone} onChange={(e) => setVerificationForm((p) => ({ ...p, phone:e.target.value }))} />
                               <div>
                                 <p className="text-xs font-medium text-violet-700 mb-1.5">Government-issued ID</p>
                                 <ImageUpload value={verificationForm.governmentIdUrl || null} documents onChange={(url) => setVerificationForm((p) => ({ ...p, governmentIdUrl:url ?? "" }))} />
@@ -673,18 +685,17 @@ function SettingsPage() {
                     catch (e) { toast.error(e instanceof Error ? e.message : "Could not save logo"); }
                   }} />
                 </Field>
-                <Field label="Business name">
-                  <Input value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="e.g. Paws & Claws Grooming" />
+                <Field label="Business name" htmlFor="set-name">
+                  <Input id="set-name" value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="e.g. Paws & Claws Grooming" />
                 </Field>
-                <Field label="Contact email">
-                  <Input type="email" value={(form.email as string) ?? ""} onChange={(e) => f("email", e.target.value)} />
+                <Field label="Contact email" htmlFor="set-email">
+                  <Input id="set-email" type="email" value={(form.email as string) ?? ""} onChange={(e) => f("email", e.target.value)} />
                 </Field>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Phone">
-                    <Input type="tel" placeholder="+1 (416) 555-0123" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
+                  <Field label="Phone" htmlFor="set-phone">
+                    <Input id="set-phone" type="tel" placeholder="+1 (416) 555-0123" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
                   </Field>
-                  <Field label="Timezone">
-                    <label htmlFor="biz-timezone" className="sr-only">Timezone</label>
+                  <Field label="Timezone" htmlFor="biz-timezone">
                     <select id="biz-timezone" value={(form.timezone as string) ?? "America/New_York"} onChange={(e) => f("timezone", e.target.value)}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                       {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}
@@ -692,11 +703,10 @@ function SettingsPage() {
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Address">
-                    <Input value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
+                  <Field label="Address" htmlFor="set-address">
+                    <Input id="set-address" value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
                   </Field>
-                  <Field label="Currency">
-                    <label htmlFor="biz-currency" className="sr-only">Currency</label>
+                  <Field label="Currency" htmlFor="biz-currency">
                     <select id="biz-currency" value={(form.currency as string) ?? "CAD"} onChange={(e) => f("currency", e.target.value)}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                       <option value="CAD">CAD — Canadian dollar (CA$)</option>
@@ -709,13 +719,13 @@ function SettingsPage() {
                     <p className="text-sm font-semibold text-gray-800">Post-visit and social links</p>
                     <p className="text-xs text-gray-400">Shown after an appointment closes. Only secure https:// links are accepted.</p>
                   </div>
-                  <Field label="Thank-you message">
-                    <Input value={(form.postVisitMessage as string) ?? ""} onChange={(e) => f("postVisitMessage", e.target.value)} placeholder="Thanks for visiting. We hope to see you again soon." />
+                  <Field label="Thank-you message" htmlFor="set-post-visit">
+                    <Input id="set-post-visit" value={(form.postVisitMessage as string) ?? ""} onChange={(e) => f("postVisitMessage", e.target.value)} placeholder="Thanks for visiting. We hope to see you again soon." />
                   </Field>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {(["websiteUrl", "instagramUrl", "facebookUrl", "tiktokUrl"] as const).map((key) => (
-                      <Field key={key} label={key.replace("Url", "").replace(/^./, (c) => c.toUpperCase())}>
-                        <Input type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder="https://" />
+                      <Field key={key} htmlFor={`set-${key}`} label={key.replace("Url", "").replace(/^./, (c) => c.toUpperCase())}>
+                        <Input id={`set-${key}`} type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder="https://" />
                       </Field>
                     ))}
                   </div>
@@ -775,7 +785,7 @@ function SettingsPage() {
                         <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.desc}</p>
                       </div>
                       <div className="sm:text-right">
-                        <PolicyNumberInput value={item.value} min={item.min} unit={item.unit} onChange={(minutes) => f(item.key, minutes)} />
+                        <PolicyNumberInput value={item.value} min={item.min} unit={item.unit} label={item.label} onChange={(minutes) => f(item.key, minutes)} />
                         <p className="mt-1 text-xs text-gray-400">Currently {formatPolicyDuration(item.value)}</p>
                       </div>
                     </div>
@@ -789,8 +799,9 @@ function SettingsPage() {
                   </p>
                 </div>
 
-                <Field label="Policy clients accept before booking">
+                <Field label="Policy clients accept before booking" htmlFor="set-cancel-policy">
                   <textarea
+                    id="set-cancel-policy"
                     className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-violet-200"
                     value={(form.cancellationPolicy as string) ?? ""}
                     onChange={(e) => f("cancellationPolicy", e.target.value)}
@@ -804,6 +815,8 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Clients can move appointments from their secure manage link when outside your policy window.</p>
                   </div>
                   <button type="button" onClick={() => f("allowClientReschedule", !form.allowClientReschedule)}
+                    role="switch"
+                    aria-checked={form.allowClientReschedule !== false}
                     aria-label="Toggle client self-reschedule"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.allowClientReschedule ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.allowClientReschedule ? "translate-x-6" : "translate-x-1")} />
@@ -957,15 +970,17 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online. Basic+</p>
                   </div>
                   <button type="button" onClick={() => isPaid ? f("requireDeposit", !form.requireDeposit) : promptUpgrade("BASIC", "Deposits")}
+                    role="switch"
+                    aria-checked={!!form.requireDeposit}
                     aria-label="Toggle require deposit at booking"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.requireDeposit ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.requireDeposit ? "translate-x-6" : "translate-x-1")} />
                   </button>
                 </div>
                 {isPaid && form.requireDeposit && (
-                  <Field label="Deposit percentage">
+                  <Field label="Deposit percentage" htmlFor="set-deposit-pct">
                     <div className="flex items-center gap-2">
-                      <Input type="number" min={1} max={100} value={(form.depositPercent as number) ?? 25}
+                      <Input id="set-deposit-pct" type="number" min={1} max={100} value={(form.depositPercent as number) ?? 25}
                         onChange={(e) => f("depositPercent", Number(e.target.value))} />
                       <span className="text-sm text-gray-500 shrink-0">%</span>
                     </div>
@@ -978,6 +993,8 @@ function SettingsPage() {
                     <p className="text-xs text-gray-400 mt-0.5">Ask every client to save a card with Stripe at booking (no upfront charge) so you can collect deposits/no-show/late-cancel fees later. Basic+</p>
                   </div>
                   <button type="button" onClick={() => isPaid ? f("collectCardOnFile", !form.collectCardOnFile) : promptUpgrade("BASIC", "Card on file")}
+                    role="switch"
+                    aria-checked={!!form.collectCardOnFile}
                     aria-label="Toggle collect a card on file"
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.collectCardOnFile ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.collectCardOnFile ? "translate-x-6" : "translate-x-1")} />
@@ -986,10 +1003,10 @@ function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>
-                    <Field label="No-show fee">
+                    <Field label="No-show fee" htmlFor="set-noshowfee">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 shrink-0">$</span>
-                        <Input type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic no-show fees")}
+                        <Input id="set-noshowfee" type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic no-show fees")}
                           value={(((form.noShowFeeCents as number) ?? 0) / 100).toString()}
                           onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
                       </div>
@@ -998,10 +1015,10 @@ function SettingsPage() {
                     </Field>
                   </div>
                   <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>
-                    <Field label="Late-cancellation fee">
+                    <Field label="Late-cancellation fee" htmlFor="set-latefee">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 shrink-0">$</span>
-                        <Input type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic late-cancellation fees")}
+                        <Input id="set-latefee" type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic late-cancellation fees")}
                           value={(((form.cancellationFeeCents as number) ?? 0) / 100).toString()}
                           onChange={(e) => f("cancellationFeeCents", Math.round(Number(e.target.value) * 100))} />
                       </div>
@@ -1135,22 +1152,23 @@ function SettingsPage() {
                       <h4 className="text-sm font-semibold text-gray-900">Booking page builder</h4>
                       <p className="text-xs text-gray-400">Tune public page copy and SEO from the web dashboard.</p>
                     </div>
-                    <Field label="Hero headline">
-                      <Input value={(bookingSettings.headline as string) ?? ""} onChange={(e) => bf("headline", e.target.value)} placeholder={`Book with ${biz?.name ?? "us"}`} />
+                    <Field label="Hero headline" htmlFor="set-headline">
+                      <Input id="set-headline" value={(bookingSettings.headline as string) ?? ""} onChange={(e) => bf("headline", e.target.value)} placeholder={`Book with ${biz?.name ?? "us"}`} />
                     </Field>
-                    <Field label="Short introduction">
+                    <Field label="Short introduction" htmlFor="set-intro">
                       <textarea
+                        id="set-intro"
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-violet-200"
                         value={(bookingSettings.intro as string) ?? ""}
                         onChange={(e) => bf("intro", e.target.value)}
                         placeholder="Tell clients what to expect before they book." />
                     </Field>
-                    <Field label="SEO title">
-                      <Input value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
+                    <Field label="SEO title" htmlFor="set-seo-title">
+                      <Input id="set-seo-title" value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
                     </Field>
                     <p className="text-xs text-gray-400">To change your brand colour and font, go to <button type="button" onClick={() => goSection("branding")} className="text-violet-600 hover:underline font-medium">Branding</button>.</p>
-                    <Field label="SEO description">
-                      <Input value={(bookingSettings.seoDescription as string) ?? ""} onChange={(e) => bf("seoDescription", e.target.value)} placeholder="Book appointments online." />
+                    <Field label="SEO description" htmlFor="set-seo-desc">
+                      <Input id="set-seo-desc" value={(bookingSettings.seoDescription as string) ?? ""} onChange={(e) => bf("seoDescription", e.target.value)} placeholder="Book appointments online." />
                     </Field>
                   </div>
                   <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -1226,9 +1244,11 @@ function SettingsPage() {
                         <input
                           type="text"
                           maxLength={6}
-                          value={brandHex.replace('#', '')}
+                          aria-label="Hex colour code"
+                          value={hexInputValue}
                           onChange={(e) => {
                             const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+                            setHexInputValue(v);
                             if (v.length === 6) bf("brandColor", `#${v}`);
                           }}
                           className="w-20 text-sm font-mono text-gray-800 bg-transparent focus:outline-none uppercase" />
@@ -1261,7 +1281,7 @@ function SettingsPage() {
                           style={{ backgroundColor: brandHex, color: bestText }}>
                           <p className="opacity-70 mb-1 text-[10px]">Text on button</p>
                           <p className="font-bold tabular-nums text-xs">{Math.max(whiteText, blackText).toFixed(1)}:1</p>
-                          <span className={cn("text-[10px] font-semibold", btnLabel.pass ? "opacity-90" : "opacity-90")}>{btnLabel.level}</span>
+                          <span className="text-[10px] font-semibold opacity-90">{btnLabel.level}</span>
                         </div>
                       </div>
                       {!btnLabel.pass && (
@@ -1357,6 +1377,8 @@ function SettingsPage() {
                     </div>
                     <button type="button"
                       onClick={() => isUnlimited ? bf("hidePouredBy", !bookingSettings.hidePouredBy) : promptUpgrade("UNLIMITED", "Remove Pulse branding")}
+                      role="switch"
+                      aria-checked={!!(bookingSettings.hidePouredBy && isUnlimited)}
                       aria-label="Toggle remove Powered by Pulse"
                       className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4",
                         bookingSettings.hidePouredBy && isUnlimited ? "bg-violet-600" : "bg-gray-200")}>
@@ -1425,7 +1447,7 @@ function SettingsPage() {
                               {loc.active ? "Deactivate" : "Activate"}
                             </button>
                             <button type="button"
-                              onClick={async () => { if (!confirm(`Remove "${loc.name}"?`)) return; try { await api.locations.remove(bizId, loc.id); loadLocations(); toast.success("Location removed"); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } }}
+                              onClick={() => setLocationToRemove(loc)}
                               className="text-xs text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
                               Remove
                             </button>
@@ -1755,8 +1777,9 @@ function SettingsPage() {
                 <hr className="border-gray-100" />
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Current password</label>
+                  <label htmlFor="set-2fa-password" className="block text-xs font-medium text-gray-700 mb-1.5">Current password</label>
                   <Input
+                    id="set-2fa-password"
                     type="password"
                     autoComplete="current-password"
                     value={twoFAPassword}
@@ -1830,7 +1853,7 @@ function SettingsPage() {
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button type="button"
-                        onClick={() => { navigator.clipboard?.writeText(recoveryCodes.join("\n")); toast.success("Recovery codes copied"); }}
+                        onClick={() => { navigator.clipboard?.writeText(recoveryCodes.join("\n")).then(() => toast.success("Recovery codes copied")).catch(() => toast.error("Could not copy codes")); }}
                         className="text-xs font-semibold text-amber-800 border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-100">
                         Copy codes
                       </button>
@@ -1912,7 +1935,7 @@ function SettingsPage() {
                       <div className="mt-1.5 flex items-center gap-2">
                         <code className="text-sm font-bold text-amber-900 bg-white border border-amber-300 rounded-lg px-3 py-1.5">{myReferral.code}</code>
                         <button type="button"
-                          onClick={() => { navigator.clipboard.writeText(myReferral.code); setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }}
+                          onClick={() => { navigator.clipboard.writeText(myReferral.code).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }).catch(() => toast.error("Could not copy code")); }}
                           className="text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-2.5 py-1.5 hover:bg-amber-100 transition-colors">
                           {refCopied ? "Copied!" : "Copy"}
                         </button>
@@ -1989,7 +2012,7 @@ function SettingsPage() {
                             <button
                               type="button"
                               disabled={isCurrent || billingBusy !== null}
-                              onClick={() => { if (canBuy) upgrade(plan.id as "BASIC" | "PRO" | "UNLIMITED"); }}
+                              onClick={() => { if (canBuy) upgrade(plan.id as "BASIC" | "PRO" | "UNLIMITED"); else if (!isCurrent) toast.info("To downgrade to Free, cancel your subscription from the billing portal below."); }}
                               className={cn(
                                 "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
                                 isCurrent
@@ -2050,6 +2073,28 @@ function SettingsPage() {
       </div>
 
     </div>
+
+    <ConfirmDialog
+      open={locationToRemove !== null}
+      title="Remove location"
+      description={`Remove "${locationToRemove?.name}"? This cannot be undone.`}
+      confirmLabel="Remove"
+      variant="destructive"
+      onConfirm={async () => {
+        if (!locationToRemove) return;
+        try {
+          await api.locations.remove(bizId, locationToRemove.id);
+          loadLocations();
+          toast.success("Location removed");
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Failed");
+        } finally {
+          setLocationToRemove(null);
+        }
+      }}
+      onCancel={() => setLocationToRemove(null)}
+    />
+    </>
   );
 }
 

@@ -6,7 +6,6 @@ import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, Cal
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
-import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +51,7 @@ export default function ClientsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const openClientIdRef = useRef<string | null>(null);
 
   // Use a live session check instead of relying on the booking_user hint cookie
   // which can be stale or missing while the session is valid.
@@ -66,11 +66,15 @@ export default function ClientsPage() {
   const isOwner = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
 
   const load = useCallback(async (q?: string, pg = 1, append = false) => {
-    if (!bizId || !isOwner) {
-      if (bizId && !isOwner) {
-        setLoadError("Access denied. Only business owners can manage the client list.");
-        setLoading(false);
-      }
+    if (!currentUser) return;
+    if (!bizId) {
+      setLoadError("No business account is linked to your profile. Please contact support.");
+      setLoading(false);
+      return;
+    }
+    if (!isOwner) {
+      setLoadError("Access denied. Only owners and admins can manage the client list.");
+      setLoading(false);
       return;
     }
     if (!append) { setLoadError(""); setLoading(true); } else setLoadingMore(true);
@@ -83,7 +87,7 @@ export default function ClientsPage() {
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load clients"); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [bizId, isOwner]);
+  }, [bizId, isOwner, currentUser]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -98,7 +102,12 @@ export default function ClientsPage() {
   }, [search, load]);
 
   useEffect(() => {
-    if (selected) drawerRef.current?.focus();
+    const newId = selected?.id ?? null;
+    if (newId !== null && newId !== openClientIdRef.current) {
+      openClientIdRef.current = newId;
+      drawerRef.current?.focus();
+    }
+    if (newId === null) openClientIdRef.current = null;
   }, [selected]);
 
   async function openClient(c: ClientWithStats) {
@@ -392,7 +401,7 @@ export default function ClientsPage() {
             aria-labelledby="client-drawer-title"
             onKeyDown={(e) => { if (e.key === 'Escape') setSelected(null) }}
             tabIndex={-1}
-            className="dashboard-safe-bottom fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+            className="dashboard-safe-bottom fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col focus:outline-none">
             <div className="flex flex-col gap-3 px-4 py-4 border-b border-gray-100 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
               <h2 id="client-drawer-title" className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -609,6 +618,7 @@ export default function ClientsPage() {
                   <label htmlFor={`add-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
                   <Input id={`add-${k}`} type={type} placeholder={ph} value={form[k as keyof typeof form]}
                     aria-required={k === "name" ? "true" : undefined}
+                    autoFocus={k === "name"}
                     onChange={(e) => {
                       const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                       setForm((p) => ({ ...p, [k]: val }));
