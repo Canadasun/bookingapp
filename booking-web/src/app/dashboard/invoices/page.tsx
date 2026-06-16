@@ -147,16 +147,16 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Client (optional)</label>
-              <select value={clientId} onChange={(e) => setClientId(e.target.value)}
+              <label htmlFor="inv-client" className="block text-sm font-medium text-gray-700 mb-1">Client (optional)</label>
+              <select id="inv-client" value={clientId} onChange={(e) => setClientId(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
                 <option value="">— None —</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due date (optional)</label>
-              <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+              <label htmlFor="inv-due" className="block text-sm font-medium text-gray-700 mb-1">Due date (optional)</label>
+              <Input id="inv-due" type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
             </div>
           </div>
 
@@ -176,8 +176,8 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <Textarea placeholder="Thank-you note, additional info…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="resize-none" />
+            <label htmlFor="inv-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+            <Textarea id="inv-notes" placeholder="Thank-you note, additional info…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="resize-none" />
           </div>
 
           {/* Advanced fields toggle */}

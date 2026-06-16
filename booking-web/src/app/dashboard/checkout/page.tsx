@@ -249,7 +249,7 @@ export default function CheckoutPage() {
           {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-500">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "h:mm a") : format(parseISO(selectedSlot!.startsAtLocal), "h:mm a")}</p>}
           <p className="text-gray-700"><span className="text-gray-500">Provider: </span>{providerText(customStartsAt ? customStaff?.user.name : selectedSlot?.staffName)}</p>
           <p className="text-gray-700"><span className="text-gray-500">Duration: </span>{fmtDuration(totalMins)}</p>
-          <p className="font-semibold text-violet-700"><span className="text-gray-500">Total: </span>{fmtPrice(totalCents)}</p>
+          <p className="font-semibold text-violet-700"><span className="text-gray-500">Total: </span>{fmtPrice(totalCents, biz?.currency ?? "CAD")}</p>
         </div>
         <Button onClick={reset} className="w-full">New booking</Button>
       </div>
@@ -361,7 +361,7 @@ export default function CheckoutPage() {
                       <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(svc.durationMinutes)}</p>
                     </div>
                     <div className="text-right shrink-0 mr-2">
-                      <p className={cn("font-bold text-sm", sel ? "text-violet-600" : "text-gray-700")}>{fmtPrice(svc.priceCents)}</p>
+                      <p className={cn("font-bold text-sm", sel ? "text-violet-600" : "text-gray-700")}>{fmtPrice(svc.priceCents, biz?.currency ?? "CAD")}</p>
                     </div>
                     <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0",
                       sel ? "border-violet-600 bg-violet-600" : "border-gray-300")}>
@@ -377,7 +377,7 @@ export default function CheckoutPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold text-violet-700">
                   <Clock className="w-3.5 h-3.5" />{fmtDuration(totalMins)}
                 </div>
-                <span className="text-sm font-bold text-violet-700">{fmtPrice(totalCents)}</span>
+                <span className="text-sm font-bold text-violet-700">{fmtPrice(totalCents, biz?.currency ?? "CAD")}</span>
               </div>
             )}
 
@@ -575,7 +575,7 @@ export default function CheckoutPage() {
                 { label: "Date", value: customStartsAt ? format(new Date(customStartsAt), "EEE, MMM d, yyyy") : selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
                 { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "h:mm a") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "h:mm a") : "—", icon: Check },
                 { label: "Calendar", value: customStartsAt || overrideCalendar ? "Owner override" : "Available slot", icon: Check },
-                { label: "Total", value: fmtPrice(totalCents), icon: Check },
+                { label: "Total", value: fmtPrice(totalCents, biz?.currency ?? "CAD"), icon: Check },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between py-2.5 border-b border-gray-50 last:border-0">
                   <span className="text-gray-500">{label}</span>

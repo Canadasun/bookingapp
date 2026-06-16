@@ -122,7 +122,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
         onCancel={() => setTimeOffToDelete(null)}
       />
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/staff" className="text-gray-400 hover:text-gray-600"><ChevronLeft className="w-5 h-5" /></Link>
+        <Link href="/dashboard/staff" aria-label="Back to staff" className="text-gray-400 hover:text-gray-600"><ChevronLeft className="w-5 h-5" /></Link>
         <div>
           <h2 className="text-xl font-bold text-gray-900">{staff.user.name}</h2>
           {staff.user.email && <p className="text-sm text-gray-500">{staff.user.email}</p>}
@@ -178,7 +178,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
                 <Input id="timeoff-end" type="datetime-local" value={toForm.endsAt} onChange={(e) => setToForm((p) => ({ ...p, endsAt: e.target.value }))} />
               </div>
             </div>
-            <Input placeholder="Reason (optional)" value={toForm.reason} onChange={(e) => setToForm((p) => ({ ...p, reason: e.target.value }))} />
+            <Input aria-label="Reason for time off" placeholder="Reason (optional)" value={toForm.reason} onChange={(e) => setToForm((p) => ({ ...p, reason: e.target.value }))} />
             <Button size="sm" variant="secondary" onClick={addTimeOff} loading={saving} className="gap-1">
               <Plus className="w-4 h-4" /> Add time off
             </Button>

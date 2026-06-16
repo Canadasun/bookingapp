@@ -50,7 +50,7 @@ export default function ReportsPage() {
     const completed = appts.filter((a) => a.status === "COMPLETED");
     const cancelled = appts.filter((a) => a.status === "CANCELLED");
     const noShow = appts.filter((a) => a.status === "NO_SHOW");
-    const serviceValue = completed.reduce((s, a) => s + (a.totalPriceCents || a.service.priceCents), 0);
+    const serviceValue = completed.reduce((s, a) => s + (a.totalPriceCents ?? a.service.priceCents), 0);
     const collected = payments
       .filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED")
       .reduce((s, p) => s + (p.amountCents - (p.refundedCents ?? 0)), 0);
@@ -73,7 +73,7 @@ export default function ReportsPage() {
     for (const a of appts) {
       const e = svc.get(a.service.id) ?? { name: a.service.name, count: 0, cents: 0 };
       e.count += 1;
-      if (a.status === "COMPLETED") e.cents += (a.totalPriceCents || a.service.priceCents);
+      if (a.status === "COMPLETED") e.cents += (a.totalPriceCents ?? a.service.priceCents);
       svc.set(a.service.id, e);
     }
     const topServices = Array.from(svc.values()).sort((a, b) => b.count - a.count).slice(0, 5);

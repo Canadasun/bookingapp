@@ -297,27 +297,27 @@ export default function StaffPage() {
           tabIndex={-1}
           onKeyDown={(e) => e.key === "Escape" && setEditingLocation(null)}
         >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingLocation(null)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setEditingLocation(null)} />
           <Card className="dashboard-safe-bottom relative w-full max-w-sm max-h-[92dvh] overflow-y-auto z-10">
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 id="location-modal-title" className="font-semibold text-gray-900">Edit location</h3>
             </div>
             <CardContent className="space-y-3 pt-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
-                <Input autoFocus value={locForm.name} onChange={(e) => setLocForm((p) => ({ ...p, name: e.target.value }))} placeholder="Downtown" />
+                <label htmlFor="loc-name" className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
+                <Input id="loc-name" autoFocus value={locForm.name} onChange={(e) => setLocForm((p) => ({ ...p, name: e.target.value }))} placeholder="Downtown" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                <Input value={locForm.address} onChange={(e) => setLocForm((p) => ({ ...p, address: e.target.value }))} placeholder="123 Main St" />
+                <label htmlFor="loc-address" className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                <Input id="loc-address" value={locForm.address} onChange={(e) => setLocForm((p) => ({ ...p, address: e.target.value }))} placeholder="123 Main St" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-                <Input value={locForm.phone} onChange={(e) => setLocForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 0000" />
+                <label htmlFor="loc-phone" className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                <Input id="loc-phone" value={locForm.phone} onChange={(e) => setLocForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 0000" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
-                <Input value={locForm.timezone} onChange={(e) => setLocForm((p) => ({ ...p, timezone: e.target.value }))} placeholder="America/Toronto" />
+                <label htmlFor="loc-timezone" className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
+                <Input id="loc-timezone" value={locForm.timezone} onChange={(e) => setLocForm((p) => ({ ...p, timezone: e.target.value }))} placeholder="America/Toronto" />
               </div>
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
                 <span className="text-sm text-gray-700">Active</span>
@@ -401,26 +401,26 @@ export default function StaffPage() {
           tabIndex={-1}
           onKeyDown={(e) => e.key === "Escape" && setShowModal(false)}
         >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setShowModal(false)} />
           <Card className="dashboard-safe-bottom relative w-full max-w-md z-10 max-h-[90dvh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-100">
               <h3 id="staff-modal-title" className="font-semibold text-gray-900">{editing ? `Edit ${editing.user.name}` : "Add staff member"}</h3>
             </div>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full name *</label>
-                <Input autoFocus placeholder="Jane Smith" value={form.name} disabled={!!editing} onChange={(e) => setForm((p) => ({...p,name:e.target.value}))}/>
+                <label htmlFor="staff-name" className="block text-sm font-medium text-gray-700 mb-1">Full name *</label>
+                <Input id="staff-name" autoFocus placeholder="Jane Smith" value={form.name} disabled={!!editing} onChange={(e) => setForm((p) => ({...p,name:e.target.value}))}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <Input type="email" placeholder="jane@salon.com" value={form.email} disabled={!!editing} onChange={(e) => setForm((p) => ({...p,email:e.target.value}))}/>
+                <label htmlFor="staff-email" className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <Input id="staff-email" type="email" placeholder="jane@salon.com" value={form.email} disabled={!!editing} onChange={(e) => setForm((p) => ({...p,email:e.target.value}))}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio (optional)</label>
-                <Input placeholder="Specialises in…" value={form.bio} onChange={(e) => setForm((p) => ({...p,bio:e.target.value}))}/>
+                <label htmlFor="staff-bio" className="block text-sm font-medium text-gray-700 mb-1">Bio (optional)</label>
+                <Input id="staff-bio" placeholder="Specialises in…" value={form.bio} onChange={(e) => setForm((p) => ({...p,bio:e.target.value}))}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Photo (optional)</label>
+                <label htmlFor="staff-avatar" className="block text-sm font-medium text-gray-700 mb-2">Photo (optional)</label>
                 <ImageUpload value={form.avatarUrl || null} kind="AVATAR" shape="circle"
                   onChange={(url) => setForm((p) => ({ ...p, avatarUrl: url ?? "" }))} />
               </div>

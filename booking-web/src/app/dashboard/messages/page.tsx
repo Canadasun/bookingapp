@@ -98,9 +98,11 @@ export default function MessagesPage() {
 
   async function setSelectedArchived(archived: boolean) {
     if (!selected || !bizId) return;
-    await api.messages.archive(bizId, selected.clientId, archived);
-    setSelected(null); setMsgs([]); loadThreads();
-    toast.success(archived ? "Conversation archived" : "Conversation restored");
+    try {
+      await api.messages.archive(bizId, selected.clientId, archived);
+      setSelected(null); setMsgs([]); loadThreads();
+      toast.success(archived ? "Conversation archived" : "Conversation restored");
+    } catch { toast.error("Failed to update conversation"); }
   }
 
   return (

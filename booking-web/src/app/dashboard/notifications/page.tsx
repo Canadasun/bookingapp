@@ -365,8 +365,10 @@ export default function NotificationsPage() {
                     </div>
                   </div>
                   <Button size="sm" variant={d.enabled ? "outline" : "secondary"} onClick={async () => {
-                    await api.devices.setEnabled(d.id, !d.enabled);
-                    setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, enabled: !x.enabled } : x));
+                    try {
+                      await api.devices.setEnabled(d.id, !d.enabled);
+                      setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, enabled: !x.enabled } : x));
+                    } catch { toast.error("Failed to update device"); }
                   }}>
                     {d.enabled ? "Disable" : "Enable"}
                   </Button>

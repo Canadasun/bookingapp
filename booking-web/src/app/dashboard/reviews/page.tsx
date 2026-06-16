@@ -59,8 +59,10 @@ export default function ReviewsPage() {
 
   async function copyPublicLink() {
     if (!reviewUrl) return;
-    await navigator.clipboard.writeText(reviewUrl);
-    toast.success("Public review link copied");
+    try {
+      await navigator.clipboard.writeText(reviewUrl);
+      toast.success("Public review link copied");
+    } catch { toast.error("Could not copy link"); }
   }
 
   return (

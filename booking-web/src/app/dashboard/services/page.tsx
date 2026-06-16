@@ -129,8 +129,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
-            <select value={form.categoryId} onChange={e => f("categoryId", e.target.value)}
+            <label htmlFor="svc-categoryId" className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+            <select id="svc-categoryId" value={form.categoryId} onChange={e => f("categoryId", e.target.value)}
               className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
               <option value="">— No category —</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -142,8 +142,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
             { k: "description",     label: "Description",        type: "text",   ph: "Optional detail" },
           ].map(({ k, label, type, ph }) => (
             <div key={k}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-              <Input type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
+              <label htmlFor={`svc-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+              <Input id={`svc-${k}`} type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
                 onChange={e => f(k as keyof ServiceFormState, e.target.value)} />
             </div>
           ))}
@@ -177,8 +177,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
-            <Input type="number" placeholder="45.00" value={form.priceCents}
+            <label htmlFor="svc-priceCents" className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
+            <Input id="svc-priceCents" type="number" placeholder="45.00" value={form.priceCents}
               onChange={e => f("priceCents", e.target.value)}
               min={0} step="0.01" />
           </div>
@@ -208,8 +208,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
             { k: "bufferAfterMin",  label: "Buffer after (min)",  type: "number", ph: "0" },
           ].map(({ k, label, type, ph }) => (
             <div key={k}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-              <Input type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
+              <label htmlFor={`svc-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+              <Input id={`svc-${k}`} type={type} placeholder={ph} value={form[k as keyof ServiceFormState] as string}
                 onChange={e => f(k as keyof ServiceFormState, e.target.value)}
                 min={0} />
             </div>
@@ -218,8 +218,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
           {/* Room / resource this service occupies */}
           {resources.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Room / resource</label>
-              <select value={form.resourceId} onChange={e => f("resourceId", e.target.value)}
+              <label htmlFor="svc-resourceId" className="block text-sm font-medium text-gray-700 mb-1.5">Room / resource</label>
+              <select id="svc-resourceId" value={form.resourceId} onChange={e => f("resourceId", e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                 <option value="">— None —</option>
                 {resources.filter(r => r.active).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
@@ -303,12 +303,12 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
         </div>
         <CardContent className="space-y-4 pt-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category name *</label>
-            <Input placeholder="e.g. Hair Services" value={name} onChange={e => setName(e.target.value)} autoFocus />
+            <label htmlFor="cat-name" className="block text-sm font-medium text-gray-700 mb-1">Category name *</label>
+            <Input id="cat-name" placeholder="e.g. Hair Services" value={name} onChange={e => setName(e.target.value)} autoFocus />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <Input placeholder="Optional" value={desc} onChange={e => setDesc(e.target.value)} />
+            <label htmlFor="cat-desc" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <Input id="cat-desc" placeholder="Optional" value={desc} onChange={e => setDesc(e.target.value)} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
@@ -555,7 +555,7 @@ export default function ServicesPage() {
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={() => toggleResourceActive(r)}
-                              title={r.active ? "Deactivate" : "Activate"}
+                              aria-label={r.active ? "Deactivate" : "Activate"}
                               className={cn(
                                 "text-xs px-2 py-0.5 rounded-full border font-medium transition-colors",
                                 r.active
@@ -566,13 +566,13 @@ export default function ServicesPage() {
                             </button>
                             <button
                               onClick={() => setEditingResource({ id: r.id, name: r.name })}
-                              title="Rename"
+                              aria-label="Rename"
                               className="p-1 text-gray-400 hover:text-gray-700 rounded">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setResourceToDelete(r)}
-                              title="Delete"
+                              aria-label="Delete"
                               className="p-1 text-gray-400 hover:text-red-600 rounded">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -633,10 +633,12 @@ export default function ServicesPage() {
                     </button>
                     <div className="flex gap-1 shrink-0">
                       <button onClick={() => { setEditCat(cat); setCatModal(true); }}
+                        aria-label={`Edit ${cat.name} category`}
                         className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => setCategoryToDelete(cat)}
+                        aria-label={`Delete ${cat.name} category`}
                         className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -685,10 +687,12 @@ export default function ServicesPage() {
                 <span className="text-xs text-gray-400">— empty</span>
                 <div className="ml-auto flex gap-1">
                   <button onClick={() => { setEditCat(cat); setCatModal(true); }}
+                    aria-label={`Edit ${cat.name} category`}
                     className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => setCategoryToDelete(cat)}
+                    aria-label={`Delete ${cat.name} category`}
                     className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

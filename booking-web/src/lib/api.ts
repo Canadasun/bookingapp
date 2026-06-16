@@ -82,7 +82,7 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
 
 export interface Business {
   id: string; name: string; slug: string; timezone: string;
-  email: string; phone?: string; address?: string; logoUrl?: string;
+  email: string; phone?: string; address?: string; logoUrl?: string; brandColor?: string;
   websiteUrl?: string; instagramUrl?: string; facebookUrl?: string; tiktokUrl?: string; postVisitMessage?: string;
   bookingPageSettings: Record<string, unknown>;
   notificationSettings?: NotificationSettings;

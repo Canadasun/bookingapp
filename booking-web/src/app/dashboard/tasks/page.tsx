@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
-import { Plus, Check, Trash2, Circle, CalendarClock, User } from "lucide-react";
+import { Plus, Check, Trash2, CalendarClock, User } from "lucide-react";
 import { toast } from "sonner";
 import { api, TaskItem, StaffMember } from "@/lib/api";
 import { getUser } from "@/lib/auth";

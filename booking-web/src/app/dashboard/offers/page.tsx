@@ -141,7 +141,7 @@ export default function OffersPage() {
           tabIndex={-1}
           onKeyDown={(e) => e.key === "Escape" && setShowModal(false)}
         >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setShowModal(false)} />
           <Card className="relative w-full max-w-md z-10">
             <CardHeader><CardTitle id="offer-modal-title">{editing ? "Edit offer" : "New offer"}</CardTitle></CardHeader>
             <CardContent className="space-y-4">

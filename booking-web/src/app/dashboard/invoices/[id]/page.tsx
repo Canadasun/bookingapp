@@ -274,17 +274,20 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 {lines.map((li, i) => (
                   <div key={i} className="grid grid-cols-[1fr_56px_88px_88px_32px] gap-2 px-4 py-2.5 border-b border-gray-50 items-center">
                     <Input
+                      aria-label={`Description for line ${i + 1}`}
                       value={li.description}
                       onChange={(e) => setLines((prev) => prev.map((l, j) => j === i ? { ...l, description: e.target.value } : l))}
                       placeholder="Service or item"
                       className="h-7 text-xs"
                     />
                     <Input
+                      aria-label={`Quantity for line ${i + 1}`}
                       type="number" min={1} value={li.quantity}
                       onChange={(e) => setLines((prev) => prev.map((l, j) => j === i ? { ...l, quantity: Number(e.target.value) } : l))}
                       className="h-7 text-xs text-center"
                     />
                     <Input
+                      aria-label={`Unit price for line ${i + 1}`}
                       type="number" min={0} step="0.01" value={(li.unitCents / 100).toFixed(2)}
                       onChange={(e) => setLines((prev) => prev.map((l, j) => j === i ? { ...l, unitCents: Math.round(Number(e.target.value) * 100) } : l))}
                       className="h-7 text-xs text-right"
