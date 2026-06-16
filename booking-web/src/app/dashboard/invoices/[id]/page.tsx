@@ -180,7 +180,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       <div ref={printRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm print:shadow-none print:border-0 print:rounded-none overflow-hidden">
 
         {/* Header band */}
-        <div className="px-8 py-7 flex items-start justify-between gap-4" style={{ backgroundColor: biz?.brandColor ?? "#f59e0b" }}>
+        <div className="px-8 py-7 flex items-start justify-between gap-4" style={{ backgroundColor: (biz?.bookingPageSettings as { brandColor?: string } | undefined)?.brandColor ?? "#7c3aed" }}>
           <div className="flex items-center gap-3">
             {biz?.logoUrl
               // eslint-disable-next-line @next/next/no-img-element
