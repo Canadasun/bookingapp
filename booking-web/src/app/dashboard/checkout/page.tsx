@@ -58,9 +58,13 @@ export default function CheckoutPage() {
 
   const user = getUser();
   const bizId = user?.businessId ?? "";
+  const [bizIdError, setBizIdError] = useState("");
 
   useEffect(() => {
-    if (!bizId) return;
+    if (!bizId) {
+      setBizIdError("No business account is linked to your account. Please contact support.");
+      return;
+    }
     api.business.get(bizId).then(setBiz).catch(() => {});
     api.services.listAll(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
     api.staff.listAll(bizId).then((all) => setAllStaffList(all.filter((st) => st.active))).catch(() => {});
@@ -222,6 +226,12 @@ export default function CheckoutPage() {
     : ["client", "services", "datetime", "confirm"];
   const customStartsAt = customStartsAtValue();
   const customStaff = resolvedCustomStaff();
+
+  if (bizIdError) return (
+    <div className="max-w-lg mx-auto text-center py-16">
+      <p className="text-red-500 font-medium mb-2">{bizIdError}</p>
+    </div>
+  );
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (booked) return (

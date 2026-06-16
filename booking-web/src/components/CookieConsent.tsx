@@ -47,9 +47,10 @@ export function CookieConsent({ clarityId }: CookieConsentProps) {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Cookie preferences"
+          aria-labelledby="cookie-consent-title"
           className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-xl px-4 py-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center gap-4"
         >
+          <span id="cookie-consent-title" className="sr-only">Cookie preferences</span>
           <p className="text-sm text-gray-700 flex-1 leading-relaxed">
             We use analytics cookies to improve your experience. See our{" "}
             <a href="/privacy" className="text-violet-600 underline hover:text-violet-700">

@@ -51,7 +51,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
     clientPhone: formatPhoneDisplay(apt.client.phone),
     startsAt: format(new Date(apt.startsAt), "yyyy-MM-dd'T'HH:mm"),
     notes: apt.notes ?? "",
-    notifyClient: "true",
+    notifyClient: true,
   });
   const [acting, setActing] = useState<string | null>(null);
 
@@ -187,15 +187,22 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
-                  checked={edit.notifyClient === "true"}
-                  onChange={(e) => setEdit((p) => ({ ...p, notifyClient: e.target.checked ? "true" : "false" }))}
+                  checked={edit.notifyClient}
+                  onChange={(e) => setEdit((p) => ({ ...p, notifyClient: e.target.checked }))}
                   className="h-4 w-4 accent-violet-600"
                 />
                 Notify client by email
               </label>
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowEditForm(false)}>Back</Button>
-                <Button size="sm" className="flex-1" loading={acting === "edit"} onClick={() => act("edit", edit)}>
+                <Button size="sm" className="flex-1" loading={acting === "edit"} onClick={() => act("edit", {
+                  clientName: edit.clientName,
+                  clientEmail: edit.clientEmail,
+                  clientPhone: edit.clientPhone,
+                  startsAt: edit.startsAt,
+                  notes: edit.notes,
+                  notifyClient: String(edit.notifyClient),
+                })}>
                   Save changes
                 </Button>
               </div>
@@ -307,6 +314,8 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
                   <button key={a.id} onClick={() => onSelect(a)}
                     draggable
                     onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
+                    aria-label={`${format(new Date(a.startsAt), "h:mm a")} – ${a.client.name}`}
+                    title="Drag to move to another day, or click to open and use Edit to change date/time"
                     className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100 cursor-grab active:cursor-grabbing">
                     <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
                     <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "h:mm a")} {a.client.name}</span>
@@ -408,15 +417,15 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" aria-hidden="true">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-apt-modal-title"
         onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
         tabIndex={-1}
-        aria-hidden="false"
-        className="dashboard-safe-bottom bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md sm:mx-4 max-h-[92dvh] overflow-y-auto p-4 sm:p-6">
+        className="dashboard-safe-bottom relative z-10 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md sm:mx-4 max-h-[92dvh] overflow-y-auto p-4 sm:p-6">
         <div className="flex items-center justify-between mb-5">
           <p id="new-apt-modal-title" className="text-base font-semibold text-gray-900">New appointment</p>
           <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
@@ -809,12 +818,15 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
                       draggable
                       onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
                       onClick={() => onSelect(a)}
+                      aria-label={`${format(new Date(a.startsAt), "h:mm a")} – ${a.client.name}, ${a.service?.name ?? ""}`}
+                      title="Drag to move to another day, or click to open and use Edit to change date/time"
                       className={cn(
                         "z-10 rounded-md text-left overflow-hidden border text-white cursor-grab active:cursor-grabbing hover:brightness-95 transition-all",
-                        STATUS_DOT[a.status] === "bg-emerald-500" ? "bg-emerald-500 border-emerald-600"
-                          : STATUS_DOT[a.status] === "bg-red-500"     ? "bg-red-500 border-red-600"
-                          : STATUS_DOT[a.status] === "bg-gray-400"    ? "bg-gray-400 border-gray-500"
-                          : "bg-violet-500 border-violet-600",
+                        a.status === "CONFIRMED"  ? "bg-emerald-500 border-emerald-600"
+                          : a.status === "COMPLETED"  ? "bg-violet-500 border-violet-600"
+                          : a.status === "NO_SHOW"    ? "bg-red-400 border-red-500"
+                          : a.status === "CANCELLED"  ? "bg-gray-300 border-gray-400 text-gray-700"
+                          : "bg-amber-400 border-amber-500",
                       )}>
                       <div className="px-1.5 pt-1 leading-tight">
                         <p className="text-[10px] font-bold truncate">{format(new Date(a.startsAt), "h:mm a")}</p>

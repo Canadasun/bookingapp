@@ -51,9 +51,9 @@ function groupSlots<T extends Slot>(slots: T[]) {
 function StepBar({ labels, current }: { labels: string[]; current: number }) {
   const STEPS = labels;
   return (
-    <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+    <ol aria-label="Booking steps" className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 list-none p-0 m-0">
       {STEPS.map((label, i) => (
-        <div key={label} className="flex items-center gap-2 shrink-0">
+        <li key={label} className="flex items-center gap-2 shrink-0" aria-current={i === current ? "step" : undefined}>
           <div className={cn(
             "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
             i < current ? "bg-violet-600 text-white" :
@@ -64,9 +64,9 @@ function StepBar({ labels, current }: { labels: string[]; current: number }) {
           </div>
           <span className={cn("text-sm font-medium shrink-0", i === current ? "text-gray-900" : "text-gray-400")}>{label}</span>
           {i < STEPS.length - 1 && <ChevronRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />}
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
@@ -936,18 +936,21 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   {/* Intake / consultation questions (owner-defined) */}
                   {(biz?.intakeQuestions ?? []).map((q) => (
                     <div key={q.id}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      <label htmlFor={`intake-${q.id}`} className="block text-sm font-medium text-gray-700 mb-1.5">
                         {q.label}{q.required ? " *" : ""}
                       </label>
                       <textarea
+                        id={`intake-${q.id}`}
                         value={intake[q.id] ?? ""}
                         onChange={(e) => { setIntake((p) => ({ ...p, [q.id]: e.target.value })); setErrs((p) => ({ ...p, [`intake_${q.id}`]: "" })); }}
                         placeholder="Your answer"
+                        aria-required={q.required || undefined}
+                        aria-describedby={errs[`intake_${q.id}`] ? `intake-err-${q.id}` : undefined}
                         className={cn(
                           "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 min-h-[64px]",
                           errs[`intake_${q.id}`] ? "border-red-400" : "border-gray-200",
                         )} />
-                      {errs[`intake_${q.id}`] && <p className="text-xs text-red-500 mt-1">{errs[`intake_${q.id}`]}</p>}
+                      {errs[`intake_${q.id}`] && <p id={`intake-err-${q.id}`} className="text-xs text-red-500 mt-1">{errs[`intake_${q.id}`]}</p>}
                     </div>
                   ))}
 
