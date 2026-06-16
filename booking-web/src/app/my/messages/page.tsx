@@ -31,7 +31,7 @@ export default function ClientMessagesPage() {
       const data = await api.clientPortal.messages();
       setThreads(data);
       if (selected) {
-        const updated = data.find((t) => t.businessId === selected.businessId);
+        const updated = data.find((t) => t.businessId === selected.businessId && t.clientId === selected.clientId);
         if (updated) setSelected(updated);
       }
     }
@@ -106,6 +106,9 @@ export default function ClientMessagesPage() {
                 </div>
               </div>
             ))}
+            {selected.messages.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
+            )}
           </div>
           <div className="p-4 border-t border-gray-100 bg-white flex gap-2">
             <Input placeholder="Message…" value={reply} onChange={(e) => setReply(e.target.value)}

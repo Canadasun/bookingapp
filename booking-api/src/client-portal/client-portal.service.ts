@@ -40,11 +40,12 @@ export class ClientPortalService {
       include: {
         business: { select: { id: true, name: true } },
         messages: { orderBy: { createdAt: 'asc' } },
+        _count: { select: { appointments: true } },
       },
     });
 
     return clients
-      .filter((c) => c.messages.length > 0)
+      .filter((c) => c.messages.length > 0 || c._count.appointments > 0)
       .map((c) => ({
         businessId: c.business.id,
         businessName: c.business.name,

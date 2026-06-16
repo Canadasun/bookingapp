@@ -78,19 +78,23 @@ export default function MessagesPage() {
       setMsgs(data);
       setTimeout(() => scrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 50);
       // Surface how the reply was delivered (in-app always; SMS for Basic+ when eligible).
-      if (res?.sms?.sent) toast.success("Sent — also texted to the client");
-      else if (res?.sms?.reason === "client_must_text_first") toast.success("Sent in-app — they'll get a text once they message you first");
+      if (res?.sms?.sent) toast.success("Sent and texted to the client");
+      else if (res?.sms?.reason === "client_must_text_first") toast.success("Sent in-app. SMS is available after the client texts first.");
+      else if (res?.sms?.reason === "send_failed") toast.warning("Sent in-app, but the SMS could not be delivered.");
+      else if (res?.sms?.reason === "no_phone") toast.success("Sent in-app. This client has no phone number for SMS.");
+      else if (res?.sms?.reason === "plan_not_eligible") toast.success("Sent in-app.");
+      loadThreads();
     } catch { toast.error("Failed to send"); }
     finally { setSending(false); }
   }
 
-  const unread = threads.filter((t) => t.fromClient && !t.read).length;
+  const unread = threads.reduce((sum, t) => sum + t.unreadCount, 0);
 
-  async function archiveSelected() {
+  async function setSelectedArchived(archived: boolean) {
     if (!selected || !bizId) return;
-    await api.messages.archive(bizId, selected.clientId, true);
+    await api.messages.archive(bizId, selected.clientId, archived);
     setSelected(null); setMsgs([]); loadThreads();
-    toast.success("Conversation archived");
+    toast.success(archived ? "Conversation archived" : "Conversation restored");
   }
 
   return (
@@ -194,7 +198,9 @@ export default function MessagesPage() {
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-2 py-1 shrink-0">
                 <Mail className="w-3 h-3" /> In-app · <Smartphone className="w-3 h-3" /> SMS
               </span>
-              <button onClick={archiveSelected} className="text-xs font-semibold text-gray-500 hover:text-red-600">Archive</button>
+              <button onClick={() => setSelectedArchived(!selected.archived)} className="text-xs font-semibold text-gray-500 hover:text-red-600">
+                {selected.archived ? "Restore" : "Archive"}
+              </button>
             </div>
 
             {/* Messages */}

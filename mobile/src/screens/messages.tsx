@@ -21,6 +21,7 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   const navigation = useNavigation<any>();
   const [threads, setThreads]   = useState<Array<{clientId:string;client:{name:string;email?:string|null};lastMessage:string;fromClient:boolean;read:boolean;unreadCount:number;archived?:boolean;createdAt:string}>>([]);
   const [selected, setSelected] = useState<Client|null>(null);
+  const [selectedArchived, setSelectedArchived] = useState(false);
   const [msgs, setMsgs]         = useState<Message[]>([]);
   const [reply, setReply]       = useState('');
   const [sending, setSending]   = useState(false);
@@ -55,7 +56,7 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   }, [loadThreads]);
 
   useEffect(()=>{
-    if (initialClient) { openThread(initialClient); onClearClient(); }
+    if (initialClient) { openThread(initialClient, false); onClearClient(); }
   },[initialClient]);
 
   async function loadMessages(clientId: string) {
@@ -66,8 +67,9 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     } catch {}
   }
 
-  async function openThread(c:Client) {
+  async function openThread(c:Client, archived = false) {
     setSelected(c);
+    setSelectedArchived(archived);
     try {
       const data = await api<Message[]>(`/businesses/${bizId()}/clients/${c.id}/messages`);
       setMsgs(data);
@@ -89,9 +91,11 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     if (!reply.trim()||!selected) return;
     setSending(true);
     try {
-      await api(`/businesses/${bizId()}/clients/${selected.id}/messages/reply`,{
+      const res = await api<{sms?:{sent:boolean;reason?:string}}>(`/businesses/${bizId()}/clients/${selected.id}/messages/reply`,{
         method:'POST', body:JSON.stringify({content:reply.trim()}),
       });
+      if (res?.sms?.reason === 'send_failed') Alert.alert('Sent in-app', 'The SMS could not be delivered.');
+      else if (res?.sms?.reason === 'client_must_text_first') Alert.alert('Sent in-app', 'SMS is available after the client texts first.');
       setReply('');
       const data = await api<Message[]>(`/businesses/${bizId()}/clients/${selected.id}/messages`);
       setMsgs(data);
@@ -108,8 +112,8 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
           <Ionicons name="arrow-back" size={22} color={GRAY_700}/>
         </TouchableOpacity>
         <Text style={s.headerTitle} numberOfLines={1}>{selected.name}</Text>
-        <TouchableOpacity onPress={async()=>{try{await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:true})});setSelected(null);loadThreads();}catch(e){Alert.alert('Could not archive',e instanceof Error?e.message:'Please try again.');}}}
-          accessibilityRole="button" accessibilityLabel="Archive conversation"><Text style={{color:'#DC2626',fontWeight:'700'}}>Archive</Text></TouchableOpacity>
+        <TouchableOpacity onPress={async()=>{try{const next=!selectedArchived;await api(`/businesses/${bizId()}/messages/${selected.id}/archive`,{method:'PATCH',body:JSON.stringify({archived:next})});setSelected(null);loadThreads();}catch(e){Alert.alert(selectedArchived?'Could not restore':'Could not archive',e instanceof Error?e.message:'Please try again.');}}}
+          accessibilityRole="button" accessibilityLabel={selectedArchived?'Restore conversation':'Archive conversation'}><Text style={{color:'#DC2626',fontWeight:'700'}}>{selectedArchived?'Restore':'Archive'}</Text></TouchableOpacity>
       </View>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={Platform.OS==='ios'?88:0}>
         <ScrollView ref={scrollRef} contentContainerStyle={{padding:16}} showsVerticalScrollIndicator={false}>
@@ -164,7 +168,7 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
           showsVerticalScrollIndicator={false}
           renderItem={({item:t})=>(
             <TouchableOpacity style={[s.card, t.unreadCount>0 && { borderColor:'#FCA5A5', backgroundColor:'#FEF2F2' }]} activeOpacity={0.7}
-              onPress={()=>openThread({id:t.clientId,...t.client})}
+              onPress={()=>openThread({id:t.clientId,...t.client}, !!t.archived)}
               accessibilityRole="button"
               accessibilityLabel={`Open conversation with ${t.client.name}`}>
               <View style={s.avatar}><Text style={s.avatarText}>{t.client.name.slice(0,2).toUpperCase()}</Text></View>

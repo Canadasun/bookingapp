@@ -11,8 +11,13 @@ function build() {
       groupBy: jest.fn().mockResolvedValue([{ clientId: 'c1', _count: { _all: 2 } }]),
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
     },
+    staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1' }) },
+    appointment: { findFirst: jest.fn().mockResolvedValue({ id: 'apt1' }) },
     user: { findMany: jest.fn().mockResolvedValue([{ id: 'owner1' }]) },
-    client: { findUnique: jest.fn().mockResolvedValue({ name: 'Jane' }) },
+    client: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'c1' }),
+      findUnique: jest.fn().mockResolvedValue({ name: 'Jane' }),
+    },
     notification: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
   };
   const events = { emitMessageUpdate: jest.fn() };
@@ -36,6 +41,14 @@ describe('MessagesService priority unread handling', () => {
     await svc.send('biz1', 'c1', 'I cannot find the salon', true);
 
     expect(prisma.notification.createMany).toHaveBeenCalled();
+    expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          { role: 'OWNER' },
+          expect.objectContaining({ role: 'STAFF' }),
+        ]),
+      }),
+    }));
     expect(events.emitMessageUpdate).toHaveBeenCalledWith('biz1', {
       clientId: 'c1', unreadMessages: 2, unreadThreads: 1,
     });
@@ -53,5 +66,44 @@ describe('MessagesService priority unread handling', () => {
     expect(events.emitMessageUpdate).toHaveBeenCalledWith('biz1', {
       clientId: 'c1', unreadMessages: 0, unreadThreads: 0,
     });
+  });
+
+  it('allows a staff user to access only clients assigned through appointments', async () => {
+    const { svc, prisma } = build();
+
+    await expect(svc.assertBusinessUserCanAccessClient(
+      { id: 'user1', role: 'STAFF', businessId: 'biz1' },
+      'biz1',
+      'c1',
+    )).resolves.toBeUndefined();
+
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: 'user1', businessId: 'biz1', active: true },
+    }));
+    expect(prisma.appointment.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { businessId: 'biz1', clientId: 'c1', staffId: 'staff1' },
+    }));
+  });
+
+  it('rejects a staff user with no appointment for the client', async () => {
+    const { svc, prisma } = build();
+    prisma.appointment.findFirst.mockResolvedValueOnce(null);
+
+    await expect(svc.assertBusinessUserCanAccessClient(
+      { id: 'user1', role: 'STAFF', businessId: 'biz1' },
+      'biz1',
+      'c1',
+    )).rejects.toThrow('FORBIDDEN_CLIENT');
+  });
+
+  it('rejects business users when the client is outside the business', async () => {
+    const { svc, prisma } = build();
+    prisma.client.findFirst.mockResolvedValueOnce(null);
+
+    await expect(svc.assertBusinessUserCanAccessClient(
+      { id: 'owner1', role: 'OWNER', businessId: 'biz1' },
+      'biz1',
+      'other-client',
+    )).rejects.toThrow('FORBIDDEN_CLIENT');
   });
 });

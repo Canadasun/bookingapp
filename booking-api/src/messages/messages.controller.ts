@@ -12,6 +12,15 @@ import { verifyAppointmentToken } from '../common/util/appointment-token';
 
 const SendSchema = z.object({ content: z.string().min(1).max(2000) });
 type SendDto = z.infer<typeof SendSchema>;
+type BusinessUser = { id: string; role: string; businessId: string | null };
+
+async function assertBusinessThreadAccess(svc: MessagesService, user: BusinessUser, businessId: string, clientId: string) {
+  try {
+    await svc.assertBusinessUserCanAccessClient(user, businessId, clientId);
+  } catch {
+    throw new ForbiddenException('You do not have access to this thread');
+  }
+}
 
 @ApiTags('messages')
 @Controller('businesses/:businessId/clients/:clientId/messages')
@@ -31,7 +40,8 @@ export class MessagesController {
     @CurrentUser() user?: { id: string; role: string; businessId: string | null },
   ) {
     const token = headerToken;
-    if (user && (user.role === 'ADMIN' || user.businessId === businessId)) {
+    if (user && user.role !== 'CLIENT') {
+      await assertBusinessThreadAccess(this.svc, user, businessId, clientId);
       return this.svc.getThread(businessId, clientId);
     }
 
@@ -96,9 +106,7 @@ export class MessagesController {
     @Body(new ZodValidationPipe(SendSchema)) dto: SendDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+    await assertBusinessThreadAccess(this.svc, user, businessId, clientId);
 
     const msg = await this.svc.send(businessId, clientId, dto.content, false);
     // FREE: in-app only — no SMS outreach.
@@ -117,15 +125,13 @@ export class MessagesController {
   @Patch('read')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  markRead(
+  async markRead(
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
-    return this.svc.markRead(businessId, clientId, user.id);
+    await assertBusinessThreadAccess(this.svc, user, businessId, clientId);
+    return this.svc.markRead(businessId, clientId, user.id, user);
   }
 }
 
@@ -149,7 +155,7 @@ export class BusinessMessagesController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.getBusinessThreads(businessId, user.id, { unreadOnly: unread === 'true', archived: archived === 'true', search: search?.slice(0, 100), channel });
+    return this.svc.getBusinessThreads(businessId, user, { unreadOnly: unread === 'true', archived: archived === 'true', search: search?.slice(0, 100), channel });
   }
 
   @Get('unread-count')
@@ -160,17 +166,17 @@ export class BusinessMessagesController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.getUnreadCount(businessId, user.id);
+    return this.svc.getUnreadCount(businessId, user.id, user);
   }
 
   @Patch(':clientId/archive')
-  archive(
+  async archive(
     @Param('businessId') businessId: string,
     @Param('clientId') clientId: string,
     @Body() body: { archived?: boolean },
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== businessId) throw new ForbiddenException('You do not have access to this business');
+    await assertBusinessThreadAccess(this.svc, user, businessId, clientId);
     return this.svc.setArchived(businessId, clientId, user.id, body.archived !== false);
   }
 }

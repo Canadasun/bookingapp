@@ -5,6 +5,9 @@ import { TwilioSmsProvider } from '../notifications/providers/sms.provider';
 import { EventsGateway } from '../events/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { isProPlan } from '../common/util/plan-features';
+import { Prisma } from '@prisma/client';
+
+type BusinessUser = { id: string; role: string; businessId: string | null };
 
 @Injectable()
 export class MessagesService {
@@ -21,7 +24,6 @@ export class MessagesService {
     return this.prisma.message.findMany({
       where: { businessId, clientId },
       orderBy: { createdAt: 'asc' },
-      take: 1000, // bound a single conversation
     });
   }
 
@@ -66,6 +68,67 @@ export class MessagesService {
     return false;
   }
 
+  async assertBusinessUserCanAccessClient(user: BusinessUser, businessId: string, clientId: string) {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, businessId },
+      select: { id: true },
+    });
+    if (!client) throw new Error('FORBIDDEN_CLIENT');
+
+    if (user.role === 'ADMIN') return;
+    if (user.businessId !== businessId) throw new Error('FORBIDDEN_BUSINESS');
+    if (user.role === 'OWNER') return;
+    if (user.role !== 'STAFF') throw new Error('FORBIDDEN_ROLE');
+
+    const staff = await this.prisma.staff.findFirst({
+      where: { userId: user.id, businessId, active: true },
+      select: { id: true },
+    });
+    if (!staff) throw new Error('FORBIDDEN_STAFF');
+
+    const assigned = await this.prisma.appointment.findFirst({
+      where: { businessId, clientId, staffId: staff.id },
+      select: { id: true },
+    });
+    if (!assigned) throw new Error('FORBIDDEN_CLIENT');
+  }
+
+  private async threadAccessWhere(businessId: string, user?: BusinessUser): Promise<Prisma.MessageWhereInput> {
+    const base: Prisma.MessageWhereInput = { businessId };
+    if (!user || user.role === 'ADMIN' || user.role === 'OWNER') return base;
+    if (user.businessId !== businessId) return { businessId: '__forbidden__' };
+    if (user.role !== 'STAFF') return { businessId: '__forbidden__' };
+    const staff = await this.prisma.staff.findFirst({
+      where: { userId: user.id, businessId, active: true },
+      select: { id: true },
+    });
+    if (!staff) return { businessId: '__forbidden__' };
+    return {
+      ...base,
+      client: { appointments: { some: { businessId, staffId: staff.id } } },
+    };
+  }
+
+  private async recipientUserIdsForClientMessage(businessId: string, clientId: string) {
+    const users = await this.prisma.user.findMany({
+      where: {
+        businessId,
+        OR: [
+          { role: 'OWNER' },
+          {
+            role: 'STAFF',
+            staff: {
+              active: true,
+              appointments: { some: { businessId, clientId } },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    return users.map((user) => user.id);
+  }
+
   async send(businessId: string, clientId: string, content: string, fromClient: boolean, channel: 'IN_APP' | 'SMS' = 'IN_APP') {
     const message = await this.prisma.message.create({
       data: { businessId, clientId, content, fromClient, channel },
@@ -84,18 +147,15 @@ export class MessagesService {
   }
 
   private async notifyBusinessUsersOfClientMessage(businessId: string, clientId: string, content: string, channel: 'IN_APP' | 'SMS') {
-    const [users, client] = await Promise.all([
-      this.prisma.user.findMany({
-        where: { businessId, role: { in: ['OWNER', 'STAFF'] } },
-        select: { id: true },
-      }),
+    const [userIds, client] = await Promise.all([
+      this.recipientUserIdsForClientMessage(businessId, clientId),
       this.prisma.client.findUnique({ where: { id: clientId }, select: { name: true } }),
     ]);
-    if (!users.length) return;
+    if (!userIds.length) return;
     const source = channel === 'SMS' ? 'text' : 'message';
     await this.prisma.notification.createMany({
-      data: users.map((u) => ({
-        userId: u.id,
+      data: userIds.map((userId) => ({
+        userId,
         kind: 'SYSTEM' as const,
         title: `Urgent: new ${source} from ${client?.name ?? 'a client'}`,
         body: content.slice(0, 140),
@@ -153,13 +213,17 @@ export class MessagesService {
       const recentMsg = await this.prisma.message.findFirst({ where: { clientId: { in: ids } }, orderBy: { createdAt: 'desc' }, select: { clientId: true } });
       const recentApt = recentMsg ? null : await this.prisma.appointment.findFirst({ where: { clientId: { in: ids } }, orderBy: { createdAt: 'desc' }, select: { clientId: true } });
       const pick = recentMsg?.clientId ?? recentApt?.clientId;
+      if (!pick) {
+        this.logger.warn(`Inbound SMS from ${phone} matched multiple clients with no activity; message was not routed.`);
+        return;
+      }
       target = clients.find((c) => c.id === pick) ?? target;
     }
 
     await this.send(target.businessId, target.id, body.slice(0, 2000), true, 'SMS');
   }
 
-  async markRead(businessId: string, clientId: string, userId?: string) {
+  async markRead(businessId: string, clientId: string, userId?: string, user?: BusinessUser) {
     const result = await this.prisma.message.updateMany({
       where: { businessId, clientId, fromClient: true, read: false },
       data: { read: true },
@@ -171,19 +235,19 @@ export class MessagesService {
         update: { lastReadAt: new Date(), archivedAt: null },
       });
     }
-    const unread = await this.getUnreadCount(businessId, userId);
+    const unread = await this.getUnreadCount(businessId, userId, user);
     this.events.emitMessageUpdate(businessId, { clientId, ...unread });
     return { ...result, ...unread };
   }
 
-  async getUnreadCount(businessId: string, userId?: string) {
+  async getUnreadCount(businessId: string, userId?: string, user?: BusinessUser) {
+    const accessWhere = await this.threadAccessWhere(businessId, user);
     if (userId) {
       const [messages, states] = await Promise.all([
         this.prisma.message.findMany({
-          where: { businessId, fromClient: true },
+          where: { ...accessWhere, fromClient: true },
           select: { clientId: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
-          take: 5000,
         }),
         this.prisma.messageThreadState.findMany({ where: { businessId, userId } }),
       ]);
@@ -202,40 +266,68 @@ export class MessagesService {
       };
     }
     const [unreadMessages, unreadGroups] = await Promise.all([
-      this.prisma.message.count({ where: { businessId, fromClient: true, read: false } }),
+      this.prisma.message.count({ where: { ...accessWhere, fromClient: true, read: false } }),
       this.prisma.message.groupBy({
         by: ['clientId'],
-        where: { businessId, fromClient: true, read: false },
+        where: { ...accessWhere, fromClient: true, read: false },
       }),
     ]);
     return { unreadMessages, unreadThreads: unreadGroups.length };
   }
 
-  async getBusinessThreads(businessId: string, userId?: string, filters: { unreadOnly?: boolean; archived?: boolean; search?: string; channel?: string } = {}) {
+  async getBusinessThreads(businessId: string, user?: BusinessUser, filters: { unreadOnly?: boolean; archived?: boolean; search?: string; channel?: string } = {}) {
+    const userId = user?.id;
     const states = userId
       ? await this.prisma.messageThreadState.findMany({ where: { businessId, userId } })
       : [];
     const stateByClient = new Map(states.map((state) => [state.clientId, state]));
-    const [messages, unreadGroups] = await Promise.all([
-      this.prisma.message.findMany({
-        where: {
-          businessId,
-          ...(filters.channel ? { channel: filters.channel } : {}),
-          ...(filters.search ? { OR: [
-            { content: { contains: filters.search, mode: 'insensitive' } },
-            { client: { name: { contains: filters.search, mode: 'insensitive' } } },
-          ] } : {}),
-        },
-        include: { client: { select: { id: true, name: true, email: true, phone: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 2000, // bound: newest messages are enough to surface active threads
+    const accessWhere = await this.threadAccessWhere(businessId, user);
+    const where: Prisma.MessageWhereInput = {
+      ...accessWhere,
+      ...(filters.channel ? { channel: filters.channel } : {}),
+      ...(filters.search ? { OR: [
+        { content: { contains: filters.search, mode: 'insensitive' } },
+        { client: { name: { contains: filters.search, mode: 'insensitive' } } },
+        { client: { email: { contains: filters.search, mode: 'insensitive' } } },
+        { client: { phone: { contains: filters.search, mode: 'insensitive' } } },
+      ] } : {}),
+    };
+    const [latestByClient, unreadGroups] = await Promise.all([
+      this.prisma.message.groupBy({
+        by: ['clientId'],
+        where,
+        _max: { createdAt: true },
+        orderBy: { _max: { createdAt: 'desc' } },
       }),
       this.prisma.message.groupBy({
         by: ['clientId'],
-        where: { businessId, fromClient: true, read: false },
+        where: { ...accessWhere, fromClient: true, read: false },
         _count: { _all: true },
       }),
     ]);
+    const messages = latestByClient.length ? await this.prisma.message.findMany({
+      where: {
+        OR: latestByClient.map((row) => ({
+          clientId: row.clientId,
+          createdAt: row._max.createdAt ?? new Date(0),
+        })),
+      },
+      include: { client: { select: { id: true, name: true, email: true, phone: true } } },
+      orderBy: { createdAt: 'desc' },
+    }) : [];
+    const unreadMessagesForState = userId ? await this.prisma.message.findMany({
+      where: { ...accessWhere, fromClient: true },
+      select: { clientId: true, createdAt: true },
+    }) : [];
+    const unreadByClientForState = new Map<string, number>();
+    if (userId) {
+      for (const message of unreadMessagesForState) {
+        const state = stateByClient.get(message.clientId);
+        if (!state?.lastReadAt || message.createdAt > state.lastReadAt) {
+          unreadByClientForState.set(message.clientId, (unreadByClientForState.get(message.clientId) ?? 0) + 1);
+        }
+      }
+    }
     const unreadByClient = new Map(unreadGroups.map((row) => [row.clientId, row._count._all]));
 
     // Group by clientId — return latest message per thread
@@ -247,7 +339,7 @@ export class MessagesService {
     return Array.from(threads.values()).map((m) => {
       const state = stateByClient.get(m.clientId);
       const unreadCount = userId
-        ? messages.filter((message) => message.clientId === m.clientId && message.fromClient && (!state?.lastReadAt || message.createdAt > state.lastReadAt)).length
+        ? unreadByClientForState.get(m.clientId) ?? 0
         : unreadByClient.get(m.clientId) ?? 0;
       return ({
       clientId: m.clientId,

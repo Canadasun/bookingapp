@@ -480,7 +480,19 @@ export class NotificationProcessor extends WorkerHost {
       if (!message || !message.fromClient) return;
       this.currentBusinessId = message.businessId;
       const users = await this.prisma.user.findMany({
-        where: { businessId: message.businessId, role: { in: ['OWNER', 'STAFF'] } },
+        where: {
+          businessId: message.businessId,
+          OR: [
+            { role: 'OWNER' },
+            {
+              role: 'STAFF',
+              staff: {
+                active: true,
+                appointments: { some: { businessId: message.businessId, clientId: message.clientId } },
+              },
+            },
+          ],
+        },
         select: { id: true },
       });
       await this.sendPushToUsers(users.map((user) => user.id), {
