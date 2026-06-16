@@ -75,7 +75,7 @@ export class InboxService {
     if (filters.channel && Object.values(DeliveryChannel).includes(filters.channel as DeliveryChannel)) {
       where.channel = filters.channel as DeliveryChannel;
     }
-    const search = filters.search?.trim();
+    const search = filters.search?.trim().slice(0, 200);
     if (search) {
       where.OR = [
         { recipient: { contains: search, mode: 'insensitive' } },
