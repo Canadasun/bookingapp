@@ -113,6 +113,7 @@ function LoginForm() {
         </div>
         {recoveryMode ? (
           <Input
+            aria-label="Recovery code"
             autoComplete="off"
             placeholder="xxxxx-xxxxx"
             value={recovery}
@@ -123,6 +124,7 @@ function LoginForm() {
           />
         ) : (
           <Input
+            aria-label="Verification code"
             inputMode="numeric"
             autoComplete="one-time-code"
             placeholder="123456"
@@ -159,16 +161,17 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-        <Input type="email" placeholder="you@example.com" value={email}
+        <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+        <Input id="login-email" type="email" placeholder="you@example.com" value={email}
           onChange={(e) => setEmail(e.target.value)} required autoFocus />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+        <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
         <div className="relative">
-          <Input type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
+          <Input id="login-password" type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
             onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
           <button type="button" onClick={() => setShowPw((p) => !p)}
+            aria-label={showPw ? "Hide password" : "Show password"}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>

@@ -142,6 +142,16 @@ export class AuthController {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }
 
+  // Authenticated — seed demo records for owners who signed up before the demo
+  // feature shipped. Idempotent: returns { ok: true, skipped: true } if already done.
+  @Post('seed-demo')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
+  seedDemo(@CurrentUser() user: User) {
+    return this.authService.seedDemoData(user.id);
+  }
+
   // One-time bootstrap: promote BOOTSTRAP_ADMIN_EMAIL to ADMIN role.
   // Only active when BOOTSTRAP_ADMIN_SECRET env var is set. Remove the env var to disable.
   @Post('bootstrap-admin')

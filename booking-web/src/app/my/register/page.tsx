@@ -51,7 +51,8 @@ function RegisterForm() {
     setLoading(true);
     try {
       const email = form.email.trim().toLowerCase();
-      const regRes = await fetch("/proxy/auth/register", {
+      // Single BFF call: registers the user and sets auth cookies from the returned tokens.
+      const regRes = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name.trim(), email, password: form.password, role: "CLIENT", privacyConsentAccepted: true, consentVersion: "2026-06-13" }),
@@ -60,12 +61,6 @@ function RegisterForm() {
         const body = await readJson<{ message?: string }>(regRes);
         throw new Error(body?.message ?? "Registration failed");
       }
-      const loginRes = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: form.password }),
-      });
-      if (!loginRes.ok) { router.push("/my/login"); return; }
       toast.success("Account created!");
       router.push("/my/dashboard");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
@@ -87,31 +82,34 @@ function RegisterForm() {
         <Card>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {([
-                { k: "name",    label: "Full name",     type: "text",     ph: "Jane Smith" },
-                { k: "email",   label: "Email",          type: "email",    ph: "jane@example.com" },
-              ] as const).map(({ k, label, type, ph }) => (
-                <div key={k}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-                  <Input type={type} placeholder={ph} value={form[k]} onChange={(e) => f(k, e.target.value)}
-                    className={errs[k] ? "border-red-400" : ""} />
-                  {errs[k] && <p className="text-xs text-red-500 mt-1">{errs[k]}</p>}
-                </div>
-              ))}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                <label htmlFor="creg-name" className="block text-sm font-medium text-gray-700 mb-1.5">Full name</label>
+                <Input id="creg-name" type="text" placeholder="Jane Smith" value={form.name} onChange={(e) => f("name", e.target.value)}
+                  className={errs.name ? "border-red-400" : ""} />
+                {errs.name && <p className="text-xs text-red-500 mt-1">{errs.name}</p>}
+              </div>
+              <div>
+                <label htmlFor="creg-email" className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                <Input id="creg-email" type="email" placeholder="jane@example.com" value={form.email} onChange={(e) => f("email", e.target.value)}
+                  className={errs.email ? "border-red-400" : ""} />
+                {errs.email && <p className="text-xs text-red-500 mt-1">{errs.email}</p>}
+              </div>
+              <div>
+                <label htmlFor="creg-password" className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
                 <div className="relative">
-                  <Input type={showPw ? "text" : "password"} placeholder="Min 8 characters" value={form.password}
+                  <Input id="creg-password" type={showPw ? "text" : "password"} placeholder="Min 8 characters" value={form.password}
                     onChange={(e) => f("password", e.target.value)} className={`pr-10 ${errs.password ? "border-red-400" : ""}`} />
-                  <button type="button" onClick={() => setShowPw((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <button type="button" onClick={() => setShowPw((p) => !p)}
+                    aria-label={showPw ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                     {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {errs.password && <p className="text-xs text-red-500 mt-1">{errs.password}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password</label>
-                <Input type="password" placeholder="Repeat password" value={form.confirm}
+                <label htmlFor="creg-confirm" className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password</label>
+                <Input id="creg-confirm" type="password" placeholder="Repeat password" value={form.confirm}
                   onChange={(e) => f("confirm", e.target.value)} className={errs.confirm ? "border-red-400" : ""} />
                 {errs.confirm && <p className="text-xs text-red-500 mt-1">{errs.confirm}</p>}
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Pulse Booking" className="w-20 h-auto mx-auto" />
+            <Image src="/logo.png" alt="Pulse Booking" width={80} height={80} className="w-20 h-auto mx-auto" />
           </Link>
           <p className="text-slate-500 mt-2 text-sm">Reset your password</p>
         </div>
@@ -47,8 +47,8 @@ export default function ForgotPasswordPage() {
             {sent ? (
               <div className="text-center space-y-4">
                 <p className="text-sm text-slate-600">
-                  If an account exists for <span className="font-medium">{email}</span>, we’ve emailed a
-                  reset link. It expires in 30 minutes.
+                  If an account exists for <span className="font-medium">{email}</span>, we&apos;ve emailed a
+                  reset link. It expires in 15 minutes.
                 </p>
                 <Link href="/login" className="inline-block text-violet-600 hover:underline font-medium text-sm">
                   Back to sign in
@@ -57,8 +57,8 @@ export default function ForgotPasswordPage() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-                  <Input type="email" placeholder="you@example.com" value={email}
+                  <label htmlFor="forgot-email" className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                  <Input id="forgot-email" type="email" placeholder="you@example.com" value={email}
                     onChange={(e) => setEmail(e.target.value)} required autoFocus />
                 </div>
                 <Button type="submit" loading={loading} className="w-full" size="lg">Send reset link</Button>

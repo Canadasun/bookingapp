@@ -38,8 +38,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const email = form.email.trim().toLowerCase();
-      // Register creates the user then logs in
-      const regRes = await fetch("/proxy/auth/register", {
+      // Single BFF call: registers the user and sets auth cookies from the returned tokens.
+      const regRes = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -53,8 +53,6 @@ export default function RegisterPage() {
       if (!regRes.ok) {
         const body = await regRes.json().catch(() => ({})) as Record<string, unknown>;
         const msg = typeof body.message === "string" ? body.message : "Registration failed";
-        // Duplicate email: don't create a second account — point them to sign in
-        // or reset their password instead.
         if (regRes.status === 409 || /already registered|already exists/i.test(msg)) {
           setEmailExists(true);
           toast.error("That email already has an account.");
@@ -63,13 +61,6 @@ export default function RegisterPage() {
         }
         return;
       }
-      // Use the login route to set cookies properly
-      const loginRes = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: form.password }),
-      });
-      if (!loginRes.ok) { toast.error("Registered but login failed — please log in manually"); router.push("/login"); return; }
       toast.success("Account created! Welcome.");
       router.push("/dashboard");
     } catch {
@@ -102,33 +93,34 @@ export default function RegisterPage() {
             )}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Your name</label>
-                <Input placeholder="Jane Smith" value={form.name} onChange={(e) => f("name", e.target.value)}
+                <label htmlFor="reg-name" className="block text-sm font-medium text-slate-700 mb-1.5">Your name</label>
+                <Input id="reg-name" placeholder="Jane Smith" value={form.name} onChange={(e) => f("name", e.target.value)}
                   className={errs.name ? "border-red-400" : ""} autoFocus />
                 {errs.name && <p className="text-xs text-red-500 mt-1">{errs.name}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Business name</label>
-                <Input placeholder="e.g. Paws & Claws Grooming · Bliss Lash Studio" value={form.businessName} onChange={(e) => f("businessName", e.target.value)}
+                <label htmlFor="reg-business" className="block text-sm font-medium text-slate-700 mb-1.5">Business name</label>
+                <Input id="reg-business" placeholder="e.g. Paws & Claws Grooming · Bliss Lash Studio" value={form.businessName} onChange={(e) => f("businessName", e.target.value)}
                   className={errs.businessName ? "border-red-400" : ""} />
                 {errs.businessName && <p className="text-xs text-red-500 mt-1">{errs.businessName}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Business phone <span className="text-slate-400 font-normal">(optional)</span></label>
-                <Input type="tel" placeholder="+1 (416) 555-0123" value={form.phone} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
+                <label htmlFor="reg-phone" className="block text-sm font-medium text-slate-700 mb-1.5">Business phone <span className="text-slate-400 font-normal">(optional)</span></label>
+                <Input id="reg-phone" type="tel" placeholder="+1 (416) 555-0123" value={form.phone} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-                <Input type="email" placeholder="you@example.com" value={form.email} onChange={(e) => f("email", e.target.value)}
+                <label htmlFor="reg-email" className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                <Input id="reg-email" type="email" placeholder="you@example.com" value={form.email} onChange={(e) => f("email", e.target.value)}
                   className={errs.email ? "border-red-400" : ""} />
                 {errs.email && <p className="text-xs text-red-500 mt-1">{errs.email}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                <label htmlFor="reg-password" className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
                 <div className="relative">
-                  <Input type={showPw ? "text" : "password"} placeholder="Min 8 characters" value={form.password}
+                  <Input id="reg-password" type={showPw ? "text" : "password"} placeholder="Min 8 characters" value={form.password}
                     onChange={(e) => f("password", e.target.value)} className={errs.password ? "border-red-400 pr-10" : "pr-10"} />
                   <button type="button" onClick={() => setShowPw((p) => !p)}
+                    aria-label={showPw ? "Hide password" : "Show password"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                     {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -136,8 +128,8 @@ export default function RegisterPage() {
                 {errs.password && <p className="text-xs text-red-500 mt-1">{errs.password}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm password</label>
-                <Input type="password" placeholder="Repeat password" value={form.confirm}
+                <label htmlFor="reg-confirm" className="block text-sm font-medium text-slate-700 mb-1.5">Confirm password</label>
+                <Input id="reg-confirm" type="password" placeholder="Repeat password" value={form.confirm}
                   onChange={(e) => f("confirm", e.target.value)} className={errs.confirm ? "border-red-400" : ""} />
                 {errs.confirm && <p className="text-xs text-red-500 mt-1">{errs.confirm}</p>}
               </div>

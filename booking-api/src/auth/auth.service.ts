@@ -35,7 +35,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const { user: result, ownerStaffId } = await this.prisma.$transaction(async (tx) => {
       let businessId: string | undefined;
 
       if (dto.role === "OWNER") {
@@ -90,9 +90,11 @@ export class AuthService {
       // take bookings immediately, without adding "staff". Extra staff are
       // optional — the booking flow only shows a provider step once more than one
       // provider exists.
+      let ownerStaffId: string | undefined;
       if (user.role === 'OWNER' && businessId) {
         const ownerStaff = await tx.staff.create({ data: { userId: user.id, businessId, active: true } });
-        await this.createOwnerDemoData(tx, { businessId, userId: user.id, staffId: ownerStaff.id, businessName: dto.businessName?.trim() || `${dto.name}'s Business` });
+        ownerStaffId = ownerStaff.id;
+        // Demo seed runs outside this transaction so a seed failure never rolls back sign-up.
       }
 
       await tx.privacyConsent.createMany({
@@ -136,8 +138,22 @@ export class AuthService {
         ],
       });
 
-      return user;
+      return { user, ownerStaffId };
     });
+
+    // Seed demo data outside the transaction so any failure is silent and never
+    // prevents a new owner from accessing their account.
+    if (result.role === 'OWNER' && result.businessId && ownerStaffId) {
+      const businessName = dto.businessName?.trim() || `${dto.name}'s Business`;
+      void this.prisma.$transaction((tx) =>
+        this.createOwnerDemoData(tx, {
+          businessId: result.businessId!,
+          userId: result.id,
+          staffId: ownerStaffId!,
+          businessName,
+        }),
+      ).catch(() => {});
+    }
 
     // Welcome the new owner (best-effort — never block signup on email).
     if (result.role === 'OWNER') {
@@ -148,6 +164,41 @@ export class AuthService {
     this.sendVerification(result.id).catch(() => {});
 
     return this.issueTokens(result);
+  }
+
+  // Allow existing owners to seed demo data on demand (e.g., accounts created
+  // before this feature was shipped). Idempotent — skips if already seeded.
+  async seedDemoData(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, role: true, businessId: true },
+    });
+    if (!user || user.role !== 'OWNER' || !user.businessId) {
+      throw new ForbiddenException('Only business owners can seed demo data');
+    }
+    const already = await this.prisma.client.findFirst({
+      where: { businessId: user.businessId, name: 'Demo Client' },
+      select: { id: true },
+    });
+    if (already) return { ok: true, skipped: true };
+    const staff = await this.prisma.staff.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!staff) throw new ForbiddenException('No staff record found');
+    const business = await this.prisma.business.findUnique({
+      where: { id: user.businessId },
+      select: { name: true },
+    });
+    await this.prisma.$transaction((tx) =>
+      this.createOwnerDemoData(tx, {
+        businessId: user.businessId!,
+        userId: user.id,
+        staffId: staff.id,
+        businessName: business?.name ?? `${user.name}'s Business`,
+      }),
+    );
+    return { ok: true, skipped: false };
   }
 
   private async createOwnerDemoData(
@@ -453,7 +504,7 @@ export class AuthService {
       },
     });
     await tx.giftCardRedemption.create({
-      data: { giftCardId: giftCard.id, amountCents: 0, appointmentId: upcomingAppointment.id },
+      data: { giftCardId: giftCard.id, amountCents: 2500, appointmentId: upcomingAppointment.id },
     });
 
     const pkg = await tx.package.create({

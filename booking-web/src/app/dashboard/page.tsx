@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck, Sparkles, X } from "lucide-react";
 import { api, Appointment, DashboardOverview } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SkeletonMetric, SkeletonRow } from "@/components/Skeleton";
 import { formatPrice } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/auth";
+import { toast } from "sonner";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -80,8 +81,44 @@ export default function OverviewPage() {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
+  const [showDemoBanner, setShowDemoBanner] = useState(false);
+  const [seedingDemo, setSeedingDemo] = useState(false);
   const isStaff = user?.role === "STAFF";
   const bizId   = user?.businessId ?? "";
+
+  useEffect(() => {
+    if (!userLoading && user?.role === "OWNER" && typeof window !== "undefined") {
+      if (!localStorage.getItem("pulse-demo-dismissed")) {
+        setShowDemoBanner(true);
+      }
+    }
+  }, [user, userLoading]);
+
+  async function loadDemoData() {
+    setSeedingDemo(true);
+    try {
+      const res = await fetch("/api/auth/seed-demo", { method: "POST" });
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; skipped?: boolean };
+      if (!res.ok) throw new Error("Failed");
+      if (data.skipped) {
+        toast.info("Demo data is already loaded — check each section to explore.");
+      } else {
+        toast.success("Demo data added! Browse each dashboard section to see examples.");
+        load();
+      }
+      localStorage.setItem("pulse-demo-dismissed", "1");
+      setShowDemoBanner(false);
+    } catch {
+      toast.error("Could not load demo data. Please try again.");
+    } finally {
+      setSeedingDemo(false);
+    }
+  }
+
+  function dismissDemoBanner() {
+    localStorage.setItem("pulse-demo-dismissed", "1");
+    setShowDemoBanner(false);
+  }
 
   const load = useCallback(async () => {
     if (userLoading) return;
@@ -147,6 +184,29 @@ export default function OverviewPage() {
     <div className="max-w-5xl mx-auto min-w-0 space-y-5 sm:space-y-6">
 
       {!isStaff && <ErrorBoundary><OnboardingWizard /></ErrorBoundary>}
+
+      {showDemoBanner && (
+        <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Sparkles className="w-6 h-6 text-violet-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-violet-900">Explore with demo data</p>
+            <p className="text-xs text-violet-700 mt-0.5">Load sample records into every dashboard section so you can see how each feature works before adding real data.</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={loadDemoData}
+              disabled={seedingDemo}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors"
+            >
+              {seedingDemo ? "Loading…" : "Load demo data"}
+            </button>
+            <button type="button" onClick={dismissDemoBanner} aria-label="Dismiss demo banner" className="p-1.5 text-violet-400 hover:text-violet-700 rounded-lg transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

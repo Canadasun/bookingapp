@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { clearSession } from "@/lib/auth";
 import { safeNextPath } from "@/lib/utils";
 
 async function readJson<T>(res: Response): Promise<T | null> {
@@ -31,6 +32,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [challenge, setChallenge] = useState<{ id: string; method: string } | null>(null);
   const [code, setCode] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recovery, setRecovery] = useState("");
   const [rememberDevice, setRememberDevice] = useState(true);
 
   function go() {
@@ -58,6 +61,10 @@ function LoginForm() {
       const user = data?.user;
       if (!user) throw new Error("Login did not return a user session");
       if (user.role !== "CLIENT") {
+        // Clear the session set by the BFF so the owner isn't left in a
+        // half-authenticated state. Best-effort — navigating away also works.
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        clearSession();
         toast.error("This is the client portal. Business owners please use the main login.");
         return;
       }
@@ -68,13 +75,15 @@ function LoginForm() {
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
-    if (!challenge || code.trim().length < 4) return;
+    if (!challenge) return;
+    const entered = recoveryMode ? recovery.trim() : code.trim();
+    if (entered.length < 4) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/2fa-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.id, code: code.trim(), rememberDevice }),
+        body: JSON.stringify({ challengeId: challenge.id, code: entered, rememberDevice }),
       });
       if (!res.ok) {
         const body = await readJson<{ message?: string }>(res);
@@ -82,6 +91,8 @@ function LoginForm() {
       }
       const data = await readJson<{ user?: { role: string } }>(res);
       if (data?.user?.role !== "CLIENT") {
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        clearSession();
         toast.error("This is the client portal. Business owners please use the main login.");
         return;
       }
@@ -97,21 +108,39 @@ function LoginForm() {
     return (
       <form onSubmit={handleVerify} className="space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900">Enter your verification code</h2>
+          <h2 className="text-sm font-semibold text-gray-900">
+            {recoveryMode ? "Enter a recovery code" : "Enter your verification code"}
+          </h2>
           <p className="text-xs text-gray-500 mt-1">
-            We sent a 6-digit code to your {challenge.method === "SMS" ? "phone" : "email"}.
+            {recoveryMode
+              ? "Enter one of the one-time recovery codes you saved when you turned on two-factor sign-in."
+              : `We sent a 6-digit code to your ${challenge.method === "SMS" ? "phone" : "email"}.`}
           </p>
         </div>
-        <Input
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          placeholder="123456"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          required
-          autoFocus
-          className="text-center text-lg tracking-[0.4em]"
-        />
+        {recoveryMode ? (
+          <Input
+            aria-label="Recovery code"
+            autoComplete="off"
+            placeholder="xxxxx-xxxxx"
+            value={recovery}
+            onChange={(e) => setRecovery(e.target.value.trim())}
+            required
+            autoFocus
+            className="text-center text-lg tracking-[0.2em]"
+          />
+        ) : (
+          <Input
+            aria-label="Verification code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            required
+            autoFocus
+            className="text-center text-lg tracking-[0.4em]"
+          />
+        )}
         <label className="flex items-center gap-2 text-xs text-gray-600 select-none cursor-pointer">
           <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="rounded border-gray-300" />
           Remember this device for 30 days
@@ -119,7 +148,14 @@ function LoginForm() {
         <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
         <button
           type="button"
-          onClick={() => { setChallenge(null); setCode(""); }}
+          onClick={() => setRecoveryMode((m) => !m)}
+          className="w-full text-center text-xs text-violet-600 hover:underline font-medium"
+        >
+          {recoveryMode ? "Use the code we sent instead" : "Lost access? Use a recovery code"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setChallenge(null); setCode(""); setRecovery(""); setRecoveryMode(false); }}
           className="w-full text-center text-xs text-gray-500 hover:text-gray-700"
         >
           Back to sign in
@@ -131,13 +167,13 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-        <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+        <label htmlFor="client-login-email" className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+        <Input id="client-login-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+        <label htmlFor="client-login-password" className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
         <div className="relative">
-          <Input type={showPw ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
+          <Input id="client-login-password" type={showPw ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
           <button type="button" onClick={() => setShowPw((p) => !p)} aria-label={showPw ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
             {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
