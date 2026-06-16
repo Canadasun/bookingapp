@@ -31,7 +31,11 @@ export class ResourcesService {
   async remove(id: string, businessId: string) {
     const resource = await this.prisma.resource.findFirst({ where: { id, businessId } });
     if (!resource) throw new NotFoundException('Resource not found');
-    // Services referencing it are detached via the schema's ON DELETE SET NULL.
+    const usedByServices = await this.prisma.service.count({ where: { businessId, resourceId: id } });
+    if (usedByServices > 0) {
+      await this.prisma.resource.update({ where: { id }, data: { active: false } });
+      return { ok: true, archived: true };
+    }
     await this.prisma.resource.delete({ where: { id } });
     return { ok: true };
   }

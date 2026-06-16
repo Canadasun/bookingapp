@@ -12,7 +12,10 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-type Entry = { id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; createdAt: string };
+type Entry = {
+  id: string; name: string; email: string; phone?: string | null; serviceId?: string | null;
+  desiredDate?: string | null; notes?: string | null; status: "WAITING" | "NOTIFIED" | "CONVERTED" | "CANCELLED"; createdAt: string;
+};
 
 export default function WaitlistPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -38,6 +41,7 @@ export default function WaitlistPage() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     finally { setEntryToRemove(null); }
   }
+  const waitingCount = entries.filter((entry) => entry.status === "WAITING").length;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -48,7 +52,7 @@ export default function WaitlistPage() {
         </div>
         {!loading && entries.length > 0 && (
           <span className="shrink-0 inline-flex items-center rounded-full bg-violet-100 text-violet-700 text-sm font-semibold px-3 py-1">
-            {entries.length} waiting
+            {waitingCount} waiting
           </span>
         )}
       </div>
@@ -69,6 +73,11 @@ export default function WaitlistPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900">{e.name}</p>
+                  {e.status === "NOTIFIED" && (
+                    <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                      Notified
+                    </span>
+                  )}
                   <p className="text-sm text-gray-500 truncate">{e.email}{e.phone ? ` · ${e.phone}` : ""}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Joined {format(new Date(e.createdAt), "MMM d")}

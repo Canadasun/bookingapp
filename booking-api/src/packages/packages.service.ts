@@ -11,7 +11,17 @@ export class PackagesService {
   constructor(private prisma: PrismaService) {}
 
   // ── Package products (templates) ─────────────────────────────────────
-  createPackage(businessId: string, dto: CreatePackageDto) {
+  private async assertServiceInBusiness(businessId: string, serviceId?: string | null) {
+    if (!serviceId) return;
+    const service = await this.prisma.service.findFirst({
+      where: { id: serviceId, businessId },
+      select: { id: true },
+    });
+    if (!service) throw new NotFoundException('Service not found');
+  }
+
+  async createPackage(businessId: string, dto: CreatePackageDto) {
+    await this.assertServiceInBusiness(businessId, dto.serviceId);
     return this.prisma.package.create({ data: { businessId, ...dto } });
   }
 
@@ -27,6 +37,7 @@ export class PackagesService {
 
   async updatePackage(businessId: string, id: string, dto: UpdatePackageDto) {
     await this.getPackage(businessId, id);
+    await this.assertServiceInBusiness(businessId, dto.serviceId);
     return this.prisma.package.update({ where: { id }, data: dto });
   }
 
@@ -51,13 +62,7 @@ export class PackagesService {
       credits = credits ?? tmpl.credits;
     }
     if (!name || !credits) throw new BadRequestException('Package name and credits are required');
-    if (serviceId) {
-      const service = await this.prisma.service.findFirst({
-        where: { id: serviceId, businessId },
-        select: { id: true },
-      });
-      if (!service) throw new NotFoundException('Service not found');
-    }
+    await this.assertServiceInBusiness(businessId, serviceId);
 
     return this.prisma.clientPackage.create({
       data: {
@@ -96,33 +101,45 @@ export class PackagesService {
   }
 
   async redeem(businessId: string, id: string, dto: RedeemClientPackageDto) {
+    const runRedeem = () =>
+      this.prisma.$transaction(async (tx) => {
+        const cp = await tx.clientPackage.findFirst({
+          where: { id, businessId },
+        });
+        if (!cp) throw new NotFoundException('Client package not found');
+        if (cp.status === 'VOID') throw new BadRequestException('This package has been voided');
+        if (cp.expiresAt && cp.expiresAt < new Date()) throw new BadRequestException('This package has expired');
+        if (cp.creditsRemaining <= 0) throw new BadRequestException('No credits remaining on this package');
+        if (dto.appointmentId) {
+          const appointment = await tx.appointment.findFirst({
+            where: { id: dto.appointmentId, businessId, clientId: cp.clientId },
+            select: { id: true },
+          });
+          if (!appointment) throw new NotFoundException('Appointment not found');
+        }
+
+        const remaining = cp.creditsRemaining - 1;
+        await tx.packageRedemption.create({
+          data: { clientPackageId: cp.id, appointmentId: dto.appointmentId },
+        });
+        return tx.clientPackage.update({
+          where: { id: cp.id },
+          data: { creditsRemaining: remaining, status: remaining === 0 ? 'USED' : 'ACTIVE' },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
     // SERIALIZABLE isolation ensures two concurrent redemptions cannot both read
     // the same balance and both deduct from it — mirrors gift-cards.service.ts.
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const cp = await tx.clientPackage.findFirst({
-        where: { id, businessId },
-      });
-      if (!cp) throw new NotFoundException('Client package not found');
-      if (cp.status === 'VOID') throw new BadRequestException('This package has been voided');
-      if (cp.expiresAt && cp.expiresAt < new Date()) throw new BadRequestException('This package has expired');
-      if (cp.creditsRemaining <= 0) throw new BadRequestException('No credits remaining on this package');
-      if (dto.appointmentId) {
-        const appointment = await tx.appointment.findFirst({
-          where: { id: dto.appointmentId, businessId, clientId: cp.clientId },
-          select: { id: true },
-        });
-        if (!appointment) throw new NotFoundException('Appointment not found');
+    let updated: Awaited<ReturnType<typeof runRedeem>>;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        updated = await runRedeem();
+        break;
+      } catch (err) {
+        const isWriteConflict = err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034';
+        if (!isWriteConflict || attempt >= 2) throw err;
       }
-
-      const remaining = cp.creditsRemaining - 1;
-      await tx.packageRedemption.create({
-        data: { clientPackageId: cp.id, appointmentId: dto.appointmentId },
-      });
-      return tx.clientPackage.update({
-        where: { id: cp.id },
-        data: { creditsRemaining: remaining, status: remaining === 0 ? 'USED' : 'ACTIVE' },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }
 
     return { creditsRemaining: updated.creditsRemaining, status: updated.status };
   }

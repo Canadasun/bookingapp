@@ -17,7 +17,7 @@ import * as bcrypt from 'bcryptjs';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { hashRefreshToken, refreshTokenTtlMs } from '../common/util/refresh-token';
 import { normalizePhone } from '../common/util/phone';
-import { User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -39,9 +39,9 @@ export class AuthService {
       let businessId: string | undefined;
 
       if (dto.role === "OWNER") {
-        // Brand the new (empty) business from the signup form, falling back to
-        // the owner's name. The account starts empty — no staff/services/clients —
-        // the owner sets it up in-app.
+        // Brand the new business from the signup form, falling back to the
+        // owner's name. Signup also creates labeled demo records so the owner can
+        // open each dashboard category and understand what it is for.
         const businessName = dto.businessName?.trim() || `${dto.name}'s Business`;
         const slugSource = (dto.businessName?.trim() || dto.name).toLowerCase();
         const baseSlug = slugSource.replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "business";
@@ -91,7 +91,8 @@ export class AuthService {
       // optional — the booking flow only shows a provider step once more than one
       // provider exists.
       if (user.role === 'OWNER' && businessId) {
-        await tx.staff.create({ data: { userId: user.id, businessId, active: true } });
+        const ownerStaff = await tx.staff.create({ data: { userId: user.id, businessId, active: true } });
+        await this.createOwnerDemoData(tx, { businessId, userId: user.id, staffId: ownerStaff.id, businessName: dto.businessName?.trim() || `${dto.name}'s Business` });
       }
 
       await tx.privacyConsent.createMany({
@@ -147,6 +148,387 @@ export class AuthService {
     this.sendVerification(result.id).catch(() => {});
 
     return this.issueTokens(result);
+  }
+
+  private async createOwnerDemoData(
+    tx: Prisma.TransactionClient,
+    args: { businessId: string; userId: string; staffId: string; businessName: string },
+  ) {
+    const now = new Date();
+    const addDays = (days: number, hour = 10, minute = 0) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() + days);
+      d.setHours(hour, minute, 0, 0);
+      return d;
+    };
+    const nextWeekdayOffset = (() => {
+      for (let offset = 1; offset <= 7; offset += 1) {
+        const day = addDays(offset).getDay();
+        if (day >= 1 && day <= 5) return offset;
+      }
+      return 1;
+    })();
+    const previousWeekdayOffset = (() => {
+      for (let offset = -1; offset >= -7; offset -= 1) {
+        const day = addDays(offset).getDay();
+        if (day >= 1 && day <= 5) return offset;
+      }
+      return -1;
+    })();
+    const startsAt = addDays(nextWeekdayOffset, 10, 0);
+    const endsAt = addDays(nextWeekdayOffset, 10, 45);
+    const completedAt = addDays(previousWeekdayOffset, 14, 0);
+    const completedEnd = addDays(previousWeekdayOffset, 14, 45);
+
+    await tx.business.update({
+      where: { id: args.businessId },
+      data: {
+        taxRatePercent: 5,
+        postVisitMessage: 'Demo: thanks for visiting. Book your next appointment anytime.',
+        intakeQuestions: [
+          { id: 'demo-allergies', label: 'Demo: any allergies or sensitivities?', required: false },
+          { id: 'demo-goal', label: 'Demo: what should we focus on today?', required: true },
+        ],
+        bookingPageSettings: {
+          headline: `Book with ${args.businessName}`,
+          intro: 'Demo booking-page text. Replace this with what clients should know before booking.',
+          tagline: 'Demo: online booking made simple.',
+          brandColor: '#7C3AED',
+        },
+        notificationSettings: {
+          emailConfirmation: true,
+          emailReminder24h: true,
+          emailCancellation: true,
+          emailReschedule: true,
+        },
+      },
+    });
+
+    await tx.businessHours.createMany({
+      data: [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+        businessId: args.businessId,
+        dayOfWeek,
+        startTime: '09:00',
+        endTime: '17:00',
+      })),
+      skipDuplicates: true,
+    });
+
+    const location = await tx.location.create({
+      data: {
+        businessId: args.businessId,
+        name: 'Demo Location',
+        address: '123 Demo Street',
+        active: true,
+      },
+    });
+    await tx.staff.update({ where: { id: args.staffId }, data: { locationId: location.id, bio: 'Demo provider profile. Update this from Staff.' } });
+
+    const resource = await tx.resource.create({
+      data: { businessId: args.businessId, name: 'Demo Room' },
+    });
+    const category = await tx.serviceCategory.create({
+      data: { businessId: args.businessId, name: 'Demo Services', description: 'Sample service category', color: '#7C3AED' },
+    });
+    const service = await tx.service.create({
+      data: {
+        businessId: args.businessId,
+        categoryId: category.id,
+        resourceId: resource.id,
+        name: 'Demo Consultation',
+        description: 'A sample service showing duration, price, buffers, staff, and resources.',
+        durationMinutes: 45,
+        priceCents: 7500,
+        bufferBeforeMin: 10,
+        bufferAfterMin: 15,
+        color: '#7C3AED',
+      },
+    });
+    await tx.staffService.create({ data: { staffId: args.staffId, serviceId: service.id } });
+    await tx.availabilityRule.createMany({
+      data: [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+        staffId: args.staffId,
+        dayOfWeek,
+        startTime: '09:00',
+        endTime: '17:00',
+      })),
+    });
+
+    const client = await tx.client.create({
+      data: {
+        businessId: args.businessId,
+        name: 'Demo Client',
+        email: `demo-client-${args.businessId}@example.com`,
+        phone: '+14165550123',
+        notes: 'Demo client profile. Safe to edit or delete after exploring.',
+        tags: ['Demo', 'VIP'],
+        birthday: '06-15',
+      },
+    });
+
+    const upcomingAppointment = await tx.appointment.create({
+      data: {
+        businessId: args.businessId,
+        staffId: args.staffId,
+        serviceId: service.id,
+        clientId: client.id,
+        locationId: location.id,
+        startsAt,
+        endsAt,
+        status: 'CONFIRMED',
+        totalPriceCents: 7500,
+        notes: 'Demo confirmed appointment.',
+        referralSource: 'Demo referral',
+        intakeAnswers: [
+          { label: 'Demo: any allergies or sensitivities?', answer: 'No known allergies.' },
+          { label: 'Demo: what should we focus on today?', answer: 'First visit consultation.' },
+        ],
+      },
+    });
+    const completedAppointment = await tx.appointment.create({
+      data: {
+        businessId: args.businessId,
+        staffId: args.staffId,
+        serviceId: service.id,
+        clientId: client.id,
+        locationId: location.id,
+        startsAt: completedAt,
+        endsAt: completedEnd,
+        status: 'COMPLETED',
+        totalPriceCents: 7500,
+        notes: 'Demo completed appointment for reports and history.',
+      },
+    });
+
+    const payment = await tx.payment.create({
+      data: {
+        businessId: args.businessId,
+        appointmentId: completedAppointment.id,
+        clientId: client.id,
+        amountCents: 7500,
+        taxCents: 375,
+        tipCents: 1000,
+        currency: 'cad',
+        kind: 'IN_PERSON',
+        status: 'SUCCEEDED',
+        description: 'Demo in-person payment',
+      },
+    });
+    await tx.refund.create({
+      data: {
+        businessId: args.businessId,
+        paymentId: payment.id,
+        amountCents: 1000,
+        reason: 'Demo partial refund example',
+        status: 'SUCCEEDED',
+      },
+    });
+    await tx.transaction.create({
+      data: {
+        businessId: args.businessId,
+        type: 'PROCESSING_FEE',
+        amountCents: 245,
+        currency: 'CAD',
+        status: 'COMPLETED',
+        provider: 'DEMO',
+        metadata: { note: 'Demo processing-fee row for financial reports' },
+      },
+    });
+
+    const invoiceSeq = await tx.business.update({
+      where: { id: args.businessId },
+      data: { invoiceSeq: { increment: 1 } },
+      select: { invoiceSeq: true },
+    });
+    await tx.invoice.create({
+      data: {
+        businessId: args.businessId,
+        clientId: client.id,
+        number: invoiceSeq.invoiceSeq,
+        status: 'DRAFT',
+        currency: 'CAD',
+        lineItems: [{ description: 'Demo invoice line item', quantity: 1, unitCents: 7500, amountCents: 7500 }],
+        subtotalCents: 7500,
+        taxRatePercent: 5,
+        taxCents: 375,
+        totalCents: 7875,
+        paymentTerms: 'Due on receipt',
+        notes: 'Demo invoice. Edit or delete when ready.',
+      },
+    });
+
+    await tx.staffTask.create({
+      data: {
+        businessId: args.businessId,
+        staffId: args.staffId,
+        title: 'Demo task: prepare for first appointment',
+        notes: 'Tasks can be assigned to providers and tracked as open/done.',
+        dueAt: addDays(1, 9, 0),
+      },
+    });
+    const followUpPolicy = await tx.followUpPolicy.create({
+      data: {
+        businessId: args.businessId,
+        serviceId: service.id,
+        name: 'Demo follow-up rule',
+        delayDays: 30,
+        subject: 'Demo: time to book again',
+        body: 'Hi {name}, this is a demo follow-up reminder from {business}.',
+      },
+    });
+    await tx.serviceDue.create({
+      data: {
+        businessId: args.businessId,
+        clientId: client.id,
+        serviceId: service.id,
+        policyId: followUpPolicy.id,
+        cadenceDays: 30,
+        dueAt: addDays(30, 9, 0),
+        messageSubject: 'Demo next-visit reminder',
+        messageBody: 'This sample shows how follow-ups become due.',
+      },
+    });
+    await tx.waitlistEntry.create({
+      data: {
+        businessId: args.businessId,
+        name: 'Demo Waitlist Client',
+        email: `demo-waitlist-${args.businessId}@example.com`,
+        phone: '+14165550124',
+        serviceId: service.id,
+        staffId: args.staffId,
+        desiredDate: startsAt,
+        notes: 'Demo waitlist request for a full slot.',
+      },
+    });
+
+    await tx.message.createMany({
+      data: [
+        { businessId: args.businessId, clientId: client.id, fromClient: true, content: 'Demo: can I move my appointment later?', read: false },
+        { businessId: args.businessId, clientId: client.id, fromClient: false, content: 'Demo reply: yes, here are two options.', read: true },
+      ],
+    });
+    await tx.messageThreadState.create({
+      data: { businessId: args.businessId, clientId: client.id, userId: args.userId, lastReadAt: addDays(0, 8, 0) },
+    });
+
+    await tx.offer.create({
+      data: {
+        businessId: args.businessId,
+        title: 'Demo Offer',
+        description: 'A sample promotion clients can see in the client portal.',
+        discount: '10% off',
+        expiresAt: addDays(30, 23, 59),
+      },
+    });
+    await tx.promoCode.create({
+      data: {
+        businessId: args.businessId,
+        code: 'DEMO10',
+        discountType: 'PERCENT',
+        discountValue: 10,
+        maxUsages: 25,
+        expiresAt: addDays(30, 23, 59),
+      },
+    });
+    await tx.campaign.create({
+      data: {
+        businessId: args.businessId,
+        name: 'Demo campaign draft',
+        channel: 'EMAIL',
+        audience: 'ALL',
+        subject: 'Demo campaign subject',
+        body: 'Hi {name}, this draft shows where marketing campaigns live for {business}.',
+      },
+    });
+    const giftCard = await tx.giftCard.create({
+      data: {
+        businessId: args.businessId,
+        code: 'DEMO-GIFT',
+        initialCents: 5000,
+        balanceCents: 5000,
+        recipientName: 'Demo Recipient',
+        recipientEmail: `demo-gift-${args.businessId}@example.com`,
+        purchaserName: 'Demo Purchaser',
+        message: 'Sample gift card balance.',
+      },
+    });
+    await tx.giftCardRedemption.create({
+      data: { giftCardId: giftCard.id, amountCents: 0, appointmentId: upcomingAppointment.id },
+    });
+
+    const pkg = await tx.package.create({
+      data: {
+        businessId: args.businessId,
+        name: 'Demo 5-Visit Package',
+        serviceId: service.id,
+        credits: 5,
+        priceCents: 30000,
+      },
+    });
+    const clientPackage = await tx.clientPackage.create({
+      data: {
+        businessId: args.businessId,
+        packageId: pkg.id,
+        clientId: client.id,
+        name: pkg.name,
+        serviceId: service.id,
+        creditsTotal: 5,
+        creditsRemaining: 4,
+        expiresAt: addDays(180, 23, 59),
+      },
+    });
+    await tx.packageRedemption.create({
+      data: { clientPackageId: clientPackage.id, appointmentId: completedAppointment.id },
+    });
+
+    const membershipPlan = await tx.membershipPlan.create({
+      data: {
+        businessId: args.businessId,
+        name: 'Demo Monthly Membership',
+        description: 'Sample recurring membership plan.',
+        priceMonthly: 4900,
+      },
+    });
+    await tx.clientMembership.create({
+      data: {
+        businessId: args.businessId,
+        clientId: client.id,
+        planId: membershipPlan.id,
+        status: 'ACTIVE',
+        currentPeriodEnd: addDays(30, 23, 59),
+      },
+    });
+    await tx.review.create({
+      data: {
+        businessId: args.businessId,
+        appointmentId: completedAppointment.id,
+        staffId: args.staffId,
+        clientName: 'Demo Client',
+        rating: 5,
+        comment: 'Demo review showing where client feedback appears.',
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        userId: args.userId,
+        kind: 'SYSTEM',
+        title: 'Demo examples added',
+        body: 'Your dashboard includes labeled demo records in each main category so you can explore safely. Delete or edit them when you are ready.',
+        linkUrl: '/dashboard',
+      },
+    });
+    await tx.notificationDelivery.create({
+      data: {
+        businessId: args.businessId,
+        userId: args.userId,
+        channel: 'EMAIL',
+        recipient: 'demo@example.com',
+        type: 'DEMO_DELIVERY',
+        status: 'SKIPPED',
+        error: 'Demo delivery only; no email was sent.',
+      },
+    });
   }
 
   // ── Email verification ──────────────────────────────────────────────────────

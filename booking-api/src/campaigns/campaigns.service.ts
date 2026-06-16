@@ -59,8 +59,9 @@ export class CampaignsService {
     const cutoff60 = new Date(now - 60 * 24 * 60 * 60 * 1000);
 
     const where: Prisma.ClientWhereInput = { businessId };
-    // SMS needs a phone number; email is always on file.
+    // Only count recipients that can actually receive the selected channel.
     if (channel === 'SMS') where.phone = { not: null };
+    else where.email = { not: null };
 
     if (audience === 'RECENT') {
       where.appointments = { some: { startsAt: { gte: cutoff30 } } };

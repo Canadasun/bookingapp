@@ -31,7 +31,7 @@ export class WaitlistService {
 
   list(businessId: string) {
     return this.prisma.waitlistEntry.findMany({
-      where: { businessId, status: 'WAITING' },
+      where: { businessId, status: { in: ['WAITING', 'NOTIFIED'] } },
       orderBy: { createdAt: 'asc' },
       take: 500, // bound the result set
     });

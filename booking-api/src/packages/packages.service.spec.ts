@@ -129,3 +129,14 @@ describe('PackagesService.issue', () => {
       .rejects.toThrow(NotFoundException);
   });
 });
+
+describe('PackagesService package products', () => {
+  it('rejects creating a package for a service outside the business', async () => {
+    const prisma = build();
+    (prisma.service.findFirst as jest.Mock).mockResolvedValue(null);
+    const svc = await svcWith(prisma);
+
+    await expect(svc.createPackage(BIZ, { name: 'Foreign service package', serviceId: 'foreign', credits: 5, priceCents: 1000 }))
+      .rejects.toThrow(NotFoundException);
+  });
+});

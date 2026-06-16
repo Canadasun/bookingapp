@@ -48,6 +48,128 @@ describe('AuthService.verifyEmail', () => {
   });
 });
 
+describe('AuthService.register', () => {
+  it('creates labeled dashboard demo examples for new owner accounts', async () => {
+    const tx = {
+      business: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({ id: 'biz1' }),
+        update: jest.fn()
+          .mockResolvedValueOnce({ id: 'biz1' })
+          .mockResolvedValueOnce({ invoiceSeq: 1 }),
+      },
+      user: {
+        create: jest.fn().mockResolvedValue({
+          id: 'u1',
+          name: 'Owner',
+          email: 'owner@example.com',
+          role: 'OWNER',
+          businessId: 'biz1',
+          mustResetPassword: false,
+          emailVerified: false,
+          twoFactorEnabled: false,
+          twoFactorMethod: 'EMAIL',
+        }),
+      },
+      staff: {
+        create: jest.fn().mockResolvedValue({ id: 'staff1' }),
+        update: jest.fn().mockResolvedValue({ id: 'staff1' }),
+      },
+      privacyConsent: { createMany: jest.fn().mockResolvedValue({ count: 4 }) },
+      businessHours: { createMany: jest.fn().mockResolvedValue({ count: 5 }) },
+      location: { create: jest.fn().mockResolvedValue({ id: 'loc1' }) },
+      resource: { create: jest.fn().mockResolvedValue({ id: 'resource1' }) },
+      serviceCategory: { create: jest.fn().mockResolvedValue({ id: 'category1' }) },
+      service: { create: jest.fn().mockResolvedValue({ id: 'svc1', name: 'Demo Consultation' }) },
+      staffService: { create: jest.fn().mockResolvedValue({}) },
+      availabilityRule: { createMany: jest.fn().mockResolvedValue({ count: 5 }) },
+      client: { create: jest.fn().mockResolvedValue({ id: 'client1' }) },
+      appointment: {
+        create: jest.fn()
+          .mockResolvedValueOnce({ id: 'apt-upcoming' })
+          .mockResolvedValueOnce({ id: 'apt-completed' }),
+      },
+      payment: { create: jest.fn().mockResolvedValue({ id: 'pay1' }) },
+      refund: { create: jest.fn().mockResolvedValue({ id: 'refund1' }) },
+      transaction: { create: jest.fn().mockResolvedValue({ id: 'txn1' }) },
+      invoice: { create: jest.fn().mockResolvedValue({ id: 'inv1' }) },
+      staffTask: { create: jest.fn().mockResolvedValue({ id: 'task1' }) },
+      followUpPolicy: { create: jest.fn().mockResolvedValue({ id: 'policy1' }) },
+      serviceDue: { create: jest.fn().mockResolvedValue({ id: 'due1' }) },
+      waitlistEntry: { create: jest.fn().mockResolvedValue({ id: 'wait1' }) },
+      message: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      messageThreadState: { create: jest.fn().mockResolvedValue({ id: 'thread1' }) },
+      offer: { create: jest.fn().mockResolvedValue({ id: 'offer1' }) },
+      promoCode: { create: jest.fn().mockResolvedValue({ id: 'promo1' }) },
+      campaign: { create: jest.fn().mockResolvedValue({ id: 'campaign1' }) },
+      giftCard: { create: jest.fn().mockResolvedValue({ id: 'gift1' }) },
+      giftCardRedemption: { create: jest.fn().mockResolvedValue({ id: 'gift-redemption1' }) },
+      package: { create: jest.fn().mockResolvedValue({ id: 'package1', name: 'Demo 5-Visit Package' }) },
+      clientPackage: { create: jest.fn().mockResolvedValue({ id: 'client-package1' }) },
+      packageRedemption: { create: jest.fn().mockResolvedValue({ id: 'package-redemption1' }) },
+      membershipPlan: { create: jest.fn().mockResolvedValue({ id: 'membership-plan1' }) },
+      clientMembership: { create: jest.fn().mockResolvedValue({ id: 'membership1' }) },
+      review: { create: jest.fn().mockResolvedValue({ id: 'review1' }) },
+      notification: { create: jest.fn().mockResolvedValue({ id: 'notification1' }) },
+      notificationDelivery: { create: jest.fn().mockResolvedValue({ id: 'delivery1' }) },
+    };
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn().mockImplementation((cb) => cb(tx)),
+      refreshSession: {
+        create: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const jwt = { sign: jest.fn().mockReturnValue('token') };
+    const notifications = {
+      sendWelcome: jest.fn().mockResolvedValue(undefined),
+      sendVerifyEmail: jest.fn().mockResolvedValue(undefined),
+    };
+    const svc = new AuthService(
+      prisma as unknown as PrismaService,
+      jwt as unknown as JwtService,
+      notifications as unknown as NotificationsService,
+      { isLocked: jest.fn() } as unknown as AuthLockService,
+      { client: { set: jest.fn(), exists: jest.fn() } } as unknown as RedisService,
+    );
+
+    const result = await svc.register({
+      name: 'Owner',
+      email: 'owner@example.com',
+      password: 'password123',
+      role: 'OWNER',
+      businessName: 'Demo Salon',
+      businessPhone: '+1 416 555 0100',
+      timezone: 'America/Toronto',
+      privacyConsentAccepted: true,
+      consentVersion: 'v1',
+      marketingConsent: false,
+      trackingConsent: false,
+    });
+
+    expect(result.user.businessId).toBe('biz1');
+    expect(tx.staff.create).toHaveBeenCalledWith({ data: { userId: 'u1', businessId: 'biz1', active: true } });
+    expect(tx.business.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'biz1' },
+      data: expect.objectContaining({
+        intakeQuestions: expect.any(Array),
+        bookingPageSettings: expect.objectContaining({ headline: 'Book with Demo Salon' }),
+        notificationSettings: expect.objectContaining({ emailConfirmation: true }),
+      }),
+    }));
+    expect(tx.service.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ name: 'Demo Consultation' }) }));
+    expect(tx.appointment.create).toHaveBeenCalledTimes(2);
+    expect(tx.client.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ name: 'Demo Client' }) }));
+    expect(tx.waitlistEntry.create).toHaveBeenCalled();
+    expect(tx.message.createMany).toHaveBeenCalled();
+    expect(tx.invoice.create).toHaveBeenCalled();
+    expect(tx.review.create).toHaveBeenCalled();
+    expect(tx.notification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: 'Demo examples added' }) }));
+  });
+});
+
 describe('AuthService SMS 2FA phone resolution', () => {
   function buildResolver(prisma: Record<string, unknown>) {
     const mockAuthLock = { isLocked: jest.fn().mockResolvedValue(false), recordFailure: jest.fn(), clearFailures: jest.fn() } as unknown as AuthLockService;

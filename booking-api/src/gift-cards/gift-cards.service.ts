@@ -77,49 +77,61 @@ export class GiftCardsService {
   }
 
   async redeem(businessId: string, dto: RedeemGiftCardDto) {
+    const runRedeem = () =>
+      this.prisma.$transaction(
+        async (tx) => {
+          // Re-read inside the transaction — this is the read that Postgres
+          // tracks for serialization conflict detection.
+          const card = await tx.giftCard.findFirst({
+            where: { businessId, code: dto.code.trim().toUpperCase() },
+          });
+          if (!card) throw new NotFoundException('No gift card found for that code');
+          if (card.status === 'VOID') throw new BadRequestException('This gift card has been voided');
+          if (card.expiresAt && card.expiresAt < new Date())
+            throw new BadRequestException('This gift card has expired');
+          if (card.balanceCents <= 0)
+            throw new BadRequestException('This gift card has no balance left');
+          if (dto.amountCents > card.balanceCents) {
+            throw new BadRequestException(
+              `Only ${(card.balanceCents / 100).toFixed(2)} remaining on this card`,
+            );
+          }
+          if (dto.appointmentId) {
+            const appointment = await tx.appointment.findFirst({
+              where: { id: dto.appointmentId, businessId },
+              select: { id: true },
+            });
+            if (!appointment) throw new NotFoundException('Appointment not found');
+          }
+          const newBalance = card.balanceCents - dto.amountCents;
+          await tx.giftCardRedemption.create({
+            data: {
+              giftCardId: card.id,
+              amountCents: dto.amountCents,
+              appointmentId: dto.appointmentId,
+            },
+          });
+          return tx.giftCard.update({
+            where: { id: card.id },
+            data: { balanceCents: newBalance, status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE' },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+
     // SERIALIZABLE isolation ensures two concurrent redemptions cannot both
     // read the same balance and both deduct from it. Postgres will abort one
     // with a serialization error (P2034) if the reads/writes conflict.
-    const updated = await this.prisma.$transaction(
-      async (tx) => {
-        // Re-read inside the transaction — this is the read that Postgres
-        // tracks for serialization conflict detection.
-        const card = await tx.giftCard.findFirst({
-          where: { businessId, code: dto.code.trim().toUpperCase() },
-        });
-        if (!card) throw new NotFoundException('No gift card found for that code');
-        if (card.status === 'VOID') throw new BadRequestException('This gift card has been voided');
-        if (card.expiresAt && card.expiresAt < new Date())
-          throw new BadRequestException('This gift card has expired');
-        if (card.balanceCents <= 0)
-          throw new BadRequestException('This gift card has no balance left');
-        if (dto.amountCents > card.balanceCents) {
-          throw new BadRequestException(
-            `Only ${(card.balanceCents / 100).toFixed(2)} remaining on this card`,
-          );
-        }
-        if (dto.appointmentId) {
-          const appointment = await tx.appointment.findFirst({
-            where: { id: dto.appointmentId, businessId },
-            select: { id: true },
-          });
-          if (!appointment) throw new NotFoundException('Appointment not found');
-        }
-        const newBalance = card.balanceCents - dto.amountCents;
-        await tx.giftCardRedemption.create({
-          data: {
-            giftCardId: card.id,
-            amountCents: dto.amountCents,
-            appointmentId: dto.appointmentId,
-          },
-        });
-        return tx.giftCard.update({
-          where: { id: card.id },
-          data: { balanceCents: newBalance, status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE' },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    let updated: Awaited<ReturnType<typeof runRedeem>>;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        updated = await runRedeem();
+        break;
+      } catch (err) {
+        const isWriteConflict = err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034';
+        if (!isWriteConflict || attempt >= 2) throw err;
+      }
+    }
     return { redeemedCents: dto.amountCents, balanceCents: updated.balanceCents, status: updated.status };
   }
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Crown, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
-import { api, ClientWithStats, MembershipPlan, MembershipMember } from "@/lib/api";
+import { api, Business, ClientWithStats, MembershipPlan, MembershipMember } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ export default function MembershipsPage() {
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [members, setMembers] = useState<MembershipMember[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);
+  const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [planForm, setPlanForm] = useState({ name: "", description: "", priceMonthly: "" });
@@ -26,10 +27,14 @@ export default function MembershipsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [p, m, c] = await Promise.all([
-        api.memberships.listPlans(bizId), api.memberships.listMembers(bizId), api.clients.list(bizId, undefined, 1, 100),
+      const [p, m, c, b] = await Promise.all([
+        api.memberships.listPlans(bizId),
+        api.memberships.listMembers(bizId),
+        api.clients.list(bizId, undefined, 1, 100),
+        api.business.get(bizId),
       ]);
       setPlans(p); setMembers(m); setClients(c.data);
+      setBusiness(b);
     } catch { toast.error("Could not load memberships"); }
     finally { setLoading(false); }
   }, [bizId]);
@@ -103,6 +108,7 @@ export default function MembershipsPage() {
 
   const activeMembers = members.filter(m => m.status === "ACTIVE");
   const monthlyRevenue = activeMembers.reduce((s, m) => s + m.plan.priceMonthly, 0);
+  const membershipsEnabled = business?.capabilities?.memberships ?? false;
 
   if (!bizId) return null;
 
@@ -113,8 +119,18 @@ export default function MembershipsPage() {
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Crown className="w-6 h-6 text-amber-500" /> Memberships</h1>
           <p className="text-sm text-gray-500 mt-1">Recurring monthly plans for your best clients.</p>
         </div>
-        {tab === "plans" ? <Button onClick={() => setShowPlanForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> New plan</Button> : <Button onClick={() => setShowEnrollForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> Enroll client</Button>}
+        {tab === "plans" ? (
+          <Button onClick={() => setShowPlanForm(s => !s)} disabled={!membershipsEnabled} className="gap-2"><Plus className="w-4 h-4" /> New plan</Button>
+        ) : (
+          <Button onClick={() => setShowEnrollForm(s => !s)} disabled={!membershipsEnabled} className="gap-2"><Plus className="w-4 h-4" /> Enroll client</Button>
+        )}
       </div>
+
+      {!membershipsEnabled && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Memberships require a paid Pulse plan. Existing demo examples are visible here, but new plans and enrollments unlock after upgrading.
+        </div>
+      )}
 
       {activeMembers.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

@@ -650,16 +650,23 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       const merge = (t: string) => t.replace(/\{name\}/g, () => client.name).replace(/\{business\}/g, () => campaign.business.name); // raw: SMS + subject; function replacer prevents re-expansion
       const mergeHtml = (t: string) => esc(t).replace(/\{name\}/g, () => esc(client.name)).replace(/\{business\}/g, () => esc(campaign.business.name));
 
+      let sent = false;
       if (campaign.channel === 'SMS') {
-        if (client.phone) await this.sms.send({ to: client.phone, body: merge(campaign.body) });
+        if (client.phone) {
+          await this.sms.send({ to: client.phone, body: merge(campaign.body) });
+          sent = true;
+        }
       } else if (client.email) {
         await this.email.send({
           to: client.email,
           subject: merge(campaign.subject ?? `A note from ${campaign.business.name}`),
           html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${mergeHtml(campaign.body)}</div>`),
         });
+        sent = true;
       }
-      await this.prisma.campaign.update({ where: { id: campaign.id }, data: { sentCount: { increment: 1 } } });
+      if (sent) {
+        await this.prisma.campaign.update({ where: { id: campaign.id }, data: { sentCount: { increment: 1 } } });
+      }
       return;
     }
 

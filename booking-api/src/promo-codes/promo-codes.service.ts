@@ -35,6 +35,11 @@ export class PromoCodesService {
   }>) {
     const pc = await this.prisma.promoCode.findFirst({ where: { id, businessId } });
     if (!pc) throw new NotFoundException('Promo code not found');
+    const nextType = dto.discountType ?? pc.discountType;
+    const nextValue = dto.discountValue ?? pc.discountValue;
+    if (nextType === 'PERCENT' && nextValue > 100) {
+      throw new BadRequestException('Percentage discount cannot exceed 100');
+    }
     return this.prisma.promoCode.update({
       where: { id },
       data: {

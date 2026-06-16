@@ -580,7 +580,7 @@ export const api = {
     join: (businessId: string, data: { name: string; email: string; phone?: string; serviceId?: string; staffId?: string; desiredDate?: string; notes?: string }) =>
       req<{ id: string }>(`/businesses/${businessId}/waitlist`, { method: "POST", body: JSON.stringify(data) }, null),
     list: (businessId: string) =>
-      req<Array<{ id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; createdAt: string }>>(`/businesses/${businessId}/waitlist`),
+      req<Array<{ id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; status: "WAITING" | "NOTIFIED" | "CONVERTED" | "CANCELLED"; createdAt: string }>>(`/businesses/${businessId}/waitlist`),
     remove: (businessId: string, id: string) =>
       req<void>(`/businesses/${businessId}/waitlist/${id}`, { method: "DELETE" }),
   },
