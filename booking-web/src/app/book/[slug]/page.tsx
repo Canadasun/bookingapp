@@ -51,7 +51,7 @@ function groupSlots<T extends Slot>(slots: T[]) {
 function StepBar({ labels, current }: { labels: string[]; current: number }) {
   const STEPS = labels;
   return (
-    <ol aria-label="Booking steps" className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 list-none p-0 m-0">
+    <ol aria-label="Booking steps" className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 list-none pl-0">
       {STEPS.map((label, i) => (
         <li key={label} className="flex items-center gap-2 shrink-0" aria-current={i === current ? "step" : undefined}>
           <div className={cn(
