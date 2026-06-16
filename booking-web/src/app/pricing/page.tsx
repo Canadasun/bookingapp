@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, X, ArrowRight, Sparkles } from "lucide-react";
+import { Check, X, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

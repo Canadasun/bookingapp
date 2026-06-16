@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, Body, Patch, Post, UseGuards } from '@nestjs/common';
 
-const INTERNAL_UPLOAD = /^\/uploads\/[a-zA-Z0-9-]+$/;
+const INTERNAL_UPLOAD = /^\/(?:proxy\/)?uploads\/[a-zA-Z0-9-]+$/;
 function isValidAvatarUrl(url: string): boolean {
   if (INTERNAL_UPLOAD.test(url)) return true;
   try { return new URL(url).protocol === 'https:'; } catch { return false; }
@@ -10,10 +10,23 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { normalizePhone } from '../common/util/phone';
+
+const phoneSchema = z
+  .preprocess((v) => v === '' ? null : v, z.string().trim().nullable().optional())
+  .transform((v, ctx) => {
+    if (v == null) return null;
+    const normalized = normalizePhone(v);
+    if (!normalized) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a valid phone number, e.g. +1 555 123 4567' });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 const UpdateMeSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
-  phone: z.string().trim().max(30).optional(),
+  phone: phoneSchema,
   avatarUrl: z.string().nullable().optional().refine(
     (v) => v == null || isValidAvatarUrl(v),
     { message: 'avatarUrl must be an https:// URL or an internal /uploads/ path' },

@@ -13,6 +13,7 @@ export interface SessionUser {
   role: "ADMIN" | "OWNER" | "STAFF" | "CLIENT";
   businessId: string | null;
   staffId: string | null;
+  avatarUrl?: string | null;
   permissions?: string[];
   emailVerified?: boolean;    // not in cookie; available from useCurrentUser()
   twoFactorEnabled?: boolean; // not in cookie; available from useCurrentUser()
@@ -41,6 +42,18 @@ export function invalidateCurrentUser() {
   _promise = null;
 }
 
+export function updateCurrentUser(user: SessionUser) {
+  _cache = user;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<SessionUser>("pulse-current-user", { detail: user }));
+  }
+}
+
+export function patchCurrentUser(patch: Partial<SessionUser>) {
+  if (!_cache) return;
+  updateCurrentUser({ ..._cache, ...patch });
+}
+
 // Authoritative hook — calls /api/auth/me, caches the result, redirects to
 // /login if the session is invalid. Use this in layouts and auth-sensitive pages.
 export function useCurrentUser() {
@@ -56,6 +69,14 @@ export function useCurrentUser() {
       if (!u) router.replace("/login");
     });
   }, [router]);
+
+  useEffect(() => {
+    function onUser(e: Event) {
+      setUser((e as CustomEvent<SessionUser>).detail);
+    }
+    window.addEventListener("pulse-current-user", onUser);
+    return () => window.removeEventListener("pulse-current-user", onUser);
+  }, []);
 
   return { user, loading };
 }

@@ -345,6 +345,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     api.users.me().then((u) => setAvatar(u.avatarUrl ?? null)).catch(() => {});
   }, [pathname]);
   useEffect(() => {
+    if (user) setAvatar(user.avatarUrl ?? null);
+  }, [user]);
+  useEffect(() => {
     if (!user?.businessId) return;
     api.business.get(user.businessId).then(setBiz).catch(() => {});
     if (user.role !== "OWNER" && user.role !== "ADMIN") return;

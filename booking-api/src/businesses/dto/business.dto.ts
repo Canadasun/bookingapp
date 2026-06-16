@@ -59,7 +59,7 @@ export const CreateBusinessSchema = z.object({
   allowClientReschedule: z.boolean().default(true),
   cancellationPolicy: optionalString(5000),
   currency: z.enum(['CAD', 'USD']).default('CAD'),
-  plan: z.enum(['FREE', 'BASIC', 'PRO']).optional(),
+  plan: z.enum(['FREE', 'BASIC', 'PRO', 'UNLIMITED']).optional(),
 });
 
 // plan is server-controlled (via Stripe or admin); omit it so owners can never

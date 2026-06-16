@@ -168,7 +168,7 @@ function TaskRow({ t, isOwner, onToggle, onRemove }: { t: TaskItem; isOwner: boo
           <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5 flex-wrap">
             {t.staff?.user?.name && <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{t.staff.user.name}</span>}
             {dueDate && <span className={cn("inline-flex items-center gap-1", overdue && "text-red-500 font-medium")}><CalendarClock className="w-3 h-3" />{format(dueDate, "MMM d, HH:mm")}</span>}
-            {t.notes && <span className="italic truncate max-w-[16rem]">"{t.notes}"</span>}
+            {t.notes && <span className="italic truncate max-w-[16rem]">&ldquo;{t.notes}&rdquo;</span>}
           </div>
         </div>
         {isOwner && (

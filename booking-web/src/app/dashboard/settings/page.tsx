@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback, useRef } from "react";
+import { useEffect, useState, Suspense, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditC
 import QRCode from "react-qr-code";
 import { toast } from "sonner";
 import { api, Business, VerificationStatus, IntakeQuestion, Location } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -38,17 +38,17 @@ type SubscriptionDetails = {
 };
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string; group: string }[] = [
-  { id: "profile",       label: "Business profile",   icon: Building2,    desc: "Name, contact info, timezone",          group: "Setup" },
-  { id: "booking",       label: "Booking policies",   icon: Clock,        desc: "Notice, cancellations, advance limits", group: "Setup" },
-  { id: "online",        label: "Online booking",     icon: Globe,        desc: "Booking link, QR code, embed",          group: "Setup" },
-  { id: "payments",      label: "Payments & fees",    icon: DollarSign,   desc: "Deposits, no-show fees",                group: "Money" },
-  { id: "payouts",       label: "Payouts",            icon: Banknote,     desc: "Connect bank account & withdraw",       group: "Money" },
-  { id: "branding",      label: "Branding",           icon: Palette,      desc: "Colors, fonts, booking page style",     group: "Presence" },
-  { id: "notifications", label: "Notifications",      icon: Bell,         desc: "Emails & SMS sent to clients",          group: "Presence" },
-  { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar",      group: "Advanced" },
-  { id: "locations",     label: "Locations",          icon: MapPin,       desc: "Manage multiple business locations",    group: "Advanced" },
+  { id: "profile",       label: "Business profile",   icon: Building2,    desc: "Name, contact info, timezone",          group: "Business" },
+  { id: "locations",     label: "Locations",          icon: MapPin,       desc: "Manage multiple business locations",    group: "Business" },
+  { id: "booking",       label: "Booking policies",   icon: Clock,        desc: "Notice, cancellations, advance limits", group: "Booking setup" },
+  { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar",      group: "Booking setup" },
+  { id: "online",        label: "Online booking",     icon: Globe,        desc: "Booking link, QR code, embed",          group: "Booking page" },
+  { id: "branding",      label: "Branding",           icon: Palette,      desc: "Colors, fonts, booking page style",     group: "Booking page" },
+  { id: "payments",      label: "Payments & fees",    icon: DollarSign,   desc: "Deposits, no-show fees",                group: "Payments" },
+  { id: "payouts",       label: "Payouts",            icon: Banknote,     desc: "Connect bank account & withdraw",       group: "Payments" },
+  { id: "billing",       label: "Billing & plan",     icon: CreditCard,   desc: "Subscription plan, upgrade",            group: "Payments" },
+  { id: "notifications", label: "Notifications",      icon: Bell,         desc: "Emails & SMS sent to clients",          group: "Account" },
   { id: "security",      label: "Security",           icon: ShieldCheck,  desc: "Two-factor sign-in, password",          group: "Account" },
-  { id: "billing",       label: "Billing & plan",     icon: CreditCard,   desc: "Subscription plan, upgrade",            group: "Account" },
 ];
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
@@ -89,6 +89,21 @@ function PolicyNumberInput({ value, min = 0, unit, label, onChange }: {
         className="h-8 w-20 border-0 bg-transparent p-0 text-base font-semibold tabular-nums shadow-none focus-visible:ring-0"
       />
       <span className="ml-2 text-sm font-medium text-gray-500">{unit}</span>
+    </div>
+  );
+}
+
+function FeatureError({ message, onRetry }: { message?: string; onRetry?: () => void }) {
+  if (!message) return null;
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+      <p className="font-semibold text-red-800">Could not load this section completely.</p>
+      <p className="mt-0.5 text-xs">{message}</p>
+      {onRetry && (
+        <button type="button" onClick={onRetry} className="mt-2 text-xs font-semibold underline underline-offset-2">
+          Retry
+        </button>
+      )}
     </div>
   );
 }
@@ -178,20 +193,40 @@ function contrastLabel(ratio: number): { pass: boolean; level: string; color: st
 }
 
 function SettingsPage() {
+  const { user, loading: userLoading } = useCurrentUser();
   const [biz, setBiz]       = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving]   = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [copied, setCopied]   = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [section, setSection] = useState<Section>("profile");
   const [form, setForm]       = useState<Partial<Business>>({});
+  const [featureErrors, setFeatureErrors] = useState<Record<string, string>>({});
 
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const user = getUser();
   const bizId = user?.businessId ?? "";
+  const isOwner = user?.role === "OWNER" || user?.role === "ADMIN";
+  const visibleSections = useMemo(
+    () => isOwner ? SECTIONS : SECTIONS.filter((s) => s.id === "security"),
+    [isOwner],
+  );
+
+  const recordFeatureError = useCallback((key: string, error: unknown, fallback: string) => {
+    const message = error instanceof Error ? error.message : fallback;
+    setFeatureErrors((prev) => ({ ...prev, [key]: message }));
+  }, []);
+  const clearFeatureError = useCallback((key: string) => {
+    setFeatureErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
 
   // Sync section ↔ URL so refresh stays on the same tab.
   const goSection = useCallback((s: Section) => {
@@ -199,12 +234,18 @@ function SettingsPage() {
     router.replace(`/dashboard/settings?tab=${s}`, { scroll: false });
   }, [router]);
 
-  // Two-factor: seeded from the session, updated optimistically on toggle.
+  // Two-factor: seeded from the live session, updated optimistically on toggle.
   const [twoFA, setTwoFA] = useState<boolean>(user?.twoFactorEnabled ?? false);
   const [twoFAMethod, setTwoFAMethod] = useState<"EMAIL" | "SMS">(user?.twoFactorMethod ?? "EMAIL");
   const [twoFASaving, setTwoFASaving] = useState(false);
   const [twoFAPassword, setTwoFAPassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null); // shown once after enabling
+
+  useEffect(() => {
+    if (!user) return;
+    setTwoFA(!!user.twoFactorEnabled);
+    setTwoFAMethod(user.twoFactorMethod ?? "EMAIL");
+  }, [user]);
 
   async function saveTwoFactor(enabled: boolean, method: "EMAIL" | "SMS") {
     if (!twoFAPassword) {
@@ -233,16 +274,22 @@ function SettingsPage() {
   }
 
   useEffect(() => {
+    if (userLoading) return;
+    if (!isOwner) {
+      setSection("security");
+      setLoading(false);
+      return;
+    }
     if (!bizId) {
       setLoadError("No business account is linked to your profile. Please contact support.");
       setLoading(false);
       return;
     }
     api.business.get(bizId)
-      .then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); })
+      .then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); setDirty(false); })
       .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); setLoading(false); })
       .finally(() => setLoading(false));
-  }, [bizId]);
+  }, [bizId, isOwner, userLoading]);
 
   useEvents(
     bizId || null,
@@ -253,17 +300,26 @@ function SettingsPage() {
     }, []),
   );
 
-  const f = (k: keyof Business, v: unknown) => setForm((p) => ({ ...p, [k]: v }));
+  const f = (k: keyof Business, v: unknown) => {
+    setDirty(true);
+    setForm((p) => ({ ...p, [k]: v }));
+  };
   const bookingSettings = (form.bookingPageSettings ?? {}) as Record<string, unknown>;
   const notificationSettings = (form.notificationSettings ?? {}) as NonNullable<Business["notificationSettings"]>;
-  const nf = (k: keyof NonNullable<Business["notificationSettings"]>, v: boolean) => setForm((p) => ({
-    ...p,
-    notificationSettings: { ...((p.notificationSettings ?? {}) as Record<string, unknown>), [k]: v },
-  }));
-  const bf = (k: string, v: unknown) => setForm((p) => ({
-    ...p,
-    bookingPageSettings: { ...((p.bookingPageSettings ?? {}) as Record<string, unknown>), [k]: v },
-  }));
+  const nf = (k: keyof NonNullable<Business["notificationSettings"]>, v: boolean) => {
+    setDirty(true);
+    setForm((p) => ({
+      ...p,
+      notificationSettings: { ...((p.notificationSettings ?? {}) as Record<string, unknown>), [k]: v },
+    }));
+  };
+  const bf = (k: string, v: unknown) => {
+    setDirty(true);
+    setForm((p) => ({
+      ...p,
+      bookingPageSettings: { ...((p.bookingPageSettings ?? {}) as Record<string, unknown>), [k]: v },
+    }));
+  };
 
   const currentBrandColor = (form.bookingPageSettings as Record<string, unknown> | undefined)?.brandColor as string | undefined;
   useEffect(() => {
@@ -280,23 +336,31 @@ function SettingsPage() {
   const [hexInputValue, setHexInputValue] = useState("");
 
   const loadSubscription = useCallback(async () => {
-    const details = await api.subscriptions.get();
-    setSubscription(details);
-    return details;
-  }, []);
+    try {
+      const details = await api.subscriptions.get();
+      setSubscription(details);
+      clearFeatureError("subscription");
+      return details;
+    } catch (e) {
+      recordFeatureError("subscription", e, "Could not load billing details");
+      throw e;
+    }
+  }, [clearFeatureError, recordFeatureError]);
 
   useEffect(() => {
-    if (bizId) loadSubscription().catch(() => {});
-  }, [bizId, loadSubscription]);
+    if (bizId && isOwner) loadSubscription().catch(() => {});
+  }, [bizId, isOwner, loadSubscription]);
 
   // Locations
   const [locations, setLocations] = useState<Location[]>([]);
   const [locationForm, setLocationForm] = useState({ name: "", address: "", phone: "", timezone: "" });
   const [locationBusy, setLocationBusy] = useState(false);
   const loadLocations = useCallback(() => {
-    if (!bizId) return;
-    api.locations.list(bizId).then(setLocations).catch(() => {});
-  }, [bizId]);
+    if (!bizId || !isOwner) return;
+    api.locations.list(bizId)
+      .then((items) => { setLocations(items); clearFeatureError("locations"); })
+      .catch((e) => recordFeatureError("locations", e, "Could not load locations"));
+  }, [bizId, isOwner, clearFeatureError, recordFeatureError]);
   useEffect(() => { loadLocations(); }, [loadLocations]);
 
   // Stripe Connect / Payouts
@@ -305,15 +369,21 @@ function SettingsPage() {
   const [connectBusy, setConnectBusy] = useState<string | null>(null);
   const [payoutAmount, setPayoutAmount] = useState("");
   const payoutIdempotencyKey = useRef<string | null>(null);
-  function loadConnect() {
-    api.connect.status().then(setConnectStatus).catch(() => {});
-  }
-  useEffect(() => { loadConnect(); }, []);
+  const loadConnect = useCallback(() => {
+    if (!isOwner) return;
+    api.connect.status()
+      .then((status) => { setConnectStatus(status); clearFeatureError("connect"); })
+      .catch((e) => recordFeatureError("connect", e, "Could not load payout status"));
+  }, [isOwner, clearFeatureError, recordFeatureError]);
+  useEffect(() => { loadConnect(); }, [loadConnect]);
 
   // Load this business's own referral code + count.
   useEffect(() => {
-    api.referrals.get().then((r) => setMyReferral({ code: r.code, referredCount: r.referredCount })).catch(() => {});
-  }, []);
+    if (!isOwner) return;
+    api.referrals.get()
+      .then((r) => { setMyReferral({ code: r.code, referredCount: r.referredCount }); clearFeatureError("referrals"); })
+      .catch((e) => recordFeatureError("referrals", e, "Could not load referral details"));
+  }, [isOwner, clearFeatureError, recordFeatureError]);
 
   // Business verification status.
   const [verif, setVerif] = useState<{ status: VerificationStatus; note: string | null } | null>(null);
@@ -322,7 +392,7 @@ function SettingsPage() {
     legalName: "", address: "", phone: "", governmentIdUrl: "", registrationDocUrl: "",
   });
   useEffect(() => {
-    if (!bizId) return;
+    if (!bizId || !isOwner) return;
     api.verification.status(bizId).then((v) => {
       setVerif({ status: v.verificationStatus, note: v.verificationNote });
       setVerificationForm({
@@ -332,8 +402,9 @@ function SettingsPage() {
         governmentIdUrl: v.verificationGovernmentIdUrl ?? "",
         registrationDocUrl: v.verificationDocUrl ?? "",
       });
-    }).catch(() => {});
-  }, [bizId]);
+      clearFeatureError("verification");
+    }).catch((e) => recordFeatureError("verification", e, "Could not load verification status"));
+  }, [bizId, isOwner, clearFeatureError, recordFeatureError]);
   async function submitVerification() {
     if (!bizId) return;
     if (!verificationForm.legalName.trim() || !verificationForm.address.trim() || !verificationForm.phone.trim() || !verificationForm.governmentIdUrl || !verificationForm.registrationDocUrl) {
@@ -351,8 +422,13 @@ function SettingsPage() {
 
   // Google Calendar connection.
   const [cal, setCal] = useState<{ connected: boolean; email: string | null; configured: boolean } | null>(null);
-  function loadCal() { api.calendarSync.status().then(setCal).catch(() => {}); }
-  useEffect(() => { loadCal(); }, []);
+  const loadCal = useCallback(() => {
+    if (!isOwner) return;
+    api.calendarSync.status()
+      .then((status) => { setCal(status); clearFeatureError("calendar"); })
+      .catch((e) => recordFeatureError("calendar", e, "Could not load calendar sync status"));
+  }, [isOwner, clearFeatureError, recordFeatureError]);
+  useEffect(() => { loadCal(); }, [loadCal]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const p = params.get("calendar");
@@ -363,7 +439,7 @@ function SettingsPage() {
       toast.error(msg);
       goSection("calendar");
     }
-  }, [goSection]);
+  }, [goSection, loadCal]);
   async function connectCal() {
     try { const { url } = await api.calendarSync.connect(); window.location.assign(url); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Google connect"); }
@@ -420,8 +496,9 @@ function SettingsPage() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && SECTIONS.some((s) => s.id === tab)) setSection(tab as Section);
-  }, [searchParams]);
+    if (tab && visibleSections.some((s) => s.id === tab)) setSection(tab as Section);
+    else if (!visibleSections.some((s) => s.id === section)) setSection(visibleSections[0]?.id ?? "security");
+  }, [searchParams, section, visibleSections]);
 
   useEffect(() => {
     const connect = searchParams.get("connect");
@@ -461,7 +538,7 @@ function SettingsPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!bizId) return;
+    if (!bizId || !isOwner) return;
     if (form.requireDeposit && !isPaid) {
       promptUpgrade("BASIC", "Mandatory deposits");
       return;
@@ -510,6 +587,7 @@ function SettingsPage() {
       const updated = await api.business.update(bizId, payload);
       setBiz(updated);
       setForm({ ...updated, phone: formatPhoneDisplay(updated.phone) });
+      setDirty(false);
       // If plan limits stripped a payment setting the user tried to enable, tell them.
       const planStripped =
         (payload.requireDeposit && !updated.requireDeposit) ||
@@ -530,11 +608,11 @@ function SettingsPage() {
       .catch(() => toast.error("Could not copy link"));
   }
 
-  if (loading) return <LoadingSpinner />;
+  if (userLoading || loading) return <LoadingSpinner />;
   if (loadError) return (
     <div className="text-center py-20">
       <p className="text-red-500 mb-3">{loadError}</p>
-      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); setDirty(false); }).catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">Retry</button>
     </div>
   );
 
@@ -563,7 +641,14 @@ function SettingsPage() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-600 mt-0.5">Manage your business profile and booking preferences</p>
+        <p className="text-sm text-gray-600 mt-0.5">
+          {isOwner ? "Manage your business profile and booking preferences" : "Manage your account security"}
+        </p>
+        {dirty && (
+          <p className="mt-2 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+            Unsaved changes
+          </p>
+        )}
       </div>
 
       {/* Duplicate account warning */}
@@ -581,28 +666,34 @@ function SettingsPage() {
 
       <div className="flex flex-col xl:flex-row gap-5">
 
-        {/* Compact tab bar — used until there is room for both dashboard sidebars. */}
+        {/* Compact section picker — easier to scan than an 11-item horizontal tab strip. */}
         <div className="xl:hidden mb-4 relative -mx-3 sm:-mx-5">
-          <div className="px-3 sm:px-5 overflow-x-auto">
-          <div className="flex gap-2 pb-1" style={{ minWidth: 'max-content' }}>
-            {SECTIONS.map((s) => (
-              <button key={s.id} onClick={() => goSection(s.id)}
-                className={cn("flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors",
-                  section === s.id ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>
-                <s.icon className="w-4 h-4" />
-                {s.label}
-              </button>
-            ))}
+          <div className="px-3 sm:px-5">
+            <label htmlFor="settings-section" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Settings section
+            </label>
+            <select
+              id="settings-section"
+              value={section}
+              onChange={(e) => goSection(e.target.value as Section)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            >
+              {[...new Set(visibleSections.map((s) => s.group))].map((group) => (
+                <optgroup key={group} label={group}>
+                  {visibleSections.filter((s) => s.group === group).map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
-          </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#FFF9F0] to-transparent" />
         </div>
 
         {/* Left nav */}
         <aside className="hidden xl:block w-56 shrink-0">
           <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {SECTIONS.map(({ id, label, icon: Icon, desc, group }, i) => {
-              const isGroupStart = i === 0 || SECTIONS[i - 1].group !== group;
+            {visibleSections.map(({ id, label, icon: Icon, desc, group }, i) => {
+              const isGroupStart = i === 0 || visibleSections[i - 1].group !== group;
               return (
                 <div key={id} className={cn(!isGroupStart && i !== 0 && "border-t border-gray-50")}>
                   {isGroupStart && i !== 0 && (
@@ -641,6 +732,20 @@ function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Business profile</h3>
                   <p className="text-xs text-gray-600 mt-0.5">This information appears on your booking page.</p>
                 </div>
+                <FeatureError
+                  message={featureErrors.verification}
+                  onRetry={() => bizId && api.verification.status(bizId).then((v) => {
+                    setVerif({ status: v.verificationStatus, note: v.verificationNote });
+                    setVerificationForm({
+                      legalName: v.verificationLegalName ?? "",
+                      address: v.verificationAddress ?? "",
+                      phone: v.verificationPhone ?? "",
+                      governmentIdUrl: v.verificationGovernmentIdUrl ?? "",
+                      registrationDocUrl: v.verificationDocUrl ?? "",
+                    });
+                    clearFeatureError("verification");
+                  }).catch((e) => recordFeatureError("verification", e, "Could not load verification status"))}
+                />
                 <hr className="border-gray-100" />
 
                 {/* Business verification */}
@@ -691,7 +796,7 @@ function SettingsPage() {
 
                 <Field label="Logo">
                   <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={async (url) => {
-                    f("logoUrl", url ?? "");
+                    setForm((p) => ({ ...p, logoUrl: url ?? "" }));
                     // Persist the logo on its own so it can't be lost to an unrelated
                     // invalid field elsewhere in the settings form.
                     if (!bizId) return;
@@ -789,10 +894,10 @@ function SettingsPage() {
                     },
                     {
                       label: "Cancel / reschedule cutoff",
-                      desc: "How many days before the appointment clients can still change it themselves.",
+                      desc: "How many hours before the appointment clients can still change it themselves.",
                       value: (form.cancellationWindowMinutes as number) ?? (((form.cancellationWindowHours as number) ?? 24) * 60),
                       min: 0,
-                      unit: "days" as const,
+                      unit: "hours" as const,
                       key: "cancellationWindowMinutes" as const,
                     },
                   ].map((item) => (
@@ -867,6 +972,7 @@ function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Calendar sync</h3>
                   <p className="text-xs text-gray-400 mt-0.5">See your Pulse appointments in any calendar app on your phone or computer.</p>
                 </div>
+                <FeatureError message={featureErrors.calendar} onRetry={loadCal} />
 
                 {/* ── iCal feed (primary, beginner-friendly) ───────────────── */}
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 space-y-4">
@@ -1102,11 +1208,11 @@ function SettingsPage() {
                   </div>
 
                   {/* Instagram tip */}
-                  <div className="mt-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100 px-3 py-2 text-xs text-purple-800">
-                    <span className="font-semibold">📸 Instagram:</span> Go to your profile → <strong>Edit profile</strong> → paste your link in the <strong>Website</strong> field. Clients can tap it directly from your bio.
+                  <div className="mt-3 rounded-lg bg-purple-50 border border-purple-100 px-3 py-2 text-xs text-purple-800">
+                    <span className="font-semibold">Instagram:</span> Go to your profile → <strong>Edit profile</strong> → paste your link in the <strong>Website</strong> field. Clients can tap it directly from your bio.
                   </div>
                   <div className="mt-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
-                    <span className="font-semibold">🔍 Google Business:</span> Go to your Google Business Profile → <strong>Edit profile</strong> → <strong>Website</strong> → paste your link so clients who find you on Google can book instantly.
+                    <span className="font-semibold">Google Business:</span> Go to your Google Business Profile → <strong>Edit profile</strong> → <strong>Website</strong> → paste your link so clients who find you on Google can book instantly.
                   </div>
                 </div>
 
@@ -1440,6 +1546,7 @@ function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Locations</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Manage multiple branches under one account. Staff and appointments are assigned per location.</p>
                 </div>
+                <FeatureError message={featureErrors.locations} onRetry={loadLocations} />
                 <hr className="border-gray-100" />
 
                 {!isUnlimited ? (
@@ -1513,6 +1620,7 @@ function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Payouts</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Connect your bank account and withdraw your earnings. Powered by Stripe Connect.</p>
                 </div>
+                <FeatureError message={featureErrors.connect} onRetry={loadConnect} />
                 <hr className="border-gray-100" />
 
                 {/* Pricing table */}
@@ -1552,8 +1660,13 @@ function SettingsPage() {
                 </div>
 
                 {/* Connect status + onboarding */}
-                {!connectStatus ? (
+                {!connectStatus && !featureErrors.connect ? (
                   <p className="text-sm text-gray-400">Loading…</p>
+                ) : !connectStatus ? (
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-sm font-semibold text-gray-800">Payout status unavailable</p>
+                    <p className="mt-1 text-xs text-gray-500">Retry above, or open Billing if you need to confirm your plan while Stripe status is unavailable.</p>
+                  </div>
                 ) : !connectStatus.onboarded ? (
                   <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 space-y-3">
                     <p className="text-sm font-semibold text-violet-900">Connect your bank account</p>
@@ -1725,6 +1838,7 @@ function SettingsPage() {
                         <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
                           {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
                             <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
+                              aria-pressed={enabled === opt.value}
                               className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                                 enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
                               {opt.label}
@@ -1765,6 +1879,7 @@ function SettingsPage() {
                         <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
                           {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
                             <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
+                              aria-pressed={enabled === opt.value}
                               className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                                 enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
                               {opt.label}
@@ -1905,6 +2020,12 @@ function SettingsPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Billing &amp; plan</h3>
                   <p className="text-xs text-gray-400 mt-0.5">Choose the plan that fits your business.</p>
                 </div>
+                <FeatureError message={featureErrors.subscription || featureErrors.referrals} onRetry={() => {
+                  loadSubscription().catch(() => {});
+                  api.referrals.get()
+                    .then((r) => { setMyReferral({ code: r.code, referredCount: r.referredCount }); clearFeatureError("referrals"); })
+                    .catch((e) => recordFeatureError("referrals", e, "Could not load referral details"));
+                }} />
                 <hr className="border-gray-100" />
 
                 <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
@@ -2023,17 +2144,21 @@ function SettingsPage() {
                           const RANK: Record<string, number> = { FREE: 0, BASIC: 1, PRO: 2, UNLIMITED: 3 };
                           const currentPlan = biz?.plan ?? "FREE";
                           const isCurrent = currentPlan === plan.id;
-                          const canBuy = (plan.id === "BASIC" || plan.id === "PRO" || plan.id === "UNLIMITED") && !isCurrent;
                           const isDowngrade = (RANK[plan.id] ?? 0) < (RANK[currentPlan] ?? 0);
+                          const canBuy = (plan.id === "BASIC" || plan.id === "PRO" || plan.id === "UNLIMITED") && !isCurrent && !isDowngrade;
                           const label = isCurrent ? "Current plan"
                             : billingBusy === plan.id ? "Redirecting…"
-                            : isDowngrade ? `Downgrade to ${plan.name}`
+                            : isDowngrade ? `Manage ${plan.name} downgrade`
                             : plan.cta;
                           return (
                             <button
                               type="button"
                               disabled={isCurrent || billingBusy !== null}
-                              onClick={() => { if (canBuy) upgrade(plan.id as "BASIC" | "PRO" | "UNLIMITED"); else if (!isCurrent) toast.info("To downgrade to Free, cancel your subscription from the billing portal below."); }}
+                              onClick={() => {
+                                if (canBuy) upgrade(plan.id as "BASIC" | "PRO" | "UNLIMITED");
+                                else if (isDowngrade && subscription?.hasBilling) manageBilling();
+                                else if (!isCurrent) toast.info("To downgrade, manage your subscription from the billing portal below.");
+                              }}
                               className={cn(
                                 "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
                                 isCurrent
@@ -2085,8 +2210,21 @@ function SettingsPage() {
               </div>
             )}
 
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-              {section !== "billing" && section !== "security" && section !== "payouts" && section !== "locations" && section !== "calendar" && <Button type="submit" loading={saving} size="md">Save changes</Button>}
+            <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/95 px-4 py-3 backdrop-blur sm:px-6">
+              {section !== "billing" && section !== "security" && section !== "payouts" && section !== "locations" && section !== "calendar" ? (
+                <>
+                  <p className={cn("text-xs", dirty ? "text-amber-700" : "text-gray-400")}>
+                    {dirty ? "Changes on this page are not saved yet." : "No unsaved changes."}
+                  </p>
+                  <Button type="submit" loading={saving} disabled={!dirty} size="md">
+                    Save changes
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  This section saves with its own buttons or connects to an external provider.
+                </p>
+              )}
             </div>
           </form>
         </div>

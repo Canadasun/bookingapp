@@ -6,12 +6,13 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
-export function ImageUpload({ value, kind, onChange, shape = "square", documents = false }: {
+export function ImageUpload({ value, kind, onChange, shape = "square", documents = false, alt = "Uploaded image" }: {
   value?: string | null;
   kind?: "LOGO" | "AVATAR" | "COVER";
   onChange: (url: string | null) => void;
   shape?: "square" | "circle";
   documents?: boolean;
+  alt?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -35,14 +36,14 @@ export function ImageUpload({ value, kind, onChange, shape = "square", documents
 
   const radius = shape === "circle" ? "rounded-full" : "rounded-xl";
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
       <div className={`w-16 h-16 ${radius} border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0`}>
         {value && !documents
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={value} alt="Uploaded image" className="w-full h-full object-cover" />
+          ? <img src={value} alt={alt} className="w-full h-full object-cover" />
           : <Upload className="w-5 h-5 text-gray-300" />}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input ref={inputRef} type="file" accept={documents ? "image/png,image/jpeg,image/webp,image/gif,application/pdf" : "image/png,image/jpeg,image/webp,image/gif"} className="hidden" onChange={pick} />
         <Button type="button" variant="outline" size="sm" loading={busy} onClick={() => inputRef.current?.click()}>
           {value ? "Replace" : "Upload"}
@@ -54,7 +55,7 @@ export function ImageUpload({ value, kind, onChange, shape = "square", documents
           </button>
         )}
       </div>
-      <p className="text-xs text-gray-400">{documents ? "PDF, PNG, JPG, WebP or GIF · up to 5 MB" : "PNG, JPG, WebP or GIF · up to 2 MB"}</p>
+      <p className="text-xs text-gray-400 sm:max-w-[12rem]">{documents ? "PDF, PNG, JPG, WebP or GIF · up to 5 MB" : "PNG, JPG, WebP or GIF · up to 2 MB"}</p>
     </div>
   );
 }

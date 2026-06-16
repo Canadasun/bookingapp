@@ -14,7 +14,7 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, data: { name?: string; phone?: string; avatarUrl?: string | null }) {
+  async update(id: string, data: { name?: string; phone?: string | null; avatarUrl?: string | null }) {
     return this.prisma.user.update({
       where: { id },
       // Only write fields that were actually provided (avatarUrl may be null to clear).

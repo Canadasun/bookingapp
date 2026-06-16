@@ -468,7 +468,7 @@ export const api = {
   users: {
     // The signed-in user's own profile (account page).
     me: () => req<{ id: string; email: string; name: string; phone?: string | null; role: string; businessId: string | null; avatarUrl?: string | null; createdAt: string }>("/users/me"),
-    updateMe: (data: { name?: string; phone?: string; avatarUrl?: string | null }) =>
+    updateMe: (data: { name?: string; phone?: string | null; avatarUrl?: string | null }) =>
       req<{ id: string; email: string; name: string; phone?: string | null; role: string; businessId: string | null; avatarUrl?: string | null }>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
   },
 
