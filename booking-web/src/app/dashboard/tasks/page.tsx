@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 export default function TasksPage() {
@@ -25,6 +26,7 @@ export default function TasksPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", staffId: "", dueAt: "", notes: "" });
+  const [taskToDelete, setTaskToDelete] = useState<TaskItem | null>(null);
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -66,10 +68,12 @@ export default function TasksPage() {
       load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not update"); }
   }
-  async function remove(t: TaskItem) {
-    if (!confirm(`Delete "${t.title}"?`)) return;
-    try { await api.tasks.remove(bizId, t.id); load(); }
+
+  async function deleteTask() {
+    if (!taskToDelete) return;
+    try { await api.tasks.remove(bizId, taskToDelete.id); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete"); }
+    finally { setTaskToDelete(null); }
   }
 
   const open = tasks.filter((t) => t.status !== "DONE");
@@ -90,17 +94,17 @@ export default function TasksPage() {
       {isOwner && showAdd && (
         <Card className="mb-5">
           <CardContent className="py-4 space-y-3">
-            <Input placeholder="What needs doing? e.g. Restock shampoo, sanitize tools" value={form.title}
+            <Input aria-label="Task title" placeholder="What needs doing? e.g. Restock shampoo, sanitize tools" value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
             <div className="grid sm:grid-cols-2 gap-3">
-              <select value={form.staffId} onChange={(e) => setForm((p) => ({ ...p, staffId: e.target.value }))}
+              <select aria-label="Assign to staff member" value={form.staffId} onChange={(e) => setForm((p) => ({ ...p, staffId: e.target.value }))}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                 <option value="">Assign to… (optional)</option>
                 {staff.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
               </select>
-              <Input type="datetime-local" value={form.dueAt} onChange={(e) => setForm((p) => ({ ...p, dueAt: e.target.value }))} />
+              <Input aria-label="Due date and time" type="datetime-local" value={form.dueAt} onChange={(e) => setForm((p) => ({ ...p, dueAt: e.target.value }))} />
             </div>
-            <Input placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+            <Input aria-label="Task notes" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
               <Button size="sm" loading={saving} onClick={addTask}>Add task</Button>
@@ -120,19 +124,29 @@ export default function TasksPage() {
         <div className="space-y-5">
           <div className="space-y-2">
             {open.length === 0 ? <p className="text-sm text-gray-400">No open tasks 🎉</p> : open.map((t) => (
-              <TaskRow key={t.id} t={t} isOwner={isOwner} onToggle={() => toggle(t)} onRemove={() => remove(t)} />
+              <TaskRow key={t.id} t={t} isOwner={isOwner} onToggle={() => toggle(t)} onRemove={() => setTaskToDelete(t)} />
             ))}
           </div>
           {done.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Done ({done.length})</p>
               <div className="space-y-2 opacity-70">
-                {done.map((t) => <TaskRow key={t.id} t={t} isOwner={isOwner} onToggle={() => toggle(t)} onRemove={() => remove(t)} />)}
+                {done.map((t) => <TaskRow key={t.id} t={t} isOwner={isOwner} onToggle={() => toggle(t)} onRemove={() => setTaskToDelete(t)} />)}
               </div>
             </div>
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={taskToDelete !== null}
+        title="Delete task"
+        description={`Delete "${taskToDelete?.title}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={deleteTask}
+        onCancel={() => setTaskToDelete(null)}
+      />
     </div>
   );
 }
@@ -143,7 +157,8 @@ function TaskRow({ t, isOwner, onToggle, onRemove }: { t: TaskItem; isOwner: boo
   return (
     <Card>
       <CardContent className="py-3 flex items-center gap-3">
-        <button onClick={onToggle} title={t.status === "DONE" ? "Reopen" : "Mark done"}
+        <button type="button" onClick={onToggle}
+          aria-label={t.status === "DONE" ? "Reopen task" : "Mark task done"}
           className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
             t.status === "DONE" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300 text-transparent hover:border-violet-400")}>
           {t.status === "DONE" ? <Check className="w-3.5 h-3.5" /> : <Circle className="w-0 h-0" />}
@@ -153,11 +168,11 @@ function TaskRow({ t, isOwner, onToggle, onRemove }: { t: TaskItem; isOwner: boo
           <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5 flex-wrap">
             {t.staff?.user?.name && <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{t.staff.user.name}</span>}
             {dueDate && <span className={cn("inline-flex items-center gap-1", overdue && "text-red-500 font-medium")}><CalendarClock className="w-3 h-3" />{format(dueDate, "MMM d, HH:mm")}</span>}
-            {t.notes && <span className="italic truncate max-w-[16rem]">“{t.notes}”</span>}
+            {t.notes && <span className="italic truncate max-w-[16rem]">"{t.notes}"</span>}
           </div>
         </div>
         {isOwner && (
-          <button onClick={onRemove} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0" title="Delete">
+          <button type="button" onClick={onRemove} aria-label="Delete task" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0">
             <Trash2 className="w-4 h-4" />
           </button>
         )}

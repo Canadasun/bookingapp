@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function ResourcesPage() {
   const bizId = getUser()?.businessId ?? "";
@@ -19,6 +20,7 @@ export default function ResourcesPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -59,13 +61,14 @@ export default function ResourcesPage() {
     } catch { toast.error("Failed to update"); }
   }
 
-  async function remove(r: Resource) {
-    if (!confirm(`Delete "${r.name}"? This cannot be undone.`)) return;
+  async function remove() {
+    if (!resourceToDelete) return;
     try {
-      await api.resources.remove(bizId, r.id);
-      setResources((p) => p.filter((x) => x.id !== r.id));
+      await api.resources.remove(bizId, resourceToDelete.id);
+      setResources((p) => p.filter((x) => x.id !== resourceToDelete.id));
       toast.success("Deleted");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
+    finally { setResourceToDelete(null); }
   }
 
   if (!bizId) return null;
@@ -86,13 +89,14 @@ export default function ResourcesPage() {
         <form onSubmit={create} className="flex gap-2">
           <Input
             autoFocus
+            aria-label="Resource name"
             placeholder="e.g. Room 1, Chair 3, Laser machine"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             className="flex-1"
           />
           <Button type="submit" loading={adding} disabled={!newName.trim()}>Add</Button>
-          <Button type="button" variant="ghost" onClick={() => { setShowAdd(false); setNewName(""); }}>
+          <Button type="button" variant="ghost" aria-label="Cancel" onClick={() => { setShowAdd(false); setNewName(""); }}>
             <X className="w-4 h-4" />
           </Button>
         </form>
@@ -113,15 +117,16 @@ export default function ResourcesPage() {
                 <>
                   <Input
                     autoFocus
+                    aria-label="Edit resource name"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") saveEdit(r.id); if (e.key === "Escape") setEditingId(null); }}
                     className="flex-1 h-8 text-sm"
                   />
-                  <button onClick={() => saveEdit(r.id)} className="text-violet-600 hover:text-violet-800">
+                  <button type="button" aria-label="Save name" onClick={() => saveEdit(r.id)} className="text-violet-600 hover:text-violet-800">
                     <Check className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setEditingId(null)} className="text-gray-400 hover:text-gray-600">
+                  <button type="button" aria-label="Cancel edit" onClick={() => setEditingId(null)} className="text-gray-400 hover:text-gray-600">
                     <X className="w-4 h-4" />
                   </button>
                 </>
@@ -131,18 +136,24 @@ export default function ResourcesPage() {
                     {r.name}
                   </span>
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={r.active}
+                    aria-label={`${r.name} active`}
                     onClick={() => toggleActive(r)}
                     className={`text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${r.active ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
                   >
                     {r.active ? "Active" : "Inactive"}
                   </button>
                   <button
+                    type="button"
+                    aria-label={`Edit ${r.name}`}
                     onClick={() => { setEditingId(r.id); setEditName(r.name); }}
                     className="text-gray-400 hover:text-gray-700 p-1"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => remove(r)} className="text-gray-400 hover:text-red-500 p-1">
+                  <button type="button" aria-label={`Delete ${r.name}`} onClick={() => setResourceToDelete(r)} className="text-gray-400 hover:text-red-500 p-1">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </>
@@ -151,6 +162,16 @@ export default function ResourcesPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={resourceToDelete !== null}
+        title="Delete resource"
+        description={`Delete "${resourceToDelete?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={remove}
+        onCancel={() => setResourceToDelete(null)}
+      />
     </div>
   );
 }

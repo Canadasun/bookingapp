@@ -10,6 +10,7 @@ import { getUser } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Entry = { id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; createdAt: string };
 
@@ -17,6 +18,7 @@ export default function WaitlistPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [entryToRemove, setEntryToRemove] = useState<Entry | null>(null);
   const user = getUser();
   const bizId = user?.businessId ?? "";
 
@@ -30,10 +32,11 @@ export default function WaitlistPage() {
   }, [bizId]);
   useEffect(() => { load(); }, [load]);
 
-  async function remove(id: string) {
-    if (!confirm("Remove this person from the waitlist?")) return;
-    try { await api.waitlist.remove(bizId, id); toast.success("Removed"); load(); }
+  async function remove() {
+    if (!entryToRemove) return;
+    try { await api.waitlist.remove(bizId, entryToRemove.id); toast.success("Removed"); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    finally { setEntryToRemove(null); }
   }
 
   return (
@@ -78,13 +81,23 @@ export default function WaitlistPage() {
                   <a href={`mailto:${e.email}`} className="text-gray-400 hover:text-violet-600 p-2" title="Email" aria-label="Email client"><Mail className="w-4 h-4" /></a>
                   <a href={`mailto:${e.email}?subject=${encodeURIComponent("A booking spot is available")}&body=${encodeURIComponent(`Hi ${e.name}, a spot may be available. Reply to this email or book online if the time works for you.`)}`} className="text-gray-400 hover:text-blue-600 p-2" title="Notify" aria-label="Notify client"><Send className="w-4 h-4" /></a>
                   <Link href="/dashboard/appointments" className="text-gray-400 hover:text-violet-600 p-2" title="Book" aria-label="Book appointment"><CalendarPlus className="w-4 h-4" /></Link>
-                  <button onClick={() => remove(e.id)} className="text-gray-400 hover:text-red-600 p-2" title="Remove" aria-label="Remove from waitlist"><Trash2 className="w-4 h-4" /></button>
+                  <button type="button" onClick={() => setEntryToRemove(e)} className="text-gray-400 hover:text-red-600 p-2" title="Remove" aria-label="Remove from waitlist"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={entryToRemove !== null}
+        title="Remove from waitlist"
+        description={`Remove ${entryToRemove?.name} from the waitlist?`}
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={remove}
+        onCancel={() => setEntryToRemove(null)}
+      />
     </div>
   );
 }

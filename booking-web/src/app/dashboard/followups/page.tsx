@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 const CADENCES = [
@@ -38,7 +39,7 @@ export default function FollowupsPage() {
   const [policies, setPolicies] = useState<Array<{ id:string; name:string; delayDays:number; subject:string; body:string; enabled:boolean; service?:{name:string}|null }>>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [policy, setPolicy] = useState({ name:"", serviceId:"", delayDays:14, subject:"Time for a follow-up", body:"We hope you are doing well. Book your follow-up appointment when you are ready." });
-
+  const [pendingConfirm, setPendingConfirm] = useState<{ title: string; description: string; onConfirm: () => void } | null>(null);
   const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async (silent = false) => {
@@ -67,11 +68,17 @@ export default function FollowupsPage() {
     try { await api.serviceDue.reschedule(bizId, it.id, { cadenceDays: days }); setSnoozing(null); toast.success(`Rescheduled — due in ${cadenceLabel(days).toLowerCase()}`); load(true); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(null); }
   }
-  async function cancel(it: ServiceDueItem) {
-    if (!confirm(`Stop follow-up reminders for ${it.client.name}?`)) return;
-    setBusy(it.id);
-    try { await api.serviceDue.cancel(bizId, it.id); toast.success("Follow-up cancelled"); load(true); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } finally { setBusy(null); }
+  function cancel(it: ServiceDueItem) {
+    setPendingConfirm({
+      title: "Stop follow-ups",
+      description: `Stop follow-up reminders for ${it.client.name}?`,
+      onConfirm: async () => {
+        setBusy(it.id);
+        try { await api.serviceDue.cancel(bizId, it.id); toast.success("Follow-up cancelled"); load(true); }
+        catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+        finally { setBusy(null); setPendingConfirm(null); }
+      },
+    });
   }
   async function createPolicy() {
     if (!policy.name.trim() || !policy.subject.trim() || !policy.body.trim()) return toast.error("Complete the follow-up policy fields");
@@ -81,10 +88,16 @@ export default function FollowupsPage() {
       toast.success("Follow-up policy created"); load(true);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not create policy"); }
   }
-  async function deletePolicy(id: string, name: string) {
-    if (!confirm(`Delete policy "${name}"? This will also cancel any scheduled follow-ups using it.`)) return;
-    try { await api.serviceDue.deletePolicy(bizId, id); toast.success("Policy deleted"); load(true); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete policy"); }
+  function deletePolicy(id: string, name: string) {
+    setPendingConfirm({
+      title: "Delete policy",
+      description: `Delete policy "${name}"? This will also cancel any scheduled follow-ups using it.`,
+      onConfirm: async () => {
+        try { await api.serviceDue.deletePolicy(bizId, id); toast.success("Policy deleted"); load(true); }
+        catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete policy"); }
+        finally { setPendingConfirm(null); }
+      },
+    });
   }
 
   const due = items.filter((i) => i.status === "DUE");
@@ -120,15 +133,15 @@ export default function FollowupsPage() {
       <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 space-y-3">
         <div><p className="text-sm font-semibold text-gray-900">Professional follow-up policy</p><p className="text-xs text-gray-400">Automatically schedules a customized follow-up after a completed appointment.</p></div>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Input value={policy.name} onChange={(e)=>setPolicy(p=>({...p,name:e.target.value}))} placeholder="Policy name, e.g. Dental check-in" />
-          <Input type="number" min={0} max={3660} value={policy.delayDays} onChange={(e)=>setPolicy(p=>({...p,delayDays:Number(e.target.value)}))} placeholder="Delay in days" />
+          <Input aria-label="Policy name" value={policy.name} onChange={(e)=>setPolicy(p=>({...p,name:e.target.value}))} placeholder="Policy name, e.g. Dental check-in" />
+          <Input aria-label="Delay in days" type="number" min={0} max={3660} value={policy.delayDays} onChange={(e)=>setPolicy(p=>({...p,delayDays:Number(e.target.value)}))} placeholder="Delay in days" />
         </div>
-        <select value={policy.serviceId} onChange={(e)=>setPolicy(p=>({...p,serviceId:e.target.value}))} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm">
+        <select aria-label="Apply policy to service" value={policy.serviceId} onChange={(e)=>setPolicy(p=>({...p,serviceId:e.target.value}))} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm">
           <option value="">All services (business default)</option>
           {services.filter(service=>service.active).map(service=><option key={service.id} value={service.id}>{service.name}</option>)}
         </select>
-        <Input value={policy.subject} onChange={(e)=>setPolicy(p=>({...p,subject:e.target.value}))} placeholder="Message subject" />
-        <textarea className="min-h-20 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" maxLength={2000} value={policy.body} onChange={(e)=>setPolicy(p=>({...p,body:e.target.value}))} />
+        <Input aria-label="Message subject" value={policy.subject} onChange={(e)=>setPolicy(p=>({...p,subject:e.target.value}))} placeholder="Message subject" />
+        <textarea aria-label="Message body" className="min-h-20 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" maxLength={2000} value={policy.body} onChange={(e)=>setPolicy(p=>({...p,body:e.target.value}))} />
         <Button size="sm" onClick={createPolicy}>Add policy</Button>
         {policies.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">
@@ -136,7 +149,8 @@ export default function FollowupsPage() {
               <span key={pol.id} className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700">
                 {pol.name} · {pol.delayDays} days
                 <button type="button" onClick={() => deletePolicy(pol.id, pol.name)}
-                  className="ml-0.5 rounded-full text-violet-400 hover:text-red-500 transition-colors" title="Delete policy">
+                  aria-label={`Delete policy ${pol.name}`}
+                  className="ml-0.5 rounded-full text-violet-400 hover:text-red-500 transition-colors">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -198,10 +212,10 @@ export default function FollowupsPage() {
                         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
                           <span className="text-xs text-gray-500">Reschedule for:</span>
                           {CADENCES.map((c) => (
-                            <button key={c.days} disabled={busy === it.id} onClick={() => snooze(it, c.days)}
+                            <button type="button" key={c.days} disabled={busy === it.id} onClick={() => snooze(it, c.days)}
                               className="text-xs font-semibold border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-50">{c.label}</button>
                           ))}
-                          <button onClick={() => setSnoozing(null)} className="text-xs text-gray-400 hover:text-gray-600">cancel</button>
+                          <button type="button" onClick={() => setSnoozing(null)} className="text-xs text-gray-400 hover:text-gray-600">cancel</button>
                         </div>
                       ) : (
                         <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
@@ -235,7 +249,7 @@ export default function FollowupsPage() {
                         <span className={cn("text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0", soon ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-500")}>
                           {days <= 0 ? "due" : `${days}d`}
                         </span>
-                        <button onClick={() => cancel(it)} className={cn("p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0", busy === it.id && "opacity-50")} title="Stop"><X className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => cancel(it)} aria-label={`Stop follow-ups for ${it.client.name}`} className={cn("p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0", busy === it.id && "opacity-50")}><X className="w-4 h-4" /></button>
                       </CardContent>
                     </Card>
                   );
@@ -245,6 +259,16 @@ export default function FollowupsPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingConfirm !== null}
+        title={pendingConfirm?.title ?? ""}
+        description={pendingConfirm?.description ?? ""}
+        confirmLabel="Confirm"
+        variant="destructive"
+        onConfirm={() => pendingConfirm?.onConfirm()}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </div>
   );
 }
