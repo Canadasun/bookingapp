@@ -68,6 +68,8 @@ export class PackagesController {
 
   // ── Client packages (issued) ─────────────────────────────────────────
   @Get('issued/list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   listIssued(
     @Param('businessId') businessId: string,
     @Query('clientId') clientId: string | undefined,
@@ -78,6 +80,8 @@ export class PackagesController {
   }
 
   @Get('issued/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   getIssued(@Param('businessId') businessId: string, @Param('id') id: string, @CurrentUser() user: AuthUser) {
     assertOwns(user, businessId);
     return this.svc.getClientPackageDetail(businessId, id);

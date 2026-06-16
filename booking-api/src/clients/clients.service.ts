@@ -31,12 +31,9 @@ export class ClientsService {
           _count: { select: { appointments: true } },
           appointments: {
             where: { status: 'COMPLETED' },
-            select: { startsAt: true, totalPriceCents: true, service: { select: { priceCents: true } } },
+            select: { startsAt: true },
             orderBy: { startsAt: 'desc' },
-          },
-          payments: {
-            where: { status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
-            select: { amountCents: true, refundedCents: true },
+            take: 1, // Only need the last visit date
           },
         },
         orderBy: { name: 'asc' },
@@ -45,6 +42,26 @@ export class ClientsService {
       }),
       this.prisma.client.count({ where }),
     ]);
+
+    // Batch fetch total spent for this page of clients. This avoids loading all
+    // successful/refunded payment rows for every client just to sum them up,
+    // which would become heavy on real data.
+    const spentMap = new Map<string, number>();
+    if (clients.length) {
+      const aggregates = await this.prisma.payment.groupBy({
+        by: ['clientId'],
+        where: {
+          clientId: { in: clients.map(c => c.id) },
+          status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] },
+        },
+        _sum: { amountCents: true, refundedCents: true },
+      });
+      aggregates.forEach(agg => {
+        if (agg.clientId) {
+          spentMap.set(agg.clientId, (agg._sum.amountCents ?? 0) - (agg._sum.refundedCents ?? 0));
+        }
+      });
+    }
 
     return {
       data: clients.map((c) => ({
@@ -58,7 +75,7 @@ export class ClientsService {
         updatedAt: c.updatedAt,
         totalVisits: c._count.appointments,
         lastVisit: c.appointments[0]?.startsAt ?? null,
-        totalSpentCents: c.payments.reduce((sum, payment) => sum + payment.amountCents - payment.refundedCents, 0),
+        totalSpentCents: spentMap.get(c.id) ?? 0,
       })),
       total,
       page,
@@ -77,19 +94,28 @@ export class ClientsService {
         appointments: {
           include: { service: true, staff: { include: { user: true } } },
           orderBy: { startsAt: 'desc' },
+          take: 50, // Limit history returned to prevent UI/API lag for long-term clients
         },
         payments: {
           where: { status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
-          select: { amountCents: true, refundedCents: true },
+          select: { amountCents: true, refundedCents: true, createdAt: true, kind: true, status: true, id: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
         },
       },
     });
     if (!client) throw new NotFoundException('Client not found');
 
-    const totalSpentCents = client.payments.reduce(
-      (sum, payment) => sum + payment.amountCents - payment.refundedCents,
-      0,
-    );
+    // Aggregate total spent separately for consistency and performance
+    const spent = await this.prisma.payment.aggregate({
+      where: {
+        clientId: id,
+        status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] },
+      },
+      _sum: { amountCents: true, refundedCents: true },
+    });
+
+    const totalSpentCents = (spent._sum.amountCents ?? 0) - (spent._sum.refundedCents ?? 0);
 
     return { ...client, totalSpentCents };
   }
@@ -102,6 +128,7 @@ export class ClientsService {
       },
       include: { service: true, staff: { include: { user: true } } },
       orderBy: { startsAt: 'desc' },
+      take: 50,
     });
   }
 

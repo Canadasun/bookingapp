@@ -47,14 +47,25 @@ export default function ClientsPage() {
   const [tagInput, setTagInput] = useState("");
   const [tagBusy, setTagBusy] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const router = useRouter();
-  const user = getUser();
-  const bizId = user?.businessId ?? "";
+  
+  // Use a live session check instead of relying on the booking_user hint cookie
+  // which can be stale or missing while the session is valid.
+  useEffect(() => {
+    api.users.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const bizId = currentUser?.businessId ?? "";
+  const isOwner = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
 
   const load = useCallback(async (q?: string, pg = 1, append = false) => {
-    if (!bizId) {
-      setLoading(false);
+    if (!bizId || !isOwner) {
+      if (bizId && !isOwner) {
+        setLoadError("Access denied. Only business owners can manage the client list.");
+        setLoading(false);
+      }
       return;
     }
     if (!append) { setLoadError(""); setLoading(true); } else setLoadingMore(true);
@@ -67,7 +78,7 @@ export default function ClientsPage() {
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load clients"); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [bizId]);
+  }, [bizId, isOwner]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -88,13 +99,15 @@ export default function ClientsPage() {
     setDueSet(null);
     setLoadingDetail(true);
     try {
-      const [detail, payments, packages, messages] = await Promise.all([
+      // FIX: Use the client-specific payment history returned by the detail
+      // endpoint (now limited to 50 server-side) instead of filtering a global
+      // business-wide list of 100 latest payments.
+      const [detail, packages, messages] = await Promise.all([
         api.clients.get(bizId, c.id),
-        api.payments.list().then((rows) => rows.filter((p) => p.client?.id === c.id)).catch(() => []),
         api.packages.listIssued(bizId, c.id).catch(() => []),
         api.messages.thread(bizId, c.id).catch(() => []),
       ]);
-      setSelected({ ...c, ...detail, payments, packages, messages });
+      setSelected({ ...c, ...detail, packages, messages });
     } catch { toast.error("Failed to load client details"); }
     finally { setLoadingDetail(false); }
   }
@@ -234,54 +247,69 @@ export default function ClientsPage() {
           <h2 className="text-xl font-bold text-gray-900">Clients</h2>
           <p className="text-sm text-gray-500">{total} client{total !== 1 ? "s" : ""}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />Merge duplicates</Button>
-          <a href={api.clients.exportCsv(bizId)} download="clients.csv"
-            className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
-            <Download className="w-4 h-4" />Export CSV
-          </a>
-          <label className="cursor-pointer inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
-            <Upload className="w-4 h-4" />Import CSV
-            <input type="file" accept=".csv" className="hidden" onChange={async (e) => {
-              const file = e.target.files?.[0]; if (!file) return;
-              const text = await file.text();
-              // RFC 4180-compliant parser: handles commas inside quoted fields and
-              // escaped double-quotes (""). Naive split(",") corrupts "Smith, Jane".
-              function parseCsvRow(line: string): string[] {
-                const vals: string[] = []; let cur = ""; let inQ = false;
-                for (let i = 0; i < line.length; i++) {
-                  const ch = line[i];
-                  if (inQ) {
-                    if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-                    else if (ch === '"') { inQ = false; }
-                    else { cur += ch; }
-                  } else {
-                    if (ch === '"') { inQ = true; }
-                    else if (ch === ',') { vals.push(cur.trim()); cur = ""; }
-                    else { cur += ch; }
+        {/* RBAC: Hide management controls from staff */}
+        {isOwner && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />Merge duplicates</Button>
+            <a href={api.clients.exportCsv(bizId)} download="clients.csv"
+              className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
+              <Download className="w-4 h-4" />Export CSV
+            </a>
+            <label className="cursor-pointer inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
+              <Upload className="w-4 h-4" />Import CSV
+              <input type="file" accept=".csv" className="hidden" onChange={async (e) => {
+                const file = e.target.files?.[0]; if (!file) return;
+                const text = await file.text();
+                // RFC 4180-compliant parser: handles commas and newlines inside
+                // quoted fields and escaped double-quotes ("").
+                function parseCsv(data: string): string[][] {
+                  const result: string[][] = [];
+                  let row: string[] = [];
+                  let cur = "";
+                  let inQ = false;
+                  for (let i = 0; i < data.length; i++) {
+                    const ch = data[i];
+                    const next = data[i + 1];
+                    if (inQ) {
+                      if (ch === '"' && next === '"') { cur += '"'; i++; }
+                      else if (ch === '"') { inQ = false; }
+                      else { cur += ch; }
+                    } else {
+                      if (ch === '"') { inQ = true; }
+                      else if (ch === ',') { row.push(cur.trim()); cur = ""; }
+                      else if (ch === '\n' || (ch === '\r' && next === '\n')) {
+                        row.push(cur.trim());
+                        result.push(row);
+                        row = [];
+                        cur = "";
+                        if (ch === '\r') i++;
+                      }
+                      else { cur += ch; }
+                    }
                   }
+                  if (cur || row.length) { row.push(cur.trim()); result.push(row); }
+                  return result;
                 }
-                vals.push(cur.trim()); return vals;
-              }
-              const lines = text.trim().split("\n");
-              const headers = parseCsvRow(lines[0]).map(h => h.toLowerCase());
-              const rows = lines.slice(1).map(line => {
-                const vals = parseCsvRow(line);
-                const obj: Record<string, string> = {};
-                headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
-                return { name: obj.name ?? obj["full name"] ?? "", email: obj.email || undefined, phone: obj.phone || undefined, tags: obj.tags || undefined, notes: obj.notes || undefined };
-              }).filter(r => r.name);
-              if (!rows.length) { toast.error("No valid rows found"); return; }
-              try {
-                const r = await api.clients.importCsv(bizId, rows);
-                toast.success(`Imported ${r.created} new, updated ${r.updated}`);
-                window.location.reload();
-              } catch (err) { toast.error(err instanceof Error ? err.message : "Import failed"); }
-              e.target.value = "";
-            }} />
-          </label>
-          <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
-        </div>
+                const allRows = parseCsv(text);
+                if (allRows.length < 2) { toast.error("No valid rows found"); return; }
+                const headers = allRows[0].map(h => h.toLowerCase());
+                const rows = allRows.slice(1).map(vals => {
+                  const obj: Record<string, string> = {};
+                  headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
+                  return { name: obj.name ?? obj["full name"] ?? "", email: obj.email || undefined, phone: obj.phone || undefined, tags: obj.tags || undefined, notes: obj.notes || undefined };
+                }).filter(r => r.name);
+                if (!rows.length) { toast.error("No valid rows found after parsing"); return; }
+                try {
+                  const r = await api.clients.importCsv(bizId, rows);
+                  toast.success(`Imported ${r.created} new, updated ${r.updated}`);
+                  window.location.reload();
+                } catch (err) { toast.error(err instanceof Error ? err.message : "Import failed"); }
+                e.target.value = "";
+              }} />
+            </label>
+            <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
+          </div>
+        )}
       </div>
 
       <div className="relative mb-4">
@@ -358,10 +386,15 @@ export default function ClientsPage() {
                 <Button size="sm" onClick={rebook} className="gap-1.5">
                   <CalendarPlus className="w-4 h-4" />Book again
                 </Button>
-                <button onClick={startEdit} title="Edit contact" aria-label="Edit"
-                  className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4" /></button>
-                <button onClick={deleteClient} disabled={deletingClient} title="Delete contact" aria-label="Delete client"
-                  className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
+                {/* RBAC: Hide edit/delete for staff */}
+                {isOwner && (
+                  <>
+                    <button onClick={startEdit} title="Edit contact" aria-label="Edit"
+                      className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={deleteClient} disabled={deletingClient} title="Delete contact" aria-label="Delete client"
+                      className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
+                  </>
+                )}
                 <button onClick={() => setSelected(null)} aria-label="Close" className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
               </div>
             </div>
@@ -428,7 +461,7 @@ export default function ClientsPage() {
                   {[
                     { d: 14, l: "2 weeks" }, { d: 30, l: "Monthly" }, { d: 42, l: "6 weeks" }, { d: 56, l: "8 weeks" },
                   ].map(({ d, l }) => (
-                    <button key={d} disabled={dueBusy} onClick={() => setNextDue(d)}
+                    <button key={d} disabled={dueBusy || !isOwner} onClick={() => setNextDue(d)}
                       className={cn("text-xs font-semibold rounded-lg px-3 py-1.5 border transition-colors disabled:opacity-50",
                         dueSet === d ? "bg-violet-600 text-white border-violet-600" : "bg-white border-violet-200 text-violet-700 hover:bg-violet-100")}>
                       {l}
@@ -444,18 +477,22 @@ export default function ClientsPage() {
                   {(selected.tags ?? []).map((t) => (
                     <span key={t} className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
                       {t}
-                      <button disabled={tagBusy} onClick={() => saveTags((selected.tags ?? []).filter((x) => x !== t))}
-                        className="text-violet-400 hover:text-red-600" aria-label={`Remove ${t}`}>×</button>
+                      {isOwner && (
+                        <button disabled={tagBusy} onClick={() => saveTags((selected.tags ?? []).filter((x) => x !== t))}
+                          className="text-violet-400 hover:text-red-600" aria-label={`Remove ${t}`}>×</button>
+                      )}
                     </span>
                   ))}
-                  <input
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
-                    onBlur={addTag}
-                    placeholder="+ Add tag"
-                    aria-label="Add tag"
-                    className="text-xs px-2 py-1 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-200 w-24" />
+                  {isOwner && (
+                    <input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                      onBlur={addTag}
+                      placeholder="+ Add tag"
+                      aria-label="Add tag"
+                      className="text-xs px-2 py-1 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-200 w-24" />
+                  )}
                 </div>
               </div>
 
@@ -479,14 +516,16 @@ export default function ClientsPage() {
                         <StatusBadge status={apt.status} />
                       </div>
                     ))}
+                    {detail?.appointments?.length === 50 && <p className="text-[10px] text-gray-400 text-center pt-2">Showing last 50 appointments</p>}
                   </div>
                 )}
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payments</p>
-                {(detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No payments recorded.</p> : (
+                {loadingDetail ? <div className="space-y-2 py-2"><SkeletonCard /></div> :
+                  (detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No payments recorded.</p> : (
                   <div className="space-y-2">
-                    {(detail?.payments ?? []).slice(0, 8).map((p) => (
+                    {(detail?.payments ?? []).map((p) => (
                       <div key={p.id} className="flex items-center justify-between border-b border-gray-100 py-2">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{formatPrice(p.amountCents - p.refundedCents)}</p>
@@ -495,6 +534,7 @@ export default function ClientsPage() {
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{p.status.replaceAll("_", " ")}</span>
                       </div>
                     ))}
+                    {detail?.payments?.length === 50 && <p className="text-[10px] text-gray-400 text-center pt-2">Showing last 50 payments</p>}
                   </div>
                 )}
               </div>

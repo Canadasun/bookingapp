@@ -45,7 +45,8 @@ export class ClientsController {
   constructor(private clientService: ClientsService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   findAll(
     @Param('businessId') businessId: string,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
@@ -59,11 +60,6 @@ export class ClientsController {
     const paging = pagination(page, limit);
     return this.clientService.findAll(businessId, search?.slice(0, 100), paging.page, paging.limit);
   }
-
-  // (Removed) The unauthenticated guest "lookup by email/phone" endpoint was
-  // dropped: it disclosed a person's name, phone and booking history to anyone
-  // who knew their email/phone. Clients now manage bookings only via the signed
-  // link in their confirmation email, or by signing into the portal.
 
   // CSV export — before :id so the literal path isn't consumed as a param
   @Get('export-csv')
@@ -124,7 +120,8 @@ export class ClientsController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   findOne(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -133,7 +130,8 @@ export class ClientsController {
   }
 
   @Get(':id/bookings')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   getHistory(
     @Param('id') id: string,
     @Param('businessId') businessId: string,
@@ -150,6 +148,9 @@ export class ClientsController {
     @Body(new ZodValidationPipe(CreateClientSchema)) dto: CreateClientDto,
     @CurrentUser() user?: { role: string; businessId: string | null },
   ) {
+    // If it's a dashboard user (Staff/Owner), they can create/find a client.
+    // Staff should be allowed to create clients during booking, but we should
+    // restrict this to OWNER/ADMIN/STAFF as intended.
     if (user && (user.role === 'ADMIN' || user.businessId === businessId) && user.role !== 'CLIENT') {
       return this.clientService.findOrCreate(businessId, dto);
     }
@@ -157,7 +158,8 @@ export class ClientsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   update(
     @Param('id') id: string,
     @Param('businessId') businessId: string,

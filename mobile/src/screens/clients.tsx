@@ -20,15 +20,22 @@ import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
 function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
+  const { user } = getAuth();
+  const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN';
+  
   const nav = useNavigation<any>();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [profile, setProfile] = useState<Client | null>(null);
   const [tagInput, setTagInput] = useState('');
 
-  const { data: clients = [], isLoading, isFetching, refetch } = useQuery({
+  const { data: clients = [], isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ['clients', search],
-    queryFn: () => api<{ data: Client[] }>(`/businesses/${bizId()}/clients${search ? `?search=${encodeURIComponent(search)}` : ''}`).then(res => res.data),
+    queryFn: () => {
+      if (!isOwner) throw new Error('Access denied. Only owners can view the client list.');
+      return api<{ data: Client[] }>(`/businesses/${bizId()}/clients${search ? `?search=${encodeURIComponent(search)}` : ''}`).then(res => res.data);
+    },
+    enabled: isOwner,
   });
 
   const updateClientMutation = useMutation({
@@ -46,6 +53,7 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   });
 
   function addTag(client: Client) {
+    if (!isOwner) return;
     const t = tagInput.trim();
     if (!t) return;
     const existing = client.tags ?? [];
@@ -55,6 +63,7 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   }
 
   function removeTag(client: Client, tag: string) {
+    if (!isOwner) return;
     updateClientMutation.mutate({ id: client.id, tags: (client.tags ?? []).filter(x => x !== tag) });
   }
 
@@ -68,6 +77,20 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   }, [profile]);
 
   function initials(name: string) { return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(); }
+
+  if (!isOwner) {
+    return (
+      <SafeAreaView style={s.screen}>
+        <View style={s.header}><Text style={s.headerTitle}>Customers</Text></View>
+        <View style={s.center}>
+          <Ionicons name="lock-closed-outline" size={48} color={GRAY_400} />
+          <Text style={[s.emptyText, { marginTop: 12, textAlign: 'center', paddingHorizontal: 40 }]}>
+            Access Denied. Only business owners can manage the customer database.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (isLoading && !isFetching) return <View style={s.center}><ActivityIndicator size="large" color={BRAND} /></View>;
 
@@ -83,7 +106,7 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
         data={clients}
         keyExtractor={c => c.id}
         contentContainerStyle={s.listContent}
-        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>No customers found</Text></View>}
+        ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>{error ? (error as Error).message : 'No customers found'}</Text></View>}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={BRAND} />}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: c }) => (
@@ -123,8 +146,8 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
             {[
               { l: 'Email', v: profile.email },
               { l: 'Phone', v: profile.phone ? formatPhoneDisplay(profile.phone) : '—' },
-              { l: 'Visits', v: profile.totalVisits !== undefined ? String(profile.totalVisits) : '—' },
-              { l: 'Last visit', v: profile.lastVisit ? new Date(profile.lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
+              { l: 'Visits', v: (profile as any).totalVisits !== undefined ? String((profile as any).totalVisits) : '—' },
+              { l: 'Last visit', v: (profile as any).lastVisit ? new Date((profile as any).lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
             ].map(({ l, v }) => (
               <View key={l} style={s.detailRow}>
                 <Text style={s.detailLabel}>{l}</Text>
