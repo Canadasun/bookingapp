@@ -47,14 +47,19 @@ export default function ClientsPage() {
   const [tagInput, setTagInput] = useState("");
   const [tagBusy, setTagBusy] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<{ businessId: string | null; role: string } | null>(null);
 
   const router = useRouter();
-  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
   // Use a live session check instead of relying on the booking_user hint cookie
   // which can be stale or missing while the session is valid.
   useEffect(() => {
-    api.users.me().then(setCurrentUser).catch(() => {});
+    api.users.me().then(setCurrentUser).catch(() => {
+      setLoading(false);
+      setLoadError("Could not verify your session. Please refresh the page.");
+    });
   }, []);
 
   const bizId = currentUser?.businessId ?? "";
@@ -91,6 +96,10 @@ export default function ClientsPage() {
     const t = setTimeout(() => { setPage(1); load(search, 1); }, 300);
     return () => clearTimeout(t);
   }, [search, load]);
+
+  useEffect(() => {
+    if (selected) drawerRef.current?.focus();
+  }, [selected]);
 
   async function openClient(c: ClientWithStats) {
     if (!bizId) return;
@@ -255,9 +264,13 @@ export default function ClientsPage() {
               className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
               <Download className="w-4 h-4" />Export CSV
             </a>
-            <label className="cursor-pointer inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
               <Upload className="w-4 h-4" />Import CSV
-              <input type="file" accept=".csv" className="hidden" onChange={async (e) => {
+            </button>
+            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={async (e) => {
                 const file = e.target.files?.[0]; if (!file) return;
                 const text = await file.text();
                 // RFC 4180-compliant parser: handles commas and newlines inside
@@ -302,11 +315,10 @@ export default function ClientsPage() {
                 try {
                   const r = await api.clients.importCsv(bizId, rows);
                   toast.success(`Imported ${r.created} new, updated ${r.updated}`);
-                  window.location.reload();
+                  await load(search, 1);
                 } catch (err) { toast.error(err instanceof Error ? err.message : "Import failed"); }
                 e.target.value = "";
               }} />
-            </label>
             <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
           </div>
         )}
@@ -374,6 +386,7 @@ export default function ClientsPage() {
         <>
           <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setSelected(null)} aria-hidden="true" />
           <div
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="client-drawer-title"
@@ -404,18 +417,19 @@ export default function ClientsPage() {
                   <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Edit contact</p>
                   {([
                     { k: "name",  label: "Full name *", type: "text",  ph: "Jane Doe" },
-                    { k: "email", label: "Email *",      type: "email", ph: "jane@example.com" },
+                    { k: "email", label: "Email",        type: "email", ph: "jane@example.com" },
                     { k: "phone", label: "Phone",        type: "tel",   ph: "+1 (416) 555-0123" },
                     { k: "notes", label: "Notes",        type: "text",  ph: "" },
                   ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
                       <label htmlFor={`edit-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
                       <Input id={`edit-${k}`} type={type} placeholder={ph} value={editForm[k]}
-                        aria-required={k === "name" || k === "email" ? "true" : undefined}
+                        aria-required={k === "name" ? "true" : undefined}
                         onChange={(e) => {
                           const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                           setEditForm((p) => ({ ...p, [k]: val }));
                         }} />
+                      {k === "phone" && <p className="mt-1 text-xs text-gray-500">At least one of email or phone is required.</p>}
                     </div>
                   ))}
                   <div>
@@ -594,11 +608,12 @@ export default function ClientsPage() {
                 <div key={k}>
                   <label htmlFor={`add-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
                   <Input id={`add-${k}`} type={type} placeholder={ph} value={form[k as keyof typeof form]}
-                    aria-required={k === "name" || k === "email" ? "true" : undefined}
+                    aria-required={k === "name" ? "true" : undefined}
                     onChange={(e) => {
                       const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                       setForm((p) => ({ ...p, [k]: val }));
                     }} />
+                  {k === "phone" && <p className="mt-1 text-xs text-gray-500">At least one of email or phone is required.</p>}
                 </div>
               ))}
               <div className="flex gap-3 pt-2">
