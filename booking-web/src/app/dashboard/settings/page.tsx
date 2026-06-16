@@ -37,18 +37,18 @@ type SubscriptionDetails = {
   hasBilling: boolean;
 };
 
-const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "profile",       label: "Business profile",   icon: Building2,   desc: "Name, contact info, timezone" },
-  { id: "locations",     label: "Locations",          icon: MapPin,      desc: "Manage multiple business locations" },
-  { id: "booking",       label: "Booking policies",   icon: Clock,       desc: "Notice, cancellations, advance limits" },
-  { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar" },
-  { id: "payments",      label: "Payments & fees",    icon: DollarSign,  desc: "Deposits, no-show fees" },
-  { id: "payouts",       label: "Payouts",            icon: Banknote,    desc: "Connect bank account & withdraw" },
-  { id: "online",        label: "Online booking",     icon: Globe,       desc: "Booking page link, availability" },
-  { id: "branding",      label: "Branding",           icon: Palette,     desc: "Colors, fonts, and booking page style" },
-  { id: "notifications", label: "Notifications",      icon: Bell,        desc: "Emails & SMS sent to clients" },
-  { id: "security",      label: "Security",           icon: ShieldCheck, desc: "Two-factor sign-in, password" },
-  { id: "billing",       label: "Billing & plan",     icon: CreditCard,  desc: "Subscription plan, upgrade" },
+const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string; group: string }[] = [
+  { id: "profile",       label: "Business profile",   icon: Building2,    desc: "Name, contact info, timezone",          group: "Setup" },
+  { id: "booking",       label: "Booking policies",   icon: Clock,        desc: "Notice, cancellations, advance limits", group: "Setup" },
+  { id: "online",        label: "Online booking",     icon: Globe,        desc: "Booking link, QR code, embed",          group: "Setup" },
+  { id: "payments",      label: "Payments & fees",    icon: DollarSign,   desc: "Deposits, no-show fees",                group: "Money" },
+  { id: "payouts",       label: "Payouts",            icon: Banknote,     desc: "Connect bank account & withdraw",       group: "Money" },
+  { id: "branding",      label: "Branding",           icon: Palette,      desc: "Colors, fonts, booking page style",     group: "Presence" },
+  { id: "notifications", label: "Notifications",      icon: Bell,         desc: "Emails & SMS sent to clients",          group: "Presence" },
+  { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar",      group: "Advanced" },
+  { id: "locations",     label: "Locations",          icon: MapPin,       desc: "Manage multiple business locations",    group: "Advanced" },
+  { id: "security",      label: "Security",           icon: ShieldCheck,  desc: "Two-factor sign-in, password",          group: "Account" },
+  { id: "billing",       label: "Billing & plan",     icon: CreditCard,   desc: "Subscription plan, upgrade",            group: "Account" },
 ];
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
@@ -597,23 +597,33 @@ function SettingsPage() {
         {/* Left nav */}
         <aside className="hidden xl:block w-56 shrink-0">
           <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {SECTIONS.map(({ id, label, icon: Icon, desc }) => (
-              <button key={id} onClick={() => goSection(id)}
-                className={cn(
-                  "w-full flex items-start gap-3 px-4 py-3.5 text-left border-b border-gray-50 last:border-0 transition-colors group",
-                  section === id ? "bg-violet-50" : "hover:bg-gray-50",
-                )}>
-                <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 shrink-0",
-                  section === id ? "bg-violet-100" : "bg-gray-100 group-hover:bg-gray-200")}>
-                  <Icon className={cn("w-4 h-4", section === id ? "text-violet-600" : "text-gray-500")} />
+            {SECTIONS.map(({ id, label, icon: Icon, desc, group }, i) => {
+              const isGroupStart = i === 0 || SECTIONS[i - 1].group !== group;
+              return (
+                <div key={id}>
+                  {isGroupStart && i !== 0 && (
+                    <div className="px-4 pt-3 pb-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{group}</p>
+                    </div>
+                  )}
+                  <button onClick={() => goSection(id)}
+                    className={cn(
+                      "w-full flex items-start gap-3 px-4 py-3 text-left border-t border-gray-50 first:border-0 transition-colors group",
+                      section === id ? "bg-violet-50" : "hover:bg-gray-50",
+                    )}>
+                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center mt-0.5 shrink-0",
+                      section === id ? "bg-violet-100" : "bg-gray-100 group-hover:bg-gray-200")}>
+                      <Icon className={cn("w-3.5 h-3.5", section === id ? "text-violet-600" : "text-gray-500")} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("text-sm font-medium", section === id ? "text-violet-700" : "text-gray-700")}>{label}</p>
+                      <p className="text-xs text-gray-400 leading-tight mt-0.5 truncate">{desc}</p>
+                    </div>
+                    <ChevronRight className={cn("w-3 h-3 mt-1.5 shrink-0", section === id ? "text-violet-400" : "text-gray-300")} />
+                  </button>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className={cn("text-sm font-medium", section === id ? "text-violet-700" : "text-gray-700")}>{label}</p>
-                  <p className="text-xs text-gray-400 leading-tight mt-0.5 truncate">{desc}</p>
-                </div>
-                <ChevronRight className={cn("w-3.5 h-3.5 mt-1 shrink-0", section === id ? "text-violet-400" : "text-gray-300")} />
-              </button>
-            ))}
+              );
+            })}
           </nav>
         </aside>
 
