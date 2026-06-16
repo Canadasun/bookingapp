@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, Plus, Trash2, ClipboardList, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type, Braces } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore – react-qr-code ships types but they're not resolved via "exports"; works fine at runtime
 import QRCode from "react-qr-code";
@@ -82,7 +82,7 @@ function PolicyNumberInput({ value, min = 0, unit, label, onChange }: {
       <Input
         type="number"
         min={min / multiplier}
-        step={unit === "days" ? 1 : 1}
+        step={1}
         value={Number.isInteger(displayValue) ? displayValue : Number(displayValue.toFixed(1))}
         onChange={(e) => onChange(Math.max(min, Math.round((Number(e.target.value) || 0) * multiplier)))}
         aria-label={label}
@@ -124,11 +124,15 @@ function IntakeFormEditor({ bizId, initial }: { bizId: string; initial: IntakeQu
       <p className="text-xs text-gray-400 mb-3">Questions clients answer when they book online. Answers show on the appointment.</p>
 
       <div className="space-y-2">
-        {questions.map((q) => (
+        {questions.map((q, qi) => (
           <div key={q.id} className="flex items-center gap-2">
             <Input value={q.label} placeholder="e.g. Any allergies or sensitivities?"
+              aria-label={`Question ${qi + 1}`}
               onChange={(e) => update(q.id, { label: e.target.value })} className="flex-1" />
             <button type="button" onClick={() => update(q.id, { required: !q.required })}
+              role="switch"
+              aria-checked={q.required}
+              aria-label={`Question ${qi + 1} required`}
               className={cn("text-xs font-semibold px-2.5 py-2 rounded-lg border transition-colors shrink-0",
                 q.required ? "border-violet-200 bg-violet-50 text-violet-700" : "border-gray-200 text-gray-400 hover:bg-gray-50")}>
               Required
@@ -534,7 +538,7 @@ function SettingsPage() {
     </div>
   );
 
-  const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/book/${biz?.slug ?? biz?.id ?? ""}`;
+  const bookingUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/book/${biz?.slug || biz?.id || ""}`;
   const embedOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const embedSnippet = `<script src="${embedOrigin}/embed.js" data-business-id="${biz?.id ?? ""}" async></script>`;
   const plan = biz?.plan ?? "FREE";
@@ -600,7 +604,7 @@ function SettingsPage() {
             {SECTIONS.map(({ id, label, icon: Icon, desc, group }, i) => {
               const isGroupStart = i === 0 || SECTIONS[i - 1].group !== group;
               return (
-                <div key={id}>
+                <div key={id} className={cn(!isGroupStart && i !== 0 && "border-t border-gray-50")}>
                   {isGroupStart && i !== 0 && (
                     <div className="px-4 pt-3 pb-1">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{group}</p>
@@ -608,7 +612,7 @@ function SettingsPage() {
                   )}
                   <button onClick={() => goSection(id)}
                     className={cn(
-                      "w-full flex items-start gap-3 px-4 py-3 text-left border-t border-gray-50 first:border-0 transition-colors group",
+                      "w-full flex items-start gap-3 px-4 py-3 text-left transition-colors group",
                       section === id ? "bg-violet-50" : "hover:bg-gray-50",
                     )}>
                     <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center mt-0.5 shrink-0",
@@ -733,11 +737,14 @@ function SettingsPage() {
                     <Input id="set-post-visit" value={(form.postVisitMessage as string) ?? ""} onChange={(e) => f("postVisitMessage", e.target.value)} placeholder="Thanks for visiting. We hope to see you again soon." />
                   </Field>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {(["websiteUrl", "instagramUrl", "facebookUrl", "tiktokUrl"] as const).map((key) => (
-                      <Field key={key} htmlFor={`set-${key}`} label={key.replace("Url", "").replace(/^./, (c) => c.toUpperCase())}>
-                        <Input id={`set-${key}`} type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder="https://" />
-                      </Field>
-                    ))}
+                    {(["websiteUrl", "instagramUrl", "facebookUrl", "tiktokUrl"] as const).map((key) => {
+                      const LABELS: Record<string, string> = { websiteUrl: "Website", instagramUrl: "Instagram", facebookUrl: "Facebook", tiktokUrl: "TikTok" };
+                      return (
+                        <Field key={key} htmlFor={`set-${key}`} label={LABELS[key]}>
+                          <Input id={`set-${key}`} type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder="https://" />
+                        </Field>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -843,12 +850,13 @@ function SettingsPage() {
                   <p className="text-xs text-gray-400 mb-3">Shown on booking totals and receipts. Set to 0 to hide tax.</p>
                   <div className="flex items-center gap-2 max-w-[180px]">
                     <Input type="number" min={0} max={100} step={0.01}
+                      aria-label="Sales tax rate"
                       value={(form.taxRatePercent as number) ?? 0}
                       onChange={(e) => f("taxRatePercent", Number(e.target.value))}
                       className="bg-white text-base font-semibold" />
                     <span className="text-sm font-medium text-gray-500">% tax</span>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-2">Saved with the section below.</p>
+                  <p className="text-[11px] text-gray-400 mt-2">Saved when you click Save changes below.</p>
                 </div>
               </div>
             )}
@@ -1132,7 +1140,7 @@ function SettingsPage() {
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-1">
-                    <CreditCard className="w-4 h-4 text-gray-700" />
+                    <Braces className="w-4 h-4 text-gray-700" />
                     <span className="text-sm font-semibold text-gray-900">Embed on your website</span>
                   </div>
                   <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It uses your public business ID instead of an email-derived slug.</p>
@@ -1341,6 +1349,7 @@ function SettingsPage() {
                     <input
                       type="text"
                       maxLength={80}
+                      aria-label="Tagline"
                       value={(bookingSettings.tagline as string) ?? ""}
                       onChange={(e) => bf("tagline", e.target.value)}
                       placeholder="e.g. Premium care, every visit."
@@ -1468,10 +1477,10 @@ function SettingsPage() {
 
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
                       <p className="text-sm font-medium text-gray-700">Add location</p>
-                      <Input placeholder="Location name (e.g. Downtown)" value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} />
-                      <Input placeholder="Address (optional)" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} />
+                      <Input placeholder="Location name (e.g. Downtown)" aria-label="Location name" value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
+                      <Input placeholder="Address (optional)" aria-label="Location address" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Input placeholder="+1 (416) 555-0123" type="tel" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} />
+                        <Input placeholder="+1 (416) 555-0123" type="tel" aria-label="Location phone number" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
                         <label htmlFor="loc-timezone" className="sr-only">Location timezone</label>
                         <select id="loc-timezone" value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
                           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
@@ -1621,6 +1630,7 @@ function SettingsPage() {
                       <div className="flex gap-2">
                         <Input
                           type="number" min="1" step="0.01" placeholder="Amount (e.g. 100.00)"
+                          aria-label="Payout amount"
                           value={payoutAmount} onChange={(e) => {
                             setPayoutAmount(e.target.value);
                             payoutIdempotencyKey.current = null;
@@ -1673,7 +1683,7 @@ function SettingsPage() {
                 {/* Plan capability summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                   {([
-                    { id: "FREE",      label: "Free",      lines: ["In-app messaging only", "Confirmation email", "Cancellation &", "reschedule"] },
+                    { id: "FREE",      label: "Free",      lines: ["In-app messaging only", "Confirmation email", "Cancellation & reschedule"] },
                     { id: "BASIC",     label: "Basic",     lines: ["Receive SMS from clients", "Reply when texted first", "24h email reminder", "+ all Free"] },
                     { id: "PRO",       label: "Pro",       lines: ["Initiate SMS first", "SMS confirmation", "2h SMS reminder", "72h email reminder", "+ all Basic"] },
                     { id: "UNLIMITED", label: "Unlimited", lines: ["All Pro features", "Across all locations", "Multi-location inbox"] },
@@ -1933,6 +1943,7 @@ function SettingsPage() {
                     <p className="text-sm font-semibold text-amber-900">Have a referral code?</p>
                     <p className="text-xs text-amber-700 mt-0.5">Enter it before upgrading to get a discount on your subscription.</p>
                     <input
+                      aria-label="Referral code"
                       value={referralInput}
                       onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
                       placeholder="PULSE-XXXXXX"
