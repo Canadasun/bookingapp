@@ -14,6 +14,10 @@ import {
 import { fromZonedTime, toZonedTime, format as formatTZ } from 'date-fns-tz';
 import { AvailabilityRule, TimeOff, Appointment } from '@prisma/client';
 
+type AppointmentWithServiceBuffers = Appointment & {
+  service?: { bufferBeforeMin: number; bufferAfterMin: number } | null;
+};
+
 interface Interval {
   start: Date;
   end: Date;
@@ -26,7 +30,7 @@ export class AvailabilityService {
   async getAvailableSlots(dto: GetSlotsDto): Promise<TimeSlot[]> {
     const { staffId, serviceId, startDate, endDate, timezone } = dto;
 
-    const [service, staff] = await Promise.all([
+    const [primaryService, staff] = await Promise.all([
       this.prisma.service.findUnique({ where: { id: serviceId } }),
       this.prisma.staff.findUnique({
         where: { id: staffId },
@@ -34,21 +38,39 @@ export class AvailabilityService {
       }),
     ]);
 
-    if (!service) throw new NotFoundException('Service not found');
+    if (!primaryService) throw new NotFoundException('Service not found');
     if (!staff) throw new NotFoundException('Staff not found');
     // Staff and service must belong to the same business, the staff must be
     // active, and actually offer this service — otherwise the returned slots
     // are meaningless (and could mix tenants).
-    if (staff.businessId !== service.businessId) {
+    if (staff.businessId !== primaryService.businessId) {
       throw new NotFoundException('Staff does not belong to this service’s business');
     }
     if (!staff.active) throw new NotFoundException('Staff is not available');
+    const additionalIds = [...new Set(dto.additionalServiceIds ?? [])];
+    const additionalServices = additionalIds.length
+      ? await this.prisma.service.findMany({
+          where: { id: { in: additionalIds }, businessId: primaryService.businessId, active: true },
+        })
+      : [];
+    if (additionalServices.length !== additionalIds.length) {
+      throw new NotFoundException('One or more additional services were not found');
+    }
+    const selectedServices = [primaryService, ...additionalServices];
+    const service = {
+      ...primaryService,
+      durationMinutes: selectedServices.reduce((sum, s) => sum + s.durationMinutes, 0),
+      bufferBeforeMin: Math.max(...selectedServices.map((s) => s.bufferBeforeMin ?? 0)),
+      bufferAfterMin: Math.max(...selectedServices.map((s) => s.bufferAfterMin ?? 0)),
+    };
+    const resourceIds = [...new Set(selectedServices.map((s) => s.resourceId).filter((id): id is string => !!id))];
+
     const assignedServiceCount = await this.prisma.staffService.count({ where: { staffId } });
     if (assignedServiceCount > 0) {
-      const offersService = await this.prisma.staffService.findFirst({
-        where: { staffId, serviceId },
+      const offered = await this.prisma.staffService.count({
+        where: { staffId, serviceId: { in: selectedServices.map((s) => s.id) } },
       });
-      if (!offersService) throw new NotFoundException('Staff does not offer this service');
+      if (offered !== selectedServices.length) throw new NotFoundException('Staff does not offer this service');
     }
 
     const businessTimezone = staff.business.timezone;
@@ -56,6 +78,8 @@ export class AvailabilityService {
     // Parse dates in the requested timezone
     const rangeStart = fromZonedTime(`${startDate}T00:00:00`, timezone);
     const rangeEnd = fromZonedTime(`${endDate}T23:59:59`, timezone);
+    const conflictRangeStart = addMinutes(rangeStart, -480);
+    const conflictRangeEnd = addMinutes(rangeEnd, 480);
 
     const businessId = staff.businessId;
 
@@ -65,9 +89,10 @@ export class AvailabilityService {
         where: {
           staffId,
           status: { in: ['CONFIRMED', 'PENDING'] },
-          startsAt: { lt: rangeEnd },
-          endsAt: { gt: rangeStart },
+          startsAt: { lt: conflictRangeEnd },
+          endsAt: { gt: conflictRangeStart },
         },
+        include: { service: { select: { bufferBeforeMin: true, bufferAfterMin: true } } },
       }),
       this.prisma.timeOff.findMany({
         where: {
@@ -88,21 +113,28 @@ export class AvailabilityService {
     // being used by ANOTHER staff member's appointment also blocks the slot. (Same
     // staff is already covered by `appointments`.) Treat those like time off.
     let effectiveTimeOffs = timeOffs;
-    if (service.resourceId) {
+    if (resourceIds.length) {
       const resourceBusy = await this.prisma.appointment.findMany({
         where: {
-          businessId: service.businessId,
+          businessId: primaryService.businessId,
           staffId: { not: staffId },
           status: { in: ['CONFIRMED', 'PENDING'] },
-          startsAt: { lt: rangeEnd },
-          endsAt: { gt: rangeStart },
-          service: { resourceId: service.resourceId },
+          startsAt: { lt: conflictRangeEnd },
+          endsAt: { gt: conflictRangeStart },
+          service: { resourceId: { in: resourceIds } },
         },
-        select: { startsAt: true, endsAt: true },
+        select: { startsAt: true, endsAt: true, service: { select: { bufferBeforeMin: true, bufferAfterMin: true } } },
       });
       effectiveTimeOffs = [
         ...timeOffs,
-        ...resourceBusy.map((a) => ({ id: 'resource', staffId, reason: null, createdAt: a.startsAt, startsAt: a.startsAt, endsAt: a.endsAt } as TimeOff)),
+        ...resourceBusy.map((a) => ({
+          id: 'resource',
+          staffId,
+          reason: null,
+          createdAt: a.startsAt,
+          startsAt: addMinutes(a.startsAt, -(a.service?.bufferBeforeMin ?? 0)),
+          endsAt: addMinutes(a.endsAt, a.service?.bufferAfterMin ?? 0),
+        } as TimeOff)),
       ];
     }
 
@@ -181,7 +213,7 @@ export class AvailabilityService {
     localDay: Date,
     rule: AvailabilityRule,
     service: { id: string; durationMinutes: number; bufferBeforeMin: number; bufferAfterMin: number; capacity?: number },
-    appointments: Appointment[],
+    appointments: AppointmentWithServiceBuffers[],
     timeOffs: TimeOff[],
     businessTimezone: string,
     displayTimezone: string,
@@ -214,7 +246,11 @@ export class AvailabilityService {
       // Group/class services: clients join the same instance (same service + exact
       // start) until capacity is full. Overlaps with anything else still block.
       const overlapping = appointments.filter(
-        (apt) => occupiedStart < apt.endsAt && occupiedEnd > apt.startsAt,
+        (apt) => {
+          const aptOccupiedStart = addMinutes(apt.startsAt, -(apt.service?.bufferBeforeMin ?? 0));
+          const aptOccupiedEnd = addMinutes(apt.endsAt, apt.service?.bufferAfterMin ?? 0);
+          return occupiedStart < aptOccupiedEnd && occupiedEnd > aptOccupiedStart;
+        },
       );
       const sameInstance = overlapping.filter(
         (apt) => apt.serviceId === service.id && +apt.startsAt === +candidateStart,

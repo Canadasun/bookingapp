@@ -27,12 +27,18 @@ export const AvailabilityRuleSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
+}).refine((value) => value.endTime > value.startTime, {
+  path: ['endTime'],
+  message: 'endTime must be after startTime',
 });
 
 export const TimeOffSchema = z.object({
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   reason: z.string().max(500).optional(),
+}).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
+  path: ['endsAt'],
+  message: 'endsAt must be after startsAt',
 });
 
 export const AssignServicesSchema = z.object({

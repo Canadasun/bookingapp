@@ -752,9 +752,10 @@ export const api = {
   },
 
   availability: {
-    getSlots: (params: { staffId: string; serviceId: string; startDate: string; endDate: string; timezone?: string; enforceNotice?: boolean }) => {
-      const { enforceNotice, ...rest } = params;
+    getSlots: (params: { staffId: string; serviceId: string; additionalServiceIds?: string[]; startDate: string; endDate: string; timezone?: string; enforceNotice?: boolean }) => {
+      const { enforceNotice, additionalServiceIds, ...rest } = params;
       const q = new URLSearchParams(rest as Record<string, string>);
+      if (additionalServiceIds?.length) q.set("additionalServiceIds", additionalServiceIds.join(","));
       if (enforceNotice === false) q.set("enforceNotice", "false");
       return req<Slot[]>(`/availability/slots?${q.toString()}`);
     },

@@ -10,6 +10,10 @@ const DateOnlySchema = z.string()
 export const GetSlotsSchema = z.object({
   staffId: z.string().min(1),
   serviceId: z.string().min(1),
+  additionalServiceIds: z.preprocess((value) => {
+    if (typeof value === 'string') return value.split(',').map((v) => v.trim()).filter(Boolean);
+    return value;
+  }, z.array(z.string().min(1)).max(10).optional()),
   startDate: DateOnlySchema,
   endDate: DateOnlySchema,
   timezone: z.string().trim().min(1).max(64).default('UTC').refine((value) => {

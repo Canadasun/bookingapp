@@ -118,8 +118,9 @@ export default function CheckoutPage() {
     try {
       const d = format(date, "yyyy-MM-dd");
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const additionalServiceIds = selectedServices.slice(1).map((svc) => svc.id);
       const rows = await Promise.all(targets.map(async (staff) => {
-        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, startDate: d, endDate: d, timezone: tz, enforceNotice: false });
+        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, additionalServiceIds, startDate: d, endDate: d, timezone: tz, enforceNotice: false });
         return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
       }));
       setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));

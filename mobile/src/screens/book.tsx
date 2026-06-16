@@ -123,10 +123,12 @@ function BookScreen() {
       // provider to pull availability for — never block the booking outright.
       const targets = staff && staff !== 'any' ? [staff] : (staffList.length ? staffList : allStaffList);
       if (targets.length === 0 || !serviceId) { Alert.alert('Provider required','No active provider is available for this service.'); return; }
+      const additionalServiceIds = selectedSvcs.slice(1).map(s => s.id);
+      const addonQuery = additionalServiceIds.length ? `&additionalServiceIds=${encodeURIComponent(additionalServiceIds.join(','))}` : '';
       const rows = await Promise.all(targets.map(async st => {
         // enforceNotice=false: owner-created bookings aren't bound by the public
         // minimum-notice window (matches web), so today's times still show.
-        const data = await api<Slot[]>(`/availability/slots?staffId=${st.id}&serviceId=${serviceId}&startDate=${d}&endDate=${d}&timezone=${tz}&enforceNotice=false`);
+        const data = await api<Slot[]>(`/availability/slots?staffId=${st.id}&serviceId=${serviceId}${addonQuery}&startDate=${d}&endDate=${d}&timezone=${tz}&enforceNotice=false`);
         return data.map(sl => ({...sl, staffId:st.id, staffName:st.user.name}));
       }));
       setSlots(rows.flat().sort((a,b)=>new Date(a.startsAt).getTime()-new Date(b.startsAt).getTime()));
@@ -537,7 +539,10 @@ function BookScreen() {
               try {
                 await api(`/businesses/${bizId()}/waitlist`, { method:'POST', body: JSON.stringify({
                   name: form.name, email: form.email, phone: form.phone||undefined,
-                  serviceId: selectedSvcs[0]?.id, date: date,
+                  serviceId: selectedSvcs[0]?.id,
+                  staffId: staff && staff !== 'any' ? staff.id : slot?.staffId,
+                  desiredDate: slot?.startsAt ?? (date ? new Date(date + 'T00:00:00').toISOString() : undefined),
+                  notes: slot?.startsAt ? `Preferred slot: ${slot.startsAt}` : undefined,
                 })});
                 setWlPrompt(false);
                 Alert.alert("You're on the waitlist!", "We'll contact you when a spot opens.");

@@ -16,6 +16,9 @@ const HoursSchema = z.object({
     dayOfWeek: z.number().int().min(0).max(6),
     startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm'),
     endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Must be HH:mm'),
+  }).refine((value) => value.endTime > value.startTime, {
+    path: ['endTime'],
+    message: 'endTime must be after startTime',
   })).max(7),
 });
 
@@ -23,6 +26,9 @@ const ClosureSchema = z.object({
   startsAt: z.string().datetime({ message: 'startsAt must be a valid ISO 8601 datetime' }),
   endsAt: z.string().datetime({ message: 'endsAt must be a valid ISO 8601 datetime' }),
   reason: z.string().max(500).optional(),
+}).refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
+  path: ['endsAt'],
+  message: 'endsAt must be after startsAt',
 });
 
 @ApiTags('business')

@@ -445,9 +445,9 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
       { text:'No', style:'cancel' },
       { text:'Cancel booking', style:'destructive', onPress: async () => {
         try {
-          await api(`/bookings/${a.id}/status?token=${encodeURIComponent(a.manageToken!)}`, {
+          await api(`/bookings/${a.id}/status`, {
             method:'PATCH',
-            body: JSON.stringify({ status:'CANCELLED', cancelReason:'Cancelled by client from mobile app' }),
+            body: JSON.stringify({ status:'CANCELLED', cancelReason:'Cancelled by client from mobile app', token: a.manageToken }),
           });
           setSelectedAppointment(null);
           load(true);
@@ -485,9 +485,9 @@ function ClientPortalScreen({ onLogout }: { onLogout:()=>void }) {
   async function saveClientReschedule(startsAt: string) {
     if (!clientReschedule?.appointment.manageToken) return;
     try {
-      await api(`/bookings/${clientReschedule.appointment.id}/reschedule?token=${encodeURIComponent(clientReschedule.appointment.manageToken)}`, {
+      await api(`/bookings/${clientReschedule.appointment.id}/reschedule`, {
         method:'PATCH',
-        body: JSON.stringify({ startsAt }),
+        body: JSON.stringify({ startsAt, token: clientReschedule.appointment.manageToken }),
       });
       setClientReschedule(null);
       load(true);

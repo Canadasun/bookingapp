@@ -47,7 +47,7 @@ function localUtc(date: string, time: string) {
 
 function mockPrisma(overrides: Record<string, unknown> = {}) {
   return {
-    service: { findUnique: jest.fn().mockResolvedValue(makeService()) },
+    service: { findUnique: jest.fn().mockResolvedValue(makeService()), findMany: jest.fn().mockResolvedValue([]) },
     staff: { findUnique: jest.fn().mockResolvedValue(makeStaff()) },
     staffService: { count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
     appointment: { findMany: jest.fn().mockResolvedValue([]) },
@@ -139,6 +139,32 @@ describe('AvailabilityService', () => {
         timezone: TZ,
       });
       expect(slots).toHaveLength(16); // 8 slots × 2 Mondays
+    });
+
+    it('uses combined duration when additional services are selected', async () => {
+      const { svc } = await buildService({
+        service: {
+          findUnique: jest.fn().mockResolvedValue(makeService({ durationMinutes: 60 })),
+          findMany: jest.fn().mockResolvedValue([makeService({ id: 'svc2', durationMinutes: 30 })]),
+        },
+        staffService: {
+          count: jest.fn()
+            .mockResolvedValueOnce(1)
+            .mockResolvedValueOnce(2),
+          findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }),
+        },
+      });
+      const slots = await svc.getAvailableSlots({
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        additionalServiceIds: ['svc2'],
+        startDate: MONDAY,
+        endDate: MONDAY,
+        timezone: TZ,
+      });
+      expect(slots).toHaveLength(5);
+      expect(slots[0].startsAt).toEqual(localUtc(MONDAY, '09:00'));
+      expect(slots[0].endsAt).toEqual(localUtc(MONDAY, '10:30'));
     });
   });
 
@@ -295,6 +321,36 @@ describe('AvailabilityService', () => {
         timezone: TZ,
       });
       // A slot starting at 10:00 would occupy 09:45–11:15, which overlaps the 11:00 appointment
+      const tenOclock = localUtc(MONDAY, '10:00');
+      expect(slots.find((s) => s.startsAt.getTime() === tenOclock.getTime())).toBeUndefined();
+    });
+
+    it('respects buffers from existing appointments when listing other services', async () => {
+      const { svc } = await buildService({
+        service: {
+          findUnique: jest.fn().mockResolvedValue(makeService({ durationMinutes: 60, bufferBeforeMin: 0, bufferAfterMin: 0 })),
+        },
+        appointment: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'apt1',
+              staffId: 'staff1',
+              serviceId: 'svc-other',
+              startsAt: localUtc(MONDAY, '09:00'),
+              endsAt: localUtc(MONDAY, '10:00'),
+              status: 'CONFIRMED',
+              service: { bufferBeforeMin: 0, bufferAfterMin: 30 },
+            },
+          ]),
+        },
+      });
+      const slots = await svc.getAvailableSlots({
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        startDate: MONDAY,
+        endDate: MONDAY,
+        timezone: TZ,
+      });
       const tenOclock = localUtc(MONDAY, '10:00');
       expect(slots.find((s) => s.startsAt.getTime() === tenOclock.getTime())).toBeUndefined();
     });

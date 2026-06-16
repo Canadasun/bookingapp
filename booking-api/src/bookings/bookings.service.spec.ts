@@ -7,6 +7,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { EventsGateway } from '../events/events.gateway';
 import { AvailabilityService } from '../availability/availability.service';
 import { CalendarSyncService } from '../calendar-sync/calendar-sync.service';
+import { addMinutes } from 'date-fns';
 
 // 7 days out: within the default 60-day max-advance and past the 120-min notice
 // window, so public-booking policy checks pass.
@@ -36,7 +37,7 @@ function makeAppointment(overrides = {}) {
     createdAt: new Date(),
     updatedAt: new Date(),
     client: { id: 'client1', name: 'Jane Doe', email: 'jane@example.com', phone: null },
-    service: { id: 'svc1', name: 'Haircut', durationMinutes: 60 },
+    service: { id: 'svc1', name: 'Haircut', durationMinutes: 60, bufferBeforeMin: 0, bufferAfterMin: 0, capacity: 1, resourceId: null },
     staff: { id: 'staff1', user: { name: 'Bob' } },
     business: {
       id: 'biz1',
@@ -51,7 +52,7 @@ function makeAppointment(overrides = {}) {
   };
 }
 
-function mockPrisma(options: { conflictExists?: boolean } = {}) {
+function mockPrisma(options: { conflictExists?: boolean; bufferConflict?: boolean; closureExists?: boolean } = {}) {
   const promoCode = {
     findFirst: jest.fn().mockResolvedValue(null),
     update: jest.fn().mockResolvedValue({}),
@@ -60,11 +61,28 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
     $queryRaw: jest.fn().mockResolvedValue([]),
     appointment: {
       // A different-instance overlap (serviceId !== the booked service) signals a real conflict.
-      findMany: jest.fn().mockResolvedValue(options.conflictExists ? [{ serviceId: 'other', startsAt: new Date(0) }] : []),
-      findFirst: jest.fn().mockResolvedValue(options.conflictExists ? { id: 'conflict' } : null),
+      findMany: jest.fn().mockResolvedValue(
+        options.conflictExists ? [{
+          serviceId: 'other',
+          startsAt: SLOT_START,
+          endsAt: SLOT_END,
+          service: { bufferBeforeMin: 0, bufferAfterMin: 0 },
+        }] : options.bufferConflict ? [{
+          serviceId: 'previous',
+          startsAt: addMinutes(SLOT_START, -60),
+          endsAt: SLOT_START,
+          service: { bufferBeforeMin: 0, bufferAfterMin: 30 },
+        }] : [],
+      ),
+      findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue(makeAppointment()),
       update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
     },
+    business: { findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }) },
+    availabilityRule: { findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]) },
+    businessHours: { findMany: jest.fn().mockResolvedValue([]) },
+    timeOff: { findFirst: jest.fn().mockResolvedValue(null) },
+    businessClosure: { findFirst: jest.fn().mockResolvedValue(options.closureExists ? { id: 'closure1' } : null) },
     promoCode,
   };
 
@@ -75,14 +93,22 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
         durationMinutes: 60,
         priceCents: 10000,
         active: true,
+        bufferBeforeMin: 0,
+        bufferAfterMin: 0,
+        capacity: 1,
+        resourceId: null,
       }),
-      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }),
+      findFirstOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true, bufferBeforeMin: 0, bufferAfterMin: 0, capacity: 1, resourceId: null }),
       findUnique: jest.fn().mockResolvedValue({
         id: 'svc1',
         durationMinutes: 60,
         active: true,
+        bufferBeforeMin: 0,
+        bufferAfterMin: 0,
+        capacity: 1,
+        resourceId: null,
       }),
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true, bufferBeforeMin: 0, bufferAfterMin: 0, capacity: 1, resourceId: null }),
     },
     staff: {
       findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }),
@@ -119,7 +145,13 @@ function mockPrisma(options: { conflictExists?: boolean } = {}) {
     availabilityRule: {
       findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]),
     },
+    businessHours: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     timeOff: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    businessClosure: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
@@ -202,6 +234,30 @@ describe('BookingsService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it('rejects a slot that overlaps an existing appointment buffer', async () => {
+      const { svc } = await buildService(mockPrisma({ bufferConflict: true }));
+      await expect(
+        svc.create('biz1', {
+          staffId: 'staff1',
+          serviceId: 'svc1',
+          clientId: 'client1',
+          startsAt: SLOT_START.toISOString(),
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects a slot inside a business closure during the transaction', async () => {
+      const { svc } = await buildService(mockPrisma({ closureExists: true }));
+      await expect(
+        svc.create('biz1', {
+          staffId: 'staff1',
+          serviceId: 'svc1',
+          clientId: 'client1',
+          startsAt: SLOT_START.toISOString(),
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('throws NotFoundException when service does not exist', async () => {
       const { svc } = await buildService({
         service: {
@@ -254,22 +310,34 @@ describe('BookingsService', () => {
               booked = true;
               return Promise.resolve([]);
             }
-            return Promise.resolve([{ serviceId: 'other', startsAt: new Date(0) }]);
+            return Promise.resolve([{
+              serviceId: 'other',
+              startsAt: SLOT_START,
+              endsAt: SLOT_END,
+              service: { bufferBeforeMin: 0, bufferAfterMin: 0 },
+            }]);
           }),
           findFirst: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue(makeAppointment()),
         },
+        business: { findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }) },
+        availabilityRule: { findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]) },
+        businessHours: { findMany: jest.fn().mockResolvedValue([]) },
+        timeOff: { findFirst: jest.fn().mockResolvedValue(null) },
+        businessClosure: { findFirst: jest.fn().mockResolvedValue(null) },
       };
 
       const prisma = {
-        service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true }) },
+        service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1', durationMinutes: 60, active: true, bufferBeforeMin: 0, bufferAfterMin: 0, capacity: 1, resourceId: null }) },
         staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }) },
         client: { findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }) },
         staffService: { count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue({ staffId: 'staff1', serviceId: 'svc1' }) },
         business: { findUnique: jest.fn().mockResolvedValue({ minNoticeMinutes: 120, maxAdvanceDays: 60, timezone: 'UTC' }) },
         appointment: { findFirst: jest.fn().mockResolvedValue(makeAppointment()) },
         availabilityRule: { findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]) },
+        businessHours: { findMany: jest.fn().mockResolvedValue([]) },
         timeOff: { findFirst: jest.fn().mockResolvedValue(null) },
+        businessClosure: { findFirst: jest.fn().mockResolvedValue(null) },
         auditLog: { create: jest.fn().mockResolvedValue({}) },
         $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock)),
       };
@@ -460,6 +528,30 @@ describe('BookingsService', () => {
   });
 
   describe('updateStatus', () => {
+    it('prioritizes exact-slot waitlist entries when a booking is cancelled', async () => {
+      const waitlistFindFirst = jest.fn().mockResolvedValue({ id: 'wait1' });
+      const waitlistUpdate = jest.fn().mockResolvedValue({});
+      const { svc } = await buildService({
+        waitlistEntry: {
+          findFirst: waitlistFindFirst,
+          update: waitlistUpdate,
+        },
+      });
+
+      await svc.updateStatus('apt1', { status: 'CANCELLED' }, 'biz1', true);
+
+      expect(waitlistFindFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        where: expect.objectContaining({
+          businessId: 'biz1',
+          status: 'WAITING',
+          serviceId: 'svc1',
+          staffId: 'staff1',
+          desiredDate: SLOT_START,
+        }),
+      }));
+      expect(waitlistUpdate).toHaveBeenCalledWith({ where: { id: 'wait1' }, data: { status: 'NOTIFIED' } });
+    });
+
     it('cancels reminders when status set to CANCELLED', async () => {
       const cancelReminders = jest.fn();
       const sendCancellation = jest.fn();

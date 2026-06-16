@@ -21,6 +21,16 @@ import { randomUUID } from 'node:crypto';
 import { formatInTimeZone } from 'date-fns-tz';
 import { verifyPublicClientToken } from '../common/util/public-client-token';
 
+type BookingServiceForValidation = {
+  id: string;
+  businessId?: string;
+  durationMinutes: number;
+  bufferBeforeMin?: number | null;
+  bufferAfterMin?: number | null;
+  capacity?: number | null;
+  resourceId?: string | null;
+};
+
 @Injectable()
 export class BookingsService {
   constructor(
@@ -244,6 +254,7 @@ export class BookingsService {
     let totalDurationMinutes = primaryService.durationMinutes;
     let subtotalCents = primaryService.priceCents;
     const additionalServiceNames: string[] = [];
+    let additionalServices: BookingServiceForValidation[] = [];
     if (dto.additionalServiceIds?.length) {
       const ids = [...new Set(dto.additionalServiceIds)];
       const extras = await this.prisma.service.findMany({
@@ -265,6 +276,7 @@ export class BookingsService {
       totalDurationMinutes += extras.reduce((sum, s) => sum + s.durationMinutes, 0);
       subtotalCents += extras.reduce((sum, s) => sum + s.priceCents, 0);
       additionalServiceNames.push(...extras.map((s) => s.name));
+      additionalServices = extras;
     }
 
     const startsAt = new Date(dto.startsAt);
@@ -329,61 +341,15 @@ export class BookingsService {
             });
           }
 
-          // Lock all overlapping appointments for this staff member.
-          // This prevents concurrent transactions from inserting a conflicting row.
-          await tx.$queryRaw(Prisma.sql`
-            SELECT id FROM "Appointment"
-            WHERE "staffId" = ${dto.staffId}
-              AND "businessId" = ${businessId}
-              AND status IN ('CONFIRMED', 'PENDING')
-              AND "startsAt" < ${endsAt}
-              AND "endsAt" > ${startsAt}
-            FOR UPDATE
-          `);
-
-          // Re-check availability inside the transaction. Group/class services
-          // (capacity > 1) allow multiple clients on the same instance (same
-          // service + exact start) until full; any other overlap still conflicts.
           if (!opts.overrideConflicts) {
-            const overlapping = await tx.appointment.findMany({
-              where: {
-                businessId,
-                staffId: dto.staffId,
-                status: { in: ['CONFIRMED', 'PENDING'] },
-                startsAt: { lt: endsAt },
-                endsAt: { gt: startsAt },
-              },
-              select: { serviceId: true, startsAt: true },
+            await this.assertBookableWindow(tx, {
+              businessId,
+              staffId: dto.staffId,
+              service: primaryService,
+              resourceIds: this.resourceIdsForServices([primaryService, ...additionalServices]),
+              startsAt,
+              endsAt,
             });
-            const capacity = Math.max(1, primaryService.capacity ?? 1);
-            const sameInstance = overlapping.filter(
-              (a) => a.serviceId === dto.serviceId && +a.startsAt === +startsAt,
-            );
-            if (overlapping.length > sameInstance.length) {
-              throw new ConflictException('This time slot is no longer available');
-            }
-            if (sameInstance.length >= capacity) {
-              throw new ConflictException('This class is full');
-            }
-
-            // Shared resource (room/equipment): no other appointment may use it at
-            // the same time. The same class instance (same service + start) shares
-            // one room, so it's allowed.
-            if (primaryService.resourceId) {
-              const resourceConflict = await tx.appointment.findFirst({
-                where: {
-                  businessId,
-                  status: { in: ['CONFIRMED', 'PENDING'] },
-                  startsAt: { lt: endsAt },
-                  endsAt: { gt: startsAt },
-                  service: { resourceId: primaryService.resourceId },
-                  NOT: { serviceId: dto.serviceId, startsAt },
-                },
-              });
-              if (resourceConflict) {
-                throw new ConflictException('The room or resource for this service is already booked at this time');
-              }
-            }
           }
 
           return tx.appointment.create({
@@ -592,29 +558,15 @@ export class BookingsService {
     const runReschedule = () =>
       this.prisma.$transaction(
         async (tx) => {
-          await tx.$queryRaw(Prisma.sql`
-            SELECT id FROM "Appointment"
-            WHERE "staffId" = ${existing.staffId}
-              AND "businessId" = ${existing.businessId}
-              AND status IN ('CONFIRMED', 'PENDING')
-              AND id != ${id}
-              AND "startsAt" < ${endsAt}
-              AND "endsAt" > ${startsAt}
-            FOR UPDATE
-          `);
-
-          const conflict = await tx.appointment.findFirst({
-            where: {
-              businessId: existing.businessId,
-              staffId: existing.staffId,
-              status: { in: ['CONFIRMED', 'PENDING'] },
-              id: { not: id },
-              startsAt: { lt: endsAt },
-              endsAt: { gt: startsAt },
-            },
+          await this.assertBookableWindow(tx, {
+            businessId: existing.businessId,
+            staffId: existing.staffId,
+            service,
+            resourceIds: this.resourceIdsForServices([service]),
+            startsAt,
+            endsAt,
+            excludeAppointmentId: id,
           });
-
-          if (conflict) throw new ConflictException('New time slot is not available');
 
           return tx.appointment.update({
             where: { id },
@@ -771,7 +723,7 @@ export class BookingsService {
       } else {
         await this.notifications.sendCancellation(updated);
       }
-      await this.notifyWaitlist(updated.businessId, updated.serviceId);
+      await this.notifyWaitlist(updated);
     }
 
     await this.logAction('APPOINTMENT', id, 'UPDATE_STATUS', auditChanges, userId);
@@ -926,28 +878,15 @@ export class BookingsService {
       this.prisma.$transaction(
         async (tx) => {
           if (timeChanged) {
-            await tx.$queryRaw(Prisma.sql`
-              SELECT id FROM "Appointment"
-              WHERE "staffId" = ${existing.staffId}
-                AND "businessId" = ${existing.businessId}
-                AND status IN ('CONFIRMED', 'PENDING')
-                AND id != ${id}
-                AND "startsAt" < ${endsAt}
-                AND "endsAt" > ${startsAt}
-              FOR UPDATE
-            `);
-
-            const conflict = await tx.appointment.findFirst({
-              where: {
-                businessId: existing.businessId,
-                staffId: existing.staffId,
-                status: { in: ['CONFIRMED', 'PENDING'] },
-                id: { not: id },
-                startsAt: { lt: endsAt },
-                endsAt: { gt: startsAt },
-              },
+            await this.assertBookableWindow(tx, {
+              businessId: existing.businessId,
+              staffId: existing.staffId,
+              service: existing.service,
+              resourceIds: this.resourceIdsForServices([existing.service]),
+              startsAt,
+              endsAt,
+              excludeAppointmentId: id,
             });
-            if (conflict) throw new ConflictException('New time slot is not available');
           }
 
           return tx.appointment.update({ where: { id }, data: updateData, include });
@@ -997,19 +936,222 @@ export class BookingsService {
   }
 
   // Auto-fill: when a slot opens (cancellation), notify the oldest waiting
-  // waitlist entry that matches the freed service (or has no service preference).
-  private async notifyWaitlist(businessId: string, serviceId: string) {
-    const entry = await this.prisma.waitlistEntry.findFirst({
-      where: {
-        businessId,
-        status: 'WAITING',
-        OR: [{ serviceId: null }, { serviceId }],
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+  // entry for this exact slot first. Day-level and general service waitlist
+  // entries still work as a fallback.
+  private async notifyWaitlist(appointment: { businessId: string; serviceId: string; staffId: string; startsAt: Date; endsAt: Date }) {
+    const dayStart = new Date(appointment.startsAt);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const baseWhere = { businessId: appointment.businessId, status: 'WAITING' as const };
+    const candidates = [
+      { serviceId: appointment.serviceId, staffId: appointment.staffId, desiredDate: appointment.startsAt },
+      { serviceId: appointment.serviceId, staffId: null, desiredDate: appointment.startsAt },
+      { serviceId: appointment.serviceId, staffId: appointment.staffId, desiredDate: { gte: dayStart, lt: dayEnd } },
+      { serviceId: appointment.serviceId, staffId: null, desiredDate: { gte: dayStart, lt: dayEnd } },
+      { serviceId: appointment.serviceId, desiredDate: null },
+      { serviceId: null },
+    ];
+    let entry: { id: string } | null = null;
+    for (const where of candidates) {
+      entry = await this.prisma.waitlistEntry.findFirst({
+        where: { ...baseWhere, ...where },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (entry) break;
+    }
     if (!entry) return;
     await this.prisma.waitlistEntry.update({ where: { id: entry.id }, data: { status: 'NOTIFIED' } });
     await this.notifications.notifyWaitlistOpening(entry.id);
+  }
+
+  private resourceIdsForServices(services: BookingServiceForValidation[]) {
+    return [...new Set(services.map((s) => s.resourceId).filter((id): id is string => !!id))];
+  }
+
+  private occupiedWindow(startsAt: Date, endsAt: Date, service: BookingServiceForValidation) {
+    return {
+      start: addMinutes(startsAt, -(service.bufferBeforeMin ?? 0)),
+      end: addMinutes(endsAt, service.bufferAfterMin ?? 0),
+    };
+  }
+
+  private overlaps(a: { start: Date; end: Date }, b: { start: Date; end: Date }) {
+    return a.start < b.end && a.end > b.start;
+  }
+
+  private async lockNearbyAppointments(
+    tx: any,
+    args: { businessId: string; staffId: string; occupiedStart: Date; occupiedEnd: Date; excludeAppointmentId?: string },
+  ) {
+    const lockStart = addMinutes(args.occupiedStart, -480);
+    const lockEnd = addMinutes(args.occupiedEnd, 480);
+    await tx.$queryRaw(Prisma.sql`
+      SELECT id FROM "Appointment"
+      WHERE "staffId" = ${args.staffId}
+        AND "businessId" = ${args.businessId}
+        AND status IN ('CONFIRMED', 'PENDING')
+        ${args.excludeAppointmentId ? Prisma.sql`AND id != ${args.excludeAppointmentId}` : Prisma.empty}
+        AND "startsAt" < ${lockEnd}
+        AND "endsAt" > ${lockStart}
+      FOR UPDATE
+    `);
+  }
+
+  private async lockNearbyResourceAppointments(
+    tx: any,
+    args: { businessId: string; resourceIds: string[]; occupiedStart: Date; occupiedEnd: Date; excludeAppointmentId?: string },
+  ) {
+    if (!args.resourceIds.length) return;
+    const lockStart = addMinutes(args.occupiedStart, -480);
+    const lockEnd = addMinutes(args.occupiedEnd, 480);
+    await tx.$queryRaw(Prisma.sql`
+      SELECT a.id FROM "Appointment" a
+      JOIN "Service" s ON s.id = a."serviceId"
+      WHERE a."businessId" = ${args.businessId}
+        AND a.status IN ('CONFIRMED', 'PENDING')
+        ${args.excludeAppointmentId ? Prisma.sql`AND a.id != ${args.excludeAppointmentId}` : Prisma.empty}
+        AND s."resourceId" IN (${Prisma.join(args.resourceIds)})
+        AND a."startsAt" < ${lockEnd}
+        AND a."endsAt" > ${lockStart}
+      FOR UPDATE
+    `);
+  }
+
+  private async assertBookableWindow(
+    tx: any,
+    args: {
+      businessId: string;
+      staffId: string;
+      service: BookingServiceForValidation;
+      resourceIds: string[];
+      startsAt: Date;
+      endsAt: Date;
+      excludeAppointmentId?: string;
+    },
+  ) {
+    const occupied = this.occupiedWindow(args.startsAt, args.endsAt, args.service);
+    const lockStart = addMinutes(occupied.start, -480);
+    const lockEnd = addMinutes(occupied.end, 480);
+
+    await this.lockNearbyAppointments(tx, {
+      businessId: args.businessId,
+      staffId: args.staffId,
+      occupiedStart: occupied.start,
+      occupiedEnd: occupied.end,
+      excludeAppointmentId: args.excludeAppointmentId,
+    });
+    await this.lockNearbyResourceAppointments(tx, {
+      businessId: args.businessId,
+      resourceIds: args.resourceIds,
+      occupiedStart: occupied.start,
+      occupiedEnd: occupied.end,
+      excludeAppointmentId: args.excludeAppointmentId,
+    });
+
+    const business = await tx.business.findUnique({
+      where: { id: args.businessId },
+      select: { timezone: true },
+    });
+    const timezone = business?.timezone ?? 'UTC';
+    const dayOfWeek = Number(formatInTimeZone(args.startsAt, timezone, 'i')) % 7;
+    const localStartDay = formatInTimeZone(args.startsAt, timezone, 'yyyy-MM-dd');
+    const localEndDay = formatInTimeZone(args.endsAt, timezone, 'yyyy-MM-dd');
+    if (localStartDay !== localEndDay) {
+      throw new BadRequestException('This appointment must fit within one business day.');
+    }
+
+    const [rules, bizHours] = await Promise.all([
+      tx.availabilityRule.findMany({ where: { staffId: args.staffId, dayOfWeek } }),
+      tx.businessHours.findMany({ where: { businessId: args.businessId, dayOfWeek } }),
+    ]);
+    const effectiveRules = rules.length
+      ? rules
+      : bizHours.length
+        ? bizHours
+        : [{ startTime: '09:00', endTime: '17:00' }];
+    const occupiedLocalStart = formatInTimeZone(occupied.start, timezone, 'HH:mm');
+    const occupiedLocalEnd = formatInTimeZone(occupied.end, timezone, 'HH:mm');
+    const fitsRule = effectiveRules.some((rule: { startTime: string; endTime: string }) =>
+      occupiedLocalStart >= rule.startTime && occupiedLocalEnd <= rule.endTime,
+    );
+    if (!fitsRule) {
+      throw new BadRequestException('This appointment is outside the available calendar window.');
+    }
+
+    const [timeOff, closure] = await Promise.all([
+      tx.timeOff.findFirst({
+        where: { staffId: args.staffId, startsAt: { lt: occupied.end }, endsAt: { gt: occupied.start } },
+      }),
+      tx.businessClosure.findFirst({
+        where: { businessId: args.businessId, startsAt: { lt: occupied.end }, endsAt: { gt: occupied.start } },
+      }),
+    ]);
+    if (timeOff) throw new BadRequestException('This time overlaps staff time off.');
+    if (closure) throw new BadRequestException('This time overlaps a business closure.');
+
+    const nearby = await tx.appointment.findMany({
+      where: {
+        businessId: args.businessId,
+        staffId: args.staffId,
+        status: { in: ['CONFIRMED', 'PENDING'] },
+        ...(args.excludeAppointmentId ? { id: { not: args.excludeAppointmentId } } : {}),
+        startsAt: { lt: lockEnd },
+        endsAt: { gt: lockStart },
+      },
+      select: {
+        id: true,
+        serviceId: true,
+        startsAt: true,
+        endsAt: true,
+        service: { select: { bufferBeforeMin: true, bufferAfterMin: true } },
+      },
+    });
+
+    const overlapping = nearby.filter((apt: any) => this.overlaps(occupied, this.occupiedWindow(apt.startsAt, apt.endsAt, {
+      id: apt.serviceId,
+      durationMinutes: differenceInMinutes(apt.endsAt, apt.startsAt),
+      bufferBeforeMin: apt.service?.bufferBeforeMin ?? 0,
+      bufferAfterMin: apt.service?.bufferAfterMin ?? 0,
+    })));
+    const sameInstance = overlapping.filter((apt: any) => apt.serviceId === args.service.id && +apt.startsAt === +args.startsAt);
+    if (overlapping.length > sameInstance.length) {
+      throw new ConflictException('This time slot is no longer available');
+    }
+    if (sameInstance.length >= Math.max(1, args.service.capacity ?? 1)) {
+      throw new ConflictException('This class is full');
+    }
+
+    if (args.resourceIds.length) {
+      const resourceNearby = await tx.appointment.findMany({
+        where: {
+          businessId: args.businessId,
+          status: { in: ['CONFIRMED', 'PENDING'] },
+          ...(args.excludeAppointmentId ? { id: { not: args.excludeAppointmentId } } : {}),
+          startsAt: { lt: lockEnd },
+          endsAt: { gt: lockStart },
+          service: { resourceId: { in: args.resourceIds } },
+          NOT: { serviceId: args.service.id, startsAt: args.startsAt },
+        },
+        select: {
+          id: true,
+          serviceId: true,
+          startsAt: true,
+          endsAt: true,
+          service: { select: { bufferBeforeMin: true, bufferAfterMin: true, resourceId: true } },
+        },
+      });
+      const resourceBusy = resourceNearby.some((apt: any) => this.overlaps(occupied, this.occupiedWindow(apt.startsAt, apt.endsAt, {
+        id: apt.serviceId,
+        durationMinutes: differenceInMinutes(apt.endsAt, apt.startsAt),
+        bufferBeforeMin: apt.service?.bufferBeforeMin ?? 0,
+        bufferAfterMin: apt.service?.bufferAfterMin ?? 0,
+        resourceId: apt.service?.resourceId ?? null,
+      })));
+      if (resourceBusy) {
+        throw new ConflictException('The room or resource for this service is already booked at this time');
+      }
+    }
   }
 
   private async assertStartsAtAvailable(staffId: string, serviceId: string, startsAt: Date, endsAt: Date, timezone: string) {
@@ -1033,8 +1175,14 @@ export class BookingsService {
     const dayOfWeek = Number(formatInTimeZone(startsAt, timezone, 'i')) % 7;
     const localStart = formatInTimeZone(startsAt, timezone, 'HH:mm');
     const localEnd = formatInTimeZone(endsAt, timezone, 'HH:mm');
-    const rules = await this.prisma.availabilityRule.findMany({ where: { staffId, dayOfWeek } });
-    const effectiveRules = rules.length ? rules : [{ startTime: '09:00', endTime: '17:00' }];
+    const staff = await this.prisma.staff.findFirst({ where: { id: staffId }, select: { businessId: true } });
+    const [rules, bizHours] = await Promise.all([
+      this.prisma.availabilityRule.findMany({ where: { staffId, dayOfWeek } }),
+      staff?.businessId && this.prisma.businessHours?.findMany
+        ? this.prisma.businessHours.findMany({ where: { businessId: staff.businessId, dayOfWeek } })
+        : Promise.resolve([]),
+    ]);
+    const effectiveRules = rules.length ? rules : bizHours.length ? bizHours : [{ startTime: '09:00', endTime: '17:00' }];
     const fitsRule = effectiveRules.some((rule) => localStart >= rule.startTime && localEnd <= rule.endTime);
     if (!fitsRule) {
       throw new BadRequestException('This appointment is longer than the available calendar window.');

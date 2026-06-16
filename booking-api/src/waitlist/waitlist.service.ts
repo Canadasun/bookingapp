@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JoinWaitlistDto } from './dto/waitlist.dto';
 
@@ -6,7 +6,15 @@ import { JoinWaitlistDto } from './dto/waitlist.dto';
 export class WaitlistService {
   constructor(private prisma: PrismaService) {}
 
-  join(businessId: string, dto: JoinWaitlistDto) {
+  async join(businessId: string, dto: JoinWaitlistDto) {
+    if (dto.serviceId) {
+      const service = await this.prisma.service.findFirst({ where: { id: dto.serviceId, businessId, active: true }, select: { id: true } });
+      if (!service) throw new BadRequestException('Selected service is not available');
+    }
+    if (dto.staffId) {
+      const staff = await this.prisma.staff.findFirst({ where: { id: dto.staffId, businessId, active: true }, select: { id: true } });
+      if (!staff) throw new BadRequestException('Selected staff member is not available');
+    }
     return this.prisma.waitlistEntry.create({
       data: {
         businessId,

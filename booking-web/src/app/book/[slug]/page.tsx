@@ -232,9 +232,10 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     try {
       const d = format(date, "yyyy-MM-dd");
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const additionalServiceIds = selectedServices.slice(1).map((svc) => svc.id);
       const staffTargets = selectedStaff && selectedStaff !== "any" ? [selectedStaff] : staffList;
       const rows = await Promise.all(staffTargets.map(async (staff) => {
-        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, startDate: d, endDate: d, timezone: tz });
+        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, additionalServiceIds, startDate: d, endDate: d, timezone: tz });
         return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
       }));
       setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
@@ -361,9 +362,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         email: form.email.trim(),
         phone: form.phone.trim() ? normalizePhoneE164(form.phone.trim()) : undefined,
         serviceId: selectedServices[0]?.id,
-        staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : undefined,
-        desiredDate: selectedDate ? selectedDate.toISOString() : undefined,
-        notes: form.notes.trim() || undefined,
+        staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : selectedSlot?.staffId,
+        desiredDate: selectedSlot?.startsAt ?? (selectedDate ? selectedDate.toISOString() : undefined),
+        notes: [form.notes.trim(), selectedSlot ? `Preferred slot: ${selectedSlot.startsAt}` : null].filter(Boolean).join(" | ") || undefined,
       });
       setWlDone(true); // keep the panel open to show the success state
     } catch (e) { toast.error(e instanceof Error ? e.message : "Could not join the waitlist"); }
