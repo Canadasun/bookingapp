@@ -119,7 +119,7 @@ export class StaffService {
       if (!location) throw new NotFoundException('Location not found');
     }
     return this.prisma.staff.update({
-      where: { id: staff.id },
+      where: { id: staff.id, businessId: staff.businessId },
       data: {
         ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
         ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
@@ -136,7 +136,7 @@ export class StaffService {
 
   async deactivate(id: string, businessId: string) {
     const staff = await this.findOne(id, businessId);
-    return this.prisma.staff.update({ where: { id: staff.id }, data: { active: false } });
+    return this.prisma.staff.update({ where: { id: staff.id, businessId: staff.businessId }, data: { active: false } });
   }
 
   // Permanently remove a provider + their login. Never allowed for the owner.
@@ -161,11 +161,11 @@ export class StaffService {
       }
       const ownerStaffId = await this.ensureOwnerProvider(staff.businessId);
       if (ownerStaffId !== staff.id) {
-        await this.prisma.appointment.updateMany({ where: { staffId: staff.id }, data: { staffId: ownerStaffId } });
+        await this.prisma.appointment.updateMany({ where: { staffId: staff.id, businessId: staff.businessId }, data: { staffId: ownerStaffId } });
       }
     }
     await this.prisma.$transaction(async (tx) => {
-      await tx.staff.delete({ where: { id: staff.id } });       // cascades services/availability/time-off
+      await tx.staff.delete({ where: { id: staff.id, businessId: staff.businessId } });       // cascades services/availability/time-off
       await tx.user.delete({ where: { id: staff.userId } });    // remove their login too
     });
     return { ok: true };
@@ -191,7 +191,7 @@ export class StaffService {
     if (!owner) throw new BadRequestException('No owner account found to receive the bookings.');
     const existing = await this.prisma.staff.findUnique({ where: { userId: owner.id } });
     if (existing) {
-      if (!existing.active) await this.prisma.staff.update({ where: { id: existing.id }, data: { active: true } });
+      if (!existing.active) await this.prisma.staff.update({ where: { id: existing.id, businessId: existing.businessId }, data: { active: true } });
       return existing.id;
     }
     const created = await this.prisma.staff.create({ data: { businessId, userId: owner.id, active: true } });

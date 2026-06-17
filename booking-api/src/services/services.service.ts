@@ -55,7 +55,7 @@ export class ServicesService {
     const { categoryId, ...rest } = dto;
     await this.assertCategoryOwnership(businessId, categoryId);
     return this.prisma.service.update({
-      where: { id: service.id },
+      where: { id: service.id, businessId: service.businessId },
       data: {
         ...rest,
         ...(categoryId !== undefined ? { categoryId: categoryId ?? null } : {}),
@@ -70,7 +70,7 @@ export class ServicesService {
     if (appointments > 0) {
       throw new BadRequestException('This service has appointment history and cannot be permanently deleted.');
     }
-    return this.prisma.service.delete({ where: { id: service.id } });
+    return this.prisma.service.delete({ where: { id: service.id, businessId: service.businessId } });
   }
 
   // ── Categories ───────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ export class ServicesService {
     });
     if (!cat) throw new NotFoundException('Category not found');
     return this.prisma.serviceCategory.update({
-      where: { id },
+      where: { id, businessId: cat.businessId },
       data: dto,
       include: { services: { include: { category: true } } },
     });
@@ -113,7 +113,7 @@ export class ServicesService {
       where: { id, businessId }
     });
     if (!cat) throw new NotFoundException('Category not found');
-    await this.prisma.service.updateMany({ where: { categoryId: id }, data: { categoryId: null } });
-    return this.prisma.serviceCategory.delete({ where: { id } });
+    await this.prisma.service.updateMany({ where: { categoryId: id, businessId }, data: { categoryId: null } });
+    return this.prisma.serviceCategory.delete({ where: { id, businessId: cat.businessId } });
   }
 }

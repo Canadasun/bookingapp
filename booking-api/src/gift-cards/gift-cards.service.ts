@@ -112,7 +112,7 @@ export class GiftCardsService {
             },
           });
           return tx.giftCard.update({
-            where: { id: card.id },
+            where: { id: card.id, businessId: card.businessId },
             data: { balanceCents: newBalance, status: newBalance === 0 ? 'REDEEMED' : 'ACTIVE' },
           });
         },

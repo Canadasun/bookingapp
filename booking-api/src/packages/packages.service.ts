@@ -123,7 +123,7 @@ export class PackagesService {
           data: { clientPackageId: cp.id, appointmentId: dto.appointmentId },
         });
         return tx.clientPackage.update({
-          where: { id: cp.id },
+          where: { id: cp.id, businessId: cp.businessId },
           data: { creditsRemaining: remaining, status: remaining === 0 ? 'USED' : 'ACTIVE' },
         });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
