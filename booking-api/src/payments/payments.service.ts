@@ -291,8 +291,12 @@ export class PaymentsService {
 
   async handleWebhook(rawBody: Buffer, signature: string) {
     const webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') ?? '';
+    const connectSecret = this.configService.get<string>('STRIPE_CONNECT_WEBHOOK_SECRET') ?? '';
 
-    if (!webhookSecret.startsWith('whsec_')) {
+    const hasAccount  = webhookSecret.startsWith('whsec_');
+    const hasConnect  = connectSecret.startsWith('whsec_');
+
+    if (!hasAccount && !hasConnect) {
       // In production, fail CLOSED and loudly: a missing/invalid secret means the
       // webhook is misconfigured (deposits won't auto-confirm) — surface it as an
       // error so Stripe flags failed deliveries and the operator notices, rather
@@ -303,10 +307,18 @@ export class PaymentsService {
       return { received: true, skipped: 'stripe webhook deferred — not configured' };
     }
 
-    let event: Stripe.Event;
-    try {
-      event = this.getStripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
-    } catch {
+    // Try the account-level secret first, then the Connect secret.
+    // One endpoint handles both platform events (payment_intent.succeeded, subscriptions)
+    // and Connect events (account.updated, payout.paid) — each signed by its own secret.
+    let event: Stripe.Event | null = null;
+    const stripe = this.getStripe();
+    if (hasAccount) {
+      try { event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret); } catch { /* try connect next */ }
+    }
+    if (!event && hasConnect) {
+      try { event = stripe.webhooks.constructEvent(rawBody, signature, connectSecret); } catch { /* both failed */ }
+    }
+    if (!event) {
       throw new BadRequestException('Invalid Stripe webhook signature');
     }
 
