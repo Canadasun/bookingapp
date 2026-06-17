@@ -818,6 +818,7 @@ model Client {
   // Square (per-merchant) customer + card-on-file for the same purpose
   squareCustomerId String?
   squareCardId     String?
+  marketingOptOut  Boolean  @default(false) // set by one-click unsubscribe; filters campaign sends
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

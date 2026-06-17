@@ -2,6 +2,7 @@ import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ResendEmailProvider } from './providers/email.provider';
 import { TwilioSmsProvider } from './providers/sms.provider';
@@ -20,7 +21,25 @@ function esc(s: unknown): string {
   );
 }
 
-function emailWrap(content: string) {
+// Signs a one-click unsubscribe token for a client. Verified by NotificationsController.
+export function signUnsubscribeToken(clientId: string, secret: string): string {
+  return createHmac('sha256', secret).update(`unsub:${clientId}`).digest('hex');
+}
+
+export function verifyUnsubscribeToken(clientId: string, sig: string, secret: string): boolean {
+  try {
+    const expected = Buffer.from(signUnsubscribeToken(clientId, secret), 'hex');
+    const provided  = Buffer.from(sig, 'hex');
+    return provided.length === expected.length && timingSafeEqual(provided, expected);
+  } catch {
+    return false;
+  }
+}
+
+function emailWrap(content: string, unsubscribeUrl?: string) {
+  const footerLink = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#E9A23C;text-decoration:none">Unsubscribe</a>`
+    : 'Manage preferences';
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse</title></head>
 <body style="margin:0;padding:0;background:#F8F9FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
@@ -30,7 +49,7 @@ function emailWrap(content: string) {
   </td></tr>
   <tr><td style="padding:32px">${content}</td></tr>
   <tr><td style="padding:16px 32px;border-top:1px solid #F3F4F6;background:#FAFAFA">
-    <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center">© Pulse · <a href="#" style="color:#E9A23C;text-decoration:none">Manage preferences</a></p>
+    <p style="margin:0;color:#9CA3AF;font-size:12px;text-align:center">© Pulse · ${footerLink}</p>
   </td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -646,6 +665,10 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         this.prisma.client.findUnique({ where: { id: job.data.clientId! } }),
       ]);
       if (!campaign || !client) return;
+      // N1: Cross-tenant guard — drop jobs where client doesn't belong to campaign's business.
+      if (client.businessId !== campaign.businessId) return;
+      // N2: Respect one-click unsubscribe opt-out.
+      if (client.marketingOptOut) return;
       this.currentBusinessId = campaign.businessId;
       const merge = (t: string) => t.replace(/\{name\}/g, () => client.name).replace(/\{business\}/g, () => campaign.business.name); // raw: SMS + subject; function replacer prevents re-expansion
       const mergeHtml = (t: string) => esc(t).replace(/\{name\}/g, () => esc(client.name)).replace(/\{business\}/g, () => esc(campaign.business.name));
@@ -657,10 +680,13 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
           sent = true;
         }
       } else if (client.email) {
+        const secret = this.configService.get<string>('JWT_SECRET') ?? '';
+        const apiUrl = this.configService.get<string>('PUBLIC_API_URL') ?? baseUrl;
+        const unsubscribeUrl = `${apiUrl}/notifications/unsubscribe?id=${encodeURIComponent(client.id)}&sig=${signUnsubscribeToken(client.id, secret)}`;
         await this.email.send({
           to: client.email,
           subject: merge(campaign.subject ?? `A note from ${campaign.business.name}`),
-          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${mergeHtml(campaign.body)}</div>`),
+          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${mergeHtml(campaign.body)}</div>`, unsubscribeUrl),
         });
         sent = true;
       }
@@ -1050,7 +1076,7 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Rea
           `),
           attachments: [{ filename: 'cancellation.ics', content: Buffer.from(cancelIcs).toString('base64'), content_type: 'text/calendar; method=CANCEL' }],
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking cancelled — ${apt.client.name}`,
@@ -1077,7 +1103,7 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
 <a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
           `),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Your appointment for ${apt.service.name} was cancelled by ${apt.business.name}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason + ')' : ''}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Your appointment for ${apt.service.name} was cancelled by ${apt.business.name}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
         break;
       }

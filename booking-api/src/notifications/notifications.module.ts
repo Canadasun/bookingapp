@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { NotificationsService, NOTIFICATION_QUEUE } from './notifications.service';
 import { NotificationProcessor } from './notifications.processor';
+import { NotificationsController } from './notifications.controller';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { NotificationProcessor } from './notifications.processor';
       },
     }),
   ],
+  controllers: [NotificationsController],
   providers: [NotificationsService, NotificationProcessor],
   exports: [NotificationsService],
 })
