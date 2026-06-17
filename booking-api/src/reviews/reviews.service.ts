@@ -59,6 +59,6 @@ export class ReviewsService {
   async setPublished(businessId: string, id: string, published: boolean) {
     const r = await this.prisma.review.findFirst({ where: { id, businessId } });
     if (!r) throw new NotFoundException('Review not found');
-    return this.prisma.review.update({ where: { id }, data: { published } });
+    return this.prisma.review.update({ where: { id, businessId }, data: { published } });
   }
 }

@@ -130,6 +130,8 @@ export class MessagesService {
   }
 
   async send(businessId: string, clientId: string, content: string, fromClient: boolean, channel: 'IN_APP' | 'SMS' = 'IN_APP') {
+    const clientRecord = await this.prisma.client.findFirst({ where: { id: clientId, businessId }, select: { id: true } });
+    if (!clientRecord) throw new Error('FORBIDDEN_CLIENT');
     const message = await this.prisma.message.create({
       data: { businessId, clientId, content, fromClient, channel },
     });

@@ -137,6 +137,6 @@ export class GiftCardsService {
 
   async void(businessId: string, id: string) {
     await this.get(businessId, id);
-    return this.prisma.giftCard.update({ where: { id }, data: { status: 'VOID' } });
+    return this.prisma.giftCard.update({ where: { id, businessId }, data: { status: 'VOID' } });
   }
 }

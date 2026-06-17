@@ -37,6 +37,12 @@ const ClosureSchema = z.object({
 export class BusinessesController {
   constructor(private businessService: BusinessesService) {}
 
+  private assertTenantAccess(user: User, id: string) {
+    if (user.role !== 'ADMIN' && user.businessId !== id) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
@@ -71,6 +77,7 @@ export class BusinessesController {
     @Param('id') id: string,
     @CurrentUser() user: User,
   ) {
+    this.assertTenantAccess(user, id);
     return this.businessService.dashboardOverview(id, user);
   }
 
@@ -82,9 +89,7 @@ export class BusinessesController {
     @Param('id') id: string,
     @CurrentUser() user: User,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+    this.assertTenantAccess(user, id);
     return this.businessService.findOne(id);
   }
 
@@ -96,9 +101,7 @@ export class BusinessesController {
     @Body(new ZodValidationPipe(UpdateBusinessSchema)) dto: UpdateBusinessDto,
     @CurrentUser() user: User,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+    this.assertTenantAccess(user, id);
     // Defense-in-depth: non-admin owners must never set plan even if the DTO
     // schema is changed in future. ADMIN can set it for provisioning.
     const { plan: _plan, ...safeDto } = dto as UpdateBusinessDto & { plan?: unknown };
@@ -111,9 +114,7 @@ export class BusinessesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   deactivate(@Param('id') id: string, @CurrentUser() user: User) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+    this.assertTenantAccess(user, id);
     return this.businessService.deactivate(id);
   }
 
@@ -121,9 +122,7 @@ export class BusinessesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
   reactivate(@Param('id') id: string, @CurrentUser() user: User) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+    this.assertTenantAccess(user, id);
     return this.businessService.reactivate(id);
   }
 
@@ -137,9 +136,7 @@ export class BusinessesController {
     @Body() body: { confirmation?: string },
     @CurrentUser() user: User,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) {
-      throw new ForbiddenException('You do not have access to this business');
-    }
+    this.assertTenantAccess(user, id);
     return this.businessService.deleteAccount(id, body?.confirmation ?? '');
   }
 
@@ -148,7 +145,7 @@ export class BusinessesController {
   @Get(':id/hours')
   @UseGuards(JwtAuthGuard)
   getHours(@Param('id') id: string, @CurrentUser() user: User) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    this.assertTenantAccess(user, id);
     return this.businessService.getHours(id);
   }
 
@@ -161,7 +158,7 @@ export class BusinessesController {
     @Body(new ZodValidationPipe(HoursSchema)) body: z.infer<typeof HoursSchema>,
     @CurrentUser() user: User,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    this.assertTenantAccess(user, id);
     return this.businessService.setHours(id, body.hours);
   }
 
@@ -175,7 +172,7 @@ export class BusinessesController {
     @Body(new ZodValidationPipe(ClosureSchema)) body: z.infer<typeof ClosureSchema>,
     @CurrentUser() user: User,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    this.assertTenantAccess(user, id);
     return this.businessService.addClosure(id, body);
   }
 
@@ -187,7 +184,7 @@ export class BusinessesController {
     @Param('closureId') closureId: string,
     @CurrentUser() user: User,
   ) {
-    if (user.role !== 'ADMIN' && user.businessId !== id) throw new ForbiddenException();
+    this.assertTenantAccess(user, id);
     return this.businessService.removeClosure(id, closureId);
   }
 }

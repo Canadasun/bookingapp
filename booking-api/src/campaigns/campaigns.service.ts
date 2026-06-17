@@ -44,12 +44,12 @@ export class CampaignsService {
   async update(businessId: string, id: string, dto: UpdateCampaignDto) {
     const c = await this.get(businessId, id);
     if (c.status !== 'DRAFT') throw new ConflictException('Only draft campaigns can be edited');
-    return this.prisma.campaign.update({ where: { id }, data: dto });
+    return this.prisma.campaign.update({ where: { id, businessId }, data: dto });
   }
 
   async remove(businessId: string, id: string) {
     await this.get(businessId, id);
-    return this.prisma.campaign.delete({ where: { id } });
+    return this.prisma.campaign.delete({ where: { id, businessId } });
   }
 
   // ── Audience ─────────────────────────────────────────────────────────
@@ -89,14 +89,14 @@ export class CampaignsService {
     });
 
     await this.prisma.campaign.update({
-      where: { id },
+      where: { id, businessId },
       data: { status: 'SENDING', recipientCount: recipients.length, sentCount: 0, sentAt: new Date() },
     });
 
     await this.notifications.sendCampaignBulk(id, recipients.map((r) => r.id));
 
     return this.prisma.campaign.update({
-      where: { id },
+      where: { id, businessId },
       data: { status: 'SENT' },
     });
   }

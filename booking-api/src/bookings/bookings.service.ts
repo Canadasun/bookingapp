@@ -481,7 +481,7 @@ export class BookingsService {
       }
     }
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, businessId: apt.businessId },
       data: { status: 'CONFIRMED' },
       include: { client: true, service: true, business: true },
     });
@@ -569,7 +569,7 @@ export class BookingsService {
           });
 
           return tx.appointment.update({
-            where: { id },
+            where: { id, businessId: existing.businessId },
             // A client-initiated reschedule goes back to PENDING for re-approval.
             // An owner/staff reschedule keeps the current status (a CONFIRMED
             // booking stays CONFIRMED) — moving a time shouldn't un-confirm it.
@@ -675,7 +675,7 @@ export class BookingsService {
     }
 
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, businessId: existing.businessId },
       data: {
         status: dto.status,
         ...(dto.cancelReason ? { cancelReason: dto.cancelReason } : {}),
@@ -889,7 +889,7 @@ export class BookingsService {
             });
           }
 
-          return tx.appointment.update({ where: { id }, data: updateData, include });
+          return tx.appointment.update({ where: { id, businessId: existing.businessId }, data: updateData, include });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
@@ -909,7 +909,7 @@ export class BookingsService {
         }
       }
     } else {
-      updated = await this.prisma.appointment.update({ where: { id }, data: updateData, include });
+      updated = await this.prisma.appointment.update({ where: { id, businessId: existing.businessId }, data: updateData, include });
     }
 
     if (timeChanged) await this.notifications.cancelReminders(id);

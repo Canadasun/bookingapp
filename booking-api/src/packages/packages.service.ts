@@ -38,12 +38,12 @@ export class PackagesService {
   async updatePackage(businessId: string, id: string, dto: UpdatePackageDto) {
     await this.getPackage(businessId, id);
     await this.assertServiceInBusiness(businessId, dto.serviceId);
-    return this.prisma.package.update({ where: { id }, data: dto });
+    return this.prisma.package.update({ where: { id, businessId }, data: dto });
   }
 
   async removePackage(businessId: string, id: string) {
     await this.getPackage(businessId, id);
-    return this.prisma.package.delete({ where: { id } });
+    return this.prisma.package.delete({ where: { id, businessId } });
   }
 
   // ── Client packages (issued) ─────────────────────────────────────────
@@ -146,6 +146,6 @@ export class PackagesService {
 
   async void(businessId: string, id: string) {
     await this.getClientPackage(businessId, id);
-    return this.prisma.clientPackage.update({ where: { id }, data: { status: 'VOID' } });
+    return this.prisma.clientPackage.update({ where: { id, businessId }, data: { status: 'VOID' } });
   }
 }

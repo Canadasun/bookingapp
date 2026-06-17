@@ -94,7 +94,7 @@ export class InvoicesService {
     const { lines, subtotalCents, taxCents, totalCents } = this.calcTotals(rawLineItems, taxRate, discount);
 
     return this.prisma.invoice.update({
-      where: { id },
+      where: { id, businessId },
       data: {
         clientId: dto.clientId !== undefined ? (dto.clientId || null) : undefined,
         lineItems: lines,
@@ -143,7 +143,7 @@ export class InvoicesService {
     ) {
       throw new BadRequestException(`A ${invoice.status} invoice cannot be reverted to ${dto.status}`);
     }
-    return this.prisma.invoice.update({ where: { id }, data: { status: dto.status } });
+    return this.prisma.invoice.update({ where: { id, businessId }, data: { status: dto.status } });
   }
 
   async sendByEmail(id: string, businessId: string) {
@@ -292,7 +292,7 @@ export class InvoicesService {
 
     // Mark as SENT if still DRAFT
     if (invoice.status === 'DRAFT') {
-      await this.prisma.invoice.update({ where: { id }, data: { status: 'SENT' } });
+      await this.prisma.invoice.update({ where: { id, businessId: invoice.businessId }, data: { status: 'SENT' } });
     }
 
     return { ok: true, sentTo: invoice.client.email };
@@ -300,7 +300,7 @@ export class InvoicesService {
 
   async remove(id: string, businessId: string) {
     await this.get(id, businessId);
-    await this.prisma.invoice.delete({ where: { id } });
+    await this.prisma.invoice.delete({ where: { id, businessId } });
     return { ok: true };
   }
 }

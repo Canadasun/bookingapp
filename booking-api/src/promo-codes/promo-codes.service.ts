@@ -41,7 +41,7 @@ export class PromoCodesService {
       throw new BadRequestException('Percentage discount cannot exceed 100');
     }
     return this.prisma.promoCode.update({
-      where: { id },
+      where: { id, businessId },
       data: {
         ...(dto.code !== undefined ? { code: dto.code.toUpperCase().trim() } : {}),
         ...(dto.discountType !== undefined ? { discountType: dto.discountType } : {}),
@@ -56,7 +56,7 @@ export class PromoCodesService {
   async remove(businessId: string, id: string) {
     const pc = await this.prisma.promoCode.findFirst({ where: { id, businessId } });
     if (!pc) throw new NotFoundException('Promo code not found');
-    return this.prisma.promoCode.delete({ where: { id } });
+    return this.prisma.promoCode.delete({ where: { id, businessId } });
   }
 
   // Called from booking page — validates and returns discount info
