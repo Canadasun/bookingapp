@@ -131,7 +131,11 @@ export class ClientsService {
 
     const totalSpentCents = (spent._sum.amountCents ?? 0) - (spent._sum.refundedCents ?? 0);
 
-    return { ...client, totalSpentCents };
+    // Strip internal payment-provider references and userId — these are server-side
+    // join keys not needed by the dashboard UI and should not appear in API responses.
+    const { stripeCustomerId: _sc, squareCustomerId: _sqc, squareCardId: _sqk, userId: _uid, ...safeClient } = client;
+    void _sc; void _sqc; void _sqk; void _uid;
+    return { ...safeClient, totalSpentCents };
   }
 
   getAppointmentHistory(clientId: string, businessId?: string) {
@@ -219,8 +223,8 @@ export class ClientsService {
   async remove(id: string, businessId?: string) {
     const client = await this.findOne(id, businessId);
     return this.prisma.$transaction(async (tx) => {
-      const appointments = await tx.appointment.deleteMany({ where: { clientId: client.id } });
-      await tx.client.delete({ where: { id: client.id } });
+      const appointments = await tx.appointment.deleteMany({ where: { clientId: client.id, businessId: client.businessId } });
+      await tx.client.delete({ where: { id: client.id, businessId: client.businessId } });
       return { ok: true, deletedAppointments: appointments.count };
     });
   }
@@ -275,7 +279,7 @@ export class ClientsService {
     if (!dupes.length) return { ok: true, merged: 0 };
 
     return this.prisma.$transaction(async (tx) => {
-      const where = { clientId: { in: dupes } };
+      const where = { clientId: { in: dupes }, businessId };
       const to = { clientId: primaryId };
       await tx.appointment.updateMany({ where, data: to });
       await tx.message.updateMany({ where, data: to });
@@ -284,7 +288,7 @@ export class ClientsService {
       await tx.serviceDue.updateMany({ where, data: to });
       await tx.client.deleteMany({ where: { id: { in: dupes }, businessId } });
       await tx.client.update({
-        where: { id: primaryId },
+        where: { id: primaryId, businessId },
         data: {
           ...(canonical.name ? { name: canonical.name.trim() } : {}),
           ...(canonical.email ? { email: canonical.email.trim().toLowerCase() } : {}),
@@ -314,7 +318,7 @@ export class ClientsService {
         ? await this.prisma.client.findFirst({ where: { businessId, email } })
         : null;
       if (existing) {
-        await this.prisma.client.update({ where: { id: existing.id }, data: { phone: phone ?? existing.phone, tags: tags.length ? tags : existing.tags, notes: row.notes?.trim() ?? existing.notes } });
+        await this.prisma.client.update({ where: { id: existing.id, businessId }, data: { phone: phone ?? existing.phone, tags: tags.length ? tags : existing.tags, notes: row.notes?.trim() ?? existing.notes } });
         updated++;
       } else {
         const created_ok = await this.prisma.client.create({ data: { businessId, name: row.name.trim(), email, phone, tags, notes: row.notes?.trim() } }).then(() => true).catch(() => false);
