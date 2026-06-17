@@ -336,7 +336,7 @@ export class BookingsService {
               ? Math.min(subtotalCents, Math.round(subtotalCents * promo.discountValue / 100))
               : Math.min(subtotalCents, promo.discountValue);
             await tx.promoCode.update({
-              where: { id: promo.id },
+              where: { id: promo.id, businessId: promo.businessId },
               data: { usageCount: { increment: 1 } },
             });
           }
