@@ -166,9 +166,9 @@ export class PaymentsService {
    *  - else                   → nothing required.
    * Returns the Stripe client secret + publishable key for Stripe.js on the client.
    */
-  async createBookingIntent(appointmentId: string) {
+  async createBookingIntent(appointmentId: string, callerBusinessId?: string) {
     const apt = await this.prisma.appointment.findFirst({
-      where: { id: appointmentId },
+      where: { id: appointmentId, ...(callerBusinessId ? { businessId: callerBusinessId } : {}) },
       include: { service: true, client: true, business: true },
     });
     if (!apt) throw new BadRequestException('Appointment not found');
@@ -231,7 +231,7 @@ export class PaymentsService {
   async createDepositIntent(appointmentId: string, businessId: string) {
     const check = await this.prisma.appointment.findFirst({ where: { id: appointmentId, businessId } });
     if (!check) throw new BadRequestException('Appointment not found');
-    return this.createBookingIntent(appointmentId);
+    return this.createBookingIntent(appointmentId, businessId);
   }
 
   /** Create an in-person PaymentIntent for confirmation in mobile PaymentSheet. */
@@ -367,9 +367,16 @@ export class PaymentsService {
         // Card-on-file (no deposit): save the payment method for no-show charges.
         const si = event.data.object as Stripe.SetupIntent;
         const appointmentId = si.metadata?.appointmentId;
+        const siBusinessId = si.metadata?.businessId;
         if (appointmentId && typeof si.payment_method === 'string') {
           await this.prisma.appointment.updateMany({
-            where: { id: appointmentId },
+            where: {
+              id: appointmentId,
+              // Scope to the business that created this SetupIntent so a Connect
+              // account cannot overwrite another tenant's saved payment method by
+              // crafting a SetupIntent with a foreign appointmentId in metadata.
+              ...(siBusinessId ? { businessId: siBusinessId } : {}),
+            },
             data: { stripePaymentMethodId: si.payment_method },
           });
         }
@@ -1107,19 +1114,19 @@ export class PaymentsService {
     if (!apt) throw new BadRequestException('Appointment not found');
     if (apt.status !== 'CONFIRMED') throw new BadRequestException(`Cannot mark as NO_SHOW: appointment is ${apt.status}`);
     if (!isProPlan(apt.business.plan)) {
-      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+      await this.prisma.appointment.update({ where: { id: appointmentId, businessId: apt.businessId }, data: { status: 'NO_SHOW' } });
       return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. Automatic no-show charging requires Pro; collect manually on Basic.' };
     }
 
     if ((apt.business.noShowFeeCents ?? 0) === 0) {
-      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+      await this.prisma.appointment.update({ where: { id: appointmentId, businessId: apt.businessId }, data: { status: 'NO_SHOW' } });
       return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. No no-show fee configured — collect manually if needed.' };
     }
     const feeCents = apt.business.noShowFeeCents;
 
     if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
       // No saved card — can't auto-charge; mark NO_SHOW for manual collection.
-      await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+      await this.prisma.appointment.update({ where: { id: appointmentId, businessId: apt.businessId }, data: { status: 'NO_SHOW' } });
       return { charged: false, feeCents, message: 'Marked NO_SHOW. No saved card on file — collect the fee manually.' };
     }
 
@@ -1136,7 +1143,7 @@ export class PaymentsService {
       ...this.connectChargeParams(apt.business, feeCents),
     }, { idempotencyKey: this.idempotencyKey(['no-show', businessId, appointmentId, feeCents]) });
 
-    await this.prisma.appointment.update({ where: { id: appointmentId }, data: { status: 'NO_SHOW' } });
+    await this.prisma.appointment.update({ where: { id: appointmentId, businessId: apt.businessId }, data: { status: 'NO_SHOW' } });
     await this.recordPayment({
       businessId, appointmentId, clientId: apt.clientId,
       stripePaymentIntentId: intent.id, amountCents: feeCents,
