@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { api, Service, StaffMember, Location } from "@/lib/api";
+import { api, Service, StaffMember, Location, Business } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [biz, setBiz] = useState<Business | null>(null);
   const [locName, setLocName] = useState("");
   const [showLocations, setShowLocations] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
@@ -58,12 +59,13 @@ export default function StaffPage() {
     setLoadError("");
     setLoading(true);
     try {
-      const [s, svcs, locs] = await Promise.all([
+      const [s, svcs, locs, b] = await Promise.all([
         api.staff.listAll(bizId),
         api.services.listAll(bizId),
         api.locations.list(bizId).catch(() => [] as Location[]),
+        api.business.get(bizId).catch(() => null as Business | null),
       ]);
-      setStaff(s); setServices(svcs.filter((sv) => sv.active)); setLocations(locs);
+      setStaff(s); setServices(svcs.filter((sv) => sv.active)); setLocations(locs); setBiz(b);
     } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
     finally { setLoading(false); }
   }, [bizId]);
@@ -186,6 +188,8 @@ export default function StaffPage() {
     setSelectedServiceIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   }
 
+  const isUnlimited = biz?.capabilities?.multipleLocations ?? (biz?.plan === "UNLIMITED");
+
   return (
     <div className="max-w-4xl mx-auto">
       <ConfirmDialog
@@ -277,12 +281,22 @@ export default function StaffPage() {
               );
             })}
             {locations.length === 0 && <p className="text-xs text-gray-400">No locations yet.</p>}
-            <div className="flex gap-2 pt-1">
-              <Input placeholder="e.g. Downtown · West End" value={locName}
-                onChange={(e) => setLocName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLocation(); } }} />
-              <Button size="sm" onClick={addLocation} disabled={!locName.trim()}>Add</Button>
-            </div>
+            {!isUnlimited && locations.length >= 1 ? (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Multiple locations require the Unlimited plan.{" "}
+                <a href="/dashboard/settings#billing" className="underline font-medium">Upgrade</a>
+              </p>
+            ) : (
+              <>
+                <div className="flex gap-2 pt-1">
+                  <Input placeholder="e.g. Downtown · West End" value={locName}
+                    onChange={(e) => setLocName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLocation(); } }} />
+                  <Button size="sm" onClick={addLocation} disabled={!locName.trim()}>Add</Button>
+                </div>
+                <p className="text-xs text-gray-400">Add address, phone, and timezone via Edit after creating.</p>
+              </>
+            )}
           </div>
         )}
       </div>

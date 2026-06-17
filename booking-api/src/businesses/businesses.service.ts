@@ -314,7 +314,12 @@ export class BusinessesService {
   async findPublicById(id: string) {
     const business = await this.findOne(id);
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    return this.publicBusiness(business);
+    const locations = await this.prisma.location.findMany({
+      where: { businessId: business.id, active: true },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, address: true },
+    });
+    return { ...this.publicBusiness(business), locations };
   }
 
   // Sitemap: public slugs for all active, non-suspended businesses.

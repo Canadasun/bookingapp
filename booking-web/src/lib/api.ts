@@ -858,7 +858,7 @@ export const api = {
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).
-    createManual: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean }) =>
+    createManual: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean; locationId?: string }) =>
       req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
     // Owner-initiated recurring series. Returns the created occurrences + any
     // dates skipped due to conflicts.

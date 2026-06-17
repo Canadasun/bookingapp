@@ -382,7 +382,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   function reset() {
     setStep(0); setSelectedServices([]); setSelectedStaff(null); setSelectedDate(undefined);
     setSelectedSlot(null); setForm({ name: "", email: "", phone: "", notes: "" }); setErrs({});
-    setPolicyAccepted(false); setBooking(null); setSlots([]);
+    setPolicyAccepted(false); setBooking(null); setSlots([]); setSelectedLocationId("");
   }
 
   const rawBrandColor = (biz?.bookingPageSettings as Record<string, unknown> | null)?.brandColor as string ?? '';

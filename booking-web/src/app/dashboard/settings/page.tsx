@@ -2236,7 +2236,7 @@ function SettingsPage() {
     <ConfirmDialog
       open={locationToRemove !== null}
       title="Remove location"
-      description={`Remove "${locationToRemove?.name}"? This cannot be undone.`}
+      description={`Remove "${locationToRemove?.name}"? Staff assigned to this location will become unassigned.`}
       confirmLabel="Remove"
       variant="destructive"
       onConfirm={async () => {

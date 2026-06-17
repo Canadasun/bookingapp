@@ -405,6 +405,7 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
         clientId: clientRes.id,
         startsAt: startsAt.toISOString(),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(locationFilter ? { locationId: locationFilter } : {}),
       });
       toast.success("Appointment created");
       onSaved();
@@ -879,6 +880,8 @@ function AppointmentsPage() {
   const [showNewApt, setShowNewApt] = useState(false);
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string }; locationId?: string | null }[]>([]);
   const [allStaffFull, setAllStaffFull] = useState<{ availabilityRules?: AvailabilityRule[] }[]>([]);
+  const [locationList, setLocationList] = useState<{ id: string; name: string }[]>([]);
+  const [locationListFilter, setLocationListFilter] = useState("");
 
   // Open modal when navigated here with ?new=1 (e.g. from the checkout client step)
   useEffect(() => {
@@ -892,6 +895,7 @@ function AppointmentsPage() {
       setStaffList(active);
       setAllStaffFull(active);
     }).catch(() => {});
+    api.locations.list(bizId).then((locs) => setLocationList(locs.filter((l) => l.active))).catch(() => {});
   }, [bizId]);
 
   const load = useCallback(async () => {
@@ -974,6 +978,7 @@ function AppointmentsPage() {
     let list = appointments;
     if (tab === "today") list = list.filter((a) => isToday(new Date(a.startsAt)));
     else if (tab === "week") list = list.filter((a) => isThisWeek(new Date(a.startsAt)));
+    if (locationListFilter) list = list.filter((a) => a.location?.id === locationListFilter);
     if (staffFilter) list = list.filter((a) => a.staff.user.name === staffFilter);
     if (statusFilter) list = list.filter((a) => a.status === statusFilter);
     if (search) {
@@ -985,12 +990,13 @@ function AppointmentsPage() {
       );
     }
     return [...list].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  }, [appointments, tab, staffFilter, statusFilter, search]);
+  }, [appointments, tab, locationListFilter, staffFilter, statusFilter, search]);
 
   // The month grid spans whole weeks, so it ignores the today/week tab and only
-  // honours the staff / status / search filters.
+  // honours the location / staff / status / search filters.
   const calendarAppts = useMemo(() => {
     let list = appointments;
+    if (locationListFilter) list = list.filter((a) => a.location?.id === locationListFilter);
     if (staffFilter) list = list.filter((a) => a.staff.user.name === staffFilter);
     if (statusFilter) list = list.filter((a) => a.status === statusFilter);
     if (search) {
@@ -1002,7 +1008,7 @@ function AppointmentsPage() {
       );
     }
     return list;
-  }, [appointments, staffFilter, statusFilter, search]);
+  }, [appointments, locationListFilter, staffFilter, statusFilter, search]);
 
   // Drag-and-drop reschedule: move an appointment to another day, keeping its time.
   async function rescheduleToDay(appointmentId: string, dayKey: string) {
@@ -1096,6 +1102,14 @@ function AppointmentsPage() {
           {["PENDING","CONFIRMED","CANCELLED","COMPLETED","NO_SHOW"].map((s) =>
             <option key={s} value={s}>{s}</option>)}
         </select>
+
+        {locationList.length > 1 && (
+          <select value={locationListFilter} onChange={(e) => setLocationListFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
+            <option value="">All locations</option>
+            {locationList.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        )}
 
         <div className="max-w-full overflow-x-auto rounded-xl bg-gray-100 p-1">
           <div className="flex w-max gap-1">
