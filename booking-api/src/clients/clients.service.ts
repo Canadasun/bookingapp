@@ -5,6 +5,20 @@ import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
 import { signPublicClientToken } from '../common/util/public-client-token';
 
+// Explicit field list for client creates — prevents accidental spread of future
+// DTO fields (userId, stripeCustomerId, marketingOptOut, etc.) into Prisma data.
+function clientFields(businessId: string, dto: CreateClientDto) {
+  return {
+    businessId,
+    name: dto.name,
+    email: dto.email,
+    phone: dto.phone,
+    notes: dto.notes,
+    tags: dto.tags,
+    birthday: dto.birthday,
+  };
+}
+
 @Injectable()
 export class ClientsService {
   constructor(private prisma: PrismaService) {}
@@ -181,25 +195,25 @@ export class ClientsService {
     // an unauthenticated caller overwrite their name, phone, or private notes.
     if (existing) return { id: existing.id, businessId: existing.businessId, matched: true as const };
 
-    const created = await this.prisma.client.create({ data: { ...dto, businessId } });
+    const created = await this.prisma.client.create({ data: clientFields(businessId, dto) });
     return { id: created.id, businessId: created.businessId, matched: false as const };
   }
 
   create(businessId: string, dto: CreateClientDto) {
-    return this.prisma.client.create({ data: { ...dto, businessId } });
+    return this.prisma.client.create({ data: clientFields(businessId, dto) });
   }
 
   // Public booking contacts are deliberately isolated from existing customer
   // profiles. Email/phone knowledge is not identity proof and must not attach an
   // attacker-controlled booking to a private record.
   async createPublicBookingClient(businessId: string, dto: CreateClientDto) {
-    const created = await this.prisma.client.create({ data: { ...dto, businessId } });
+    const created = await this.prisma.client.create({ data: clientFields(businessId, dto) });
     return { clientToken: signPublicClientToken(businessId, created.id) };
   }
 
   async update(id: string, dto: UpdateClientDto, businessId?: string) {
     const client = await this.findOne(id, businessId);
-    return this.prisma.client.update({ where: { id: client.id }, data: dto });
+    return this.prisma.client.update({ where: { id: client.id, businessId: client.businessId }, data: dto });
   }
 
   async remove(id: string, businessId?: string) {
