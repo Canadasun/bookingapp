@@ -145,7 +145,7 @@ export default function MembershipsPage() {
 
       {!membershipsEnabled && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Memberships require a paid Pulse plan. Existing demo examples are visible here, but new plans and enrollments unlock after upgrading.
+          Memberships require a paid Pulse plan. Upgrade to create plans and enroll clients.
         </div>
       )}
 
