@@ -38,7 +38,7 @@ export class MembershipsService {
     }
     const priceChanging = dto.priceMonthly !== undefined && dto.priceMonthly !== plan.priceMonthly;
     const updated = await this.prisma.membershipPlan.update({
-      where: { id },
+      where: { id: plan.id, businessId: plan.businessId },
       data: {
         ...dto,
         // Stripe prices are immutable. A price change must provision a fresh
@@ -58,7 +58,7 @@ export class MembershipsService {
     if (!plan) throw new NotFoundException('Plan not found');
     const active = await this.prisma.clientMembership.count({ where: { planId: id, status: 'ACTIVE' } });
     if (active > 0) throw new BadRequestException('Cannot delete a plan with active members. Deactivate it instead.');
-    return this.prisma.membershipPlan.delete({ where: { id } });
+    return this.prisma.membershipPlan.delete({ where: { id: plan.id, businessId: plan.businessId } });
   }
 
   // ── Memberships ───────────────────────────────────────────────────────────

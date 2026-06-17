@@ -20,7 +20,7 @@ export class ResourcesService {
     const resource = await this.prisma.resource.findFirst({ where: { id, businessId } });
     if (!resource) throw new NotFoundException('Resource not found');
     return this.prisma.resource.update({
-      where: { id },
+      where: { id: resource.id, businessId: resource.businessId },
       data: {
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
@@ -33,10 +33,10 @@ export class ResourcesService {
     if (!resource) throw new NotFoundException('Resource not found');
     const usedByServices = await this.prisma.service.count({ where: { businessId, resourceId: id } });
     if (usedByServices > 0) {
-      await this.prisma.resource.update({ where: { id }, data: { active: false } });
+      await this.prisma.resource.update({ where: { id: resource.id, businessId: resource.businessId }, data: { active: false } });
       return { ok: true, archived: true };
     }
-    await this.prisma.resource.delete({ where: { id } });
+    await this.prisma.resource.delete({ where: { id: resource.id, businessId: resource.businessId } });
     return { ok: true };
   }
 }

@@ -691,7 +691,7 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         sent = true;
       }
       if (sent) {
-        await this.prisma.campaign.update({ where: { id: campaign.id }, data: { sentCount: { increment: 1 } } });
+        await this.prisma.campaign.update({ where: { id: campaign.id, businessId: campaign.businessId }, data: { sentCount: { increment: 1 } } });
       }
       return;
     }

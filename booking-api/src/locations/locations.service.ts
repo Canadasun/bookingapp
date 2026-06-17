@@ -41,7 +41,7 @@ export class LocationsService {
     const location = await this.prisma.location.findFirst({ where: { id, businessId } });
     if (!location) throw new NotFoundException('Location not found');
     return this.prisma.location.update({
-      where: { id },
+      where: { id: location.id, businessId: location.businessId },
       data: {
         ...(data.name !== undefined ? { name: data.name.trim() } : {}),
         ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
@@ -56,7 +56,7 @@ export class LocationsService {
     const location = await this.prisma.location.findFirst({ where: { id, businessId } });
     if (!location) throw new NotFoundException('Location not found');
     // Staff/appointments referencing it are detached via ON DELETE SET NULL.
-    await this.prisma.location.delete({ where: { id } });
+    await this.prisma.location.delete({ where: { id: location.id, businessId: location.businessId } });
     return { ok: true };
   }
 }

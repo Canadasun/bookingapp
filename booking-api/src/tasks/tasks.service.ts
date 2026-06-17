@@ -60,7 +60,7 @@ export class TasksService {
       if (task.staffId !== staff?.id) throw new ForbiddenException('This task is not assigned to you');
       const done = dto.status === 'DONE';
       return this.prisma.staffTask.update({
-        where: { id },
+        where: { id: task.id, businessId: task.businessId },
         data: { status: done ? 'DONE' : 'OPEN', completedAt: done ? new Date() : null },
         include: taskInclude,
       });
@@ -70,7 +70,7 @@ export class TasksService {
     if (dto.staffId !== undefined) await this.assertStaffInBusiness(businessId, dto.staffId);
     const done = dto.status === 'DONE';
     return this.prisma.staffTask.update({
-      where: { id },
+      where: { id: task.id, businessId: task.businessId },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.staffId !== undefined ? { staffId: dto.staffId || null } : {}),
@@ -86,7 +86,7 @@ export class TasksService {
   async remove(businessId: string, id: string) {
     const task = await this.prisma.staffTask.findFirst({ where: { id, businessId }, select: { id: true } });
     if (!task) throw new NotFoundException('Task not found');
-    await this.prisma.staffTask.delete({ where: { id } });
+    await this.prisma.staffTask.delete({ where: { id, businessId } });
     return { ok: true };
   }
 }

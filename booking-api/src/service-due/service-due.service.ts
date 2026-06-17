@@ -65,7 +65,7 @@ export class ServiceDueService {
   async updatePolicy(businessId: string, id: string, dto: Partial<{ serviceId: string | null; name: string; trigger: string; delayDays: number; subject: string; body: string; enabled: boolean }>) {
     const policy = await this.prisma.followUpPolicy.findFirst({ where: { id, businessId }, select: { id: true } });
     if (!policy) throw new NotFoundException('Follow-up policy not found');
-    return this.prisma.followUpPolicy.update({ where: { id }, data: dto });
+    return this.prisma.followUpPolicy.update({ where: { id, businessId }, data: dto });
   }
 
   list(businessId: string) {
@@ -87,13 +87,13 @@ export class ServiceDueService {
       const base = d.dueAt > new Date() ? d.dueAt : new Date();
       const next = new Date(base.getTime() + d.cadenceDays * 86_400_000);
       return this.prisma.serviceDue.update({
-        where: { id },
+        where: { id: d.id, businessId: d.businessId },
         data: { status: 'SCHEDULED', dueAt: next, lastNotifiedAt: new Date() },
         include: dueInclude,
       });
     }
     return this.prisma.serviceDue.update({
-      where: { id },
+      where: { id: d.id, businessId: d.businessId },
       data: { status: 'CANCELLED', lastNotifiedAt: new Date() },
       include: dueInclude,
     });
@@ -109,7 +109,7 @@ export class ServiceDueService {
         ? new Date(Date.now() + dto.cadenceDays * 86_400_000)
         : d.dueAt;
     return this.prisma.serviceDue.update({
-      where: { id },
+      where: { id: d.id, businessId: d.businessId },
       data: { status: 'SCHEDULED', cadenceDays: dto.cadenceDays ?? d.cadenceDays, dueAt },
       include: dueInclude,
     });
@@ -118,13 +118,13 @@ export class ServiceDueService {
   async cancel(businessId: string, id: string) {
     const d = await this.prisma.serviceDue.findFirst({ where: { id, businessId }, select: { id: true } });
     if (!d) throw new NotFoundException('Follow-up not found');
-    return this.prisma.serviceDue.update({ where: { id }, data: { status: 'CANCELLED' }, include: dueInclude });
+    return this.prisma.serviceDue.update({ where: { id: d.id, businessId }, data: { status: 'CANCELLED' }, include: dueInclude });
   }
 
   async deletePolicy(businessId: string, id: string) {
     const policy = await this.prisma.followUpPolicy.findFirst({ where: { id, businessId }, select: { id: true } });
     if (!policy) throw new NotFoundException('Follow-up policy not found');
-    await this.prisma.serviceDue.updateMany({ where: { policyId: id, status: { not: 'CANCELLED' } }, data: { status: 'CANCELLED', policyId: null } });
-    return this.prisma.followUpPolicy.delete({ where: { id } });
+    await this.prisma.serviceDue.updateMany({ where: { policyId: id, businessId, status: { not: 'CANCELLED' } }, data: { status: 'CANCELLED', policyId: null } });
+    return this.prisma.followUpPolicy.delete({ where: { id, businessId } });
   }
 }
