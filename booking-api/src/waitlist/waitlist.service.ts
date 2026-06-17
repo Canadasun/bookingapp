@@ -41,6 +41,6 @@ export class WaitlistService {
     const entry = await this.prisma.waitlistEntry.findFirst({ where: { id, businessId } });
     if (!entry) throw new NotFoundException('Waitlist entry not found');
     // Soft-cancel so history is kept.
-    return this.prisma.waitlistEntry.update({ where: { id }, data: { status: 'CANCELLED' } });
+    return this.prisma.waitlistEntry.update({ where: { id: entry.id, businessId: entry.businessId }, data: { status: 'CANCELLED' } });
   }
 }
