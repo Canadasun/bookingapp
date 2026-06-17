@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateCampaignDto, UpdateCampaignDto } from './dto/campaigns.dto';
+import { isPaidPlan, isProPlan } from '../common/util/plan-features';
+
+const DAILY_CAMPAIGN_LIMIT = 3;
 
 type Channel = 'EMAIL' | 'SMS';
 type Audience = 'ALL' | 'RECENT' | 'LAPSED';
@@ -14,7 +17,9 @@ export class CampaignsService {
     private notifications: NotificationsService,
   ) {}
 
-  create(businessId: string, dto: CreateCampaignDto) {
+  async create(businessId: string, dto: CreateCampaignDto) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    this.assertCampaignPlanAccess(business.plan, dto.channel);
     return this.prisma.campaign.create({
       data: {
         businessId,
@@ -25,6 +30,15 @@ export class CampaignsService {
         body: dto.body,
       },
     });
+  }
+
+  private assertCampaignPlanAccess(plan: import('@prisma/client').PlanTier | null | undefined, channel: Channel) {
+    if (channel === 'SMS' && !isProPlan(plan)) {
+      throw new ForbiddenException('SMS campaigns require a Pro or Unlimited plan');
+    }
+    if (channel === 'EMAIL' && !isPaidPlan(plan)) {
+      throw new ForbiddenException('Email campaigns require a paid plan');
+    }
   }
 
   list(businessId: string) {
@@ -81,6 +95,20 @@ export class CampaignsService {
   async send(businessId: string, id: string) {
     const c = await this.get(businessId, id);
     if (c.status !== 'DRAFT') throw new ConflictException('Campaign has already been sent');
+
+    // C1: re-check plan at send time to catch downgrades after creation.
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    this.assertCampaignPlanAccess(business.plan, c.channel);
+
+    // C2: cap sends per business per calendar day.
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const todaySent = await this.prisma.campaign.count({
+      where: { businessId, sentAt: { gte: todayStart }, status: { in: ['SENDING', 'SENT'] } },
+    });
+    if (todaySent >= DAILY_CAMPAIGN_LIMIT) {
+      throw new BadRequestException(`Daily campaign limit of ${DAILY_CAMPAIGN_LIMIT} reached. Try again tomorrow.`);
+    }
 
     const recipients = await this.prisma.client.findMany({
       where: this.recipientWhere(businessId, c.channel, c.audience),
