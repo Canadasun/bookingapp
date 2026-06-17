@@ -331,7 +331,18 @@ export default function StaffPage() {
               </div>
               <div>
                 <label htmlFor="loc-timezone" className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
-                <Input id="loc-timezone" value={locForm.timezone} onChange={(e) => setLocForm((p) => ({ ...p, timezone: e.target.value }))} placeholder="America/Toronto" />
+                <select id="loc-timezone" value={locForm.timezone} onChange={(e) => setLocForm((p) => ({ ...p, timezone: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <option value="">— Same as business —</option>
+                  <option value="America/Vancouver">Pacific — Vancouver, Kelowna (PT)</option>
+                  <option value="America/Edmonton">Mountain — Edmonton, Calgary (MT)</option>
+                  <option value="America/Regina">Saskatchewan — Regina (CT, no DST)</option>
+                  <option value="America/Winnipeg">Central — Winnipeg (CT)</option>
+                  <option value="America/Toronto">Eastern — Toronto, Ottawa (ET)</option>
+                  <option value="America/Halifax">Atlantic — Halifax, Moncton (AT)</option>
+                  <option value="America/St_Johns">Newfoundland — St. John&apos;s (NT)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-400">Slot generation uses this timezone for staff at this location.</p>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
                 <span className="text-sm text-gray-700">Active</span>

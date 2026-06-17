@@ -34,7 +34,7 @@ export class AvailabilityService {
       this.prisma.service.findUnique({ where: { id: serviceId } }),
       this.prisma.staff.findUnique({
         where: { id: staffId },
-        include: { business: true, user: { select: { role: true } } },
+        include: { business: true, user: { select: { role: true } }, location: { select: { timezone: true } } },
       }),
     ]);
 
@@ -73,7 +73,11 @@ export class AvailabilityService {
       if (offered !== selectedServices.length) throw new NotFoundException('Staff does not offer this service');
     }
 
-    const businessTimezone = staff.business.timezone;
+    // Location timezone takes precedence over business timezone so that
+    // providers at different branches have their schedule windows interpreted
+    // in the correct local time (e.g. a Vancouver location open 9–5 should
+    // generate slots anchored to America/Vancouver, not the business HQ).
+    const businessTimezone = staff.location?.timezone ?? staff.business.timezone;
 
     // Parse dates in the requested timezone
     const rangeStart = fromZonedTime(`${startDate}T00:00:00`, timezone);
