@@ -961,7 +961,7 @@ export class BookingsService {
       if (entry) break;
     }
     if (!entry) return;
-    await this.prisma.waitlistEntry.update({ where: { id: entry.id }, data: { status: 'NOTIFIED' } });
+    await this.prisma.waitlistEntry.update({ where: { id: entry.id, businessId: appointment.businessId }, data: { status: 'NOTIFIED' } });
     await this.notifications.notifyWaitlistOpening(entry.id);
   }
 
