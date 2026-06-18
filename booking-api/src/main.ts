@@ -45,8 +45,8 @@ async function bootstrap() {
   if (isProdEnv && process.env.DISABLE_AUTH_LOCKOUT === 'true') {
     throw new Error('DISABLE_AUTH_LOCKOUT=true is not allowed in production. Remove this variable before deploying.');
   }
-  if (isProdEnv && process.env.UNLOCK_ALL_FEATURES) {
-    throw new Error('UNLOCK_ALL_FEATURES is set in production. Remove this variable before deploying.');
+  if (isProdEnv && process.env.UNLOCK_ALL_FEATURES === 'true') {
+    throw new Error('UNLOCK_ALL_FEATURES=true is not allowed in production. Remove this variable before deploying.');
   }
 
   // rawBody: true preserves the unparsed request body on req.rawBody, which the
