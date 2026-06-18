@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { format, subMonths, startOfMonth, isAfter } from "date-fns";
 import { TrendingUp, Users, CalendarCheck, XCircle, RefreshCw } from "lucide-react";
 import { api, Appointment, ClientWithStats, Payment, Business } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 function pct(n: number, d: number) { return d === 0 ? 0 : Math.round((n / d) * 100); }
 
 export default function ReportsPage() {
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);

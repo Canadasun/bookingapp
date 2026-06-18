@@ -9,7 +9,7 @@ import {
 import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api, Appointment, AvailabilityRule, Service } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -856,7 +856,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
 }
 
 function AppointmentsPage() {
-  const user = getUser();
+  const { user } = useCurrentUser();
   const isStaff = user?.role === "STAFF";
   const bizId = user?.businessId ?? "";
 

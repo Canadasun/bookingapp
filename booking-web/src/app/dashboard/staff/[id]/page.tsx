@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, Copy, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, StaffMember } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   const [toForm, setToForm] = useState({ startsAt: "", endsAt: "", reason: "" });
   const [timeOffToDelete, setTimeOffToDelete] = useState<TimeOff | null>(null);
 
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

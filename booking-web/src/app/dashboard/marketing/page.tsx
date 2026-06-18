@@ -5,7 +5,7 @@ import { Mail, MessageSquare, Send, Trash2, Plus, Users, Check } from "lucide-re
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, type Campaign, type CampaignChannel, type CampaignAudience } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ export default function MarketingPage() {
   const [composing, setComposing] = useState(false);
   const [campaignToSend, setCampaignToSend] = useState<Campaign | null>(null);
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

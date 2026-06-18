@@ -17,7 +17,7 @@ function MetricCard({ label, value, icon: Icon, accent }: {
   label: string; value: string | number; icon: React.ElementType; accent: string;
 }) {
   return (
-    <div className="min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-start gap-3 sm:gap-4">
+    <div className="min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-start gap-3 sm:gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md cursor-default">
       <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
         <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
       </div>
@@ -170,13 +170,13 @@ export default function OverviewPage() {
   const upcoming = overview.upcoming;
   const metrics = overview.metrics;
   const actions = [
-    { label: "Pending bookings", value: metrics.pendingBookings, href: "/dashboard/appointments", icon: CalendarDays, tone: "bg-amber-50 text-amber-700" },
-    { label: "Unread messages", value: metrics.unreadMessages, href: "/dashboard/messages", icon: MessageSquare, tone: "bg-violet-50 text-violet-700" },
-    { label: "Unread alerts", value: metrics.unreadNotifications, href: "/dashboard/notifications", icon: Bell, tone: "bg-blue-50 text-blue-700" },
+    { label: "Pending bookings", value: metrics.pendingBookings, href: "/dashboard/appointments", icon: CalendarDays, tone: "bg-amber-50 text-amber-700", card: "border-amber-200 bg-amber-50/60 hover:bg-amber-50" },
+    { label: "Unread messages", value: metrics.unreadMessages, href: "/dashboard/messages", icon: MessageSquare, tone: "bg-violet-50 text-violet-700", card: "border-violet-200 bg-violet-50/60 hover:bg-violet-50" },
+    { label: "Unread alerts", value: metrics.unreadNotifications, href: "/dashboard/notifications", icon: Bell, tone: "bg-blue-50 text-blue-700", card: "border-blue-200 bg-blue-50/60 hover:bg-blue-50" },
     ...(!isStaff ? [
-      { label: "Failed payments", value: metrics.failedPayments, href: "/dashboard/transactions", icon: CreditCard, tone: "bg-red-50 text-red-700" },
-      { label: "Waiting clients", value: metrics.waitlistCount, href: "/dashboard/waitlist", icon: TimerReset, tone: "bg-emerald-50 text-emerald-700" },
-      { label: "Failed deliveries", value: metrics.failedDeliveries, href: "/dashboard/notifications", icon: MailWarning, tone: "bg-red-50 text-red-700" },
+      { label: "Failed payments", value: metrics.failedPayments, href: "/dashboard/transactions", icon: CreditCard, tone: "bg-red-50 text-red-700", card: "border-red-200 bg-red-50/60 hover:bg-red-50" },
+      { label: "Waiting clients", value: metrics.waitlistCount, href: "/dashboard/waitlist", icon: TimerReset, tone: "bg-emerald-50 text-emerald-700", card: "border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50" },
+      { label: "Failed deliveries", value: metrics.failedDeliveries, href: "/dashboard/notifications", icon: MailWarning, tone: "bg-red-50 text-red-700", card: "border-red-200 bg-red-50/60 hover:bg-red-50" },
     ] : []),
   ].filter((a) => a.value > 0);
 
@@ -232,9 +232,9 @@ export default function OverviewPage() {
             <h3 className="text-sm font-semibold text-gray-900">Action needed</h3>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {actions.map(({ label, value, href, icon: Icon, tone }) => (
+            {actions.map(({ label, value, href, icon: Icon, tone, card }) => (
               <Link key={label} href={href}
-                className="rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 p-3 transition-colors">
+                className={`rounded-xl border p-3 transition-all hover:-translate-y-0.5 hover:shadow-sm ${card}`}>
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tone}`}>
                   <Icon className="w-4 h-4" />
                 </div>
@@ -315,14 +315,14 @@ export default function OverviewPage() {
             <p className="text-xs text-gray-400 mt-0.5">Next {upcoming.length} upcoming</p>
           </div>
           {!isStaff && (
-            <div className="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-100">
+            <div className="grid grid-cols-2 gap-2 p-3 border-b border-gray-100">
               {[
                 { label: "Cancelled (wk)", val: metrics.cancelledThisWeek },
                 { label: "No-shows (mo)",  val: metrics.noShowsThisMonth },
                 { label: "Top service",    val: metrics.topService ?? "—" },
                 { label: "Waitlist",       val: metrics.waitlistCount },
               ].map((s) => (
-                <div key={s.label} className="bg-white px-4 py-3">
+                <div key={s.label} className="bg-gray-50 rounded-xl px-4 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
                   <p className="mt-0.5 text-lg font-bold text-gray-900 truncate">{s.val}</p>
                 </div>

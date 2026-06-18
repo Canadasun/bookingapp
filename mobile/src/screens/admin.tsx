@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getAuth } from '../auth';
 import { api } from '../api';
-import { BRAND, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900 } from '../theme';
+import { BRAND, SURFACE, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900 } from '../theme';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,8 +192,8 @@ export function AdminScreen({ onLogout }: { onLogout: () => void }) {
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: SURFACE }}>
+      <StatusBar barStyle="dark-content" backgroundColor={SURFACE} />
 
       {/* Header */}
       <View style={st.header}>
@@ -468,14 +468,14 @@ const st = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: GRAY_100, backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: GRAY_100, backgroundColor: SURFACE,
   },
   headerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
   shieldBadge:  { width: 38, height: 38, borderRadius: 12, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { fontSize: 16, fontWeight: '700', color: GRAY_900 },
   headerSub:    { fontSize: 11, color: GRAY_500, marginTop: 1 },
   signOutBtn:   { padding: 8 },
-  tabBar:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: GRAY_100, backgroundColor: '#fff' },
+  tabBar:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: GRAY_100, backgroundColor: SURFACE },
   tabItem:      { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 3, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabItemActive:{ borderBottomColor: '#7C3AED' },
   tabLabel:     { fontSize: 10, fontWeight: '600', color: GRAY_400 },
@@ -483,13 +483,13 @@ const st = StyleSheet.create({
   badge:        { position: 'absolute', top: -4, right: -8, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText:    { fontSize: 9, fontWeight: '700', color: '#fff' },
   statsGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard:     { flex: 1, minWidth: '45%', backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: GRAY_100, padding: 14, alignItems: 'flex-start', gap: 6, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  statCard:     { flex: 1, minWidth: '45%', backgroundColor: SURFACE, borderRadius: 16, borderWidth: 1, borderColor: GRAY_100, padding: 14, alignItems: 'flex-start', gap: 6, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   statIcon:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   statValue:    { fontSize: 24, fontWeight: '700' },
   statLabel:    { fontSize: 11, color: GRAY_500 },
   alertCard:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#DDD6FE', borderRadius: 12, padding: 14 },
   alertText:    { flex: 1, fontSize: 13, fontWeight: '600', color: '#4C1D95' },
-  section:      { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: GRAY_100, padding: 14, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  section:      { backgroundColor: SURFACE, borderRadius: 16, borderWidth: 1, borderColor: GRAY_100, padding: 14, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: GRAY_500, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
   bizRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: GRAY_100, padding: 10, marginBottom: 6, backgroundColor: '#FAFAFA' },
   avatar:       { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -497,14 +497,14 @@ const st = StyleSheet.create({
   planPill:     { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   verifChip:    { borderWidth: 1, borderRadius: 10, padding: 10, minWidth: '45%', flex: 1 },
   pageTitle:    { fontSize: 20, fontWeight: '700', color: GRAY_900 },
-  verifCard:    { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: GRAY_100, padding: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  verifCard:    { backgroundColor: SURFACE, borderRadius: 16, borderWidth: 1, borderColor: GRAY_100, padding: 16, shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   detailRow:    { fontSize: 12, color: GRAY_700 },
   detailKey:    { fontWeight: '600', color: GRAY_900 },
   btnDanger:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12 },
   btnDangerText:{ fontSize: 14, fontWeight: '600', color: '#DC2626' },
   btnSuccess:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#059669', borderRadius: 10, padding: 12 },
   btnSuccessText: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  btnOutline:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: GRAY_200, backgroundColor: '#fff', borderRadius: 10, padding: 12 },
+  btnOutline:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: GRAY_200, backgroundColor: SURFACE, borderRadius: 10, padding: 12 },
   btnOutlineText: { fontSize: 14, fontWeight: '600', color: GRAY_700 },
   emptyBox:     { alignItems: 'center', padding: 40, gap: 8 },
   emptyTitle:   { fontSize: 16, fontWeight: '700', color: GRAY_900 },

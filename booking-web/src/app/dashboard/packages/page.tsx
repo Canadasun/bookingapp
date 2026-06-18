@@ -5,7 +5,7 @@ import { Package as PackageIcon, Plus, Trash2, Ban, Ticket, Tag } from "lucide-r
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, type Package, type ClientPackage, type Service, type ClientWithStats, type PackageStatus } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { formatPrice } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ export default function PackagesPage() {
   const [issuing, setIssuing] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Package | null>(null);
   const [cpToVoid, setCpToVoid] = useState<ClientPackage | null>(null);
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

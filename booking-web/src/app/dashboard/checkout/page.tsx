@@ -8,7 +8,7 @@ import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus, Repeat } 
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { api, Service, StaffMember, Client, Slot, Business } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting]     = useState(false);
   const [booked, setBooked]             = useState<{ id: string } | null>(null);
 
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [bizIdError, setBizIdError] = useState("");
 

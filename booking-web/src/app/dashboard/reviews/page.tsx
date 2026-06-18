@@ -5,7 +5,7 @@ import { Star, Eye, EyeOff, Copy, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
@@ -17,7 +17,7 @@ export default function ReviewsPage() {
   const [businessSlug, setBusinessSlug] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

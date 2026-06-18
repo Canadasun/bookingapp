@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Crown, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, Business, ClientWithStats, MembershipPlan, MembershipMember } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
@@ -13,7 +13,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 type Tab = "plans" | "members";
 
 export default function MembershipsPage() {
-  const bizId = getUser()?.businessId ?? "";
+  const { user } = useCurrentUser();
+  const bizId = user?.businessId ?? "";
   const [tab, setTab] = useState<Tab>("plans");
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [members, setMembers] = useState<MembershipMember[]>([]);

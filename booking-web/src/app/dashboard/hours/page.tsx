@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarOff, Check, Clock3, Copy, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -44,7 +44,8 @@ function formatClosureDate(value: string) {
 }
 
 export default function HoursPage() {
-  const bizId = getUser()?.businessId ?? "";
+  const { user } = useCurrentUser();
+  const bizId = user?.businessId ?? "";
   const [rules, setRules] = useState<HourRule[]>(defaultRules);
   const [savedRules, setSavedRules] = useState<HourRule[]>(defaultRules);
   const [closures, setClosures] = useState<Closure[]>([]);

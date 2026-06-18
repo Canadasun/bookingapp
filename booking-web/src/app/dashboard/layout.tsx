@@ -99,9 +99,9 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
           onClick={() => setOpen((o) => !o)}
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
-            active ? "bg-violet-50 text-violet-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+            active ? "bg-violet-100 text-violet-800 font-semibold" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
           )}>
-          <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-600" : "text-gray-400 group-hover:text-gray-600")} />
+          <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-700" : "text-gray-400 group-hover:text-gray-600")} />
           <span className="flex-1 text-left">{item.label}</span>
           <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
         </button>
@@ -117,7 +117,7 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
                   className={cn(
                     "block px-3 py-2 rounded-lg text-sm transition-colors",
                     pathname === c.href.split("?")[0]
-                      ? "text-violet-700 font-medium bg-violet-50"
+                      ? "text-violet-800 font-semibold bg-violet-100"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
                   )}>
                   {c.label}
@@ -134,9 +134,9 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
     <Link href={item.href} onClick={onClose}
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
-        active ? "bg-violet-50 text-violet-700" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+        active ? "bg-violet-100 text-violet-800 font-semibold" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
       )}>
-      <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-600" : "text-gray-400 group-hover:text-gray-600")} />
+      <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-700" : "text-gray-400 group-hover:text-gray-600")} />
       <span className="flex-1">{item.label}</span>
       {item.href === "/dashboard/messages" && unreadMessages > 0 && (
         <span className="min-w-5 h-5 rounded-full bg-red-600 px-1 text-[10px] leading-5 text-white text-center font-bold">

@@ -6,7 +6,7 @@ import { AlertTriangle, Bell, CalendarClock, CheckCheck, CreditCard, Mail, Messa
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { api, DeviceToken, NotificationDelivery, NotificationItem, NotificationKind } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,7 @@ function statusColor(status: NotificationDelivery["status"]) {
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { user } = useCurrentUser();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,9 +69,8 @@ export default function NotificationsPage() {
   const [bizName, setBizName] = useState("your business");
 
   useEffect(() => {
-    const u = getUser();
-    if (u?.businessId) api.business.get(u.businessId).then((b) => setBizName(b.name)).catch(() => {});
-  }, []);
+    if (user?.businessId) api.business.get(user.businessId).then((b) => setBizName(b.name)).catch(() => {});
+  }, [user?.businessId]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(deliverySearch), 300);

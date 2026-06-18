@@ -5,7 +5,7 @@ import { Plus, Pencil, Trash2, Tag } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,7 @@ export default function OffersPage() {
   const [saving, setSaving]   = useState(false);
   const [offerToDelete, setOfferToDelete] = useState<Offer | null>(null);
 
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { Plus, Check, Trash2, CalendarClock, User } from "lucide-react";
 import { toast } from "sonner";
 import { api, TaskItem, StaffMember } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 export default function TasksPage() {
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const isOwner = user?.role === "OWNER" || user?.role === "ADMIN";
 

@@ -5,7 +5,7 @@ import { Gift, Plus, Ban, Copy, Check, Ticket } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, type GiftCard, type GiftCardStatus } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { formatPrice } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export default function GiftCardsPage() {
   const [mode, setMode] = useState<null | "issue" | "redeem">(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [cardToVoid, setCardToVoid] = useState<GiftCard | null>(null);
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

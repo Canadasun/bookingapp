@@ -29,7 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { api, AdminOverview, FlaggedDuplicate, VerificationStatus, SystemError } from "@/lib/api";
-import { getUser, clearSession } from "@/lib/auth";
+import { useCurrentUser, clearSession } from "@/lib/auth";
 import { formatPrice, cn } from "@/lib/utils";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -73,13 +73,13 @@ function MetricCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md cursor-default">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
           <p className={cn("mt-2 text-3xl font-bold text-gray-950", accent)}>{value}</p>
         </div>
-        <div className={cn("rounded-xl p-2.5", accent ? "bg-violet-100 text-violet-600" : "bg-gray-100 text-gray-600")}>
+        <div className={cn("rounded-xl p-2.5", accent ? "bg-violet-100 text-violet-700" : "bg-purple-50 text-purple-600")}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -90,7 +90,7 @@ function MetricCard({
 
 export default function AdminPage() {
   const router = useRouter();
-  const me = getUser();
+  const { user: me } = useCurrentUser();
   const [tab, setTab] = useState<Tab>("overview");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [queue, setQueue] = useState<Pending[]>([]);
@@ -393,16 +393,16 @@ export default function AdminPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 sm:px-6">
+        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 py-2 sm:px-6">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                "inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition-all",
                 tab === t.id
-                  ? "border-violet-600 text-violet-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "bg-purple-100 text-purple-800 shadow-sm"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
               )}
             >
               <t.icon className="h-4 w-4" />
@@ -467,8 +467,8 @@ export default function AdminPage() {
                           <span className="font-medium text-gray-700">{plan}</span>
                           <span className="text-gray-500">{count} · {pct}%</span>
                         </div>
-                        <div className="h-2 rounded-full bg-gray-100">
-                          <div className={cn("h-2 rounded-full", colors[plan])} style={{ width: `${pct}%` }} />
+                        <div className="h-3 rounded-full bg-gray-100">
+                          <div className={cn("h-3 rounded-full transition-all", colors[plan])} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     );

@@ -4,14 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Tag, Plus, Trash2, ToggleLeft, ToggleRight, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { api, PromoCode } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function PromoCodesPage() {
-  const bizId = getUser()?.businessId ?? "";
+  const { user } = useCurrentUser();
+  const bizId = user?.businessId ?? "";
   const [codes, setCodes] = useState<PromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

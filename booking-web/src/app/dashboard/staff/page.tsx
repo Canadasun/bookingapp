@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, Trash2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Location, Business } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,7 +48,7 @@ export default function StaffPage() {
   const [staffDeleteWithMove, setStaffDeleteWithMove] = useState<{ member: StaffMember; msg: string } | null>(null);
   const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
 
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

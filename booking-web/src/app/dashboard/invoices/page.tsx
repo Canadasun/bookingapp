@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { Plus, X, Trash2, FileText, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { api, Invoice, ClientWithStats, Business, InvoiceCreatePayload } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +25,7 @@ const money = (cents: number, currency: string) => new Intl.NumberFormat("en-US"
 interface DraftLine { description: string; quantity: string; unitCents: string }
 
 export default function InvoicesPage() {
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);

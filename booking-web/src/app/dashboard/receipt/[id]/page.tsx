@@ -5,13 +5,13 @@ import { format } from "date-fns";
 import { Printer, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { api, Appointment, Payment, Business } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 export default function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [apt, setApt] = useState<Appointment | null>(null);
   const [biz, setBiz] = useState<Business | null>(null);

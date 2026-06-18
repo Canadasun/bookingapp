@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, Resource } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -12,7 +12,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function ResourcesPage() {
-  const bizId = getUser()?.businessId ?? "";
+  const { user } = useCurrentUser();
+  const bizId = user?.businessId ?? "";
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");

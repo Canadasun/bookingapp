@@ -5,7 +5,7 @@ import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns"
 import { CalendarClock, X, Repeat, Send, RefreshCw, Bell, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, ServiceDueItem } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
@@ -29,7 +29,7 @@ function initials(name: string) {
 }
 
 export default function FollowupsPage() {
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [items, setItems] = useState<ServiceDueItem[]>([]);
   const [loading, setLoading] = useState(true);

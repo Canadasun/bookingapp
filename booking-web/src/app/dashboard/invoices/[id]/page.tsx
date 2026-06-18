@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { Printer, ArrowLeft, Edit2, Check, X, Plus, Trash2, Mail } from "lucide-react";
 import Link from "next/link";
 import { api, Invoice, Business, InvoiceCreatePayload } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,7 @@ function StatusBadge({ status }: { status: Invoice["status"] }) {
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [inv, setInv] = useState<Invoice | null>(null);
   const [biz, setBiz] = useState<Business | null>(null);

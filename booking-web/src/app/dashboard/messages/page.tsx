@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Send, MessageSquare, ChevronLeft, Mail, Smartphone, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -29,7 +29,7 @@ export default function MessagesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   useEffect(() => {

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, ServiceCategory, Resource } from "@/lib/api";
-import { getUser } from "@/lib/auth";
+import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -355,7 +355,7 @@ export default function ServicesPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<ServiceCategory | null>(null);
   const [resourceToDelete, setResourceToDelete] = useState<Resource | null>(null);
 
-  const user = getUser();
+  const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
 
   const load = useCallback(async () => {

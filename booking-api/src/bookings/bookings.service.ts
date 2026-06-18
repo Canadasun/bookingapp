@@ -102,7 +102,7 @@ export class BookingsService {
       where,
       include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
       orderBy: { startsAt: 'asc' },
-      take: 1000,
+      take: 500,
     });
     return { data, total: data.length };
   }
