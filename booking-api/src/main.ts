@@ -25,11 +25,28 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  const isProdEnv = process.env.NODE_ENV === 'production';
+
   // Fail fast if any secret env var is missing — prevents silent fallback to empty
   // strings (which would allow token forgery in misconfigured deploys).
-  const required = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'REDIS_URL'];
+  const required = [
+    'JWT_SECRET', 'JWT_REFRESH_SECRET',
+    'DATABASE_URL', 'REDIS_URL',
+    'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
+    'RESEND_API_KEY',
+  ];
   for (const key of required) {
     if (!process.env[key]) throw new Error(`Missing required environment variable: ${key}`);
+  }
+
+  // Refuse to start in production with debug/testing overrides active.
+  // These flags disable brute-force lockout and plan enforcement respectively —
+  // leaving either set in a live environment is a critical misconfiguration.
+  if (isProdEnv && process.env.DISABLE_AUTH_LOCKOUT === 'true') {
+    throw new Error('DISABLE_AUTH_LOCKOUT=true is not allowed in production. Remove this variable before deploying.');
+  }
+  if (isProdEnv && process.env.UNLOCK_ALL_FEATURES) {
+    throw new Error('UNLOCK_ALL_FEATURES is set in production. Remove this variable before deploying.');
   }
 
   // rawBody: true preserves the unparsed request body on req.rawBody, which the
@@ -65,7 +82,7 @@ async function bootstrap() {
   // on SIGTERM/SIGINT (e.g. Railway redeploys) for a graceful shutdown.
   app.enableShutdownHooks();
 
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = isProdEnv;
 
   // Allowlist origins from env (comma-separated), falling back to NEXT_PUBLIC_WEB_URL.
   // In production we FAIL CLOSED: if nothing is configured, allow no cross-origin
