@@ -75,12 +75,34 @@ async function bootstrap() {
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
+  const adminPanelUrl = (process.env.ADMIN_PANEL_URL ?? process.env.ADMIN_DOMAIN ?? '').trim() || null;
+  const allCorsOrigins = adminPanelUrl ? [...corsOrigins, adminPanelUrl] : corsOrigins;
   app.enableCors({
-    origin: corsOrigins.length ? corsOrigins : !isProd,
+    origin: allCorsOrigins.length ? allCorsOrigins : !isProd,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'X-Manage-Token', 'X-Requested-With'],
   });
+
+  // Origin-route isolation: once a dedicated admin subdomain is live, prevent that
+  // origin from hitting non-admin routes (reduces blast radius of a stolen admin token
+  // being replayed against tenant endpoints). The reverse restriction — blocking the
+  // main web origin from /api/admin/* — is intentionally NOT applied here because the
+  // admin UI currently lives on the same www domain. Re-enable when admin moves to its
+  // own subdomain and the main web origin no longer needs admin API access.
+  if (adminPanelUrl && isProd) {
+    app.use((req: any, res: any, next: any) => {
+      if (req.method === 'OPTIONS') return next();
+      const origin: string | undefined = req.headers.origin;
+      const normalizedAdminOrigin = adminPanelUrl.startsWith('https://') ? adminPanelUrl : `https://${adminPanelUrl}`;
+      const isAdminOrigin = origin === adminPanelUrl || origin === normalizedAdminOrigin;
+      const isAdminPath: boolean = (req.path as string).startsWith('/api/admin');
+      if (isAdminOrigin && !isAdminPath) {
+        return res.status(403).json({ statusCode: 403, message: 'Admin panel origin may only access /api/admin routes' });
+      }
+      next();
+    });
+  }
 
   // Swagger exposes the full API surface — only mount it outside production.
   if (!isProd) {

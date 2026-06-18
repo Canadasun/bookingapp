@@ -253,12 +253,9 @@ export class StaffService {
 
   async deleteTimeOff(id: string, businessId: string) {
     const timeOff = await this.prisma.timeOff.findFirst({
-      where: {
-        id,
-        staff: { businessId }
-      }
+      where: { id, staff: { businessId } },
     });
     if (!timeOff) throw new NotFoundException('Time off record not found');
-    return this.prisma.timeOff.delete({ where: { id } });
+    return this.prisma.timeOff.delete({ where: { id, staff: { businessId } } });
   }
 }

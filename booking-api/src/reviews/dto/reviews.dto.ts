@@ -6,7 +6,7 @@ export const SubmitReviewSchema = z.object({
   comment: z.string().max(2000).optional(),
   // Signed manage token from the review-request email link (proves the link came
   // from us — only the appointment's client can have received it).
-  token: z.string().max(200).optional(),
+  token: z.string().min(1).max(200),
 });
 export type SubmitReviewDto = z.infer<typeof SubmitReviewSchema>;
 

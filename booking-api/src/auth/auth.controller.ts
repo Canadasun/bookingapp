@@ -54,7 +54,8 @@ export class AuthController {
     // x-client-user-agent / x-forwarded-for; mobile hits us directly.
     const fwd = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
     const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
-    return this.authService.login(dto, { ip: fwd || req.ip, userAgent });
+    const origin = req.headers.origin as string | undefined;
+    return this.authService.login(dto, { ip: fwd || req.ip, userAgent, origin });
   }
 
   // Public — second factor: exchange a valid OTP (from the login challenge) for
@@ -160,16 +161,19 @@ export class AuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   async bootstrapAdmin(@Body() body: { secret: string; email: string }) {
+    // Check DB first so the endpoint is permanently closed once any admin exists,
+    // regardless of whether this pod has already cleared BOOTSTRAP_ADMIN_SECRET.
+    const existingAdmins = await this.prisma.user.count({ where: { role: 'ADMIN' } });
+    if (existingAdmins > 0) throw new ForbiddenException('Admin bootstrap has already been completed');
     const expected = process.env.BOOTSTRAP_ADMIN_SECRET;
-    const provided = body.secret ?? '';
+    const providedBuf = Buffer.from(body.secret ?? '');
+    const expectedBuf = Buffer.from(expected ?? '');
     const secretOk = !!expected &&
-      expected.length === provided.length &&
-      timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+      providedBuf.length === expectedBuf.length &&
+      timingSafeEqual(providedBuf, expectedBuf);
     if (!secretOk) throw new ForbiddenException('Invalid bootstrap secret');
     const allowed = process.env.BOOTSTRAP_ADMIN_EMAIL;
     if (!allowed || body.email.toLowerCase().trim() !== allowed.toLowerCase()) throw new ForbiddenException('Email not authorised for bootstrap');
-    const existingAdmins = await this.prisma.user.count({ where: { role: 'ADMIN' } });
-    if (existingAdmins > 0) throw new ForbiddenException('Admin bootstrap has already been completed');
     try {
       const user = await this.prisma.user.update({
         where: { email: body.email.toLowerCase().trim() },

@@ -716,7 +716,7 @@ export class AuthService {
   // by comparing response latency.
   private static readonly DUMMY_HASH = '$2a$12$AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
-  async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string }) {
+  async login(dto: LoginDto, ctx?: { ip?: string; userAgent?: string; origin?: string }) {
     const locked = await this.authLock.isLocked(dto.email).catch(() => {
       if (process.env.NODE_ENV === 'production') {
         throw new ServiceUnavailableException('Authentication temporarily unavailable');
@@ -741,16 +741,34 @@ export class AuthService {
 
     await this.authLock.clearFailures(dto.email).catch(() => {});
 
-    if (user.role === 'ADMIN' && dto.platform !== 'web') {
-      throw new ForbiddenException('Admin accounts must be accessed from the web dashboard at pulseappointments.com');
+    if (user.role === 'ADMIN') {
+      // In production, reject login attempts from unrecognized browser origins.
+      // Allowed: corsOrigins (the main web app) + the dedicated admin subdomain.
+      // Requests with no Origin header (server-to-server, CLI tools) are permitted.
+      const adminOrigin = process.env.ADMIN_PANEL_URL ?? process.env.ADMIN_DOMAIN;
+      const isProd = process.env.NODE_ENV === 'production';
+      if (isProd && ctx?.origin) {
+        const normalizedAdmin = adminOrigin
+          ? (adminOrigin.startsWith('https://') ? adminOrigin : `https://${adminOrigin}`)
+          : null;
+        const allowedOrigins = new Set([
+          ...(process.env.CORS_ALLOWED_ORIGINS ?? '').split(',').map((o) => o.trim()).filter(Boolean),
+          ...(normalizedAdmin ? [normalizedAdmin, adminOrigin!] : []),
+        ]);
+        if (!allowedOrigins.has(ctx.origin)) {
+          throw new ForbiddenException('Admin login is not permitted from this origin');
+        }
+      }
     }
 
-    // Opt-in 2FA: password ok, but require a one-time code before issuing tokens —
-    // UNLESS this device was previously remembered (trusted), so we don't bug the
-    // user with a code on every sign-in from the same device.
-    if (user.twoFactorEnabled && !this.isTrustedDevice(user, dto.trustedDeviceToken, ctx)) {
+    // ADMIN always requires 2FA — no trusted-device bypass permitted.
+    // Regular users opt in; once enabled, trusted-device tokens skip the prompt.
+    const needs2fa = user.role === 'ADMIN'
+      ? true
+      : user.twoFactorEnabled && !this.isTrustedDevice(user, dto.trustedDeviceToken, ctx);
+    if (needs2fa) {
       const challenge = await this.createLoginChallenge(user);
-      return { twoFactorRequired: true as const, challengeId: challenge.id, method: challenge.method };
+      return { twoFactorRequired: true as const, challengeId: challenge.id, method: challenge.method, isAdmin: user.role === 'ADMIN' };
     }
 
     await this.recordLoginAndMaybeAlert(user, ctx);
@@ -1017,23 +1035,26 @@ export class AuthService {
 
   private async issueTokens(user: User, opts: { userAgent?: string; replaceTokenHash?: string } = {}) {
     const jti = randomBytes(8).toString('hex');
-    const payload = { sub: user.id, email: user.email, role: user.role, jti };
+    const isAdmin = user.role === 'ADMIN';
+    const payload = { sub: user.id, email: user.email, role: user.role, jti, ...(isAdmin ? { kind: 'admin' } : {}) };
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET,
+      // Admin sessions use a 5-minute access TTL to limit the window for replayed tokens.
       // @nestjs/jwt v11 types expiresIn as number | ms.StringValue; env strings
       // like "15m" are valid at runtime, so cast past the stricter literal type.
-      expiresIn: (process.env.JWT_EXPIRES_IN ?? '15m') as unknown as number,
+      expiresIn: (isAdmin ? '5m' : (process.env.JWT_EXPIRES_IN ?? '15m')) as unknown as number,
     });
     const refreshToken = this.jwt.sign(payload, {
       secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as unknown as number,
+      expiresIn: (isAdmin ? '1h' : (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d')) as unknown as number,
     });
 
     // Persist the session as a hash only — a DB leak then can't replay live
     // sessions. On refresh we ROTATE the presented session's row in place (one
     // row per device); on login we add a NEW row so web + mobile coexist.
     const tokenHash = hashRefreshToken(refreshToken);
-    const expiresAt = new Date(Date.now() + refreshTokenTtlMs());
+    // Admin refresh tokens are capped at 1h in the JWT; keep the DB row in sync.
+    const expiresAt = new Date(Date.now() + (isAdmin ? 60 * 60 * 1000 : refreshTokenTtlMs()));
     const userAgent = opts.userAgent?.slice(0, 256) ?? null;
     if (opts.replaceTokenHash) {
       const { count } = await this.prisma.refreshSession.updateMany({

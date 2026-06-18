@@ -33,7 +33,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   // 2FA step: set once the password check passes for an account with 2FA on.
-  const [challenge, setChallenge] = useState<{ id: string; method: string } | null>(null);
+  const [challenge, setChallenge] = useState<{ id: string; method: string; isAdmin?: boolean } | null>(null);
   const [code, setCode] = useState("");
   const [recoveryMode, setRecoveryMode] = useState(false); // enter a recovery code instead of the OTP
   const [recovery, setRecovery] = useState("");
@@ -61,9 +61,9 @@ function LoginForm() {
         const body = await readJson<{ message?: string }>(res);
         throw new Error(body?.message ?? "Invalid credentials");
       }
-      const data = await readJson<{ twoFactorRequired?: boolean; challengeId?: string; method?: string }>(res);
+      const data = await readJson<{ twoFactorRequired?: boolean; challengeId?: string; method?: string; isAdmin?: boolean }>(res);
       if (data?.twoFactorRequired && data.challengeId) {
-        setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL" });
+        setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL", isAdmin: data.isAdmin });
         return;
       }
       go();
@@ -135,10 +135,12 @@ function LoginForm() {
             className="text-center text-lg tracking-[0.4em]"
           />
         )}
-        <label className="flex items-center gap-2 text-xs text-slate-600 select-none cursor-pointer">
-          <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="rounded border-slate-300" />
-          Remember this device for 30 days (skip codes here)
-        </label>
+        {!challenge.isAdmin && (
+          <label className="flex items-center gap-2 text-xs text-slate-600 select-none cursor-pointer">
+            <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="rounded border-slate-300" />
+            Remember this device for 30 days (skip codes here)
+          </label>
+        )}
         <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
         <button
           type="button"

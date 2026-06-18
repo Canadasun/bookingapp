@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ForbiddenException, UnauthorizedException, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
 // Endpoints a user flagged for forced password reset may still call.
@@ -30,5 +30,14 @@ export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {}
 export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
   handleRequest(err: any, user: any) {
     return user || null;
+  }
+}
+
+@Injectable()
+export class AdminTokenGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest<{ user?: { _kind?: string } }>();
+    if (req.user?._kind !== 'admin') throw new UnauthorizedException('Admin session required');
+    return true;
   }
 }

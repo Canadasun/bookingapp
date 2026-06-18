@@ -341,7 +341,7 @@ export interface AdminOverview {
     successfulPayments: number;
     flaggedDuplicates: number;
   };
-  planCounts: Record<"FREE" | "BASIC" | "PRO", number>;
+  planCounts: Record<"FREE" | "BASIC" | "PRO" | "UNLIMITED", number>;
   verificationCounts: Record<VerificationStatus, number>;
   recentBusinesses: Array<{
     id: string;

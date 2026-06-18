@@ -309,6 +309,7 @@ export class MessagesService {
     ]);
     const messages = latestByClient.length ? await this.prisma.message.findMany({
       where: {
+        businessId,
         OR: latestByClient.map((row) => ({
           clientId: row.clientId,
           createdAt: row._max.createdAt ?? new Date(0),

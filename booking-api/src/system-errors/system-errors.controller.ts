@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Patch, Query, Param, Body, UseGuards, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Query, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SystemErrorsService } from './system-errors.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, AdminTokenGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -36,19 +36,25 @@ export class SystemErrorsController {
 
   @Get('counts')
   @Roles(Role.OWNER, Role.ADMIN)
-  counts(@CurrentUser() user: { role: string; businessId: string | null }) {
-    if (!user.businessId) throw new ForbiddenException('No business');
-    return this.svc.counts(user.businessId);
+  counts(
+    @CurrentUser() user: { role: string; businessId: string | null },
+    @Query('businessId') bizIdParam?: string,
+  ) {
+    const bizId = user.role === 'ADMIN' ? bizIdParam : (user.businessId ?? undefined);
+    if (!bizId) throw new ForbiddenException('No business — pass ?businessId= to filter');
+    return this.svc.counts(bizId);
   }
 
   @Get('patterns')
   @Roles(Role.ADMIN)
+  @UseGuards(AdminTokenGuard)
   patterns() {
     return this.svc.patterns();
   }
 
   @Get('business-health')
   @Roles(Role.ADMIN)
+  @UseGuards(AdminTokenGuard)
   businessHealth(@Query('limit') limit?: string) {
     return this.svc.businessHealth(limit ? Math.min(parseInt(limit, 10), 100) : 20);
   }
@@ -66,7 +72,11 @@ export class SystemErrorsController {
 
   @Post('resolve-all')
   @Roles(Role.OWNER, Role.ADMIN)
-  resolveAll(@CurrentUser() user: { role: string; businessId: string | null }) {
+  resolveAll(
+    @CurrentUser() user: { role: string; businessId: string | null },
+    @Query('businessId') bizIdParam?: string,
+  ) {
+    if (user.role === 'ADMIN') return this.svc.resolveAll(bizIdParam ?? undefined);
     if (!user.businessId) throw new ForbiddenException('No business');
     return this.svc.resolveAll(user.businessId);
   }
@@ -74,6 +84,7 @@ export class SystemErrorsController {
   /** Call OpenAI to explain a batch of recent error patterns (requires OPENAI_API_KEY). */
   @Post('ai-explain')
   @Roles(Role.ADMIN)
+  @UseGuards(AdminTokenGuard)
   aiExplain(@Body(new ZodValidationPipe(z.object({ category: z.string().max(50).optional() }))) body: { category?: string }) {
     return this.svc.aiExplain(body.category);
   }

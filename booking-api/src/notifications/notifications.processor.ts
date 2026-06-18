@@ -904,7 +904,7 @@ ${aptDetails(apt)}
           subject: `Booking request received — ${apt.service.name}`,
           html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Booking request received ⏳</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your booking request has been received and is awaiting approval from <strong>${apt.business.name}</strong>. You'll get a confirmation email once it's approved.</p>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your booking request has been received and is awaiting approval from <strong>${esc(apt.business.name)}</strong>. You'll get a confirmation email once it's approved.</p>
 ${aptDetails(apt)}
 <p style="margin:8px 0 0;color:#6B7280;font-size:13px">We'll notify you as soon as your appointment is confirmed.</p>
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>

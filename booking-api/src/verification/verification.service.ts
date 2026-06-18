@@ -93,7 +93,7 @@ export class VerificationService {
     await this.prisma.business.update({ where: { id }, data: { duplicateReviewedAt: new Date() } });
     await this.prisma.auditLog.create({
       data: { entityType: 'BUSINESS', entityId: id, action: 'DUPLICATE_FLAG_DISMISSED', userId: adminId ?? null },
-    }).catch(() => {});
+    });
     return { ok: true };
   }
 
@@ -193,7 +193,7 @@ export class VerificationService {
     });
     await this.prisma.auditLog.create({
       data: { entityType: 'BUSINESS', entityId: businessId, action: 'VERIFICATION_APPROVED', userId: adminId ?? null },
-    }).catch(() => {});
+    });
     return result;
   }
 
@@ -207,7 +207,7 @@ export class VerificationService {
     });
     await this.prisma.auditLog.create({
       data: { entityType: 'BUSINESS', entityId: businessId, action: 'VERIFICATION_REJECTED', userId: adminId ?? null, ...(note ? { changes: { note } } : {}) },
-    }).catch(() => {});
+    });
     return result;
   }
 

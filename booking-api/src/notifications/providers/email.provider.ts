@@ -7,6 +7,10 @@ function maskEmail(email: string): string {
   return `${local.slice(0, 2)}***@${domain}`;
 }
 
+function htmlEsc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+}
+
 export interface EmailAttachment {
   filename: string;
   content: string; // base64-encoded
@@ -49,13 +53,13 @@ export class ResendEmailProvider implements EmailProvider {
 
     const redirectBanner = shouldRedirect
       ? `<tr><td style="padding:8px 32px;background:#FEF3C7;border-bottom:2px dashed #F59E0B">
-          <p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ TEST REDIRECT — real recipient: <span style="color:#1D4ED8">${payload.to}</span></p>
+          <p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ TEST REDIRECT — real recipient: <span style="color:#1D4ED8">${htmlEsc(payload.to)}</span></p>
           <p style="margin:2px 0 0;font-size:11px;color:#78350F">Domain pulseappointments.com DNS pending — verify it in Resend to send directly.</p>
          </td></tr>`
       : '';
 
     const finalHtml = redirectBanner
-      ? payload.html.replace(/(<table[^>]*>[\s\S]*?)(<tr><td style="background:#E9A23C)/, `$1${redirectBanner}$2`)
+      ? payload.html.replace(/(<table[^>]*>[\s\S]*?)(<tr><td style="background:#E9A23C)/, (_m, p1, p2) => `${p1}${redirectBanner}${p2}`)
       : payload.html;
 
     const resend = new Resend(apiKey);
@@ -87,13 +91,14 @@ export class ResendEmailProvider implements EmailProvider {
       if (verifiedFrom && isDomainError && adminEmail) {
         this.logger.warn(`[Email fallback] ${verifiedFrom} not yet verified — redirecting to admin`);
         try {
+          const dnsBanner = `<tr><td style="padding:8px 32px;background:#FEF3C7"><p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ DNS PENDING — would go to: ${htmlEsc(payload.to)}</p></td></tr>`;
           const id = await attempt(
             sharedFrom,
             adminEmail,
             `[DNS PENDING → ${payload.to}] ${payload.subject}`,
             payload.html.replace(
               /(<table[^>]*>[\s\S]*?)(<tr><td style="background:#E9A23C)/,
-              `$1<tr><td style="padding:8px 32px;background:#FEF3C7"><p style="margin:0;font-size:12px;font-weight:700;color:#92400E">⚠️ DNS PENDING — would go to: ${payload.to}</p></td></tr>$2`
+              (_m, p1, p2) => `${p1}${dnsBanner}${p2}`,
             ),
           );
           this.logger.log(`[Email fallback sent] id=${id} to=${maskEmail(adminEmail)} (intended: ${maskEmail(payload.to)})`);

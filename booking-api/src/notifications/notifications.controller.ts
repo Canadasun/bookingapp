@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +29,7 @@ export class NotificationsController {
   // One-click unsubscribe — linked from campaign email footers. No auth required;
   // authenticity is proved by an HMAC-SHA256 signature over the client ID.
   @Get('unsubscribe')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async unsubscribe(
     @Query('id')  clientId: string | undefined,
     @Query('sig') sig:      string | undefined,

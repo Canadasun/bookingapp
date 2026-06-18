@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     twoFactorRequired?: boolean;
     challengeId?: string;
     method?: string;
+    isAdmin?: boolean;
     accessToken: string;
     refreshToken: string;
     user: { id: string; name: string; email: string; role: string; businessId: string | null; staffId: string | null; mustResetPassword: boolean; emailVerified: boolean; twoFactorEnabled?: boolean; twoFactorMethod?: string };
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
       twoFactorRequired: true,
       challengeId: data.challengeId,
       method: data.method,
+      isAdmin: data.isAdmin ?? false,
     });
   }
   if (!data.accessToken || !data.refreshToken || !data.user) {

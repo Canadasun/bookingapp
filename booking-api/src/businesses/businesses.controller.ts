@@ -6,6 +6,7 @@ import { BusinessesService } from './businesses.service';
 import { CreateBusinessSchema, UpdateBusinessSchema, CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PrismaService } from '../prisma/prisma.service';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -35,7 +36,7 @@ const ClosureSchema = z.object({
 @ApiBearerAuth()
 @Controller('businesses')
 export class BusinessesController {
-  constructor(private businessService: BusinessesService) {}
+  constructor(private businessService: BusinessesService, private prisma: PrismaService) {}
 
   private assertTenantAccess(user: User, id: string) {
     if (user.role !== 'ADMIN' && user.businessId !== id) {
@@ -96,7 +97,7 @@ export class BusinessesController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.OWNER, Role.ADMIN)
-  update(
+  async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(UpdateBusinessSchema)) dto: UpdateBusinessDto,
     @CurrentUser() user: User,
@@ -106,7 +107,13 @@ export class BusinessesController {
     // schema is changed in future. ADMIN can set it for provisioning.
     const { plan: _plan, ...safeDto } = dto as UpdateBusinessDto & { plan?: unknown };
     const update = user.role === Role.ADMIN ? dto : safeDto;
-    return this.businessService.update(id, update as UpdateBusinessDto);
+    const result = await this.businessService.update(id, update as UpdateBusinessDto);
+    if (user.role === Role.ADMIN) {
+      await this.prisma.auditLog.create({
+        data: { entityType: 'BUSINESS', entityId: id, action: 'ADMIN_BUSINESS_UPDATE', userId: user.id, changes: update as object },
+      });
+    }
+    return result;
   }
 
   // Pause the business (reversible) — hides the public booking page, keeps data.

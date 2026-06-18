@@ -100,6 +100,8 @@ export class PackagesController {
   }
 
   @Post('issued/:id/redeem')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
   redeem(
     @Param('businessId') businessId: string,
     @Param('id') id: string,

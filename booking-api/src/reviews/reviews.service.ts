@@ -25,7 +25,7 @@ export class ReviewsService {
     }
     return this.prisma.review.upsert({
       where: { appointmentId: dto.appointmentId },
-      update: { rating: dto.rating, comment: dto.comment },
+      update: { rating: dto.rating, comment: dto.comment, published: false },
       create: {
         businessId,
         appointmentId: dto.appointmentId,
@@ -33,6 +33,7 @@ export class ReviewsService {
         clientName: apt.client.name,
         rating: dto.rating,
         comment: dto.comment,
+        published: false,
       },
     });
   }

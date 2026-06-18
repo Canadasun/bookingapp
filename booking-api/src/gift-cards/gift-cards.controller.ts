@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { GiftCardsService } from './gift-cards.service';
@@ -19,7 +19,8 @@ export class GiftCardsController {
   @Get('balance')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   balance(@Param('businessId') businessId: string, @Query('code') code: string) {
-    return this.svc.balance(businessId, code ?? '');
+    if (!code || code.length > 50) throw new BadRequestException('Invalid gift card code');
+    return this.svc.balance(businessId, code);
   }
 
   @Get()

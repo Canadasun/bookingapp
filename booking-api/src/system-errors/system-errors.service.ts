@@ -55,9 +55,9 @@ export class SystemErrorsService {
     });
   }
 
-  async resolveAll(businessId: string) {
+  async resolveAll(businessId?: string) {
     return this.prisma.systemError.updateMany({
-      where: { businessId, resolved: false },
+      where: { ...(businessId ? { businessId } : {}), resolved: false },
       data: { resolved: true, resolvedAt: new Date() },
     });
   }

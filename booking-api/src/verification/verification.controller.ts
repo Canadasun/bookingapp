@@ -7,7 +7,7 @@ import { AuthLockService } from '../auth/auth-lock.service';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, AdminTokenGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role, User } from '@prisma/client';
@@ -64,7 +64,7 @@ export class VerificationController {
 @ApiTags('admin')
 @ApiBearerAuth()
 @Controller('admin/verifications')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, AdminTokenGuard)
 @Roles(Role.ADMIN)
 export class AdminVerificationController {
   constructor(private svc: VerificationService) {}
@@ -104,7 +104,7 @@ const EmailBodySchema = z.object({ email: z.string().trim().toLowerCase().email(
 @ApiTags('admin')
 @ApiBearerAuth()
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, AdminTokenGuard)
 @Roles(Role.ADMIN)
 export class AdminOverviewController {
   constructor(
@@ -130,7 +130,7 @@ export class AdminOverviewController {
     const result = await this.biz.deactivate(id);
     await this.prisma.auditLog.create({
       data: { entityType: 'BUSINESS', entityId: id, action: 'ADMIN_SUSPENDED', userId: user.id },
-    }).catch(() => {});
+    });
     return result;
   }
 
@@ -139,13 +139,13 @@ export class AdminOverviewController {
     const result = await this.biz.reactivate(id);
     await this.prisma.auditLog.create({
       data: { entityType: 'BUSINESS', entityId: id, action: 'ADMIN_REACTIVATED', userId: user.id },
-    }).catch(() => {});
+    });
     return result;
   }
 
   /** Look up a user by email — returns basic profile + lock status. */
   @Post('users/lookup')
-  async lookupUser(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }) {
+  async lookupUser(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }, @CurrentUser() admin: User) {
     const user = await this.prisma.user.findUnique({
       where: { email: body.email },
       select: {
@@ -156,22 +156,34 @@ export class AdminOverviewController {
     });
     if (!user) throw new NotFoundException('No account found with that email address');
     const lockStatus = await this.authLock.lockStatus(body.email).catch(() => ({ locked: false, failCount: 0, lockTtlSeconds: 0 }));
+    await this.prisma.auditLog.create({
+      data: { entityType: 'USER', entityId: user.id, action: 'ADMIN_LOOKUP', userId: admin.id },
+    });
     return { ...user, lockStatus };
   }
 
   /** Immediately clear a brute-force lock on an account. */
   @Post('users/unlock')
-  async unlockUser(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }) {
+  async unlockUser(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }, @CurrentUser() admin: User) {
     const user = await this.prisma.user.findUnique({ where: { email: body.email }, select: { id: true } });
     if (!user) throw new NotFoundException('No account found with that email address');
     await this.authLock.unlockAccount(body.email);
+    await this.prisma.auditLog.create({
+      data: { entityType: 'USER', entityId: user.id, action: 'ADMIN_UNLOCK', userId: admin.id },
+    });
     return { ok: true, message: `Account unlocked for ${body.email}` };
   }
 
   /** Send a password-reset email on behalf of support. */
   @Post('users/send-reset')
-  async sendReset(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }) {
+  async sendReset(@Body(new ZodValidationPipe(EmailBodySchema)) body: { email: string }, @CurrentUser() admin: User) {
+    const target = await this.prisma.user.findUnique({ where: { email: body.email }, select: { id: true } });
     await this.authService.forgotPassword(body.email);
+    if (target) {
+      await this.prisma.auditLog.create({
+        data: { entityType: 'USER', entityId: target.id, action: 'ADMIN_SEND_RESET', userId: admin.id },
+      });
+    }
     return { ok: true, message: `Password reset email sent to ${body.email}` };
   }
 }

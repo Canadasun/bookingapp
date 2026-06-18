@@ -214,7 +214,7 @@ export default function AdminPage() {
 
   const planTotal = useMemo(() => {
     if (!overview) return 0;
-    return overview.planCounts.FREE + overview.planCounts.BASIC + overview.planCounts.PRO;
+    return overview.planCounts.FREE + overview.planCounts.BASIC + overview.planCounts.PRO + overview.planCounts.UNLIMITED;
   }, [overview]);
 
   function approve(b: Pending) {
@@ -592,7 +592,6 @@ export default function AdminPage() {
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="font-semibold text-gray-950">{b.name}</p>
-                                <VerifiedBadge />
                               </div>
                               <p className="mt-0.5 text-xs text-gray-500">{b.email} · /{b.slug}</p>
                               <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-600 space-y-1">
@@ -639,7 +638,7 @@ export default function AdminPage() {
                                 Open full size <ExternalLink className="h-3 w-3" />
                               </a>
                             </div>
-                            <iframe src={b.verificationDocUrl} title={`${b.name} verification`} sandbox="" className="h-80 w-full bg-white" />
+                            <iframe src={b.verificationDocUrl} title={`${b.name} verification`} sandbox="allow-same-origin" className="h-80 w-full bg-white" />
                           </div>
                         )}
                       </div>

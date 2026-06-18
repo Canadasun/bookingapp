@@ -60,10 +60,15 @@ export async function POST(req: NextRequest) {
   }
 
   const secure = process.env.NODE_ENV === "production";
+  const isAdmin = data.user.role === "ADMIN";
+  // Admin tokens are short-lived (5m access / 1h refresh); cookie TTLs must match.
+  const accessMaxAge = isAdmin ? 60 * 5 : 60 * 15;
+  const refreshMaxAge = isAdmin ? 60 * 60 : 60 * 60 * 24 * 7;
+
   const res = NextResponse.json({ user: data.user });
-  // "Remember this device": persist the trusted-device token (30 days) so the
-  // next sign-in on this device skips the 2FA prompt.
-  if (data.trustedDeviceToken) {
+  // "Remember this device": skip for admin — trusted-device bypass is disabled for
+  // ADMIN accounts; the JWT TTL is the only session gate.
+  if (data.trustedDeviceToken && !isAdmin) {
     res.cookies.set("booking_td", data.trustedDeviceToken, {
       httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 30,
     });
@@ -73,14 +78,14 @@ export async function POST(req: NextRequest) {
     secure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 15,
+    maxAge: accessMaxAge,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
     httpOnly: true,
     secure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: refreshMaxAge,
   });
   const { email: _e, mustResetPassword: _mr, twoFactorEnabled: _tfe, twoFactorMethod: _tfm, ...hint } = data.user;
   void _e; void _mr; void _tfe; void _tfm;
@@ -89,7 +94,7 @@ export async function POST(req: NextRequest) {
     secure,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 15,
+    maxAge: accessMaxAge,
   });
   return res;
 }

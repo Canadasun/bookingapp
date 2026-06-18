@@ -61,6 +61,7 @@ export class MessagesController {
   // Public — client sends message from manage page or mobile
   // Secured by appointment token for guests; token in header (not URL) to avoid logs.
   @Post()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseGuards(OptionalJwtAuthGuard)
   async clientSend(
     @Param('businessId') businessId: string,
@@ -98,6 +99,7 @@ export class MessagesController {
 
   // Protected — staff replies
   @Post('reply')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   async staffReply(
@@ -155,7 +157,9 @@ export class BusinessMessagesController {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.svc.getBusinessThreads(businessId, user, { unreadOnly: unread === 'true', archived: archived === 'true', search: search?.slice(0, 100), channel });
+    const VALID_CHANNELS = ['IN_APP', 'SMS'];
+    const safeChannel = channel && VALID_CHANNELS.includes(channel) ? channel : undefined;
+    return this.svc.getBusinessThreads(businessId, user, { unreadOnly: unread === 'true', archived: archived === 'true', search: search?.slice(0, 100), channel: safeChannel });
   }
 
   @Get('unread-count')

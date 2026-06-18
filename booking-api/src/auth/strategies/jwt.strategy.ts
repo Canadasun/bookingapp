@@ -44,7 +44,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload & { kind?: string }) {
+    if (payload.kind === 'ws') throw new UnauthorizedException();
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { 
@@ -78,6 +79,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       if (revoked) throw new UnauthorizedException();
     }
 
-    return { ...user, _jti: payload.jti, _tokenExp: payload.exp };
+    return { ...user, _jti: payload.jti, _tokenExp: payload.exp, _kind: payload.kind };
   }
 }
