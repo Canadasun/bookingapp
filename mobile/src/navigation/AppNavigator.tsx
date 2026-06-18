@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ScreenCapture from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
-import { GRAY_100, GRAY_400, GRAY_900 } from '../theme';
+import { BRAND, GRAY_400, GRAY_900, GRAY_100, SURFACE } from '../theme';
 import { Client } from '../types';
 import { NetworkBanner, ErrorBoundary } from '../components';
 
@@ -57,16 +57,21 @@ function MainTabs() {
       <Tab.Navigator
         screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: GRAY_900,
+        tabBarActiveTintColor: BRAND,
         tabBarInactiveTintColor: GRAY_400,
-        tabBarActiveBackgroundColor: GRAY_100,
         tabBarStyle: {
-          backgroundColor: '#fff', borderTopColor: GRAY_100,
+          backgroundColor: SURFACE,
+          borderTopWidth: 0,
+          shadowColor: '#000',
+          shadowOpacity: 0.10,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: -6 },
+          elevation: 20,
           height: barHeight,
           paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), paddingHorizontal: 6,
         },
-        tabBarItemStyle: { borderRadius: 16, marginHorizontal: 4, marginTop: 6, marginBottom: 6, paddingVertical: 2 },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3, marginTop: 4, marginBottom: 4, paddingVertical: 2 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
         tabBarIcon: ({ color, focused }) => {
           const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
             Calendar: ['calendar', 'calendar-outline'],
@@ -77,7 +82,7 @@ function MainTabs() {
             Menu: ['menu', 'menu-outline'],
           };
           const pair = icons[route.name] ?? ['ellipse', 'ellipse-outline'];
-          return <Ionicons name={focused ? pair[0] : pair[1]} size={24} color={color} />;
+          return <Ionicons name={focused ? pair[0] : pair[1]} size={22} color={color} />;
         },
       })}
     >

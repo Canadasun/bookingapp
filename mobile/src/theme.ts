@@ -1,7 +1,9 @@
 // Brand palette + status colors, shared across every screen and style sheet.
 
-export const BRAND     = '#E9A23C'; // amber/gold brand
-export const BRAND_LT  = '#FBE8CF'; // light tint for selected backgrounds
+export const BRAND      = '#E9A23C'; // amber/gold brand
+export const BRAND_DARK = '#CE8A2A'; // deeper amber for gradients / pressed states
+export const BRAND_LT   = '#FBE8CF'; // light tint for selected backgrounds
+export const SURFACE    = '#FFFDF8'; // warm off-white — replaces pure #fff on screens/headers
 export const GRAY_50    = '#F9FAFB';
 export const GRAY_100   = '#F3F4F6';
 export const GRAY_200   = '#E5E7EB';

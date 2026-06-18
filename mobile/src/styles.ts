@@ -1,18 +1,18 @@
 // Shared StyleSheets. `s` is the app-wide sheet; cal/co/ms/dst are scoped to the
 // calendar, checkout, menu/2FA, and date-strip respectively.
 import { StyleSheet, Platform } from 'react-native';
-import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900 } from './theme';
+import { BRAND, BRAND_LT, SURFACE, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900 } from './theme';
 
 export const s = StyleSheet.create({
-  screen:          { flex:1, backgroundColor:'#fff' },
+  screen:          { flex:1, backgroundColor:SURFACE },
   center:          { flex:1, alignItems:'center', justifyContent:'center' },
-  header:          { flexDirection:'row', alignItems:'center', paddingHorizontal:20, paddingVertical:14, borderBottomWidth:1, borderBottomColor:GRAY_100, backgroundColor:'#fff' },
+  header:          { flexDirection:'row', alignItems:'center', paddingHorizontal:20, paddingVertical:14, borderBottomWidth:1, borderBottomColor:GRAY_100, backgroundColor:SURFACE },
   headerTitle:     { fontSize:17, fontWeight:'700', color:GRAY_900, flex:1 },
   listContent:     { padding:16 },
   sectionLabel:    { fontSize:11, fontWeight:'700', color:GRAY_400, textTransform:'uppercase', letterSpacing:0.8, marginBottom:8, marginTop:4 },
   emptyText:       { color:GRAY_400, fontSize:14, textAlign:'center', marginTop:20 },
   row:             { flexDirection:'row', alignItems:'center', gap:8 },
-  card:            { backgroundColor:'#fff', borderRadius:14, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10, flexDirection:'row', alignItems:'center', gap:12, shadowColor:'#000', shadowOpacity:0.04, shadowRadius:4, shadowOffset:{width:0,height:1}, elevation:1 },
+  card:            { backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, padding:14, marginBottom:10, flexDirection:'row', alignItems:'center', gap:12, shadowColor:'#000', shadowOpacity:0.07, shadowRadius:10, shadowOffset:{width:0,height:3}, elevation:3 },
   cardLeft:        { width:16, alignItems:'center' },
   cardBody:        { flex:1 },
   dot:             { width:10, height:10, borderRadius:5 },
@@ -108,19 +108,19 @@ export const s = StyleSheet.create({
   unreadDot:       { width:8, height:8, borderRadius:4, backgroundColor:BRAND, marginLeft:6 },
   msgTime:         { fontSize:11, color:GRAY_400 },
   // More
-  profileCard:     { flexDirection:'row', alignItems:'center', gap:14, backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, padding:16, marginBottom:16, shadowColor:'#000', shadowOpacity:0.04, shadowRadius:4, shadowOffset:{width:0,height:1} },
+  profileCard:     { flexDirection:'row', alignItems:'center', gap:14, backgroundColor:'#fff', borderRadius:18, borderWidth:1, borderColor:GRAY_100, padding:16, marginBottom:16, shadowColor:'#000', shadowOpacity:0.08, shadowRadius:14, shadowOffset:{width:0,height:4} },
   avatarLg:        { width:52, height:52, borderRadius:26, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
   avatarLgText:    { color:BRAND, fontWeight:'700', fontSize:18 },
   profileName:     { fontSize:16, fontWeight:'700', color:GRAY_900 },
   profileRole:     { fontSize:13, color:GRAY_500, textTransform:'capitalize', marginTop:2 },
-  menuCard:        { backgroundColor:'#fff', borderRadius:16, borderWidth:1, borderColor:GRAY_100, marginBottom:16, overflow:'hidden', shadowColor:'#000', shadowOpacity:0.04, shadowRadius:4, shadowOffset:{width:0,height:1} },
+  menuCard:        { backgroundColor:'#fff', borderRadius:18, borderWidth:1, borderColor:GRAY_100, marginBottom:16, overflow:'hidden', shadowColor:'#000', shadowOpacity:0.07, shadowRadius:12, shadowOffset:{width:0,height:3} },
   menuRow:         { flexDirection:'row', alignItems:'center', padding:16, gap:12 },
   menuRowBorder:   { borderBottomWidth:1, borderBottomColor:GRAY_100 },
   menuIcon:        { width:36, height:36, borderRadius:10, backgroundColor:BRAND_LT, alignItems:'center', justifyContent:'center' },
   menuLabel:       { flex:1, fontSize:15, fontWeight:'500', color:GRAY_900 },
   logoutBtn:       { flexDirection:'row', alignItems:'center', justifyContent:'center', padding:16, backgroundColor:'#FEF2F2', borderRadius:14, borderWidth:1, borderColor:'#FCA5A5' },
   // Login
-  loginWrap:       { flex:1, padding:28, justifyContent:'center' },
+  loginWrap:       { flex:1, padding:28, justifyContent:'center', backgroundColor:SURFACE },
   loginLogo:       { flexDirection:'row', alignItems:'center', gap:12, marginBottom:32 },
   logoIcon:        { width:48, height:48, borderRadius:14, backgroundColor:BRAND, alignItems:'center', justifyContent:'center' },
   logoText:        { fontSize:24, fontWeight:'800', color:GRAY_900, letterSpacing:-0.5 },
