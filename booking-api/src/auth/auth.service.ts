@@ -635,19 +635,17 @@ export class AuthService {
 
   // Trusted-device ("remember this device") token for 2FA. Bound to the user's
   // password, current 2FA setup, and a version-stable browser/OS signature.
-  private normalizedDeviceKey(userAgent?: string, ip?: string): string | null {
+  private normalizedDeviceKey(userAgent?: string, _ip?: string): string | null {
+    // Fingerprint by browser/platform only — IP is excluded so the 30-day trust
+    // survives network changes (mobile data ↔ WiFi, home IP renewal, VPN).
     const normalizedUa = (userAgent ?? '')
       .toLowerCase()
       .replace(/([a-z][a-z0-9._-]*)\/[\d._]+/g, '$1')
       .replace(/\b(os(?: x)?|android) [\d._]+/g, '$1')
       .replace(/\s+/g, ' ')
       .trim();
-    const ipPrefix = ip
-      ? (ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip.split('.').slice(0, 3).join('.'))
-      : '';
-    const source = [normalizedUa, ipPrefix ? `ip:${ipPrefix}` : ''].filter(Boolean).join('|') || null;
-    if (!source) return null;
-    return createHash('sha256').update(source).digest('hex').slice(0, 32);
+    if (!normalizedUa) return null;
+    return createHash('sha256').update(normalizedUa).digest('hex').slice(0, 32);
   }
 
   private trustedDeviceSecret(user: User): string {
