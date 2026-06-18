@@ -10,20 +10,11 @@ const API_INTERNAL = (
   ?? "http://localhost:3001"
 ).replace(/\/+$/, "").replace(/\/api$/, "");
 
-// Allow Next.js <Image> to optimise images hosted on the public R2 CDN bucket.
-// The API serves images via a 302 redirect to the CDN URL; without this entry the
-// Image optimizer rejects the redirect and returns null ("received null" error).
-const r2PublicHostname = (() => {
-  const base = process.env.S3_PUBLIC_BASE_URL;
-  if (!base) return null;
-  try { return new URL(base).hostname; } catch { return null; }
-})();
-
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: r2PublicHostname
-      ? [{ protocol: "https" as const, hostname: r2PublicHostname }]
-      : [],
+    // Upload images are served via /proxy/uploads/:id → API streams bytes from R2.
+    // No external CDN redirect, so no external hostname is needed here.
+    remotePatterns: [],
   },
   output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
   // Canonical host is www.pulseappointments.com. Any request that reaches the
