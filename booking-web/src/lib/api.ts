@@ -550,6 +550,12 @@ export const api = {
     // Owner — charge the configured no-show fee on the saved card.
     chargeNoShow: (appointmentId: string) =>
       req<{ charged: boolean; feeCents: number; message?: string }>(`/payments/no-show/${appointmentId}`, { method: "POST" }),
+    // Owner/Admin — create a PaymentIntent for an in-person / POS charge (used by mobile checkout).
+    charge: (amountCents: number, tipCents?: number, description?: string, idempotencyKey?: string) =>
+      req<{ paymentIntentId: string; clientSecret: string; amountCents: number; publishableKey: string }>("/payments/charge", {
+        method: "POST",
+        body: JSON.stringify({ amountCents, ...(tipCents ? { tipCents } : {}), ...(description ? { description } : {}), ...(idempotencyKey ? { idempotencyKey } : {}) }),
+      }),
     // Owner — the business payment ledger (deposits, fees, in-person charges + refunds).
     list: () => req<Payment[]>("/payments"),
     // Owner — refund a payment (omit amountCents for a full refund of the remaining balance).

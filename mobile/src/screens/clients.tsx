@@ -19,24 +19,60 @@ import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
+type DupeGroup = { clients: Array<{ id: string; name: string; email: string; phone?: string | null; createdAt: string; appointments: number }> };
+
 function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   const { user } = getAuth();
   const isOwner = user?.role === 'OWNER' || user?.role === 'ADMIN';
-  
+
   const nav = useNavigation<any>();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [profile, setProfile] = useState<Client | null>(null);
   const [tagInput, setTagInput] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const { data: clients = [], isLoading, isFetching, refetch, error } = useQuery({
+  // Duplicate detection + merge
+  const [dupeModal, setDupeModal] = useState(false);
+  const [dupeGroups, setDupeGroups] = useState<DupeGroup[]>([]);
+  const [dupeBusy, setDupeBusy] = useState(false);
+  const [merging, setMerging] = useState<DupeGroup | null>(null);
+  const [primaryId, setPrimaryId] = useState<string>('');
+
+  const PAGE_SIZE = 50;
+
+  const { data: firstPage, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ['clients', search],
-    queryFn: () => {
+    queryFn: async () => {
       if (!isOwner) throw new Error('Access denied. Only owners can view the client list.');
-      return api<{ data: Client[] }>(`/businesses/${bizId()}/clients${search ? `?search=${encodeURIComponent(search)}` : ''}`).then(res => res.data);
+      const res = await api<{ data: Client[]; total: number }>(`/businesses/${bizId()}/clients?limit=${PAGE_SIZE}&page=1${search ? `&search=${encodeURIComponent(search)}` : ''}`);
+      setPage(1);
+      setHasMore(res.total > PAGE_SIZE);
+      return res.data;
     },
     enabled: isOwner,
   });
+
+  const [extraClients, setExtraClients] = useState<Client[]>([]);
+  const clients = [...(firstPage ?? []), ...extraClients];
+
+  // Reset extra pages when search changes
+  useEffect(() => { setExtraClients([]); }, [search]);
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await api<{ data: Client[]; total: number }>(`/businesses/${bizId()}/clients?limit=${PAGE_SIZE}&page=${nextPage}${search ? `&search=${encodeURIComponent(search)}` : ''}`);
+      setExtraClients(prev => [...prev, ...res.data]);
+      setPage(nextPage);
+      setHasMore(clients.length + res.data.length < res.total);
+    } catch {}
+    finally { setLoadingMore(false); }
+  }
 
   const updateClientMutation = useMutation({
     mutationFn: ({ id, tags }: { id: string, tags: string[] }) =>
@@ -67,14 +103,45 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
     updateClientMutation.mutate({ id: client.id, tags: (client.tags ?? []).filter(x => x !== tag) });
   }
 
+  async function findDuplicates() {
+    setDupeBusy(true);
+    setDupeModal(true);
+    try {
+      const groups = await api<DupeGroup[]>(`/businesses/${bizId()}/clients/duplicates`);
+      setDupeGroups(groups);
+    } catch (e) {
+      Alert.alert('Could not load duplicates', e instanceof Error ? e.message : 'Please try again.');
+      setDupeModal(false);
+    } finally { setDupeBusy(false); }
+  }
+
+  async function doMerge(group: DupeGroup, primary: string) {
+    const dupeIds = group.clients.filter(c => c.id !== primary).map(c => c.id);
+    setDupeBusy(true);
+    try {
+      await api<{ ok: boolean; merged: number }>(`/businesses/${bizId()}/clients/merge`, {
+        method: 'POST',
+        body: JSON.stringify({ primaryId: primary, dupeIds }),
+      });
+      setMerging(null);
+      setDupeGroups(prev => prev.filter(g => g !== group));
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      Alert.alert('Merged', `${dupeIds.length} duplicate${dupeIds.length > 1 ? 's' : ''} merged into the primary record.`);
+    } catch (e) {
+      Alert.alert('Merge failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally { setDupeBusy(false); }
+  }
+
   // Hardware back closes the open profile instead of leaving the app.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (merging) { setMerging(null); return true; }
+      if (dupeModal) { setDupeModal(false); return true; }
       if (profile) { setProfile(null); return true; }
       return false;
     });
     return () => sub.remove();
-  }, [profile]);
+  }, [profile, dupeModal, merging]);
 
   function initials(name: string) { return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(); }
 
@@ -96,7 +163,12 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
 
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>Customers</Text></View>
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Customers</Text>
+        <TouchableOpacity onPress={findDuplicates} accessibilityRole="button" accessibilityLabel="Find duplicate customers">
+          <Ionicons name="git-merge-outline" size={22} color={BRAND} />
+        </TouchableOpacity>
+      </View>
       <View style={s.searchBox}>
         <Ionicons name="search" size={16} color={GRAY_400} style={{ marginRight: 8 }} />
         <TextInput style={s.searchInput} placeholder="Search by name, email…"
@@ -107,7 +179,10 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
         keyExtractor={c => c.id}
         contentContainerStyle={s.listContent}
         ListEmptyComponent={<View style={s.center}><Text style={s.emptyText}>{error ? (error as Error).message : 'No customers found'}</Text></View>}
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={BRAND} />}
+        ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color={BRAND} style={{ padding: 16 }} /> : null}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={() => { setExtraClients([]); refetch(); }} tintColor={BRAND} />}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.3}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: c }) => (
           <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={() => setProfile(c)}>
@@ -187,6 +262,82 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
           </TouchableOpacity>
         </TouchableOpacity>
       )}
+
+      {/* Duplicate detection modal */}
+      <Modal visible={dupeModal} animationType="slide" onRequestClose={() => { setDupeModal(false); setMerging(null); }}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={() => { setDupeModal(false); setMerging(null); }} accessibilityRole="button" accessibilityLabel="Close">
+              <Ionicons name="close" size={24} color={GRAY_700} />
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>Duplicate Customers</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {dupeBusy && !dupeGroups.length ? (
+            <View style={s.center}><ActivityIndicator size="large" color={BRAND} /></View>
+          ) : merging ? (
+            /* Merge detail — pick primary */
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: GRAY_900, marginBottom: 4 }}>Choose the primary record</Text>
+              <Text style={{ fontSize: 13, color: GRAY_500, marginBottom: 16 }}>All appointments and history from the others will be moved here. The others will be deleted.</Text>
+              {merging.clients.map(c => (
+                <TouchableOpacity key={c.id} onPress={() => setPrimaryId(c.id)}
+                  style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, marginBottom: 10,
+                    borderWidth: 2, borderColor: primaryId === c.id ? BRAND : GRAY_200, backgroundColor: primaryId === c.id ? BRAND_LT : '#fff' }}
+                  accessibilityRole="radio" accessibilityState={{ selected: primaryId === c.id }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: '700', color: GRAY_900 }}>{c.name}</Text>
+                    <Text style={{ fontSize: 12, color: GRAY_500 }}>{c.email}{c.phone ? ` · ${formatPhoneDisplay(c.phone)}` : ''}</Text>
+                    <Text style={{ fontSize: 12, color: GRAY_400 }}>{c.appointments} appointment{c.appointments !== 1 ? 's' : ''} · joined {new Date(c.createdAt).toLocaleDateString()}</Text>
+                  </View>
+                  {primaryId === c.id && <Ionicons name="checkmark-circle" size={22} color={BRAND} />}
+                </TouchableOpacity>
+              ))}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                <TouchableOpacity style={[s.btnPrimary, { flex: 1, opacity: !primaryId || dupeBusy ? 0.5 : 1 }]}
+                  disabled={!primaryId || dupeBusy} onPress={() => doMerge(merging, primaryId)}
+                  accessibilityRole="button" accessibilityLabel="Merge duplicates">
+                  {dupeBusy ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Merge</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.btnSecondary, { flex: 1 }]} onPress={() => setMerging(null)}
+                  accessibilityRole="button" accessibilityLabel="Cancel">
+                  <Text style={s.btnSecondaryText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          ) : (
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              {dupeGroups.length === 0 ? (
+                <View style={s.center}>
+                  <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
+                  <Text style={[s.emptyText, { marginTop: 12 }]}>No duplicate customers found.</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 13, color: GRAY_500, marginBottom: 16 }}>{dupeGroups.length} potential duplicate group{dupeGroups.length !== 1 ? 's' : ''} found.</Text>
+                  {dupeGroups.map((group, i) => (
+                    <View key={i} style={{ backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: GRAY_200, marginBottom: 12, overflow: 'hidden' }}>
+                      {group.clients.map((c, ci) => (
+                        <View key={c.id} style={{ padding: 12, borderBottomWidth: ci < group.clients.length - 1 ? 1 : 0, borderBottomColor: GRAY_100 }}>
+                          <Text style={{ fontWeight: '600', color: GRAY_900 }}>{c.name}</Text>
+                          <Text style={{ fontSize: 12, color: GRAY_500 }}>{c.email}{c.phone ? ` · ${formatPhoneDisplay(c.phone)}` : ''}</Text>
+                          <Text style={{ fontSize: 12, color: GRAY_400 }}>{c.appointments} appt{c.appointments !== 1 ? 's' : ''}</Text>
+                        </View>
+                      ))}
+                      <TouchableOpacity style={{ padding: 12, backgroundColor: BRAND_LT, alignItems: 'center' }}
+                        onPress={() => { setMerging(group); setPrimaryId(group.clients[0]?.id ?? ''); }}
+                        accessibilityRole="button" accessibilityLabel="Merge this group">
+                        <Text style={{ fontWeight: '700', color: BRAND }}>Merge these customers</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }

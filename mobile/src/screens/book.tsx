@@ -50,6 +50,7 @@ function BookScreen() {
   const [bookedId, setBookedId]       = useState('');
   const [wlPrompt, setWlPrompt]       = useState(false);
   const [wlSaving, setWlSaving]       = useState(false);
+  const [cancellationPolicy, setCancellationPolicy] = useState<string|null>(null);
 
   // Build a 90-day date strip from today
   const dateStrip = Array.from({length: 90}, (_, i) => {
@@ -85,6 +86,7 @@ function BookScreen() {
 
   useEffect(()=>{
     api<Service[]>(`/businesses/${bizId()}/services`).then(s=>setServices(s.filter(x=>x.active))).catch(()=>{});
+    api<{cancellationPolicy?:string|null}>(`/businesses/${bizId()}`).then(b=>{ if (b.cancellationPolicy) setCancellationPolicy(b.cancellationPolicy); }).catch(()=>{});
   },[]);
 
   function toggleSvc(sv: Service) {
@@ -489,7 +491,7 @@ function BookScreen() {
             {/* Cancellation policy */}
             <View style={s.policyBox}>
               <Text style={s.policyTitle}>Cancellation Policy</Text>
-              <Text style={s.policyText}>Appointments cancelled within 24 hours may be subject to a cancellation fee. No-shows may be charged a fee. Please contact us at least 24 hours in advance if you need to cancel or reschedule.</Text>
+              <Text style={s.policyText}>{cancellationPolicy ?? 'Appointments cancelled within 24 hours may be subject to a cancellation fee. No-shows may be charged a fee. Please contact us at least 24 hours in advance if you need to cancel or reschedule.'}</Text>
               <TouchableOpacity style={s.policyCheck} activeOpacity={0.7} onPress={()=>setPolicyAccepted(p=>!p)}
                 accessibilityRole="checkbox"
                 accessibilityLabel="Accept booking policy"

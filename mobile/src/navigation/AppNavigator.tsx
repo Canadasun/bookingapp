@@ -7,7 +7,7 @@ import * as ScreenCapture from 'expo-screen-capture';
 import { useAuth } from '../context/AuthContext';
 import { GRAY_100, GRAY_400, GRAY_900 } from '../theme';
 import { Client } from '../types';
-import { NetworkBanner } from '../components';
+import { NetworkBanner, ErrorBoundary } from '../components';
 
 import { CalendarScreen } from '../screens/calendar';
 import { BookScreen } from '../screens/book';
@@ -28,8 +28,8 @@ const MenuStk = createNativeStackNavigator();
 function CalendarStack() {
   return (
     <CalStack.Navigator screenOptions={{ headerShown: false }}>
-      <CalStack.Screen name="CalendarHome" component={CalendarScreen} />
-      <CalStack.Screen name="Book" component={BookScreen} />
+      <CalStack.Screen name="CalendarHome">{() => <ErrorBoundary><CalendarScreen /></ErrorBoundary>}</CalStack.Screen>
+      <CalStack.Screen name="Book">{() => <ErrorBoundary><BookScreen /></ErrorBoundary>}</CalStack.Screen>
     </CalStack.Navigator>
   );
 }
@@ -38,14 +38,14 @@ function MenuStack() {
   const { logout } = useAuth();
   return (
     <MenuStk.Navigator screenOptions={{ headerShown: false }}>
-      <MenuStk.Screen name="MenuHome">{(props) => <MenuScreen {...props} onLogout={logout} />}</MenuStk.Screen>
-      <MenuStk.Screen name="MenuDetail">{(props) => <MenuScreen {...props} onLogout={logout} />}</MenuStk.Screen>
+      <MenuStk.Screen name="MenuHome">{() => <ErrorBoundary><MenuScreen onLogout={logout} /></ErrorBoundary>}</MenuStk.Screen>
+      <MenuStk.Screen name="MenuDetail">{() => <ErrorBoundary><MenuScreen onLogout={logout} /></ErrorBoundary>}</MenuStk.Screen>
     </MenuStk.Navigator>
   );
 }
 
 function MainTabs() {
-  const { user, unreadMessages, logout, isOffline } = useAuth();
+  const { user, unreadMessages, logout, isOffline, refreshUnreadMessages } = useAuth();
   const [msgClient, setMsgClient] = useState<Client | null>(null);
   const insets = useSafeAreaInsets();
   const barHeight = 60 + Math.max(insets.bottom, 8);
@@ -81,19 +81,29 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Calendar" component={CalendarStack} />
-      {canCheckout && <Tab.Screen name="Checkout" component={CheckoutScreen} />}
+      <Tab.Screen name="Calendar">
+        {() => <ErrorBoundary><CalendarStack /></ErrorBoundary>}
+      </Tab.Screen>
+      {canCheckout && (
+        <Tab.Screen name="Checkout">
+          {() => <ErrorBoundary><CheckoutScreen /></ErrorBoundary>}
+        </Tab.Screen>
+      )}
       <Tab.Screen name="Customers">
-        {() => <ClientsScreen onMessage={c => setMsgClient(c)} />}
+        {() => <ErrorBoundary><ClientsScreen onMessage={c => setMsgClient(c)} /></ErrorBoundary>}
       </Tab.Screen>
       <Tab.Screen name="Messages" options={{
         tabBarBadge: unreadMessages > 0 ? (unreadMessages > 99 ? '99+' : unreadMessages) : undefined,
         tabBarBadgeStyle: { backgroundColor: '#DC2626', color: '#fff', fontSize: 10, fontWeight: '800' },
       }}>
-        {() => <MessagesScreen initialClient={msgClient} onClearClient={() => setMsgClient(null)} onUnreadChanged={() => { }} />}
+        {() => <ErrorBoundary><MessagesScreen initialClient={msgClient} onClearClient={() => setMsgClient(null)} onUnreadChanged={refreshUnreadMessages} /></ErrorBoundary>}
       </Tab.Screen>
-      <Tab.Screen name="Alerts" component={NotificationsScreen} />
-      <Tab.Screen name="Dashboard" component={MenuStack} />
+      <Tab.Screen name="Alerts">
+        {() => <ErrorBoundary><NotificationsScreen /></ErrorBoundary>}
+      </Tab.Screen>
+      <Tab.Screen name="Dashboard">
+        {() => <ErrorBoundary><MenuStack /></ErrorBoundary>}
+      </Tab.Screen>
     </Tab.Navigator>
     </>
   );

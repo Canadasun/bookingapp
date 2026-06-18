@@ -88,6 +88,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         const type = match ? `image/${match[1]}` : `image`;
 
         formData.append('file', { uri, name: filename, type } as any);
+        formData.append('kind', 'LOGO');
 
         const upload = await api<{ url: string }>('/uploads', {
           method: 'POST',
@@ -184,7 +185,28 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     } finally { setBioSaving(false); }
   }
   const [recoveryCodes, setRecoveryCodes] = useState<string[]|null>(null); // shown once on enable
+  const [twoFaPwModal, setTwoFaPwModal] = useState<{enabled:boolean;method:'EMAIL'|'SMS'}|null>(null);
+  const [twoFaPwText, setTwoFaPwText] = useState('');
   const [acctBusy, setAcctBusy] = useState(false);
+  // Google Calendar sync status (loaded when settings view opens)
+  const [calSyncStatus, setCalSyncStatus] = useState<{connected:boolean;email:string|null;since:string|null}|null>(null);
+  const [calSyncBusy, setCalSyncBusy] = useState(false);
+  // User profile editor
+  const [profileEditor, setProfileEditor] = useState<{name:string;phone:string}|null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  // Verification submission
+  const [verifStatus, setVerifStatus] = useState<string|null>(null);
+  const [verifEditor, setVerifEditor] = useState<{legalName:string;address:string;phone:string;govIdUrl:string;regDocUrl:string}|null>(null);
+  const [verifSaving, setVerifSaving] = useState(false);
+  // Reports date-range filter
+  const [reportRange, setReportRange] = useState<'week'|'month'|'all'>('all');
+
+  useEffect(() => {
+    if (view === 'settings') {
+      api<{connected:boolean;email:string|null;since:string|null}>('/calendar-sync/google/status').then(setCalSyncStatus).catch(()=>{});
+      api<{verificationStatus:string}>(`/businesses/${bizId()}/verification`).then(v=>setVerifStatus(v.verificationStatus)).catch(()=>{});
+    }
+  }, [view]);
 
   useEffect(() => {
     SecureStore.getItemAsync('bookingapp.preferred-price-type.v1')
@@ -194,12 +216,12 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       .catch(() => {});
   }, []);
 
-  async function saveTwoFA(enabled: boolean, method: 'EMAIL'|'SMS') {
+  async function saveTwoFA(enabled: boolean, method: 'EMAIL'|'SMS', currentPassword: string) {
     setTwoFASaving(true);
     const prev = { enabled: twoFA, method: twoFAMethod };
     setTwoFA(enabled); setTwoFAMethod(method);
     try {
-      const res = await api<{ recoveryCodes?: string[]; user?: User }>('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method }) });
+      const res = await api<{ recoveryCodes?: string[]; user?: User }>('/auth/2fa', { method:'POST', body: JSON.stringify({ enabled, method, currentPassword }) });
       if (res.user) {
         setAuth(getAuth().token, res.user, getAuth().refresh);
         await persistAuth();
@@ -212,6 +234,64 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
       Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.');
     } finally { setTwoFASaving(false); }
+  }
+
+  async function saveProfile() {
+    if (!profileEditor) return;
+    setProfileSaving(true);
+    try {
+      const updated = await api<User>('/users/me', { method:'PATCH', body: JSON.stringify({ name: profileEditor.name.trim(), phone: profileEditor.phone.trim() || undefined }) });
+      setAuth(getAuth().token, updated, getAuth().refresh);
+      await persistAuth();
+      setProfileEditor(null);
+    } catch(e) { Alert.alert('Could not save', e instanceof Error ? e.message : 'Please try again.'); }
+    finally { setProfileSaving(false); }
+  }
+
+  async function pickVerifDoc(field: 'govIdUrl'|'regDocUrl') {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.9, allowsEditing: false });
+    if (!result.canceled && result.assets[0]) {
+      try {
+        const { uri } = result.assets[0];
+        const filename = uri.split('/').pop() || 'doc.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image';
+        const formData = new FormData();
+        formData.append('file', { uri, name: filename, type } as any);
+        formData.append('kind', 'OTHER');
+        const upload = await api<{url:string}>('/uploads', { method:'POST', body: formData });
+        setVerifEditor(prev => prev ? { ...prev, [field]: upload.url } : prev);
+      } catch(e) { Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not upload.'); }
+    }
+  }
+
+  async function submitVerification() {
+    if (!verifEditor) return;
+    const { legalName, address, phone, govIdUrl, regDocUrl } = verifEditor;
+    if (!legalName.trim() || !address.trim() || !phone.trim()) { Alert.alert('Missing fields', 'Please fill in all required fields.'); return; }
+    if (!govIdUrl || !regDocUrl) { Alert.alert('Documents required', 'Please upload both required documents.'); return; }
+    setVerifSaving(true);
+    try {
+      await api(`/businesses/${bizId()}/verification`, { method:'POST', body: JSON.stringify({ legalName: legalName.trim(), address: address.trim(), phone: phone.trim(), governmentIdUrl: govIdUrl, registrationDocUrl: regDocUrl }) });
+      setVerifStatus('PENDING');
+      setVerifEditor(null);
+      Alert.alert('Submitted', 'Your verification request has been submitted and will be reviewed within 1–2 business days.');
+    } catch(e) { Alert.alert('Submission failed', e instanceof Error ? e.message : 'Please try again.'); }
+    finally { setVerifSaving(false); }
+  }
+
+  function requestTwoFA(enabled: boolean, method: 'EMAIL'|'SMS') {
+    if (Platform.OS === 'ios') {
+      Alert.prompt?.(
+        enabled ? 'Enable two-factor sign-in' : 'Disable two-factor sign-in',
+        'Enter your current password to confirm.',
+        (pw) => { if (pw?.trim()) saveTwoFA(enabled, method, pw.trim()); },
+        'secure-text',
+      );
+    } else {
+      setTwoFaPwText('');
+      setTwoFaPwModal({ enabled, method });
+    }
   }
 
   // Account lifecycle (owner): pause/reactivate (reversible) + permanent delete.
@@ -965,7 +1045,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       }
       else if (v === 'offers' && !offers){ setLoading(true); setOffers(await api<any[]>(`/businesses/${bizId()}/offers`)); }
       else if (v === 'waitlist' && !waitlist){ setLoading(true); setWaitlist(await api<any[]>(`/businesses/${bizId()}/waitlist`)); }
-      else if (v === 'reviews' && !reviews){ setLoading(true); setReviews(await api<any>(`/businesses/${bizId()}/reviews`)); }
+      else if (v === 'reviews'){ setLoading(true); setReviews(await api<any[]>(`/businesses/${bizId()}/reviews/all`)); }
       else if (v === 'marketing' && !campaigns){ setLoading(true); setCampaigns(await api<any[]>(`/businesses/${bizId()}/campaigns`)); }
       else if (v === 'giftcards' && !giftcards){ setLoading(true); setGiftcards(await api<any[]>(`/businesses/${bizId()}/gift-cards`)); }
       else if (v === 'packages' && (!packages || !issuedPackages)){ setLoading(true); await loadPackages(); }
@@ -1546,37 +1626,55 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     </SafeAreaView>
   );
 
-  if (view === 'reviews') return (
-    <SafeAreaView style={s.screen}>
-      {head('Reviews')}
-      {loading ? loader : (
-        <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
-          {reviews && reviews.count>0 && (
-            <View style={[ms.card,{ alignItems:'center', paddingVertical:16 }]}>
-              <Text style={{ fontSize:32, fontWeight:'800', color:GRAY_700 }}>{Number(reviews.average||0).toFixed(1)}</Text>
-              <View style={{ flexDirection:'row', marginTop:2 }}>
-                {[1,2,3,4,5].map(n => <Ionicons key={n} name={n<=Math.round(reviews.average||0)?'star':'star-outline'} size={16} color="#F59E0B"/>)}
-              </View>
-              <Text style={[ms.rowMeta,{ marginTop:4 }]}>{reviews.count} review{reviews.count===1?'':'s'}</Text>
-            </View>
-          )}
-          {(reviews?.reviews ?? []).map((r:any) => (
-            <View key={r.id} style={ms.card}>
-              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-                <Text style={ms.rowTitle}>{r.clientName}</Text>
-                <View style={{ flexDirection:'row' }}>
-                  {[1,2,3,4,5].map(n => <Ionicons key={n} name={n<=r.rating?'star':'star-outline'} size={13} color="#F59E0B"/>)}
+  if (view === 'reviews') {
+    const reviewList: any[] = Array.isArray(reviews) ? reviews : [];
+    const publishedList = reviewList.filter((r:any) => r.published);
+    const average = publishedList.length ? publishedList.reduce((s:number,r:any)=>s+r.rating,0)/publishedList.length : 0;
+    async function togglePublish(r: any) {
+      try {
+        const updated = await api<any>(`/businesses/${bizId()}/reviews/${r.id}`, { method:'PATCH', body: JSON.stringify({ published: !r.published }) });
+        setReviews((prev: any[]) => prev.map((x:any) => x.id === r.id ? { ...x, published: updated.published } : x));
+      } catch (e) { Alert.alert('Could not update', e instanceof Error ? e.message : 'Please try again.'); }
+    }
+    return (
+      <SafeAreaView style={s.screen}>
+        {head('Reviews')}
+        {loading ? loader : (
+          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {reviewList.length > 0 && (
+              <View style={[ms.card,{ alignItems:'center', paddingVertical:16 }]}>
+                <Text style={{ fontSize:32, fontWeight:'800', color:GRAY_700 }}>{average.toFixed(1)}</Text>
+                <View style={{ flexDirection:'row', marginTop:2 }}>
+                  {[1,2,3,4,5].map(n => <Ionicons key={n} name={n<=Math.round(average)?'star':'star-outline'} size={16} color="#F59E0B"/>)}
                 </View>
+                <Text style={[ms.rowMeta,{ marginTop:4 }]}>{publishedList.length} published · {reviewList.length} total</Text>
               </View>
-              {!!r.comment && <Text style={[ms.rowMeta,{ marginTop:4 }]}>{r.comment}</Text>}
-              <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>{new Date(r.createdAt).toLocaleDateString()}</Text>
-            </View>
-          ))}
-          {reviews && reviews.count===0 && <Text style={ms.empty}>No reviews yet.</Text>}
-        </ScrollView>
-      )}
-    </SafeAreaView>
-  );
+            )}
+            {reviewList.map((r:any) => (
+              <View key={r.id} style={[ms.card, !r.published && { opacity:0.65 }]}>
+                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                  <Text style={ms.rowTitle}>{r.clientName}</Text>
+                  <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+                    <View style={{ flexDirection:'row' }}>
+                      {[1,2,3,4,5].map(n => <Ionicons key={n} name={n<=r.rating?'star':'star-outline'} size={13} color="#F59E0B"/>)}
+                    </View>
+                    <TouchableOpacity onPress={()=>togglePublish(r)}
+                      accessibilityRole="button"
+                      accessibilityLabel={r.published ? 'Unpublish review' : 'Publish review'}>
+                      <Ionicons name={r.published ? 'eye' : 'eye-off-outline'} size={18} color={r.published ? BRAND : GRAY_400}/>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {!!r.comment && <Text style={[ms.rowMeta,{ marginTop:4 }]}>{r.comment}</Text>}
+                <Text style={[ms.rowMeta,{ color:GRAY_400, marginTop:4 }]}>{new Date(r.createdAt).toLocaleDateString()}{!r.published && ' · Hidden'}</Text>
+              </View>
+            ))}
+            {reviewList.length === 0 && <Text style={ms.empty}>No reviews yet.</Text>}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
 
   if (view === 'marketing') return (
     <SafeAreaView style={s.screen}>
@@ -2173,46 +2271,79 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   );
 
   if (view === 'reports') {
-    const list = appts ?? [];
     const now = renderedAt;
+    const cutoff = reportRange === 'week' ? now - 7*86400000 : reportRange === 'month' ? now - 30*86400000 : 0;
+    const allAppts = appts ?? [];
+    const list = cutoff ? allAppts.filter(a => +new Date(a.startsAt) >= cutoff) : allAppts;
+    const allPayments = payments ?? [];
+    const paymentRows = cutoff ? allPayments.filter(p => +new Date(p.createdAt) >= cutoff) : allPayments;
     const todayKey = new Date(renderedAt).toDateString();
-    const todayCount = list.filter(a => new Date(a.startsAt).toDateString()===todayKey).length;
-    const upcoming = list.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > now).length;
+    const todayCount = allAppts.filter(a => new Date(a.startsAt).toDateString()===todayKey).length;
+    const upcoming = allAppts.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > now).length;
     const completed = list.filter(a => a.status==='COMPLETED');
-    const paymentRows = payments ?? [];
     const revenueCents = paymentRows
       .filter(p => p.status === 'SUCCEEDED' || p.status === 'PARTIALLY_REFUNDED')
-      .reduce((sum,p)=> sum + (p.amountCents ?? 0) - (p.refundedCents ?? 0), 0);
-    const failedPayments = paymentRows.filter(p => p.status === 'FAILED').length;
+      .reduce((sum:number,p:any)=> sum + (p.amountCents ?? 0) - (p.refundedCents ?? 0), 0);
+    const failedPayments = paymentRows.filter((p:any) => p.status === 'FAILED').length;
     const noShows = list.filter(a => a.status==='NO_SHOW').length;
     const cancelled = list.filter(a => a.status==='CANCELLED').length;
+    const total = list.length;
+    const cancellationRate = total ? Math.round(((cancelled + noShows) / total) * 100) : 0;
     const byService = completed.reduce((map,a)=>{
       const key = a.service?.name ?? 'Unknown';
       map[key] = (map[key] ?? 0) + 1;
       return map;
     }, {} as Record<string,number>);
-    const topService = Object.entries(byService).sort((a,b)=>b[1]-a[1])[0];
+    const serviceBreakdown = Object.entries(byService).sort((a,b)=>b[1]-a[1]).slice(0,5);
     const stats = [
       { label:"Today's appointments", value:String(todayCount) },
       { label:'Upcoming', value:String(upcoming) },
-      { label:'Completed (all time)', value:String(completed.length) },
+      { label:'Completed', value:String(completed.length) },
       { label:'Collected revenue', value:`$${(revenueCents/100).toFixed(2)}` },
-      { label:'Cancelled / no-show', value:`${cancelled} / ${noShows}` },
+      { label:'Cancellation rate', value:`${cancellationRate}% (${cancelled + noShows} of ${total})` },
       { label:'Failed payments', value:String(failedPayments) },
-      { label:'Top service', value:topService ? `${topService[0]} (${topService[1]})` : '—' },
     ];
     return (
       <SafeAreaView style={s.screen}>
         {head('Reports')}
         {loading ? loader : (
           <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
+            {/* Date range tabs */}
+            <View style={{ flexDirection:'row', gap:8, marginBottom:16 }}>
+              {([['week','7 days'],['month','30 days'],['all','All time']] as const).map(([r,label]) => (
+                <TouchableOpacity key={r} onPress={()=>setReportRange(r)}
+                  style={[ms.methodChip, reportRange===r && ms.methodChipOn, { flex:1, justifyContent:'center' }]}
+                  accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: reportRange===r }}>
+                  <Text style={[ms.methodChipText, reportRange===r && { color:BRAND }]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             {stats.map(st => (
               <View key={st.label} style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
                 <Text style={ms.cardLabel}>{st.label}</Text>
                 <Text style={[ms.cardValue,{ marginTop:0 }]}>{st.value}</Text>
               </View>
             ))}
-            <Text style={[ms.empty,{ marginTop:8 }]}>Detailed reports & exports live on the web dashboard.</Text>
+            {serviceBreakdown.length > 0 && (
+              <View style={ms.card}>
+                <Text style={[ms.cardLabel,{ marginBottom:10 }]}>Top services (completed)</Text>
+                {serviceBreakdown.map(([name, count]) => {
+                  const pct = completed.length ? Math.round((count/completed.length)*100) : 0;
+                  return (
+                    <View key={name} style={{ marginBottom:8 }}>
+                      <View style={{ flexDirection:'row', justifyContent:'space-between', marginBottom:3 }}>
+                        <Text style={{ fontSize:13, color:GRAY_700, flex:1 }} numberOfLines={1}>{name}</Text>
+                        <Text style={{ fontSize:13, color:GRAY_500 }}>{count} · {pct}%</Text>
+                      </View>
+                      <View style={{ height:5, backgroundColor:GRAY_100, borderRadius:3 }}>
+                        <View style={{ height:5, borderRadius:3, backgroundColor:BRAND, width:`${pct}%` }}/>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+            <Text style={[ms.empty,{ marginTop:8 }]}>Full exports and charts are available on the web dashboard.</Text>
           </ScrollView>
         )}
       </SafeAreaView>
@@ -2377,6 +2508,15 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
                   <Text style={[ms.rowMeta,{ marginTop:2 }]}>{inv.client?.name ?? 'No client'} · {new Date(inv.createdAt).toLocaleDateString('en-US',{ month:'short', day:'numeric', year:'numeric' })}</Text>
                   <View style={{ flexDirection:'row', flexWrap:'wrap', gap:8, marginTop:10 }}>
                     {inv.status==='DRAFT' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'SENT')} accessibilityRole="button" accessibilityLabel="Mark invoice sent"><Text style={ms.smallActionText}>Mark sent</Text></TouchableOpacity>}
+                    {(inv.status==='DRAFT'||inv.status==='SENT') && inv.client?.email && (
+                      <TouchableOpacity style={ms.smallAction} accessibilityRole="button" accessibilityLabel="Send invoice by email" onPress={async()=>{
+                        try {
+                          await api(`/businesses/${bizId()}/invoices/${inv.id}/send`, { method:'POST' });
+                          setInvoices(await api<any[]>(`/businesses/${bizId()}/invoices`));
+                          Alert.alert('Invoice sent', `Invoice #${inv.number} emailed to ${inv.client.email}.`);
+                        } catch(e) { Alert.alert('Could not send', e instanceof Error ? e.message : 'Please try again.'); }
+                      }}><Text style={ms.smallActionText}>Send email</Text></TouchableOpacity>
+                    )}
                     {inv.status!=='PAID' && inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'PAID')} accessibilityRole="button" accessibilityLabel="Mark invoice paid"><Text style={ms.smallActionText}>Mark paid</Text></TouchableOpacity>}
                     {inv.status!=='VOID' && <TouchableOpacity style={ms.smallAction} onPress={()=>setInvoiceStatus(inv.id,'VOID')} accessibilityRole="button" accessibilityLabel="Void invoice"><Text style={ms.smallActionText}>Void</Text></TouchableOpacity>}
                     <TouchableOpacity style={ms.smallAction} onPress={()=>deleteInvoice(inv.id)} accessibilityRole="button" accessibilityLabel="Delete invoice"><Text style={[ms.smallActionText,{ color:'#DC2626' }]}>Delete</Text></TouchableOpacity>
@@ -3353,6 +3493,100 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             <Text style={s.btnPrimaryText}>Edit business settings</Text>
           </TouchableOpacity>
 
+          <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>MY PROFILE</Text>
+          <View style={ms.card}>
+            <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <View>
+                <Text style={ms.cardValue}>{user?.name ?? '—'}</Text>
+                <Text style={ms.rowMeta}>{user?.email}</Text>
+              </View>
+              <TouchableOpacity onPress={()=>setProfileEditor({ name: user?.name ?? '', phone: (user as any)?.phone ?? '' })}
+                accessibilityRole="button" accessibilityLabel="Edit profile">
+                <Text style={{ fontSize:13, color:BRAND, fontWeight:'600' }}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {user?.role === 'OWNER' && (
+            <>
+              <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>GOOGLE CALENDAR</Text>
+              <View style={ms.card}>
+                {calSyncStatus ? (
+                  calSyncStatus.connected ? (
+                    <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                      <View style={{ flex:1, paddingRight:12 }}>
+                        <Text style={ms.cardValue}>Connected</Text>
+                        <Text style={ms.rowMeta}>{calSyncStatus.email}</Text>
+                        {calSyncStatus.since && <Text style={[ms.rowMeta,{color:GRAY_400}]}>Since {new Date(calSyncStatus.since).toLocaleDateString()}</Text>}
+                      </View>
+                      <TouchableOpacity disabled={calSyncBusy} style={[ms.methodChip,{ flex:0, paddingHorizontal:16 }]}
+                        accessibilityRole="button" accessibilityLabel="Disconnect Google Calendar"
+                        onPress={async()=>{
+                          setCalSyncBusy(true);
+                          try {
+                            await api('/calendar-sync/google/disconnect', { method:'POST' });
+                            setCalSyncStatus(s=>s?{ ...s, connected:false, email:null, since:null }:s);
+                          } catch(e) { Alert.alert('Could not disconnect', e instanceof Error ? e.message : 'Please try again.'); }
+                          finally { setCalSyncBusy(false); }
+                        }}>
+                        <Text style={ms.methodChipText}>{calSyncBusy ? 'Disconnecting…' : 'Disconnect'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                      <View style={{ flex:1, paddingRight:12 }}>
+                        <Text style={ms.cardValue}>Not connected</Text>
+                        <Text style={ms.rowMeta}>Sync appointments to your Google Calendar automatically.</Text>
+                      </View>
+                      <TouchableOpacity disabled={calSyncBusy} style={[ms.methodChip,{ flex:0, paddingHorizontal:16 }, ms.methodChipOn]}
+                        accessibilityRole="button" accessibilityLabel="Connect Google Calendar"
+                        onPress={async()=>{
+                          setCalSyncBusy(true);
+                          try {
+                            const { url } = await api<{url:string}>('/calendar-sync/google/connect');
+                            await Linking.openURL(url);
+                          } catch(e) { Alert.alert('Could not connect', e instanceof Error ? e.message : 'Please try again.'); }
+                          finally { setCalSyncBusy(false); }
+                        }}>
+                        <Text style={[ms.methodChipText,{ color:BRAND }]}>{calSyncBusy ? 'Loading…' : 'Connect'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )
+                ) : (
+                  <ActivityIndicator size="small" color={BRAND}/>
+                )}
+              </View>
+            </>
+          )}
+
+          {user?.role === 'OWNER' && (verifStatus === 'UNVERIFIED' || verifStatus === 'REJECTED') && (
+            <>
+              <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>BUSINESS VERIFICATION</Text>
+              <View style={ms.card}>
+                <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+                  <View style={{ flex:1, paddingRight:12 }}>
+                    <Text style={ms.cardValue}>{verifStatus === 'REJECTED' ? 'Verification rejected' : 'Not verified'}</Text>
+                    <Text style={ms.rowMeta}>Submit documents to get a verified badge on your booking page.</Text>
+                    {verifStatus === 'REJECTED' && <Text style={[ms.rowMeta,{color:'#DC2626',marginTop:2}]}>Your previous submission was rejected. Please resubmit.</Text>}
+                  </View>
+                  <TouchableOpacity onPress={()=>setVerifEditor({ legalName:'', address:'', phone:'', govIdUrl:'', regDocUrl:'' })}
+                    accessibilityRole="button" accessibilityLabel="Submit verification documents">
+                    <Text style={{ fontSize:13, color:BRAND, fontWeight:'600' }}>Submit</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+          {user?.role === 'OWNER' && verifStatus === 'PENDING' && (
+            <>
+              <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>BUSINESS VERIFICATION</Text>
+              <View style={ms.card}>
+                <Text style={ms.cardValue}>Under review</Text>
+                <Text style={ms.rowMeta}>Your verification documents are being reviewed. This usually takes 1–2 business days.</Text>
+              </View>
+            </>
+          )}
+
           <Text style={[ms.cardLabel,{ marginTop:14, marginBottom:6, marginLeft:2 }]}>WEB DASHBOARD</Text>
           <View style={ms.card}>
             <TouchableOpacity style={[ms.notifRow, ms.notifRowBorder]} onPress={()=>Linking.openURL(`${WEB_URL}/dashboard/settings`)}
@@ -3400,7 +3634,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Switch
                 value={twoFA}
                 disabled={twoFASaving}
-                onValueChange={(v)=>saveTwoFA(v, twoFAMethod)}
+                onValueChange={(v)=>requestTwoFA(v, twoFAMethod)}
                 trackColor={{ true: BRAND, false: GRAY_200 }}
                 thumbColor="#fff"
               />
@@ -3408,7 +3642,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             {twoFA && (
               <View style={{ flexDirection:'row', gap:8, marginTop:12 }}>
                 {(['EMAIL','SMS'] as const).map(m => (
-                  <TouchableOpacity key={m} disabled={twoFASaving} onPress={()=>saveTwoFA(true, m)}
+                  <TouchableOpacity key={m} disabled={twoFASaving} onPress={()=>requestTwoFA(true, m)}
                     style={[ms.methodChip, twoFAMethod===m && ms.methodChipOn]}
                     accessibilityRole="button"
                     accessibilityLabel={m==='EMAIL'?'Two-factor via Email':'Two-factor via Text message'}
@@ -3490,6 +3724,69 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Text style={[ms.empty,{ marginTop:8 }]}>Advanced business settings, billing, and delivery-log controls are available on the web dashboard.</Text>
         </ScrollView>
       )}
+      {/* User profile editor modal */}
+      <Modal visible={!!profileEditor} animationType="slide" onRequestClose={()=>setProfileEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setProfileEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>My profile</Text>
+          </View>
+          {profileEditor && (
+            <ScrollView contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
+              <Text style={s.fieldLabel}>Display name</Text>
+              <TextInput style={s.input} value={profileEditor.name} onChangeText={v=>setProfileEditor(e=>e?{...e,name:v}:e)}
+                autoCapitalize="words" returnKeyType="next"/>
+              <Text style={s.fieldLabel}>Phone</Text>
+              <TextInput style={s.input} value={profileEditor.phone} onChangeText={v=>setProfileEditor(e=>e?{...e,phone:v}:e)}
+                keyboardType="phone-pad" returnKeyType="done"/>
+              <TouchableOpacity style={[s.btnPrimary,{marginTop:14}]} disabled={profileSaving} onPress={saveProfile}
+                accessibilityRole="button" accessibilityLabel="Save profile">
+                <Text style={s.btnPrimaryText}>{profileSaving ? 'Saving…' : 'Save'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Verification submission modal */}
+      <Modal visible={!!verifEditor} animationType="slide" onRequestClose={()=>setVerifEditor(null)}>
+        <SafeAreaView style={s.screen}>
+          <View style={s.header}>
+            <TouchableOpacity onPress={()=>setVerifEditor(null)} style={{ marginRight:6 }}
+              accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={GRAY_700}/></TouchableOpacity>
+            <Text style={s.headerTitle}>Request verification</Text>
+          </View>
+          {verifEditor && (
+            <ScrollView contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
+              <Text style={[ms.rowMeta,{marginBottom:16}]}>Provide your legal business details. We'll review and add a verified badge to your booking page.</Text>
+              <Text style={s.fieldLabel}>Legal business name *</Text>
+              <TextInput style={s.input} value={verifEditor.legalName} onChangeText={v=>setVerifEditor(e=>e?{...e,legalName:v}:e)} autoCapitalize="words" returnKeyType="next"/>
+              <Text style={s.fieldLabel}>Business address *</Text>
+              <TextInput style={s.input} value={verifEditor.address} onChangeText={v=>setVerifEditor(e=>e?{...e,address:v}:e)} autoCapitalize="words" returnKeyType="next"/>
+              <Text style={s.fieldLabel}>Business phone *</Text>
+              <TextInput style={s.input} value={verifEditor.phone} onChangeText={v=>setVerifEditor(e=>e?{...e,phone:v}:e)} keyboardType="phone-pad" returnKeyType="next"/>
+              <Text style={[s.fieldLabel,{marginTop:12}]}>Government-issued ID *</Text>
+              <TouchableOpacity style={[s.btnSecondary,{marginBottom:8}]} onPress={()=>pickVerifDoc('govIdUrl')}
+                accessibilityRole="button" accessibilityLabel="Upload government ID">
+                <Text style={s.btnSecondaryText}>{verifEditor.govIdUrl ? 'Change document' : 'Upload document'}</Text>
+              </TouchableOpacity>
+              {!!verifEditor.govIdUrl && <Text style={[ms.rowMeta,{color:'#10B981',marginBottom:8}]}>Document uploaded</Text>}
+              <Text style={s.fieldLabel}>Business registration document *</Text>
+              <TouchableOpacity style={[s.btnSecondary,{marginBottom:8}]} onPress={()=>pickVerifDoc('regDocUrl')}
+                accessibilityRole="button" accessibilityLabel="Upload registration document">
+                <Text style={s.btnSecondaryText}>{verifEditor.regDocUrl ? 'Change document' : 'Upload document'}</Text>
+              </TouchableOpacity>
+              {!!verifEditor.regDocUrl && <Text style={[ms.rowMeta,{color:'#10B981',marginBottom:8}]}>Document uploaded</Text>}
+              <TouchableOpacity style={[s.btnPrimary,{marginTop:14,opacity:verifSaving?0.6:1}]} disabled={verifSaving} onPress={submitVerification}
+                accessibilityRole="button" accessibilityLabel="Submit for verification">
+                <Text style={s.btnPrimaryText}>{verifSaving ? 'Submitting…' : 'Submit for verification'}</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
+
       {/* Change password modal */}
       <Modal visible={!!changePwEditor} animationType="slide" onRequestClose={()=>setChangePwEditor(null)}>
         <SafeAreaView style={s.screen}>
@@ -3588,6 +3885,39 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
             </ScrollView>
           )}
         </SafeAreaView>
+      </Modal>
+
+      {/* Android-only: current-password prompt for 2FA toggle */}
+      <Modal visible={!!twoFaPwModal} transparent animationType="fade" onRequestClose={()=>setTwoFaPwModal(null)}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(0,0,0,0.45)' }}>
+          <View style={{ backgroundColor:'#fff', borderRadius:14, padding:24, width:'80%', maxWidth:340 }}>
+            <Text style={{ fontWeight:'700', fontSize:16, marginBottom:8, color:GRAY_900 }}>
+              {twoFaPwModal?.enabled ? 'Enable two-factor sign-in' : 'Disable two-factor sign-in'}
+            </Text>
+            <Text style={{ color:GRAY_500, fontSize:14, marginBottom:16 }}>Enter your current password to confirm.</Text>
+            <TextInput
+              style={[s.input,{ marginBottom:16 }]}
+              placeholder="Current password"
+              secureTextEntry
+              value={twoFaPwText}
+              onChangeText={setTwoFaPwText}
+              autoFocus
+            />
+            <View style={{ flexDirection:'row', gap:10 }}>
+              <TouchableOpacity style={[s.btnPrimary,{ flex:1 }]} onPress={()=>{
+                const pw = twoFaPwText.trim();
+                setTwoFaPwModal(null);
+                if (pw && twoFaPwModal) saveTwoFA(twoFaPwModal.enabled, twoFaPwModal.method, pw);
+              }} accessibilityRole="button" accessibilityLabel="Confirm">
+                <Text style={s.btnPrimaryText}>Confirm</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.btnPrimary,{ flex:1, backgroundColor:GRAY_200 }]} onPress={()=>setTwoFaPwModal(null)}
+                accessibilityRole="button" accessibilityLabel="Cancel">
+                <Text style={[s.btnPrimaryText,{ color:GRAY_700 }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

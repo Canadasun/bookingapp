@@ -11,6 +11,9 @@ interface BizPublic {
   phone?: string | null;
   websiteUrl?: string | null;
   logoUrl?: string | null;
+  averageRating?: number | null;
+  reviewCount?: number;
+  hours?: Array<{ dayOfWeek: number; startTime: string; endTime: string }>;
 }
 
 async function getBusiness(slug: string): Promise<BizPublic | null> {
@@ -32,12 +35,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const name = biz?.name ?? "an appointment";
   const title = name === "an appointment" ? "Book an appointment" : `Book at ${name}`;
   const description = `Book an appointment online at ${name}.`;
+  const ogImages = biz?.logoUrl ? [{ url: biz.logoUrl }] : [];
   return {
     title,
     description,
     alternates: { canonical: `${SITE_URL}/book/${slug}` },
-    openGraph: { title, description },
-    twitter: { title, description },
+    openGraph: { title, description, ...(ogImages.length ? { images: ogImages } : {}) },
+    twitter: { title, description, card: ogImages.length ? "summary_large_image" : "summary" },
   };
 }
 
@@ -56,16 +60,36 @@ export default async function BookLayout({
   // client skeleton that showed before when the page.tsx handled the error.
   if (!biz) notFound();
 
+  const DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const openingHours = (biz?.hours ?? []).map(h => ({
+    "@type": "OpeningHoursSpecification",
+    dayOfWeek: DAY_NAMES[h.dayOfWeek],
+    opens: h.startTime,
+    closes: h.endTime,
+  }));
+
   const jsonLd = biz?.name
     ? {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
         name: biz.name,
-        url: `${SITE_URL}/book/${slug}`,
+        ...(biz.websiteUrl ? { url: biz.websiteUrl } : {}),
         ...(biz.address ? { address: biz.address } : {}),
         ...(biz.phone ? { telephone: biz.phone } : {}),
-        ...(biz.websiteUrl ? { sameAs: [biz.websiteUrl] } : {}),
+        sameAs: [`${SITE_URL}/book/${slug}`],
         ...(biz.logoUrl ? { image: biz.logoUrl } : {}),
+        ...(openingHours.length ? { openingHoursSpecification: openingHours } : {}),
+        ...(biz.averageRating != null && biz.reviewCount
+          ? {
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: biz.averageRating,
+                reviewCount: biz.reviewCount,
+                bestRating: 5,
+                worstRating: 1,
+              },
+            }
+          : {}),
       }
     : null;
 

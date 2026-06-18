@@ -51,9 +51,10 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   },[loadThreads]);
   useEffect(() => navigation.addListener('focus', loadThreads), [navigation, loadThreads]);
   useEffect(() => {
+    if (selected) return; // message-refresh interval handles updates while a thread is open
     const interval = setInterval(loadThreads, 10_000);
     return () => clearInterval(interval);
-  }, [loadThreads]);
+  }, [loadThreads, selected]);
 
   useEffect(()=>{
     if (initialClient) { openThread(initialClient, false); onClearClient(); }
@@ -73,7 +74,8 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
     try {
       const data = await api<Message[]>(`/businesses/${bizId()}/clients/${c.id}/messages`);
       setMsgs(data);
-      const unread = await api<{unreadMessages:number}>(`/businesses/${bizId()}/clients/${c.id}/messages/read`,{method:'PATCH'});
+      await api(`/businesses/${bizId()}/clients/${c.id}/messages/read`, { method:'PATCH' });
+      const unread = await api<{unreadMessages:number}>(`/businesses/${bizId()}/messages/unread-count`);
       onUnreadChanged(unread.unreadMessages);
       setThreads((prev) => prev.map((thread) => thread.clientId === c.id ? { ...thread, read:true, unreadCount:0 } : thread));
     } catch {}

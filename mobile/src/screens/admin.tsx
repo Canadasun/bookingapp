@@ -28,11 +28,11 @@ interface AdminMetrics {
 interface AdminOverview {
   generatedAt: string;
   metrics: AdminMetrics;
-  planCounts: Record<'FREE' | 'BASIC' | 'PRO', number>;
+  planCounts: Record<'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED', number>;
   verificationCounts: Record<'PENDING' | 'VERIFIED' | 'UNVERIFIED' | 'REJECTED', number>;
   recentBusinesses: Array<{
     id: string; name: string; email: string; slug: string;
-    plan: 'FREE' | 'BASIC' | 'PRO';
+    plan: 'FREE' | 'BASIC' | 'PRO' | 'UNLIMITED';
     verificationStatus: 'PENDING' | 'VERIFIED' | 'UNVERIFIED' | 'REJECTED';
     suspended: boolean; createdAt: string;
   }>;
@@ -294,11 +294,11 @@ export function AdminScreen({ onLogout }: { onLogout: () => void }) {
               {/* Plan mix */}
               <View style={st.section}>
                 <Text style={st.sectionTitle}>Plan mix</Text>
-                {(['PRO', 'BASIC', 'FREE'] as const).map((plan) => {
+                {(['UNLIMITED', 'PRO', 'BASIC', 'FREE'] as const).map((plan) => {
                   const count = overview.planCounts[plan];
-                  const total = overview.planCounts.FREE + overview.planCounts.BASIC + overview.planCounts.PRO;
+                  const total = overview.planCounts.FREE + overview.planCounts.BASIC + overview.planCounts.PRO + overview.planCounts.UNLIMITED;
                   const pct = total ? Math.round((count / total) * 100) : 0;
-                  const colors: Record<string, string> = { PRO: '#7C3AED', BASIC: '#3B82F6', FREE: GRAY_200 };
+                  const colors: Record<string, string> = { UNLIMITED: '#059669', PRO: '#7C3AED', BASIC: '#3B82F6', FREE: GRAY_200 };
                   return (
                     <View key={plan} style={{ marginBottom: 10 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -339,8 +339,8 @@ export function AdminScreen({ onLogout }: { onLogout: () => void }) {
                       <Text style={{ fontSize: 12, color: GRAY_500 }}>/{b.slug}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                      <View style={[st.planPill, { backgroundColor: b.plan === 'PRO' ? '#EDE9FE' : b.plan === 'BASIC' ? '#DBEAFE' : GRAY_100 }]}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: b.plan === 'PRO' ? '#7C3AED' : b.plan === 'BASIC' ? '#1D4ED8' : GRAY_500 }}>{b.plan}</Text>
+                      <View style={[st.planPill, { backgroundColor: b.plan === 'UNLIMITED' ? '#D1FAE5' : b.plan === 'PRO' ? '#EDE9FE' : b.plan === 'BASIC' ? '#DBEAFE' : GRAY_100 }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: b.plan === 'UNLIMITED' ? '#059669' : b.plan === 'PRO' ? '#7C3AED' : b.plan === 'BASIC' ? '#1D4ED8' : GRAY_500 }}>{b.plan}</Text>
                       </View>
                       {b.suspended && (
                         <View style={[st.planPill, { backgroundColor: '#FEE2E2' }]}>

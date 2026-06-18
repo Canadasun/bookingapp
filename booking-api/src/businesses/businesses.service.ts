@@ -303,24 +303,46 @@ export class BusinessesService {
     // A deactivated business is hidden from the public — its booking page reads
     // as "not found" so no new bookings can come in while it's paused.
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    // Active locations so the booking page can offer a location step (multi-location).
-    const locations = await this.prisma.location.findMany({
-      where: { businessId: business.id, active: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, address: true },
-    });
-    return { ...this.publicBusiness(business), locations };
+    const [locations, reviewAgg, hours] = await Promise.all([
+      this.prisma.location.findMany({
+        where: { businessId: business.id, active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, address: true },
+      }),
+      this.prisma.review.aggregate({
+        where: { businessId: business.id, published: true },
+        _avg: { rating: true },
+        _count: true,
+      }),
+      this.prisma.businessHours.findMany({
+        where: { businessId: business.id },
+        orderBy: { dayOfWeek: 'asc' },
+        select: { dayOfWeek: true, startTime: true, endTime: true },
+      }),
+    ]);
+    const reviewCount = reviewAgg._count;
+    const averageRating = reviewCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null;
+    return { ...this.publicBusiness(business), locations, reviewCount, averageRating, hours };
   }
 
   async findPublicById(id: string) {
     const business = await this.findOne(id);
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    const locations = await this.prisma.location.findMany({
-      where: { businessId: business.id, active: true },
-      orderBy: { name: 'asc' },
-      select: { id: true, name: true, address: true },
-    });
-    return { ...this.publicBusiness(business), locations };
+    const [locations, reviewAgg] = await Promise.all([
+      this.prisma.location.findMany({
+        where: { businessId: business.id, active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, address: true },
+      }),
+      this.prisma.review.aggregate({
+        where: { businessId: business.id, published: true },
+        _avg: { rating: true },
+        _count: true,
+      }),
+    ]);
+    const reviewCount = reviewAgg._count;
+    const averageRating = reviewCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null;
+    return { ...this.publicBusiness(business), locations, reviewCount, averageRating };
   }
 
   // Sitemap: public slugs for all active, non-suspended businesses.

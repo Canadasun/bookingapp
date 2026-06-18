@@ -35,6 +35,11 @@ function NotificationsScreen() {
     return () => clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    const interval = setInterval(() => load(true), 30_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
   async function open(item: NotificationItem) {
     if (!item.read) {
       setItems(prev => prev.map(n => n.id === item.id ? { ...n, read:true } : n));
@@ -77,12 +82,12 @@ function NotificationsScreen() {
         <Text style={s.headerTitle}>Alerts</Text>
         <View style={{ flexDirection:'row', gap:12 }}>
           {unread > 0 && (
-            <TouchableOpacity onPress={markAll}>
+            <TouchableOpacity onPress={markAll} accessibilityRole="button" accessibilityLabel={`Mark all ${unread} alert${unread !== 1 ? 's' : ''} as read`}>
               <Text style={{ color:BRAND, fontSize:12, fontWeight:'700' }}>Mark all read</Text>
             </TouchableOpacity>
           )}
           {items.length > 0 && (
-            <TouchableOpacity onPress={clearHistory}>
+            <TouchableOpacity onPress={clearHistory} accessibilityRole="button" accessibilityLabel="Clear all alert history">
               <Text style={{ color:'#DC2626', fontSize:12, fontWeight:'700' }}>Clear</Text>
             </TouchableOpacity>
           )}
@@ -91,6 +96,9 @@ function NotificationsScreen() {
       <View style={{ flexDirection:'row', gap:8, paddingHorizontal:16, paddingTop:12 }}>
         {(['all','unread'] as const).map(k => (
           <TouchableOpacity key={k} onPress={()=>setFilter(k)}
+            accessibilityRole="button"
+            accessibilityLabel={k === 'all' ? `All alerts, ${items.length} total` : `Unread alerts, ${unread} unread`}
+            accessibilityState={{ selected: filter === k }}
             style={{ paddingHorizontal:14, paddingVertical:8, borderRadius:99, backgroundColor:filter===k?BRAND:GRAY_100 }}>
             <Text style={{ fontSize:12, fontWeight:'700', color:filter===k?'#fff':GRAY_700 }}>
               {k === 'all' ? `All (${items.length})` : `Unread (${unread})`}
@@ -107,7 +115,12 @@ function NotificationsScreen() {
         renderItem={({item})=>{
           const urgentMessage = item.title.startsWith('Urgent:');
           return (
-          <TouchableOpacity style={[s.card, !item.read && { borderColor:urgentMessage?'#FCA5A5':BRAND_LT, backgroundColor:urgentMessage?'#FEF2F2':'#FFFBF6' }]} onPress={()=>open(item)}>
+          <TouchableOpacity
+            style={[s.card, !item.read && { borderColor:urgentMessage?'#FCA5A5':BRAND_LT, backgroundColor:urgentMessage?'#FEF2F2':'#FFFBF6' }]}
+            onPress={()=>open(item)}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.read ? '' : 'Unread: '}${item.title}${item.body ? '. ' + item.body : ''}`}
+            accessibilityState={{ checked: item.read }}>
             <View style={{ width:36, height:36, borderRadius:12, backgroundColor:item.read?GRAY_100:urgentMessage?'#FEE2E2':BRAND_LT, alignItems:'center', justifyContent:'center' }}>
               <Ionicons name={urgentMessage?'chatbubble-ellipses':iconFor(item.kind) as any} size={18} color={item.read?GRAY_500:urgentMessage?'#DC2626':BRAND}/>
             </View>

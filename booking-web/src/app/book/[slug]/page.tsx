@@ -452,7 +452,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             {biz?.logoUrl ? (
-              <Image src={biz.logoUrl} alt="" width={28} height={28} className="w-7 h-7 rounded-xl object-cover shrink-0" />
+              <Image src={biz.logoUrl} alt="" width={28} height={28} className="w-7 h-7 rounded-xl object-cover shrink-0" priority />
             ) : (
               <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bk-accent">
                 <Calendar className="w-3.5 h-3.5 text-white" />
