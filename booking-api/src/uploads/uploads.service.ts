@@ -47,14 +47,19 @@ export class UploadsService {
         : 'File content is not a valid PNG, JPEG, WebP, or GIF image');
     }
 
-    // Media (images: logos/avatars/covers) goes to object storage when configured,
-    // so it can be served from a CDN. Documents (kind OTHER — e.g. verification
-    // PDFs) deliberately stay in the DB regardless. Either way the public URL shape
-    // (/uploads/:id) is identical, and existing DB-stored files keep serving.
-    const useObjectStorage = objectStorageEnabled() && kind !== 'OTHER';
+    // All uploads go to object storage when configured — images to the public CDN
+    // bucket, documents (kind OTHER) to the same bucket but served only through the
+    // authenticated API (never via public CDN redirect). Existing DB-stored files
+    // (/uploads/:id with data set, no storageKey) continue serving as before.
+    const useObjectStorage = objectStorageEnabled();
     if (useObjectStorage) {
       const storageKey = newStorageKey(businessId);
-      await putObject(storageKey, file.buffer, sniffed);
+      // Documents must not be publicly cached — they're served via authenticated
+      // API proxy, never redirected to the public CDN URL.
+      const cacheControl = kind === 'OTHER'
+        ? 'private, no-cache, no-store'
+        : 'public, max-age=31536000, immutable';
+      await putObject(storageKey, file.buffer, sniffed, cacheControl);
       const row = await this.prisma.uploadedFile.create({
         data: { businessId, kind, mimeType: sniffed, sizeBytes: file.size, storageKey },
         select: { id: true },
@@ -76,23 +81,30 @@ export class UploadsService {
   }
 
   // Resolve an upload for serving: either a redirect URL (public bucket / CDN) or
-  // the raw bytes (DB storage, or streamed from a private bucket).
-  // isPrivate=true is returned for documents so the controller can set
-  // Cache-Control: private, no-store instead of the public immutable header.
+  // the raw bytes (DB storage, or fetched from object storage).
+  // isPrivate=true is returned for documents so the controller sets
+  // Cache-Control: private, no-store.
   async resolve(id: string, user?: { role: string; businessId: string | null } | null): Promise<{ redirectUrl?: string; buffer?: Buffer; contentType: string; isPrivate?: boolean }> {
     const file = await this.get(id);
     const isDocument = file.kind === 'OTHER';
-    // Documents (verification uploads) are restricted to ADMIN (platform) or
-    // OWNER of the specific business — STAFF must not access them.
+    // Auth check runs before any storage access — covers the case where the file
+    // has a storageKey that would otherwise redirect before reaching this gate.
     if (isDocument && (!user || (user.role !== 'ADMIN' && (user.role !== 'OWNER' || user.businessId !== file.businessId)))) {
       throw new ForbiddenException('Document access requires authentication');
     }
     if (file.storageKey) {
+      // Documents: always stream through the API — never redirect to the public CDN
+      // URL, which would bypass authentication at the R2 layer.
+      if (isDocument) {
+        const obj = await getObjectBytes(file.storageKey);
+        if (!obj) throw new NotFoundException('File not found');
+        return { buffer: obj.buffer, contentType: obj.contentType || file.mimeType, isPrivate: true };
+      }
       const pub = publicUrlFor(file.storageKey);
-      if (pub) return { redirectUrl: pub, contentType: file.mimeType, isPrivate: isDocument };
+      if (pub) return { redirectUrl: pub, contentType: file.mimeType, isPrivate: false };
       const obj = await getObjectBytes(file.storageKey);
       if (!obj) throw new NotFoundException('File not found');
-      return { buffer: obj.buffer, contentType: obj.contentType || file.mimeType, isPrivate: isDocument };
+      return { buffer: obj.buffer, contentType: obj.contentType || file.mimeType, isPrivate: false };
     }
     if (!file.data) throw new NotFoundException('File not found');
     return { buffer: Buffer.from(file.data), contentType: file.mimeType, isPrivate: isDocument };

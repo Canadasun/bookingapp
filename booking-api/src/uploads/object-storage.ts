@@ -35,13 +35,18 @@ export function newStorageKey(businessId: string): string {
   return `${prefix}/${businessId}/${randomBytes(16).toString('hex')}`;
 }
 
-export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+export async function putObject(
+  key: string,
+  body: Buffer,
+  contentType: string,
+  cacheControl = 'public, max-age=31536000, immutable',
+): Promise<void> {
   await s3().send(new PutObjectCommand({
     Bucket: process.env.S3_BUCKET,
     Key: key,
     Body: body,
     ContentType: contentType,
-    CacheControl: 'public, max-age=31536000, immutable',
+    CacheControl: cacheControl,
   }));
 }
 
