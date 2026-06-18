@@ -37,7 +37,7 @@ interface EBState { hasError: boolean; error?: Error }
 export class ErrorBoundary extends Component<{ children: React.ReactNode }, EBState> {
   state: EBState = { hasError: false };
   static getDerivedStateFromError(error: Error): EBState { return { hasError: true, error }; }
-  componentDidCatch(error: Error, info: React.ErrorInfo) { console.error('[ErrorBoundary]', error, info); }
+  componentDidCatch(error: Error, info: React.ErrorInfo) { if (__DEV__) console.error('[ErrorBoundary]', error, info); }
   render() {
     if (!this.state.hasError) return this.props.children;
     return (

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
+import { addNetworkStateListener } from 'expo-network';
 import { User, Client } from '../types';
 import { getAuth, setAuth, persistAuth, loadPersistedAuth, refreshSession, isBiometricEnabled, biometricCapability, bizId, invalidateSessionRefresh } from '../auth';
 import { api, registerPushNotifications, unregisterPushNotifications } from '../api';
@@ -75,14 +76,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const checkNetwork = async () => {
-      const state = await Network.getNetworkStateAsync();
-      setIsOffline(!state.isConnected);
-    };
-
-    checkNetwork();
-    const interval = setInterval(checkNetwork, 5000);
-    return () => clearInterval(interval);
+    Network.getNetworkStateAsync().then(state => setIsOffline(!state.isConnected));
+    const sub = addNetworkStateListener(state => setIsOffline(!state.isConnected));
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {

@@ -24,11 +24,13 @@ export const metadata: Metadata = {
     title: "Pulse — Scheduling made simple",
     description: "Book appointments online, 24/7. Automated reminders, deposits, and a beautiful dashboard.",
     url: SITE_URL,
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: "Pulse — Scheduling made simple" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Pulse — Scheduling made simple",
     description: "Book appointments online, 24/7.",
+    images: [`${SITE_URL}/opengraph-image`],
   },
   other: {
     'apple-itunes-app': 'app-id=6774881206, app-argument=https://www.pulseappointments.com',
