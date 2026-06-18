@@ -27,10 +27,10 @@ const optionalHttpsUrl = z.preprocess(
 
 export const CreateBusinessSchema = z.object({
   name: z.string().min(1).max(200),
-  slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
+  slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
   email: z.string().email(),
   phone: phoneSchema,
-  timezone: z.string().default('America/New_York'),
+  timezone: z.string().max(64).default('America/New_York'),
   address: optionalString(500),
   logoUrl: optionalHttpsUrl,
   websiteUrl: optionalHttpsUrl,
@@ -46,15 +46,15 @@ export const CreateBusinessSchema = z.object({
     required: z.boolean().optional(),
   })).max(20).optional(),
   taxRatePercent: z.number().min(0).max(100).optional(),
-  minNoticeMinutes: z.number().int().nonnegative().default(120),
-  maxAdvanceDays: z.number().int().positive().default(60),
-  maxAdvanceMinutes: z.number().int().positive().default(86400),
-  cancellationWindowHours: z.number().int().nonnegative().default(24),
-  cancellationWindowMinutes: z.number().int().nonnegative().default(1440),
+  minNoticeMinutes: z.number().int().nonnegative().max(43_200).default(120),     // max 30 days
+  maxAdvanceDays: z.number().int().positive().max(730).default(60),               // max 2 years
+  maxAdvanceMinutes: z.number().int().positive().max(1_051_200).default(86400),   // max 2 years
+  cancellationWindowHours: z.number().int().nonnegative().max(8_760).default(24), // max 1 year
+  cancellationWindowMinutes: z.number().int().nonnegative().max(525_600).default(1440), // max 1 year
   requireDeposit: z.boolean().default(false),
   depositPercent: z.number().int().min(1).max(100).default(25),
-  noShowFeeCents: z.number().int().nonnegative().default(0),
-  cancellationFeeCents: z.number().int().nonnegative().default(0),
+  noShowFeeCents: z.number().int().nonnegative().max(100_000_00).default(0),      // max $10,000
+  cancellationFeeCents: z.number().int().nonnegative().max(100_000_00).default(0), // max $10,000
   collectCardOnFile: z.boolean().default(false),
   allowClientReschedule: z.boolean().default(true),
   cancellationPolicy: optionalString(5000),
