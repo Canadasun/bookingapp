@@ -159,7 +159,7 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
     );
   }
 
-  if (isLoading && !isFetching) return <View style={s.center}><ActivityIndicator size="large" color={BRAND} /></View>;
+  if (isLoading) return <View style={s.center}><ActivityIndicator size="large" color={BRAND} /></View>;
 
   return (
     <SafeAreaView style={s.screen}>
