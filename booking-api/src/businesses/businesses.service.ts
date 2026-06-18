@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { applyPlanLimits, isUnlimitedPlan } from '../common/util/plan-features';
+import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 import { getCapabilities } from '../common/util/plan';
 import { ResendEmailProvider } from '../notifications/providers/email.provider';
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek } from 'date-fns';
@@ -503,7 +504,7 @@ export class BusinessesService {
       }
     }
 
-    return this.prisma.business.update({
+    const result = await this.prisma.business.update({
       where: { id },
       data: {
         ...data,
@@ -515,5 +516,9 @@ export class BusinessesService {
           : {}),
       },
     });
+    if (limited.logoUrl !== undefined && current.logoUrl && current.logoUrl !== limited.logoUrl) {
+      await deleteUploadByUrl(this.prisma, current.logoUrl);
+    }
+    return result;
   }
 }

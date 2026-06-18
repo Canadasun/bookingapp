@@ -16,7 +16,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 type AuthUser = { id: string; role: string; businessId: string | null };
 
 const internalUploadPath = z.string().trim()
-  .refine((v) => /^\/uploads\/[a-zA-Z0-9-]+$/.test(v), 'Must be an internal /uploads/:id path');
+  .refine((v) => /^\/(?:proxy\/)?uploads\/[a-zA-Z0-9_-]+$/.test(v), 'Must be an internal /uploads/:id path');
 
 const SubmitSchema = z.object({
   legalName: z.string().trim().min(2).max(200),

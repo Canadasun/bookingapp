@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 
 @Injectable()
 export class UsersService {
@@ -15,7 +16,12 @@ export class UsersService {
   }
 
   async update(id: string, data: { name?: string; phone?: string | null; avatarUrl?: string | null }) {
-    return this.prisma.user.update({
+    // Read old avatarUrl before overwriting so we can clean up the orphaned upload.
+    let oldAvatarUrl: string | null | undefined;
+    if (data.avatarUrl !== undefined) {
+      oldAvatarUrl = (await this.prisma.user.findUnique({ where: { id }, select: { avatarUrl: true } }))?.avatarUrl;
+    }
+    const updated = await this.prisma.user.update({
       where: { id },
       // Only write fields that were actually provided (avatarUrl may be null to clear).
       data: {
@@ -25,6 +31,10 @@ export class UsersService {
       },
       select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true },
     });
+    if (oldAvatarUrl && oldAvatarUrl !== data.avatarUrl) {
+      await deleteUploadByUrl(this.prisma, oldAvatarUrl);
+    }
+    return updated;
   }
 
   registerDeviceToken(id: string, data: { token: string; platform: string }) {

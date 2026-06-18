@@ -25,6 +25,16 @@ const optionalHttpsUrl = z.preprocess(
   z.string().url().max(2048).refine((v) => new URL(v).protocol === 'https:', 'Use an https:// URL').optional(),
 );
 
+// logoUrl can be an upload path (/proxy/uploads/:id or /uploads/:id) OR an external https URL.
+const INTERNAL_UPLOAD_RE = /^\/(?:proxy\/)?uploads\/[a-zA-Z0-9_-]+$/;
+const optionalLogoUrl = z.preprocess(
+  (v) => v === '' || v === null ? undefined : v,
+  z.string().max(2048).refine(
+    (v) => INTERNAL_UPLOAD_RE.test(v) || (() => { try { return new URL(v).protocol === 'https:'; } catch { return false; } })(),
+    'Use an https:// URL or an internal /uploads/ path',
+  ).optional(),
+);
+
 export const CreateBusinessSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().min(1).max(64).regex(/^[a-z0-9-]+$/),
@@ -32,7 +42,7 @@ export const CreateBusinessSchema = z.object({
   phone: phoneSchema,
   timezone: z.string().max(64).default('America/New_York'),
   address: optionalString(500),
-  logoUrl: optionalHttpsUrl,
+  logoUrl: optionalLogoUrl,
   websiteUrl: optionalHttpsUrl,
   instagramUrl: optionalHttpsUrl,
   facebookUrl: optionalHttpsUrl,

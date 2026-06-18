@@ -16,6 +16,7 @@ import {
   InviteStaffDto,
 } from './dto/staff.dto';
 import { isUnlimitedPlan } from '../common/util/plan-features';
+import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 
 // Non-Unlimited plans cap the number of active staff accounts.
 // UNLIMITED advertises "unlimited staff accounts" as a differentiator.
@@ -118,7 +119,7 @@ export class StaffService {
       });
       if (!location) throw new NotFoundException('Location not found');
     }
-    return this.prisma.staff.update({
+    const updated = await this.prisma.staff.update({
       where: { id: staff.id, businessId: staff.businessId },
       data: {
         ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
@@ -132,6 +133,10 @@ export class StaffService {
         staffServices: { include: { service: { select: { id: true, name: true, active: true } } } },
       },
     });
+    if (dto.avatarUrl !== undefined && staff.avatarUrl && staff.avatarUrl !== dto.avatarUrl) {
+      await deleteUploadByUrl(this.prisma, staff.avatarUrl);
+    }
+    return updated;
   }
 
   async deactivate(id: string, businessId: string) {

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 
 @Injectable()
 export class VerificationService {
@@ -14,13 +15,13 @@ export class VerificationService {
   }) {
     const biz = await this.prisma.business.findUnique({
       where: { id: businessId },
-      select: { verificationStatus: true },
+      select: { verificationStatus: true, verificationDocUrl: true, verificationGovernmentIdUrl: true },
     });
     if (!biz) throw new NotFoundException('Business not found');
     if (biz.verificationStatus === 'VERIFIED') {
       throw new BadRequestException('This business is already verified.');
     }
-    return this.prisma.business.update({
+    const result = await this.prisma.business.update({
       where: { id: businessId },
       data: {
         verificationStatus: 'PENDING',
@@ -34,6 +35,13 @@ export class VerificationService {
       },
       select: { verificationStatus: true, verificationSubmittedAt: true },
     });
+    if (biz.verificationDocUrl && biz.verificationDocUrl !== input.registrationDocUrl) {
+      await deleteUploadByUrl(this.prisma, biz.verificationDocUrl);
+    }
+    if (biz.verificationGovernmentIdUrl && biz.verificationGovernmentIdUrl !== input.governmentIdUrl) {
+      await deleteUploadByUrl(this.prisma, biz.verificationGovernmentIdUrl);
+    }
+    return result;
   }
 
   async status(businessId: string) {

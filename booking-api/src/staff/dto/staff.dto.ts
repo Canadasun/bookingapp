@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const INTERNAL_UPLOAD = /^\/uploads\/[a-zA-Z0-9-]+$/;
+const INTERNAL_UPLOAD = /^\/(?:proxy\/)?uploads\/[a-zA-Z0-9_-]+$/;
 const avatarUrlSchema = z.string().max(2048).refine((v) => {
   if (INTERNAL_UPLOAD.test(v)) return true;
   try { return new URL(v).protocol === 'https:'; } catch { return false; }
