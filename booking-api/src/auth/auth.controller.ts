@@ -48,7 +48,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   login(@Body(new ZodValidationPipe(LoginSchema)) dto: LoginDto, @Req() req: Request) {
     // The web proxies login server-side, so it forwards the real client UA/IP via
     // x-client-user-agent / x-forwarded-for; mobile hits us directly.
@@ -80,6 +80,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   @UseGuards(JwtRefreshGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   refresh(@CurrentUser() user: User, @Req() req: Request) {
     const presented = (req.body as { refreshToken?: string }).refreshToken;
     const userAgent = (req.headers['x-client-user-agent'] as string | undefined) || req.headers['user-agent'];
@@ -101,6 +102,7 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   changePassword(
     @CurrentUser() user: User,
     @Body(new ZodValidationPipe(ChangePasswordSchema)) dto: ChangePasswordDto,
