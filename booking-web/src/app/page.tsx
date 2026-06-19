@@ -290,7 +290,7 @@ export default async function LandingPage() {
       <footer className="py-8 border-t border-[#E9DDCB] bg-white/80">
         <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-slate-400">
-            <Image src="/logo-icon.png" alt="" width={16} height={16} className="w-4 h-4 object-contain opacity-60" aria-hidden="true" />
+            <Image src="/logo-icon.png" alt="Pulse" width={16} height={16} className="w-4 h-4 object-contain opacity-60" />
             <span className="text-sm">© {new Date().getFullYear()} Pulse Appointments</span>
           </div>
           <LandingFooterLinks />
