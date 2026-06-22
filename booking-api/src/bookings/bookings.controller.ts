@@ -122,6 +122,13 @@ export class BookingsController {
     if (from || to) {
       if (from && isNaN(Date.parse(from))) throw new BadRequestException('Invalid "from" date');
       if (to && isNaN(Date.parse(to))) throw new BadRequestException('Invalid "to" date');
+      // Prevent unbounded range scans: cap at 90 days to protect response size.
+      if (from && to) {
+        const diffMs = Date.parse(to) - Date.parse(from);
+        if (diffMs > 90 * 24 * 60 * 60 * 1000) {
+          throw new BadRequestException('Date range must not exceed 90 days');
+        }
+      }
       return this.appointmentService.findAllInRange(businessId, from, to, user);
     }
     const paging = pagination(page, limit);

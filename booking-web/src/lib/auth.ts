@@ -85,15 +85,37 @@ export function useCurrentUser() {
 // without an API round-trip. Carries { id, name, role, businessId, staffId,
 // permissions } but NOT email, emailVerified, mustResetPassword, or 2FA fields.
 // Use useCurrentUser() when those fields are needed.
+//
+// SECURITY NOTE: The HMAC signature on this cookie can only be verified
+// server-side (COOKIE_SIGN_SECRET is never sent to the browser). This function
+// strips the signature and validates the payload shape, but cannot
+// cryptographically authenticate it. Never gate a security-sensitive action
+// solely on the value returned here — always use useCurrentUser() or an API
+// call for authoritative auth checks. All real authorization is enforced by
+// the NestJS JWT guards on the backend.
 export function getUser(): SessionUser | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|;\s*)booking_user=([^;]+)/);
   if (!match) return null;
   try {
     let raw = decodeURIComponent(match[1]);
+    // Strip the HMAC signature suffix (.base64sig appended by signCookieValue).
     const dot = raw.lastIndexOf(".");
     if (dot !== -1) raw = raw.slice(0, dot);
-    return JSON.parse(atob(raw)) as SessionUser;
+    const parsed = JSON.parse(atob(raw)) as unknown;
+    // Validate the expected shape so a malformed or obviously-tampered cookie
+    // returns null rather than being silently cast to SessionUser.
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      typeof (parsed as Record<string, unknown>).id !== "string" ||
+      typeof (parsed as Record<string, unknown>).name !== "string" ||
+      typeof (parsed as Record<string, unknown>).role !== "string" ||
+      !["ADMIN", "OWNER", "STAFF", "CLIENT"].includes(
+        (parsed as Record<string, unknown>).role as string,
+      )
+    ) return null;
+    return parsed as SessionUser;
   } catch { return null; }
 }
 

@@ -16,8 +16,9 @@ export class GiftCardsService {
   ) {}
 
   private genCode() {
+    // 4 blocks × 4 chars × 5 bits/char (32-symbol alphabet) = 80 bits of entropy.
     const block = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
-    return `GIFT-${block()}-${block()}`;
+    return `GIFT-${block()}-${block()}-${block()}-${block()}`;
   }
 
   async issue(businessId: string, dto: IssueGiftCardDto) {
