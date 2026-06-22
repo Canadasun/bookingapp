@@ -100,13 +100,24 @@ export class CampaignsService {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
     this.assertCampaignPlanAccess(business.plan, c.channel);
 
-    // C2: cap sends per business per calendar day.
+    // C2: atomic daily-limit enforcement — the count check and DRAFT→SENDING
+    // transition happen in one serializable transaction so two concurrent sends
+    // for the same business cannot both read "2 sent today" and both proceed.
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
-    const todaySent = await this.prisma.campaign.count({
-      where: { businessId, sentAt: { gte: todayStart }, status: { in: ['SENDING', 'SENT'] } },
+
+    const marked = await this.prisma.$transaction(async (tx) => {
+      const todaySent = await tx.campaign.count({
+        where: { businessId, sentAt: { gte: todayStart }, status: { in: ['SENDING', 'SENT'] } },
+      });
+      if (todaySent >= DAILY_CAMPAIGN_LIMIT) return null;
+      return tx.campaign.update({
+        where: { id, businessId, status: 'DRAFT' },
+        data: { status: 'SENDING', sentAt: new Date() },
+      });
     });
-    if (todaySent >= DAILY_CAMPAIGN_LIMIT) {
+
+    if (!marked) {
       throw new BadRequestException(`Daily campaign limit of ${DAILY_CAMPAIGN_LIMIT} reached. Try again tomorrow.`);
     }
 
@@ -118,7 +129,7 @@ export class CampaignsService {
 
     await this.prisma.campaign.update({
       where: { id, businessId },
-      data: { status: 'SENDING', recipientCount: recipients.length, sentCount: 0, sentAt: new Date() },
+      data: { recipientCount: recipients.length, sentCount: 0 },
     });
 
     await this.notifications.sendCampaignBulk(id, recipients.map((r) => r.id));
