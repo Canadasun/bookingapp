@@ -12,6 +12,7 @@ import { isProPlan } from '../common/util/plan-features';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { formatInTimeZone } from 'date-fns-tz';
 import { generateICalEvent, generateICalCancellation } from '../calendar-sync/ical.util';
+import { EventsGateway } from '../events/events.gateway';
 
 // Escape user-controlled text before interpolating into email HTML — prevents
 // HTML/markup injection via names, reasons, notes, gift-card messages, etc.
@@ -136,6 +137,7 @@ export class NotificationProcessor extends WorkerHost {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private events: EventsGateway,
   ) {
     super();
     this.installDeliveryLogging();
@@ -364,6 +366,7 @@ export class NotificationProcessor extends WorkerHost {
       await this.prisma.notification.createMany({
         data: owners.map((o) => ({ userId: o.id, kind: data.kind, title: data.title, body: data.body ?? null, linkUrl: data.linkUrl ?? null })),
       });
+      this.events.emitNotificationCreated(businessId);
       await this.sendPushToUsers(owners.map((o) => o.id), {
         businessId,
         title: data.title,
@@ -384,15 +387,15 @@ export class NotificationProcessor extends WorkerHost {
       if (!targetUserIds.length) return;
 
       await this.prisma.notification.createMany({
-        data: targetUserIds.map((id) => ({ 
-          userId: id, 
-          kind: data.kind, 
-          title: data.title, 
-          body: data.body ?? null, 
-          linkUrl: data.linkUrl ?? null 
+        data: targetUserIds.map((id) => ({
+          userId: id,
+          kind: data.kind,
+          title: data.title,
+          body: data.body ?? null,
+          linkUrl: data.linkUrl ?? null
         })),
       });
-
+      this.events.emitNotificationCreated(businessId);
       await this.sendPushToUsers(targetUserIds, {
         businessId,
         title: data.title,

@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 export function useEvents(
   businessId: string | null | undefined,
   onUpdate: (data: unknown) => void,
   onPlanUpdate?: (data: { plan: string; planExpiresAt: string | null }) => void,
+  onNotification?: () => void,
 ): { connected: boolean } {
   const [connected, setConnected] = useState(false);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!businessId) return;
@@ -20,37 +22,66 @@ export function useEvents(
     let socket: Socket | null = null;
     let cancelled = false;
 
-    fetch("/proxy/events/ws-ticket")
-      .then((r) => r.json() as Promise<{ ticket: string }>)
-      .then(({ ticket }) => {
-        if (cancelled) return;
-        socket = io(apiUrl, { transports: ["websocket"], auth: { ticket } });
+    const connect = () => {
+      if (cancelled) return;
+      fetch("/proxy/events/ws-ticket")
+        .then((r) => r.json() as Promise<{ ticket: string }>)
+        .then(({ ticket }) => {
+          if (cancelled) return;
+          // Disable built-in reconnection so we re-fetch a fresh single-use
+          // ticket on each reconnect instead of replaying the old one.
+          socket = io(apiUrl, { transports: ["websocket"], auth: { ticket }, reconnection: false });
 
-        socket.on("connect", () => {
-          setConnected(true);
-          socket?.emit("joinBusiness", businessId);
+          socket.on("connect", () => {
+            setConnected(true);
+            socket?.emit("joinBusiness", businessId);
+          });
+
+          socket.on("disconnect", () => {
+            setConnected(false);
+            if (!cancelled) {
+              retryTimer.current = setTimeout(connect, 3000);
+            }
+          });
+
+          socket.on("connect_error", () => {
+            socket?.disconnect();
+            if (!cancelled) {
+              retryTimer.current = setTimeout(connect, 5000);
+            }
+          });
+
+          socket.on("bookingUpdated", (data: unknown) => onUpdate(data));
+          socket.on("messageUpdated", (data: unknown) => onUpdate(data));
+          socket.on("planUpdated", (data: { plan: string; planExpiresAt: string | null }) => {
+            onPlanUpdate?.(data);
+          });
+          socket.on("notificationCreated", () => onNotification?.());
+        })
+        .catch(() => {
+          // Not authenticated / ticket unavailable — retry after a delay; the UI
+          // still works via normal fetches and the polling fallback.
+          if (!cancelled) {
+            retryTimer.current = setTimeout(connect, 5000);
+          }
         });
-        socket.on("disconnect", () => setConnected(false));
-        socket.on("bookingUpdated", (data: unknown) => onUpdate(data));
-        socket.on("messageUpdated", (data: unknown) => onUpdate(data));
-        socket.on("planUpdated", (data: { plan: string; planExpiresAt: string | null }) => {
-          onPlanUpdate?.(data);
-        });
-      })
-      .catch(() => {
-        // Not authenticated / ticket unavailable — skip realtime; the UI still
-        // works via normal fetches and the polling fallback stays active.
-      });
+    };
+
+    connect();
 
     return () => {
       cancelled = true;
+      if (retryTimer.current) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
       setConnected(false);
       if (socket) {
         socket.emit("leaveBusiness", businessId);
         socket.disconnect();
       }
     };
-  }, [businessId, onUpdate, onPlanUpdate]);
+  }, [businessId, onUpdate, onPlanUpdate, onNotification]);
 
   return { connected };
 }

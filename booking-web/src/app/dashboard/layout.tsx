@@ -366,7 +366,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => {});
   }, [user]);
 
-  const { connected: wsConnected } = useEvents(user?.businessId, useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]));
+  const { connected: wsConnected } = useEvents(
+    user?.businessId,
+    useCallback(() => refreshUnreadMessages(), [refreshUnreadMessages]),
+    undefined,
+    useCallback(() => {
+      api.notifications.unreadCount()
+        .then((r) => setUnread(r.count))
+        .catch(() => {});
+    }, []),
+  );
 
   // Poll for unread messages only when the WebSocket is not connected.
   // When the socket is live, real-time events drive refreshes instead,
