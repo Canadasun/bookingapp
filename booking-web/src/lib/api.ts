@@ -325,6 +325,8 @@ export interface DashboardOverview {
   };
 }
 
+export type PlanTier = "FREE" | "BASIC" | "PRO" | "UNLIMITED";
+
 export interface AdminOverview {
   generatedAt: string;
   metrics: {
@@ -340,15 +342,22 @@ export interface AdminOverview {
     netRevenueCents: number;
     successfulPayments: number;
     flaggedDuplicates: number;
+    newBusinessesThisPeriod: number;
+    newUsersThisPeriod: number;
   };
-  planCounts: Record<"FREE" | "BASIC" | "PRO" | "UNLIMITED", number>;
+  trends: {
+    revenueTrendPct: number | null;
+    bizGrowthPct: number | null;
+    userGrowthPct: number | null;
+  };
+  planCounts: Record<PlanTier, number>;
   verificationCounts: Record<VerificationStatus, number>;
   recentBusinesses: Array<{
     id: string;
     name: string;
     email: string;
     slug: string;
-    plan: "FREE" | "BASIC" | "PRO" | "UNLIMITED";
+    plan: PlanTier;
     verificationStatus: VerificationStatus;
     suspended: boolean;
     createdAt: string;
@@ -358,6 +367,47 @@ export interface AdminOverview {
       cancelAtPeriodEnd: boolean;
     } | null;
   }>;
+}
+
+export interface AdminBusiness {
+  id: string;
+  name: string;
+  email: string;
+  slug: string;
+  plan: PlanTier;
+  verificationStatus: VerificationStatus;
+  suspended: boolean;
+  createdAt: string;
+  phone: string | null;
+  subscription?: { status: string; currentPeriodEnd?: string | null; cancelAtPeriodEnd: boolean } | null;
+  _count: { appointments: number; staff: number; clients: number };
+}
+
+export interface AdminBusinessList {
+  businesses: AdminBusiness[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  userId: string | null;
+  changes: Record<string, unknown> | null;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+}
+
+export interface AdminAuditLogResult {
+  logs: AdminAuditEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
 }
 export interface FlaggedDuplicate {
   id: string;
@@ -526,6 +576,27 @@ export const api = {
     overview: () => req<AdminOverview>("/admin/overview"),
     suspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/suspend`, { method: "POST" }),
     unsuspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/unsuspend`, { method: "POST" }),
+    setPlan: (id: string, plan: string) => req<{ id: string; plan: string }>(`/admin/businesses/${id}/plan`, { method: "PATCH", body: JSON.stringify({ plan }) }),
+    listBusinesses: (params: { page?: number; limit?: number; search?: string; plan?: string; verificationStatus?: string; suspended?: boolean; sortBy?: string; sortDir?: string }) => {
+      const q = new URLSearchParams();
+      if (params.page) q.set("page", String(params.page));
+      if (params.limit) q.set("limit", String(params.limit));
+      if (params.search) q.set("search", params.search);
+      if (params.plan) q.set("plan", params.plan);
+      if (params.verificationStatus) q.set("verificationStatus", params.verificationStatus);
+      if (params.suspended !== undefined) q.set("suspended", String(params.suspended));
+      if (params.sortBy) q.set("sortBy", params.sortBy);
+      if (params.sortDir) q.set("sortDir", params.sortDir);
+      return req<AdminBusinessList>(`/admin/businesses?${q.toString()}`);
+    },
+    auditLog: (params: { page?: number; limit?: number; entityType?: string; action?: string }) => {
+      const q = new URLSearchParams();
+      if (params.page) q.set("page", String(params.page));
+      if (params.limit) q.set("limit", String(params.limit));
+      if (params.entityType) q.set("entityType", params.entityType);
+      if (params.action) q.set("action", params.action);
+      return req<AdminAuditLogResult>(`/admin/audit-log?${q.toString()}`);
+    },
     lookupUser: (email: string) => req<{ id: string; email: string; name: string; role: string; createdAt: string; emailVerified: boolean; business: { id: string; name: string; plan: string; suspended: boolean } | null; lockStatus: { locked: boolean; failCount: number; lockTtlSeconds: number } }>("/admin/users/lookup", { method: "POST", body: JSON.stringify({ email }) }),
     unlockUser: (email: string) => req<{ ok: boolean; message: string }>("/admin/users/unlock", { method: "POST", body: JSON.stringify({ email }) }),
     sendPasswordReset: (email: string) => req<{ ok: boolean; message: string }>("/admin/users/send-reset", { method: "POST", body: JSON.stringify({ email }) }),

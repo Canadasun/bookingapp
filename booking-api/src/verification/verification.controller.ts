@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, UseGuards, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 import { VerificationService } from './verification.service';
@@ -185,5 +185,63 @@ export class AdminOverviewController {
       });
     }
     return { ok: true, message: `Password reset email sent to ${body.email}` };
+  }
+
+  /** Paginated, searchable, filterable business list for the admin panel. */
+  @Get('businesses')
+  listBusinesses(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('plan') plan?: string,
+    @Query('verificationStatus') verificationStatus?: string,
+    @Query('suspended') suspended?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
+  ) {
+    const p = Math.max(1, parseInt(page ?? '1') || 1);
+    const l = Math.min(100, Math.max(1, parseInt(limit ?? '50') || 50));
+    return this.svc.listBusinessesAdmin({
+      page: p,
+      limit: l,
+      search: search?.trim() || undefined,
+      plan: plan || undefined,
+      verificationStatus: verificationStatus || undefined,
+      suspended: suspended === 'true' ? true : suspended === 'false' ? false : undefined,
+      sortBy: sortBy || 'createdAt',
+      sortDir: (sortDir === 'asc' ? 'asc' : 'desc') as 'asc' | 'desc',
+    });
+  }
+
+  /** Override a business's subscription plan (without going through Stripe). */
+  @Patch('businesses/:id/plan')
+  async setPlan(
+    @Param('id') id: string,
+    @Body() body: { plan: string },
+    @CurrentUser() admin: User,
+  ) {
+    const validPlans = ['FREE', 'BASIC', 'PRO', 'UNLIMITED'];
+    if (!body.plan || !validPlans.includes(body.plan)) {
+      throw new BadRequestException(`Plan must be one of: ${validPlans.join(', ')}`);
+    }
+    return this.svc.setPlanAdmin(id, body.plan as import('@prisma/client').PlanTier, admin.id);
+  }
+
+  /** Audit log — full history of admin actions across all entities. */
+  @Get('audit-log')
+  auditLog(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('entityType') entityType?: string,
+    @Query('action') action?: string,
+  ) {
+    const p = Math.max(1, parseInt(page ?? '1') || 1);
+    const l = Math.min(100, Math.max(1, parseInt(limit ?? '50') || 50));
+    return this.svc.listAuditLog({
+      page: p,
+      limit: l,
+      entityType: entityType || undefined,
+      action: action || undefined,
+    });
   }
 }

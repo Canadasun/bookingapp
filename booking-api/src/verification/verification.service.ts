@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma, PlanTier } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 
@@ -109,6 +110,8 @@ export class VerificationService {
     const now = new Date();
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(now.getDate() - 30);
+    const sixtyDaysAgo = new Date(now);
+    sixtyDaysAgo.setDate(now.getDate() - 60);
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(now.getDate() - 7);
 
@@ -121,16 +124,21 @@ export class VerificationService {
       upcomingAppointments,
       recentAppointments,
       payments,
+      prevPayments,
       businessesByPlan,
       verificationByStatus,
       recentBusinesses,
       flaggedDuplicates,
+      newBusinessesThisPeriod,
+      newBusinessesPrevPeriod,
+      newUsersThisPeriod,
+      newUsersPrevPeriod,
     ] = await Promise.all([
       this.prisma.business.count(),
       this.prisma.user.count(),
       this.prisma.client.count(),
       this.prisma.business.count({ where: { verificationStatus: 'PENDING' } }),
-      this.prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'TRIALING'] }, plan: { in: ['BASIC', 'PRO'] } } }),
+      this.prisma.subscription.count({ where: { status: { in: ['ACTIVE', 'TRIALING'] }, plan: { in: ['BASIC', 'PRO', 'UNLIMITED'] } } }),
       this.prisma.appointment.count({ where: { startsAt: { gte: now }, status: { in: ['PENDING', 'CONFIRMED'] } } }),
       this.prisma.appointment.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
       this.prisma.payment.aggregate({
@@ -138,26 +146,26 @@ export class VerificationService {
         _sum: { amountCents: true, refundedCents: true },
         _count: true,
       }),
+      this.prisma.payment.aggregate({
+        where: { status: 'SUCCEEDED', createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+        _sum: { amountCents: true, refundedCents: true },
+      }),
       this.prisma.business.groupBy({ by: ['plan'], _count: { _all: true } }),
       this.prisma.business.groupBy({ by: ['verificationStatus'], _count: { _all: true } }),
       this.prisma.business.findMany({
         orderBy: { createdAt: 'desc' },
-        take: 8,
+        take: 10,
         select: {
-          id: true,
-          name: true,
-          email: true,
-          slug: true,
-          plan: true,
-          verificationStatus: true,
-          suspended: true,
-          createdAt: true,
-          subscription: {
-            select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true },
-          },
+          id: true, name: true, email: true, slug: true, plan: true,
+          verificationStatus: true, suspended: true, createdAt: true,
+          subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } },
         },
       }),
       this.prisma.business.count({ where: { suspectedDuplicateOfId: { not: null }, duplicateReviewedAt: null } }),
+      this.prisma.business.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.business.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
+      this.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.user.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
     ]);
 
     const planCounts: Record<string, number> = { FREE: 0, BASIC: 0, PRO: 0, UNLIMITED: 0 };
@@ -168,6 +176,12 @@ export class VerificationService {
 
     const grossRevenueCents = payments._sum.amountCents ?? 0;
     const refundedCents = payments._sum.refundedCents ?? 0;
+    const netRevenueCents = grossRevenueCents - refundedCents;
+
+    const prevNetRevenue = (prevPayments._sum.amountCents ?? 0) - (prevPayments._sum.refundedCents ?? 0);
+    const revenueTrendPct = prevNetRevenue > 0 ? Math.round(((netRevenueCents - prevNetRevenue) / prevNetRevenue) * 100) : null;
+    const bizGrowthPct = newBusinessesPrevPeriod > 0 ? Math.round(((newBusinessesThisPeriod - newBusinessesPrevPeriod) / newBusinessesPrevPeriod) * 100) : null;
+    const userGrowthPct = newUsersPrevPeriod > 0 ? Math.round(((newUsersThisPeriod - newUsersPrevPeriod) / newUsersPrevPeriod) * 100) : null;
 
     return {
       generatedAt: now,
@@ -181,14 +195,116 @@ export class VerificationService {
         recentAppointments,
         grossRevenueCents,
         refundedCents,
-        netRevenueCents: grossRevenueCents - refundedCents,
+        netRevenueCents,
         successfulPayments: payments._count,
         flaggedDuplicates,
+        newBusinessesThisPeriod,
+        newUsersThisPeriod,
+      },
+      trends: {
+        revenueTrendPct,
+        bizGrowthPct,
+        userGrowthPct,
       },
       planCounts,
       verificationCounts,
       recentBusinesses,
     };
+  }
+
+  async listBusinessesAdmin(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    plan?: string;
+    verificationStatus?: string;
+    suspended?: boolean;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
+  }) {
+    const { page, limit, search, plan, verificationStatus, suspended, sortBy = 'createdAt', sortDir = 'desc' } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.BusinessWhereInput = {};
+    if (search?.trim()) {
+      where.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { email: { contains: search.trim(), mode: 'insensitive' } },
+        { slug: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+    if (plan) where.plan = plan as PlanTier;
+    if (verificationStatus) where.verificationStatus = verificationStatus as Prisma.EnumVerificationStatusFilter;
+    if (suspended !== undefined) where.suspended = suspended;
+
+    const allowedSortFields = ['createdAt', 'name', 'plan', 'verificationStatus'];
+    const safeSort = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+
+    const [total, businesses] = await Promise.all([
+      this.prisma.business.count({ where }),
+      this.prisma.business.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [safeSort]: sortDir },
+        select: {
+          id: true, name: true, email: true, slug: true, plan: true,
+          verificationStatus: true, suspended: true, createdAt: true, phone: true,
+          subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } },
+          _count: { select: { appointments: true, staff: true, clients: true } },
+        },
+      }),
+    ]);
+
+    return { businesses, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async listAuditLog(params: { page: number; limit: number; entityType?: string; action?: string }) {
+    const { page, limit, entityType, action } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AuditLogWhereInput = {};
+    if (entityType) where.entityType = entityType;
+    if (action) where.action = { contains: action, mode: 'insensitive' };
+
+    const [total, logs] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
+    ]);
+
+    const userIds = [...new Set(logs.map((l) => l.userId).filter(Boolean) as string[])];
+    const users = userIds.length
+      ? await this.prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } })
+      : [];
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    return {
+      logs: logs.map((l) => ({ ...l, user: l.userId ? (userMap[l.userId] ?? null) : null })),
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    };
+  }
+
+  async setPlanAdmin(businessId: string, plan: PlanTier, adminId: string) {
+    const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true, plan: true } });
+    if (!biz) throw new NotFoundException('Business not found');
+    const result = await this.prisma.business.update({
+      where: { id: businessId },
+      data: { plan },
+      select: { id: true, plan: true },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        entityType: 'BUSINESS',
+        entityId: businessId,
+        action: 'ADMIN_PLAN_OVERRIDE',
+        userId: adminId,
+        changes: { from: biz.plan, to: plan },
+      },
+    });
+    return result;
   }
 
   async approve(businessId: string, adminId?: string) {
