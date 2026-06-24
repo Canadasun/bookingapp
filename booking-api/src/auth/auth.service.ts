@@ -956,7 +956,7 @@ export class AuthService {
   // Record the sign-in and, if it's from a NEW device (but not the user's very
   // first login), email a security alert with a password-reset link. Wrapped in
   // try/catch so this plumbing can never block a legitimate login.
-  private async recordLoginAndMaybeAlert(user: User, ctx?: { ip?: string; userAgent?: string }) {
+  private async recordLoginAndMaybeAlert(user: User, ctx?: { ip?: string; userAgent?: string }, method = 'PASSWORD') {
     try {
       const ua = ctx?.userAgent ?? '';
       const ip = ctx?.ip?.slice(0, 64) || null;
@@ -970,7 +970,7 @@ export class AuthService {
         this.prisma.loginEvent.count({ where: { userId: user.id } }),
       ]);
       await this.prisma.loginEvent.create({
-        data: { userId: user.id, deviceKey: storedDeviceKey, ip, userAgent: ua.slice(0, 256) || null },
+        data: { userId: user.id, deviceKey: storedDeviceKey, ip, userAgent: ua.slice(0, 256) || null, method },
       });
       if (total > 0 && !priorSameDevice && !priorSameIp) {
         // SSO-only users have no password to reset; skip the reset-token attachment.
@@ -1254,5 +1254,27 @@ export class AuthService {
         twoFactorMethod: user.twoFactorMethod,
       },
     };
+  }
+
+  async getSessions(userId: string) {
+    const events = await this.prisma.loginEvent.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, ip: true, userAgent: true, method: true, createdAt: true },
+    });
+    return {
+      data: events.map(e => ({
+        id: e.id,
+        ipAddress: e.ip,
+        userAgent: e.userAgent,
+        method: e.method,
+        createdAt: e.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async recordSSOLogin(user: User, method: 'GOOGLE' | 'APPLE', ctx?: { ip?: string; userAgent?: string }) {
+    await this.recordLoginAndMaybeAlert(user, ctx, method);
   }
 }

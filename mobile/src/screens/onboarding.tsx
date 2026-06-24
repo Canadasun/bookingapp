@@ -206,7 +206,7 @@ export function OnboardingScreen({ onComplete }: Props) {
       const hours = availability.filter(a => a.enabled);
       if (hours.length) {
         await api(`/businesses/${bid}/hours`, {
-          method: 'PUT',
+          method: 'POST',
           body: JSON.stringify({ hours }),
         }).catch(() => {});
       }

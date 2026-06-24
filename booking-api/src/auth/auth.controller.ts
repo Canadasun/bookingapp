@@ -16,6 +16,12 @@ import { User } from '@prisma/client';
 export class AuthController {
   constructor(private authService: AuthService, private prisma: PrismaService) {}
 
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  sessions(@CurrentUser() user: User) {
+    return this.authService.getSessions(user.id);
+  }
+
   // Returns the authoritative user profile for the current access token.
   // Always callable even when mustResetPassword is true.
   // Explicit allowlist — any new column added to User is denied by default.
@@ -203,7 +209,9 @@ export class AuthController {
     const fwd = ((req as unknown as { headers: Record<string, string | undefined> }).headers['x-forwarded-for'])?.split(',')[0]?.trim();
     const ip = fwd || (req as unknown as { ip?: string }).ip;
     const profile = await this.authService.verifyGoogleCode(body.code, body.redirectUri, body.codeVerifier);
+    const ua = (req as unknown as { headers: Record<string, string | undefined> }).headers['user-agent'];
     const user = await this.authService.findOrCreateSSOUser('google', profile.sub, profile.email, profile.name, { ip });
+    await this.authService.recordSSOLogin(user, 'GOOGLE', { ip, userAgent: ua });
     return this.authService['issueTokens'](user);
   }
 
@@ -216,7 +224,9 @@ export class AuthController {
     const fwd = ((req as unknown as { headers: Record<string, string | undefined> }).headers['x-forwarded-for'])?.split(',')[0]?.trim();
     const ip = fwd || (req as unknown as { ip?: string }).ip;
     const profile = await this.authService.verifyAppleToken(body.identityToken, platform, body.email, body.firstName, body.lastName);
+    const ua = (req as unknown as { headers: Record<string, string | undefined> }).headers['user-agent'];
     const user = await this.authService.findOrCreateSSOUser('apple', profile.sub, profile.email, profile.name, { ip });
+    await this.authService.recordSSOLogin(user, 'APPLE', { ip, userAgent: ua });
     return this.authService['issueTokens'](user);
   }
 }
