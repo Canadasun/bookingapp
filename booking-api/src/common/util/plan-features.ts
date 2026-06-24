@@ -19,6 +19,7 @@ export function applyPlanLimits<T extends {
   noShowFeeCents?: number;
   cancellationFeeCents?: number;
   collectCardOnFile?: boolean;
+  bookingApprovalMode?: string;
 }>(plan: PlanTier, data: T): T {
   if (!isPaidPlan(plan)) {
     return {
@@ -27,6 +28,8 @@ export function applyPlanLimits<T extends {
       noShowFeeCents: 0,
       cancellationFeeCents: 0,
       collectCardOnFile: false,
+      // AUTO instant-confirm is a paid feature; free plans stay on MANUAL queue
+      bookingApprovalMode: 'MANUAL',
     };
   }
   if (!isProPlan(plan)) {

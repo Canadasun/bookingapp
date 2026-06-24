@@ -180,7 +180,7 @@ export default function ReportsPage() {
           </div>
         )}
         {r.revenueProtected === 0 && (
-          <p className="text-xs text-green-700 mt-3">Enable deposits or no-show fees in <a href="/dashboard/settings#booking-policies" className="underline font-medium">Booking Policies</a> to start protecting your revenue.</p>
+          <p className="text-xs text-green-700 mt-3">Enable deposits or no-show fees in <a href="/dashboard/settings?tab=booking" className="underline font-medium">Booking Policies</a> to start protecting your revenue.</p>
         )}
       </div>
 

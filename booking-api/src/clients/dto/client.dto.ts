@@ -44,11 +44,8 @@ export const CreateClientSchema = ClientFieldsSchema.refine((v) => Boolean(v.ema
   path: ['email'],
 });
 
-export const UpdateClientSchema = ClientFieldsSchema.extend({
-  isBlocked: z.boolean().optional(),
-  blockedReason: z.string().max(500).optional(),
-}).partial().refine(
-  (v) => v.email !== undefined || v.phone !== undefined || Object.keys(v).length > 0,
+export const UpdateClientSchema = ClientFieldsSchema.partial().refine(
+  (v) => Object.keys(v).length > 0,
   { message: 'Provide at least one field to update' },
 );
 

@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto, UpdateClientDto } from './dto/client.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
 import { signPublicClientToken } from '../common/util/public-client-token';
+import { isPaidPlan } from '../common/util/plan-features';
 
 // Explicit field list for client creates — prevents accidental spread of future
 // DTO fields (userId, stripeCustomerId, marketingOptOut, etc.) into Prisma data.
@@ -85,6 +86,10 @@ export class ClientsService {
         email: c.email,
         phone: c.phone,
         notes: c.notes,
+        tags: c.tags,
+        birthday: c.birthday,
+        isBlocked: c.isBlocked,
+        blockedReason: c.blockedReason,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         totalVisits: c._count.appointments,
@@ -221,6 +226,10 @@ export class ClientsService {
   }
 
   async setBlocked(id: string, businessId: string, isBlocked: boolean, blockedReason?: string) {
+    const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
+    if (!isPaidPlan(biz?.plan)) {
+      throw new ForbiddenException('Client blocking requires a paid plan.');
+    }
     const client = await this.findOne(id, businessId);
     return this.prisma.client.update({
       where: { id: client.id, businessId: client.businessId },

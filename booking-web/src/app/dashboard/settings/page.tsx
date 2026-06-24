@@ -496,7 +496,25 @@ function SettingsPage() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && visibleSections.some((s) => s.id === tab)) setSection(tab as Section);
+    // Also honour URL hash — e.g. #booking-policies → booking tab.
+    const hash = typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "";
+    const hashToSection: Record<string, Section> = {
+      "booking-policies": "booking",
+      "booking": "booking",
+      "payments": "payments",
+      "payouts": "payouts",
+      "notifications": "notifications",
+      "security": "security",
+      "billing": "billing",
+      "online": "online",
+      "branding": "branding",
+      "calendar": "calendar",
+      "locations": "locations",
+      "profile": "profile",
+    };
+    const fromHash = hash ? hashToSection[hash] : undefined;
+    const resolved = tab ?? fromHash;
+    if (resolved && visibleSections.some((s) => s.id === resolved)) setSection(resolved as Section);
     else if (!visibleSections.some((s) => s.id === section)) setSection(visibleSections[0]?.id ?? "security");
   }, [searchParams, section, visibleSections]);
 

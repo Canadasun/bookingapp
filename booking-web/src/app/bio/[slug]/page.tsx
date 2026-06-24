@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import Link from "next/link";
 import { MapPin, Globe, Star, Calendar } from "lucide-react";
+
+const API_URL = (
+  process.env.API_INTERNAL_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:3001"
+).replace(/\/+$/, "").replace(/\/api$/, "");
 
 interface PublicBusiness {
   id: string;
@@ -27,21 +34,21 @@ interface PublicService {
   priceType: string;
 }
 
-async function getBusiness(slug: string): Promise<PublicBusiness | null> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// cache() memoizes the result per request so generateMetadata and BioPage
+// both call this function but only one network fetch is made.
+const getBusiness = cache(async (slug: string): Promise<PublicBusiness | null> => {
   try {
-    const res = await fetch(`${apiUrl}/businesses/slug/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${API_URL}/businesses/slug/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return res.json() as Promise<PublicBusiness>;
   } catch {
     return null;
   }
-}
+});
 
 async function getServices(businessId: string): Promise<PublicService[]> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   try {
-    const res = await fetch(`${apiUrl}/businesses/${businessId}/services/public`, { next: { revalidate: 60 } });
+    const res = await fetch(`${API_URL}/businesses/${businessId}/services/public`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json() as { data?: PublicService[] } | PublicService[];
     return Array.isArray(data) ? data : (data.data ?? []);
@@ -81,7 +88,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BioPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [biz, services] = await Promise.all([getBusiness(slug), (getBusiness(slug).then((b) => b ? getServices(b.id) : []))]);
+  const biz = await getBusiness(slug);
+  const services = biz ? await getServices(biz.id) : [];
 
   if (!biz) {
     return (
