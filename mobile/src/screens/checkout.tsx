@@ -16,7 +16,7 @@ import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, ref
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
-import { useStripe } from '@stripe/stripe-react-native';
+import { useStripe, usePlatformPay, PlatformPay } from '@stripe/stripe-react-native';
 
 function CheckoutScreen() {
   type Phase = 'amount'|'done';
@@ -26,10 +26,18 @@ function CheckoutScreen() {
   const [tipPct, setTipPct]   = useState(0);     // 0/15/18/20% of the entered amount
   const [loading, setLoading] = useState(false);
   const [receipt, setReceipt] = useState<{ amountCents:number; ref:string; at:Date }|null>(null);
+  const [platformPaySupported, setPlatformPaySupported] = useState(false);
   const chargeKey = useRef<string|null>(null);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { isPlatformPaySupported, confirmPlatformPayPayment } = usePlatformPay();
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteModalText, setNoteModalText] = useState('');
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      isPlatformPaySupported().then(setPlatformPaySupported).catch(() => {});
+    }
+  }, [isPlatformPaySupported]);
 
   const cents     = parseInt(digits || '0', 10);
   const tipCents  = Math.round(cents * tipPct / 100);
@@ -78,6 +86,40 @@ function CheckoutScreen() {
       chargeKey.current = null;
       setPhase('done');
     } catch(e){ Alert.alert('Checkout failed', e instanceof Error ? e.message : 'Please try again'); }
+    finally { setLoading(false); }
+  }
+
+  async function chargeApplePay() {
+    if (cents < 50) { Alert.alert('Amount too low', 'Enter at least $0.50.'); return; }
+    chargeKey.current ??= `mobile-ap-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setLoading(true);
+    try {
+      const payment = await api<{ paymentIntentId:string; clientSecret:string; amountCents:number }>(`/payments/charge`, {
+        method:'POST',
+        body: JSON.stringify({
+          amountCents: totalCents,
+          tipCents: tipCents || undefined,
+          description: note.trim() || undefined,
+          idempotencyKey: chargeKey.current,
+        }),
+      });
+      if (!payment.clientSecret) throw new Error('Stripe did not return a payment session.');
+      const label = note.trim() || 'Pulse Appointment';
+      const { error } = await confirmPlatformPayPayment(payment.clientSecret, {
+        applePay: {
+          cartItems: [{ label, amount: (totalCents / 100).toFixed(2), paymentType: PlatformPay.PaymentType.Immediate }],
+          merchantCountryCode: 'CA',
+          currencyCode: 'CAD',
+        },
+      });
+      if (error) {
+        if (error.code === 'Canceled') { chargeKey.current = null; return; }
+        throw new Error(error.message);
+      }
+      setReceipt({ amountCents: payment.amountCents, ref: payment.paymentIntentId, at: new Date() });
+      chargeKey.current = null;
+      setPhase('done');
+    } catch(e){ Alert.alert('Apple Pay failed', e instanceof Error ? e.message : 'Please try again'); }
     finally { setLoading(false); }
   }
 
@@ -174,16 +216,39 @@ function CheckoutScreen() {
         <Text style={co.tipSummary}>Tip ${(tipCents/100).toFixed(2)} · Total ${(totalCents/100).toFixed(2)}</Text>
       )}
 
+      {/* Apple Pay — primary CTA on supported iOS devices */}
+      {Platform.OS === 'ios' && platformPaySupported && (
+        <TouchableOpacity
+          style={[co.chargeBtn, { backgroundColor: '#000', marginBottom: 8 }, (cents<50||loading) && { opacity:0.4 }]}
+          disabled={cents<50||loading}
+          onPress={chargeApplePay}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Pay with Apple Pay">
+          {loading
+            ? <ActivityIndicator color="#fff"/>
+            : (
+              <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+                <Ionicons name="logo-apple" size={18} color="#fff" />
+                <Text style={[co.chargeBtnText, { color:'#fff' }]}>Pay ${(totalCents/100).toFixed(2)}</Text>
+              </View>
+            )}
+        </TouchableOpacity>
+      )}
+
+      {/* Standard Stripe card payment */}
       <TouchableOpacity
-        style={[co.chargeBtn, (cents<50||loading) && { opacity:0.4 }]}
+        style={[co.chargeBtn, (Platform.OS === 'ios' && platformPaySupported) && { backgroundColor: 'transparent', borderWidth:2, borderColor: BRAND }, (cents<50||loading) && { opacity:0.4 }]}
         disabled={cents<50||loading}
         onPress={charge}
         activeOpacity={0.85}
         accessibilityRole="button"
-        accessibilityLabel="Charge payment">
+        accessibilityLabel="Charge with card">
         {loading
-          ? <ActivityIndicator color="#fff"/>
-          : <Text style={co.chargeBtnText}>Charge ${(totalCents/100).toFixed(2)}</Text>}
+          ? <ActivityIndicator color={Platform.OS === 'ios' && platformPaySupported ? BRAND : '#fff'}/>
+          : <Text style={[co.chargeBtnText, (Platform.OS === 'ios' && platformPaySupported) && { color: BRAND }]}>
+              {Platform.OS === 'ios' && platformPaySupported ? `Card $${(totalCents/100).toFixed(2)}` : `Charge $${(totalCents/100).toFixed(2)}`}
+            </Text>}
       </TouchableOpacity>
       {/* Android note input — Alert.prompt is iOS-only */}
       <Modal visible={showNoteModal} transparent animationType="fade" onRequestClose={() => setShowNoteModal(false)}>

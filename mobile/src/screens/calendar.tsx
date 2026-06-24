@@ -8,7 +8,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { WEB_URL, API_BASE, BIZ_ID, uploadUri } from '../config';
 import { BRAND, BRAND_LT, GRAY_50, GRAY_100, GRAY_200, GRAY_400, GRAY_500, GRAY_700, GRAY_900, STATUS_COLOR } from '../theme';
 import type { User, Appointment, ServiceCategory, Service, AvailabilityRule, Staff, Slot, BookingSlot, Client, Message, NotificationItem, NotificationDelivery, TaskItem, ServiceDueItem, ClientPortalAppointment, ClientPortalMessageThread, ClientPortalOffer } from '../types';
@@ -28,6 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
 function CalendarScreen() {
   const { user } = getAuth();
   const nav = useNavigation<any>();
+  const route = useRoute<any>();
   const queryClient = useQueryClient();
   const haptics = useHaptics();
   const [selected, setSelected] = useState<Appointment | null>(null);
@@ -37,6 +38,8 @@ function CalendarScreen() {
   const [reschedule, setReschedule] = useState<{ appointment: Appointment; date: string; slots: Slot[]; loading: boolean } | null>(null);
   const [editAppt, setEditAppt] = useState<{ appointment: Appointment; name: string; email: string; phone: string; notes: string; notifyClient: boolean } | null>(null);
   const [acting, setActing] = useState(false);
+  const [blockModal, setBlockModal] = useState<{ date: string; startTime: string; endTime: string; reason: string } | null>(null);
+  const [blockSaving, setBlockSaving] = useState(false);
 
   const { data: apts = [], isLoading: loadingApts, isFetching: refreshingApts, refetch: refetchApts } = useQuery({
     queryKey: ['bookings', bizId()],
@@ -89,11 +92,45 @@ function CalendarScreen() {
   // the app; the overlay also has an on-screen close for iOS.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (blockModal) { setBlockModal(null); return true; }
       if (selected) { setSelected(null); return true; }
       return false;
     });
     return () => sub.remove();
-  }, [selected]);
+  }, [selected, blockModal]);
+
+  // Open block-time modal when deep-linked from Today quick action.
+  useEffect(() => {
+    if (route.params?.openBlockTime) {
+      const today = new Date().toISOString().slice(0, 10);
+      setBlockModal({ date: today, startTime: '12:00', endTime: '13:00', reason: '' });
+    }
+  }, [route.params?.openBlockTime]);
+
+  async function saveBlockTime() {
+    if (!blockModal) return;
+    const { date, startTime, endTime, reason } = blockModal;
+    if (!date || !startTime || !endTime) {
+      Alert.alert('Missing fields', 'Please fill in date, start time, and end time.');
+      return;
+    }
+    setBlockSaving(true);
+    try {
+      const startsAt = new Date(`${date}T${startTime}:00`).toISOString();
+      const endsAt = new Date(`${date}T${endTime}:00`).toISOString();
+      await api(`/businesses/${bizId()}/bookings`, {
+        method: 'POST',
+        body: JSON.stringify({ startsAt, endsAt, notes: reason || 'Blocked', isBlock: true }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      setBlockModal(null);
+      Alert.alert('Time blocked', `${date} ${startTime}–${endTime} has been blocked.`);
+    } catch (e) {
+      Alert.alert('Could not block time', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setBlockSaving(false);
+    }
+  }
 
   async function confirm(id: string) {
     setActing(true);
@@ -313,6 +350,17 @@ function CalendarScreen() {
             <Text style={[cal.filterText, statusFilter===status && cal.filterTextOn]}>{STATUS_LABEL[status] ?? status}</Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          onPress={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            setBlockModal({ date: today, startTime: '12:00', endTime: '13:00', reason: '' });
+          }}
+          style={[cal.filterChip, { borderColor: '#F59E0B', backgroundColor: '#FFFBEB' }]}
+          accessibilityRole="button"
+          accessibilityLabel="Block time">
+          <Ionicons name="ban-outline" size={13} color="#D97706" style={{ marginRight: 4 }} />
+          <Text style={[cal.filterText, { color: '#D97706' }]}>Block time</Text>
+        </TouchableOpacity>
       </ScrollView>
       {multiProvider && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8, paddingHorizontal:16, paddingBottom:8 }}>
@@ -545,6 +593,77 @@ function CalendarScreen() {
             </ScrollView>
           )}
         </SafeAreaView>
+      </Modal>
+
+      {/* Block time modal */}
+      <Modal visible={!!blockModal} animationType="slide" onRequestClose={() => setBlockModal(null)} presentationStyle="pageSheet">
+        {blockModal && (
+          <SafeAreaView style={s.screen}>
+            <View style={s.header}>
+              <TouchableOpacity onPress={() => setBlockModal(null)} style={{ padding: 8 }} accessibilityRole="button" accessibilityLabel="Close">
+                <Ionicons name="close" size={22} color={GRAY_900} />
+              </TouchableOpacity>
+              <Text style={s.headerTitle}>Block time</Text>
+              <View style={{ width: 38 }} />
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 20 }}>
+              <Text style={{ fontSize: 13, color: GRAY_500, marginBottom: 16 }}>
+                Blocked time prevents clients from booking that slot online.
+              </Text>
+
+              <Text style={s.fieldLabel}>Date</Text>
+              <TextInput
+                style={s.input}
+                value={blockModal.date}
+                onChangeText={date => setBlockModal({ ...blockModal, date })}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={GRAY_400}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <Text style={[s.fieldLabel, { marginTop: 14 }]}>Start time</Text>
+              <TextInput
+                style={s.input}
+                value={blockModal.startTime}
+                onChangeText={startTime => setBlockModal({ ...blockModal, startTime })}
+                placeholder="HH:MM (e.g. 14:00)"
+                placeholderTextColor={GRAY_400}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <Text style={[s.fieldLabel, { marginTop: 14 }]}>End time</Text>
+              <TextInput
+                style={s.input}
+                value={blockModal.endTime}
+                onChangeText={endTime => setBlockModal({ ...blockModal, endTime })}
+                placeholder="HH:MM (e.g. 15:00)"
+                placeholderTextColor={GRAY_400}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <Text style={[s.fieldLabel, { marginTop: 14 }]}>Reason (optional)</Text>
+              <TextInput
+                style={s.input}
+                value={blockModal.reason}
+                onChangeText={reason => setBlockModal({ ...blockModal, reason })}
+                placeholder="e.g. Lunch break, Personal appointment"
+                placeholderTextColor={GRAY_400}
+              />
+
+              <TouchableOpacity
+                style={[s.btnPrimary, { marginTop: 24, opacity: blockSaving ? 0.6 : 1 }]}
+                disabled={blockSaving}
+                onPress={saveBlockTime}
+                accessibilityRole="button"
+                accessibilityLabel="Save block time">
+                {blockSaving
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={s.btnPrimaryText}>Block this time</Text>
+                }
+              </TouchableOpacity>
+            </ScrollView>
+          </SafeAreaView>
+        )}
       </Modal>
     </SafeAreaView>
   );

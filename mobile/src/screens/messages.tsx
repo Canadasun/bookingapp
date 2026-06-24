@@ -28,7 +28,17 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState<'all'|'unread'|'archived'>('all');
   const [channel, setChannel]   = useState<'ALL'|'IN_APP'|'SMS'>('ALL');
+  const [showTemplates, setShowTemplates] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  const MSG_TEMPLATES = [
+    "Running 10 minutes late — be right with you!",
+    "Your appointment is confirmed. See you soon!",
+    "Thank you for coming in today! We'd love to see your feedback on Google.",
+    "Just a reminder that it's time to rebook your appointment. Reply to schedule!",
+    "We have a spot available this week — want to grab it?",
+    "Thank you for coming in today! We hope to see you again soon.",
+  ];
 
   const loadThreads = useCallback(async () => {
     try {
@@ -127,9 +137,27 @@ function MessagesScreen({ initialClient, onClearClient, onUnreadChanged }: { ini
             </View>
           ))}
         </ScrollView>
+        {/* Template picker */}
+        {showTemplates && (
+          <View style={{ backgroundColor:'#F8F7FF', borderTopWidth:1, borderTopColor:GRAY_100, paddingVertical:8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal:12, gap:8, flexDirection:'row' }}>
+              {MSG_TEMPLATES.map((t,i) => (
+                <TouchableOpacity key={i} onPress={() => { setReply(t); setShowTemplates(false); }}
+                  style={{ backgroundColor:'#fff', borderRadius:12, borderWidth:1, borderColor:GRAY_200, paddingHorizontal:12, paddingVertical:8, maxWidth:220 }}
+                  accessibilityRole="button" accessibilityLabel={`Template: ${t}`}>
+                  <Text style={{ fontSize:13, color:GRAY_900, lineHeight:18 }} numberOfLines={2}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
         <View style={s.composeRow}>
           <>
-              <TextInput style={s.composeInput} placeholder="Type a message…" placeholderTextColor={GRAY_400}
+              <TouchableOpacity onPress={() => setShowTemplates(v => !v)} style={{ padding:10, marginRight:2 }}
+                accessibilityRole="button" accessibilityLabel="Message templates">
+                <Ionicons name="list-outline" size={22} color={showTemplates ? BRAND : GRAY_400}/>
+              </TouchableOpacity>
+              <TextInput style={[s.composeInput, { flex:1 }]} placeholder="Type a message…" placeholderTextColor={GRAY_400}
                 value={reply} onChangeText={setReply} multiline returnKeyType="send" onSubmitEditing={send}/>
               <TouchableOpacity style={[s.sendBtn, (!reply.trim()||sending)&&{opacity:0.4}]}
                 disabled={!reply.trim()||sending} onPress={send}

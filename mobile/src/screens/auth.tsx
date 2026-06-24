@@ -422,6 +422,11 @@ function RegisterScreen({ onRegistered, onBack }: { onRegistered:(t:string,r:str
             {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Create account</Text>}
           </TouchableOpacity>
 
+          <Text style={{ fontSize:11, color:GRAY_400, textAlign:'center', marginTop:10, lineHeight:16 }}>
+            Your data is protected under PIPEDA and Alberta PIPA.{'\n'}
+            We never sell or share your personal information.
+          </Text>
+
           <View style={s.authSwitch}>
             <Text style={s.authSwitchText}>Already have an account? </Text>
             <TouchableOpacity onPress={onBack} accessibilityRole="button" accessibilityLabel="Sign in">

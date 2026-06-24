@@ -22,7 +22,7 @@ type ConnectStatus = { onboarded: boolean; chargesEnabled: boolean; accountId: s
 type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews' | 'invoices'
   | 'marketing' | 'giftcards' | 'packages' | 'settings'
   | 'booking' | 'notifications' | 'reports' | 'addons' | 'subscriptions' | 'transactions' | 'tasks' | 'followups' | 'resources' | 'locations'
-  | 'promo-codes' | 'memberships' | 'hours' | 'payouts' | 'soon';
+  | 'promo-codes' | 'memberships' | 'hours' | 'payouts' | 'loginHistory' | 'soon';
 
 // Plan tiers mirror the web billing page.
 const PLANS = [
@@ -3405,6 +3405,10 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     );
   }
 
+  if (view === 'loginHistory') return (
+    <LoginHistoryView onBack={() => open('settings')} />
+  );
+
   if (view === 'soon') return (
     <SafeAreaView style={s.screen}>
       {head(soonLabel)}
@@ -3850,6 +3854,22 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
               <Text style={s.fieldHint}>Clients can cancel for free until this many hours before the appointment.</Text>
 
               <Text style={[s.fieldLabel,{ marginTop:12 }]}>Cancellation policy text</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom:8 }} contentContainerStyle={{ gap:8, paddingVertical:2 }}>
+                {[
+                  '24-hour notice required. Late cancellations within 24 hours may be charged 50% of the service price.',
+                  '48-hour notice required. A non-refundable deposit is required to book. Cancellations within 48 hours forfeit the deposit.',
+                  'Same-day cancellations are subject to a $25 fee. Please provide at least 12 hours notice.',
+                  'We understand things come up. Please give as much notice as possible — no-shows may be charged a cancellation fee.',
+                  'No cancellations within 72 hours of a tattoo appointment. Your deposit is non-refundable.',
+                ].map((tmpl, i) => (
+                  <TouchableOpacity key={i}
+                    onPress={() => setSettingsEditor({...settingsEditor, cancellationPolicy: tmpl})}
+                    style={{ backgroundColor: '#F5F3FF', borderRadius:10, borderWidth:1, borderColor:BRAND, paddingHorizontal:10, paddingVertical:6, maxWidth:220 }}
+                    accessibilityRole="button" accessibilityLabel={`Policy template ${i + 1}`}>
+                    <Text style={{ fontSize:12, color:BRAND, fontWeight:'600' }} numberOfLines={2}>{tmpl}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
               <TextInput
                 style={[s.input, { height:80, textAlignVertical:'top' }]}
                 multiline
@@ -3957,6 +3977,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
       { label:'Plan & Add-ons',    icon:'extension-puzzle-outline',onPress:()=>open('addons') },
       { label:'Subscriptions',     icon:'card-outline',            onPress:()=>open('subscriptions') },
       { label:'Settings',          icon:'settings-outline',        onPress:()=>open('settings') },
+      { label:'Login History',     icon:'time-outline',            onPress:()=>open('loginHistory') },
       { label:'Support',           icon:'help-buoy-outline',       onPress:()=>Linking.openURL('mailto:support@pulseappointments.com') },
       { label:'Privacy Policy',    icon:'shield-checkmark-outline',onPress:()=>Linking.openURL(`${WEB_URL}/privacy`) },
       { label:'Terms of Service',  icon:'document-text-outline',   onPress:()=>Linking.openURL(`${WEB_URL}/terms`) },
@@ -3979,6 +4000,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     { label:'Staff', icon:'people-outline', view:'staff' as MoreView },
     { label:'Reports', icon:'bar-chart-outline', view:'reports' as MoreView },
     { label:'Settings', icon:'settings-outline', view:'settings' as MoreView },
+    { label:'Share Link', icon:'share-social-outline', view:null as unknown as MoreView, onShare: true },
   ] : [
     { label:'Tasks', icon:'checkbox-outline', view:'tasks' as MoreView },
     { label:'Alerts', icon:'notifications-outline', view:'notifications' as MoreView },
@@ -3986,7 +4008,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   ];
   return (
     <SafeAreaView style={s.screen}>
-      <View style={s.header}><Text style={s.headerTitle}>Dashboard</Text></View>
+      <View style={s.header}><Text style={s.headerTitle}>More</Text></View>
       <ScrollView contentContainerStyle={s.listContent} showsVerticalScrollIndicator={false}>
         {user&&(
           <TouchableOpacity style={s.profileCard} activeOpacity={0.7} onPress={()=>open('settings')}
@@ -4021,7 +4043,20 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         <Text style={{ fontSize:12, fontWeight:'700', color:GRAY_500, textTransform:'uppercase', letterSpacing:0.8, marginBottom:8 }}>Quick actions</Text>
         <View style={{ flexDirection:'row', flexWrap:'wrap', gap:10, marginBottom:18 }}>
           {quickActions.map(action => (
-            <TouchableOpacity key={action.label} onPress={()=>open(action.view)} activeOpacity={0.7}
+            <TouchableOpacity key={action.label}
+              onPress={() => {
+                if ((action as any).onShare) {
+                  if (biz?.slug) {
+                    const url = `${WEB_URL}/book/${biz.slug}`;
+                    Share.share({ message: `Book with me at Pulse Appointments:\n${url}`, url });
+                  } else {
+                    Alert.alert('Booking link', 'Your booking page is not yet set up. Add your business details in Settings.');
+                  }
+                } else {
+                  open(action.view);
+                }
+              }}
+              activeOpacity={0.7}
               style={{ width:'48%', minHeight:82, borderRadius:14, padding:14, backgroundColor:'#fff', borderWidth:1, borderColor:GRAY_100 }}
               accessibilityRole="button" accessibilityLabel={action.label}>
               <View style={s.menuIcon}><Ionicons name={action.icon as any} size={20} color={BRAND}/></View>
@@ -4051,6 +4086,73 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Text style={{color:'#EF4444',fontWeight:'600',fontSize:15}}>Sign out</Text>
         </TouchableOpacity>
       </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ── Login History sub-view ────────────────────────────────────────────────────
+
+function LoginHistoryView({ onBack }: { onBack: () => void }) {
+  const [sessions, setSessions] = useState<Array<{ id: string; ipAddress?: string | null; userAgent?: string | null; method: string; createdAt: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api<{ data: typeof sessions }>('/auth/sessions')
+      .then(res => setSessions(res.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  function fmtMethod(m: string) {
+    if (m === 'APPLE') return 'Apple Sign In';
+    if (m === 'GOOGLE') return 'Google';
+    if (m === 'BIOMETRIC') return 'Face ID / Touch ID';
+    return 'Password';
+  }
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        <TouchableOpacity onPress={onBack} style={{ padding: 8 }} accessibilityRole="button" accessibilityLabel="Back">
+          <Ionicons name="chevron-back" size={22} color={GRAY_900} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Login History</Text>
+        <View style={{ width: 38 }} />
+      </View>
+      {loading ? (
+        <ActivityIndicator color={BRAND} style={{ marginTop: 40 }} />
+      ) : sessions.length === 0 ? (
+        <View style={[s.center, { padding: 32 }]}>
+          <Ionicons name="shield-checkmark-outline" size={48} color={GRAY_400} />
+          <Text style={[ms.empty, { marginTop: 12, textAlign: 'center' }]}>No login history found.</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          <Text style={{ fontSize: 13, color: GRAY_500, marginBottom: 12, lineHeight: 18 }}>
+            Recent sign-ins to your account. If you see unfamiliar activity, change your password immediately.
+          </Text>
+          {sessions.map((session, i) => (
+            <View key={session.id} style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: GRAY_100 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: GRAY_900 }}>{fmtMethod(session.method)}</Text>
+                  <Text style={{ fontSize: 12, color: GRAY_500, marginTop: 2 }}>
+                    {new Date(session.createdAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  {session.ipAddress && (
+                    <Text style={{ fontSize: 12, color: GRAY_400, marginTop: 2 }}>IP: {session.ipAddress}</Text>
+                  )}
+                </View>
+                {i === 0 && (
+                  <View style={{ backgroundColor: '#D1FAE5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#059669' }}>Current</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

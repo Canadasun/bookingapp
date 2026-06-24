@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Pulse",
-    "slug": "Mobile",
+    "name": "Pulse Appointments",
+    "slug": "pulse-appointments",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,7 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "Pulse",
+        "CFBundleDisplayName": "Pulse Appointments",
         "NSCameraUsageDescription": "Pulse uses the camera to let you scan a payment card when entering card details at checkout.",
         "NSFaceIDUsageDescription": "Pulse uses Face ID to securely sign you in and protect access to your account.",
         "NSPhotoLibraryUsageDescription": "Pulse uses your photo library to let you set your business logo and upload profile images."
@@ -43,7 +43,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#E9A23C",
+          "backgroundColor": "#7C3AED",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200
         }

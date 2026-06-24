@@ -20,6 +20,7 @@ import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
 
 type DupeGroup = { clients: Array<{ id: string; name: string; email: string; phone?: string | null; createdAt: string; appointments: number }> };
+type ClientHistory = { id: string; startsAt: string; status: string; service: { name: string }; staff: { user: { name: string } } };
 
 function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   const { user } = getAuth();
@@ -29,6 +30,10 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [profile, setProfile] = useState<Client | null>(null);
+  const [profileHistory, setProfileHistory] = useState<ClientHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [profileTab, setProfileTab] = useState<'info' | 'history'>('info');
+  const [blockingClient, setBlockingClient] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -60,6 +65,73 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
 
   // Reset extra pages when search changes
   useEffect(() => { setExtraClients([]); }, [search]);
+
+  async function openProfile(c: Client) {
+    setProfile(c);
+    setProfileTab('info');
+    setProfileHistory([]);
+    setHistoryLoading(true);
+    try {
+      const data = await api<{ data: ClientHistory[] }>(`/businesses/${bizId()}/bookings?clientId=${c.id}&limit=20`).catch(() => null);
+      if (data?.data) setProfileHistory(data.data.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function toggleBlock(c: Client) {
+    const willBlock = !c.isBlocked;
+    if (willBlock) {
+      Alert.alert(
+        'Block client',
+        `Block ${c.name} from online booking?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Block', style: 'destructive', onPress: async () => {
+              setBlockingClient(true);
+              try {
+                const updated = await api<Client>(`/businesses/${bizId()}/clients/${c.id}/block`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ isBlocked: true }),
+                });
+                queryClient.invalidateQueries({ queryKey: ['clients'] });
+                setProfile(prev => prev ? { ...prev, isBlocked: updated.isBlocked, blockedReason: updated.blockedReason } : prev);
+              } catch (e) {
+                Alert.alert('Error', e instanceof Error ? e.message : 'Could not block client.');
+              } finally { setBlockingClient(false); }
+            },
+          },
+        ]
+      );
+    } else {
+      setBlockingClient(true);
+      try {
+        const updated = await api<Client>(`/businesses/${bizId()}/clients/${c.id}/block`, {
+          method: 'PATCH',
+          body: JSON.stringify({ isBlocked: false }),
+        });
+        queryClient.invalidateQueries({ queryKey: ['clients'] });
+        setProfile(prev => prev ? { ...prev, isBlocked: updated.isBlocked, blockedReason: updated.blockedReason } : prev);
+      } catch (e) {
+        Alert.alert('Error', e instanceof Error ? e.message : 'Could not unblock client.');
+      } finally { setBlockingClient(false); }
+    }
+  }
+
+  async function toggleMarketingConsent(c: Client) {
+    const next = !c.marketingOptOut;
+    try {
+      const updated = await api<Client>(`/businesses/${bizId()}/clients/${c.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ marketingOptOut: next }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      setProfile(prev => prev ? { ...prev, marketingOptOut: updated.marketingOptOut } : prev);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not update consent.');
+    }
+  }
 
   async function loadMore() {
     if (loadingMore || !hasMore) return;
@@ -185,13 +257,14 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
         onEndReachedThreshold={0.3}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: c }) => (
-          <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={() => setProfile(c)}>
+          <TouchableOpacity style={s.card} activeOpacity={0.7} onPress={() => openProfile(c)}>
             <View style={s.avatar}><Text style={s.avatarText}>{initials(c.name)}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={s.clientName}>{c.name}</Text>
               <Text style={s.sub}>{c.email}</Text>
               {c.phone && <Text style={s.sub}>{formatPhoneDisplay(c.phone)}</Text>}
-              {c.totalVisits !== undefined && <Text style={s.sub}>{c.totalVisits} visit{c.totalVisits !== 1 ? 's' : ''}</Text>}
+              {c.totalVisits !== undefined && <Text style={s.sub}>{c.totalVisits} visit{c.totalVisits !== 1 ? 's' : ''}{c.totalSpentCents ? ` · $${(c.totalSpentCents / 100).toFixed(0)} spent` : ''}</Text>}
+              {c.isBlocked && <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626', marginTop: 2 }}>Blocked from booking</Text>}
               {c.tags && c.tags.length > 0 && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                   {c.tags.slice(0, 3).map(t => (
@@ -212,45 +285,171 @@ function ClientsScreen({ onMessage }: { onMessage: (c: Client) => void }) {
       {/* Customer profile */}
       {profile && (
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setProfile(null)}>
-          <TouchableOpacity style={s.sheet} activeOpacity={1} onPress={() => { }}>
+          <TouchableOpacity style={[s.sheet, { maxHeight: '92%' }]} activeOpacity={1} onPress={() => {}}>
             <View style={s.sheetHandle} />
-            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              <View style={[s.avatarLg, { marginBottom: 10 }]}><Text style={s.avatarLgText}>{initials(profile.name)}</Text></View>
-              <Text style={s.sheetTitle}>{profile.name}</Text>
-            </View>
-            {[
-              { l: 'Email', v: profile.email },
-              { l: 'Phone', v: profile.phone ? formatPhoneDisplay(profile.phone) : '—' },
-              { l: 'Visits', v: (profile as any).totalVisits !== undefined ? String((profile as any).totalVisits) : '—' },
-              { l: 'Last visit', v: (profile as any).lastVisit ? new Date((profile as any).lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
-            ].map(({ l, v }) => (
-              <View key={l} style={s.detailRow}>
-                <Text style={s.detailLabel}>{l}</Text>
-                <Text style={s.detailValue}>{v}</Text>
+
+            {/* Header */}
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <View style={[s.avatarLg, { marginBottom: 8 }]}>
+                <Text style={s.avatarLgText}>{initials(profile.name)}</Text>
               </View>
-            ))}
-            <View style={{ marginTop: 10 }}>
-              <Text style={[s.detailLabel, { marginBottom: 6 }]}>Tags</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {(profile.tags ?? []).map(tag => (
-                  <TouchableOpacity key={tag} disabled={updateClientMutation.isPending} onPress={() => removeTag(profile, tag)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: BRAND_LT, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND }}>{tag}</Text>
-                    <Ionicons name="close" size={12} color={BRAND} />
-                  </TouchableOpacity>
-                ))}
-                {(profile.tags ?? []).length === 0 && <Text style={s.sub}>No tags yet</Text>}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={s.sheetTitle}>{profile.name}</Text>
+                {profile.isBlocked && (
+                  <View style={{ backgroundColor: '#FEE2E2', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Blocked</Text>
+                  </View>
+                )}
               </View>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                <TextInput style={[s.input, { flex: 1 }]} placeholder="Add a tag (e.g. VIP)" placeholderTextColor={GRAY_400}
-                  value={tagInput} onChangeText={setTagInput} autoCapitalize="none" returnKeyType="done" onSubmitEditing={() => addTag(profile)} />
-                <TouchableOpacity style={[s.btnSecondary, { paddingHorizontal: 18, justifyContent: 'center' }]} disabled={updateClientMutation.isPending || !tagInput.trim()} onPress={() => addTag(profile)}>
-                  <Text style={s.btnSecondaryText}>Add</Text>
-                </TouchableOpacity>
-              </View>
+              {profile.totalSpentCents ? (
+                <Text style={{ fontSize: 13, color: GRAY_500, marginTop: 2 }}>
+                  ${(profile.totalSpentCents / 100).toFixed(0)} lifetime · {profile.totalVisits ?? 0} visits
+                </Text>
+              ) : null}
             </View>
 
-            <View style={s.sheetActions}>
+            {/* Tabs */}
+            <View style={{ flexDirection: 'row', gap: 0, marginBottom: 14, backgroundColor: GRAY_100, borderRadius: 10, padding: 3 }}>
+              {(['info', 'history'] as const).map(tab => (
+                <TouchableOpacity
+                  key={tab}
+                  onPress={() => setProfileTab(tab)}
+                  style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8, backgroundColor: profileTab === tab ? '#fff' : 'transparent' }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: profileTab === tab }}
+                  accessibilityLabel={tab === 'info' ? 'Client info' : 'Booking history'}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: profileTab === tab ? GRAY_900 : GRAY_400 }}>
+                    {tab === 'info' ? 'Info' : 'History'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+              {profileTab === 'info' && (
+                <View>
+                  {/* Contact info */}
+                  {[
+                    { l: 'Email', v: profile.email ?? '—' },
+                    { l: 'Phone', v: profile.phone ? formatPhoneDisplay(profile.phone) : '—' },
+                    { l: 'Birthday', v: profile.birthday ? new Date(profile.birthday).toLocaleDateString('en-CA', { month: 'long', day: 'numeric' }) : '—' },
+                    { l: 'Last visit', v: profile.lastVisit ? new Date(profile.lastVisit).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
+                  ].map(({ l, v }) => (
+                    <View key={l} style={s.detailRow}>
+                      <Text style={s.detailLabel}>{l}</Text>
+                      <Text style={s.detailValue}>{v as string}</Text>
+                    </View>
+                  ))}
+
+                  {/* Notes */}
+                  {profile.notes ? (
+                    <View style={[s.notesBox, { marginTop: 8 }]}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: GRAY_500, marginBottom: 4 }}>NOTES</Text>
+                      <Text style={s.notesText}>{profile.notes}</Text>
+                    </View>
+                  ) : null}
+
+                  {/* Tags */}
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[s.detailLabel, { marginBottom: 6 }]}>Tags</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {(profile.tags ?? []).map(tag => (
+                        <TouchableOpacity key={tag} disabled={updateClientMutation.isPending} onPress={() => removeTag(profile, tag)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: BRAND_LT, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND }}>{tag}</Text>
+                          <Ionicons name="close" size={12} color={BRAND} />
+                        </TouchableOpacity>
+                      ))}
+                      {(profile.tags ?? []).length === 0 && <Text style={s.sub}>No tags yet</Text>}
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <TextInput style={[s.input, { flex: 1 }]} placeholder="Add a tag (e.g. VIP)" placeholderTextColor={GRAY_400}
+                        value={tagInput} onChangeText={setTagInput} autoCapitalize="none" returnKeyType="done" onSubmitEditing={() => addTag(profile)} />
+                      <TouchableOpacity style={[s.btnSecondary, { paddingHorizontal: 18, justifyContent: 'center' }]}
+                        disabled={updateClientMutation.isPending || !tagInput.trim()} onPress={() => addTag(profile)}>
+                        <Text style={s.btnSecondaryText}>Add</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* CASL consent */}
+                  <View style={[s.detailRow, { marginTop: 14, paddingVertical: 12, backgroundColor: GRAY_50, borderRadius: 12, paddingHorizontal: 12 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: GRAY_900 }}>Marketing consent (CASL)</Text>
+                      <Text style={{ fontSize: 12, color: GRAY_500, marginTop: 2 }}>
+                        {profile.marketingOptOut ? 'Opted out — do not send marketing messages' : 'Opted in — may receive marketing messages'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={!profile.marketingOptOut}
+                      onValueChange={() => toggleMarketingConsent(profile)}
+                      trackColor={{ true: BRAND, false: GRAY_200 }}
+                      thumbColor="#fff"
+                      accessibilityLabel="Marketing consent toggle"
+                    />
+                  </View>
+
+                  {/* Block toggle */}
+                  <View style={[s.detailRow, { marginTop: 8, paddingVertical: 12, backgroundColor: profile.isBlocked ? '#FEF2F2' : GRAY_50, borderRadius: 12, paddingHorizontal: 12 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: profile.isBlocked ? '#DC2626' : GRAY_900 }}>
+                        {profile.isBlocked ? 'Blocked from booking' : 'Allow online booking'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: GRAY_500, marginTop: 2 }}>
+                        {profile.isBlocked ? profile.blockedReason ?? 'Client cannot book online' : 'Client can book online'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      disabled={blockingClient}
+                      onPress={() => toggleBlock(profile)}
+                      style={{ padding: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={profile.isBlocked ? 'Unblock client' : 'Block client'}
+                    >
+                      {blockingClient
+                        ? <ActivityIndicator size="small" color={BRAND} />
+                        : <Ionicons name={profile.isBlocked ? 'lock-open-outline' : 'ban-outline'} size={22} color={profile.isBlocked ? '#059669' : '#DC2626'} />
+                      }
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {profileTab === 'history' && (
+                <View>
+                  {historyLoading ? (
+                    <ActivityIndicator color={BRAND} style={{ marginTop: 20 }} />
+                  ) : profileHistory.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                      <Ionicons name="calendar-outline" size={36} color={GRAY_400} />
+                      <Text style={{ fontSize: 14, color: GRAY_500, marginTop: 10 }}>No appointments yet</Text>
+                    </View>
+                  ) : profileHistory.map(appt => (
+                    <View key={appt.id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: GRAY_900 }}>{appt.service.name}</Text>
+                          <Text style={{ fontSize: 12, color: GRAY_500, marginTop: 2 }}>
+                            {new Date(appt.startsAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })} · {appt.staff.user.name}
+                          </Text>
+                        </View>
+                        <View style={{
+                          backgroundColor: appt.status === 'COMPLETED' ? '#D1FAE5' : appt.status === 'NO_SHOW' ? '#FEE2E2' : appt.status === 'CANCELLED' ? '#FEF3C7' : GRAY_100,
+                          borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+                        }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: appt.status === 'COMPLETED' ? '#059669' : appt.status === 'NO_SHOW' ? '#DC2626' : appt.status === 'CANCELLED' ? '#D97706' : GRAY_500 }}>
+                            {appt.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={[s.sheetActions, { marginTop: 12 }]}>
               <TouchableOpacity style={s.btnPrimary} onPress={() => { const c = profile; setProfile(null); onMessage(c); nav.navigate('Messages'); }}>
                 <Text style={s.btnPrimaryText}>Message</Text>
               </TouchableOpacity>

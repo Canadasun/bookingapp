@@ -8,7 +8,20 @@ export interface AvailabilityRule { id?:string; staffId?:string; dayOfWeek:numbe
 export interface Staff { id:string; active?:boolean; user:{name:string; email?:string; role?:string}; staffServices:{serviceId:string}[]; availabilityRules?:AvailabilityRule[]; bio?:string; avatarUrl?:string; locationId?:string|null }
 export interface Slot { startsAt:string; endsAt:string; startsAtLocal:string }
 export type BookingSlot = Slot & { staffId?:string; staffName?:string };
-export interface Client { id:string; name:string; email?:string|null; phone?:string; totalVisits?:number; lastVisit?:string; tags?:string[] }
+export interface Client {
+  id: string; name: string; email?: string | null; phone?: string;
+  totalVisits?: number; lastVisit?: string | null; totalSpentCents?: number;
+  tags?: string[]; birthday?: string | null; notes?: string | null;
+  isBlocked?: boolean; blockedReason?: string | null;
+  marketingOptOut?: boolean; hasCardOnFile?: boolean;
+}
+export interface LoginEvent { id: string; ipAddress?: string|null; userAgent?: string|null; method: string; createdAt: string }
+export interface TodayDashboard {
+  appointmentsToday: number; confirmedToday: number; pendingToday: number;
+  depositsCollectedCents: number; revenueProtectedCents: number;
+  noShowRiskCount: number; rebookingDueCount: number; waitlistCount: number;
+  nextAppointment?: { clientName: string; serviceName: string; startsAt: string; hasDeposit: boolean } | null;
+}
 export interface Message { id:string; content:string; fromClient:boolean; read:boolean; createdAt:string }
 export interface NotificationItem { id:string; kind:'BOOKING_NEW'|'BOOKING_UPDATE'|'PAYMENT'|'SYSTEM'; title:string; body?:string|null; linkUrl?:string|null; read:boolean; createdAt:string }
 export interface NotificationDelivery { id:string; channel:'EMAIL'|'SMS'|'PUSH'; recipient:string; type:string; status:'SENT'|'FAILED'|'SKIPPED'; error?:string|null; createdAt:string; retryReason?:string|null }
