@@ -10,7 +10,7 @@ describe('CampaignsService audience filters', () => {
     await svc.audienceCount('biz1', 'EMAIL', 'ALL');
 
     expect(prisma.client.count).toHaveBeenCalledWith({
-      where: { businessId: 'biz1', email: { not: null } },
+      where: { businessId: 'biz1', email: { not: null }, marketingOptOut: false },
     });
   });
 
@@ -23,7 +23,7 @@ describe('CampaignsService audience filters', () => {
     await svc.audienceCount('biz1', 'SMS', 'ALL');
 
     expect(prisma.client.count).toHaveBeenCalledWith({
-      where: { businessId: 'biz1', phone: { not: null } },
+      where: { businessId: 'biz1', phone: { not: null }, marketingOptOut: false },
     });
   });
 });

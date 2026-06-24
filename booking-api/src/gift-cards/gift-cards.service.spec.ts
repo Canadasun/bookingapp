@@ -127,7 +127,7 @@ describe('GiftCardsService.issue', () => {
 
     const card = await svc.issue(BIZ, { amountCents: 5000, recipientEmail: 'a@b.com' });
 
-    expect(card.code).toMatch(/^GIFT-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(card.code).toMatch(/^GIFT-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     expect(card.balanceCents).toBe(5000);
     expect(card.initialCents).toBe(5000);
     expect(notifications.sendGiftCardIssued as jest.Mock).toHaveBeenCalledWith('gc1');

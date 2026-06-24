@@ -230,9 +230,12 @@ export class BookingsService {
 
     // A deactivated business accepts no new public bookings (owner/manual
     // bookings, which pass `confirmed`, are still allowed while paused).
+    // Also fetch bookingApprovalMode here so we avoid a second round-trip later.
+    let bizApprovalMode = 'MANUAL';
     if (!opts.confirmed) {
-      const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { suspended: true } });
+      const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { suspended: true, bookingApprovalMode: true } });
       if (biz?.suspended) throw new BadRequestException('This business is not currently accepting online bookings');
+      bizApprovalMode = biz?.bookingApprovalMode ?? 'MANUAL';
     }
 
     // Tenant integrity: the staff and client must belong to THIS business, the
@@ -242,6 +245,9 @@ export class BookingsService {
     if (!staff) throw new NotFoundException('Staff not found');
     const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId } });
     if (!client) throw new NotFoundException('Client not found');
+    // Blocked clients cannot book online. Return a neutral error that does not
+    // reveal the block reason — same message as a full slot for minimal information leakage.
+    if (!opts.confirmed && client.isBlocked) throw new ConflictException('This time slot is not available');
     const staffHasExplicitAssignments = await this.hasExplicitServiceAssignments(dto.staffId);
     if (staffHasExplicitAssignments && !opts.overrideConflicts) {
       const offersService = await this.prisma.staffService.findFirst({ where: { staffId: dto.staffId, serviceId: dto.serviceId } });
@@ -362,9 +368,9 @@ export class BookingsService {
               endsAt,
               totalPriceCents: Math.max(0, subtotalCents - discountCents),
               notes: notesWithServices,
-              // Owner/staff-initiated bookings skip the approval queue and are
-              // confirmed immediately; public self-service stays PENDING.
-              ...(opts.confirmed ? { status: 'CONFIRMED' as const } : {}),
+              // Owner/staff-initiated bookings always confirm immediately.
+              // Public bookings confirm immediately when the business uses AUTO mode.
+              ...((opts.confirmed || bizApprovalMode === 'AUTO') ? { status: 'CONFIRMED' as const } : {}),
               ...(opts.recurringGroupId ? { recurringGroupId: opts.recurringGroupId } : {}),
               ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
               // Multi-location: the appointment inherits its provider's location.
@@ -411,13 +417,13 @@ export class BookingsService {
       status: appointment.status,
     });
 
-    if (opts.confirmed) {
-      // Owner/staff booking: confirm immediately, send the real confirmation to
-      // the client and schedule reminders. No pending notice, no owner alert.
+    if (opts.confirmed || bizApprovalMode === 'AUTO') {
+      // Owner/staff booking or AUTO-mode public booking: confirm immediately.
+      // Send real confirmation + schedule reminders. No pending notice.
       await this.notifications.scheduleReminders(appointment);
       void this.calendarSync.syncWithRetry(appointment.id); // best-effort, fire-and-forget
     } else {
-      // Public self-service: notify client it's PENDING approval; alert owner to act.
+      // MANUAL mode public booking: notify client it's PENDING; alert owner to act.
       await Promise.allSettled([
         this.notifications.sendPendingNotification(appointment),
         this.notifications.sendAdminBookingAlert(appointment.id),
@@ -663,6 +669,9 @@ export class BookingsService {
     // staff (byStaff=true) can always cancel.
     if (dto.status === 'CANCELLED' && !byStaff) {
       const biz = existing.business;
+      if (biz && biz.allowClientCancel === false) {
+        throw new ForbiddenException('Online cancellation is disabled — please contact the business to cancel.');
+      }
       const cutoff = biz && this.cancellationCutoff(existing.startsAt, biz);
       if (cutoff && new Date() > cutoff) {
         const windowLabel = this.formatPolicyMinutes(this.cancellationWindowMinutes(biz));

@@ -114,6 +114,9 @@ model Business {
   cancellationFeeCents      Int     @default(0)
   collectCardOnFile         Boolean @default(false)
   allowClientReschedule     Boolean @default(true)
+  allowClientCancel         Boolean @default(true)
+  // AUTO = public bookings confirm instantly; MANUAL = PENDING until owner approves
+  bookingApprovalMode       String  @default("MANUAL")
 
   // Subscription
   plan          PlanTier  @default(FREE)
@@ -821,6 +824,8 @@ model Client {
   squareCustomerId String?
   squareCardId     String?
   marketingOptOut  Boolean  @default(false) // set by one-click unsubscribe; filters campaign sends
+  isBlocked        Boolean  @default(false) // owner can block client from making new bookings
+  blockedReason    String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

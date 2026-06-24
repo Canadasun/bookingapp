@@ -67,6 +67,8 @@ export const CreateBusinessSchema = z.object({
   cancellationFeeCents: z.number().int().nonnegative().max(100_000_00).default(0), // max $10,000
   collectCardOnFile: z.boolean().default(false),
   allowClientReschedule: z.boolean().default(true),
+  allowClientCancel: z.boolean().default(true),
+  bookingApprovalMode: z.enum(['AUTO', 'MANUAL']).default('MANUAL'),
   cancellationPolicy: optionalString(5000),
   currency: z.enum(['CAD', 'USD']).default('CAD'),
   plan: z.enum(['FREE', 'BASIC', 'PRO', 'UNLIMITED']).optional(),

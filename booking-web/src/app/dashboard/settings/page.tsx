@@ -582,6 +582,8 @@ function SettingsPage() {
         collectCardOnFile: !!form.collectCardOnFile,
         currency: (form.currency as "CAD" | "USD") ?? "CAD",
         allowClientReschedule: form.allowClientReschedule !== false,
+        allowClientCancel: form.allowClientCancel !== false,
+        bookingApprovalMode: (form.bookingApprovalMode as "AUTO" | "MANUAL") ?? "MANUAL",
         cancellationPolicy: String(form.cancellationPolicy ?? "").trim() || undefined,
       };
       const updated = await api.business.update(bizId, payload);
@@ -945,6 +947,38 @@ function SettingsPage() {
                   </button>
                 </div>
 
+                <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Client self-cancel</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Clients can cancel appointments from their secure manage link. Cancellations inside your window still trigger the late-cancel fee if configured.</p>
+                  </div>
+                  <button type="button" onClick={() => f("allowClientCancel", form.allowClientCancel === false ? true : false)}
+                    role="switch"
+                    aria-checked={form.allowClientCancel !== false}
+                    aria-label="Toggle client self-cancel"
+                    className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.allowClientCancel !== false ? "bg-violet-600" : "bg-gray-200")}>
+                    <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.allowClientCancel !== false ? "translate-x-6" : "translate-x-1")} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Booking approval mode</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Auto-confirm sends an instant confirmation when a client books. Manual approval puts bookings in a pending queue for you to review first.</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-gray-500">{form.bookingApprovalMode === "AUTO" ? "Auto-confirm" : "Manual approval"}</span>
+                    <button type="button"
+                      onClick={() => f("bookingApprovalMode", form.bookingApprovalMode === "AUTO" ? "MANUAL" : "AUTO")}
+                      role="switch"
+                      aria-checked={form.bookingApprovalMode === "AUTO"}
+                      aria-label="Toggle booking approval mode"
+                      className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.bookingApprovalMode === "AUTO" ? "bg-violet-600" : "bg-gray-200")}>
+                      <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.bookingApprovalMode === "AUTO" ? "translate-x-6" : "translate-x-1")} />
+                    </button>
+                  </div>
+                </div>
+
                 {bizId && <IntakeFormEditor bizId={bizId} initial={(biz?.intakeQuestions as IntakeQuestion[] | undefined) ?? []} />}
 
                 <div className="rounded-xl border border-gray-100 bg-white p-4">
@@ -1207,12 +1241,24 @@ function SettingsPage() {
                     </a>
                   </div>
 
+                  {/* Bio page link */}
+                  {biz?.slug && (
+                    <div className="mt-3 rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-xs text-violet-800">
+                      <span className="font-semibold">Mobile bio page:</span> Share{" "}
+                      <code className="font-mono">{typeof window !== "undefined" ? window.location.origin : ""}/bio/{biz.slug}</code>{" "}
+                      — a clean mobile link page with your services, social links, and a Book Now button. Perfect for Instagram and TikTok bios.
+                    </div>
+                  )}
+
                   {/* Instagram tip */}
-                  <div className="mt-3 rounded-lg bg-purple-50 border border-purple-100 px-3 py-2 text-xs text-purple-800">
-                    <span className="font-semibold">Instagram:</span> Go to your profile → <strong>Edit profile</strong> → paste your link in the <strong>Website</strong> field. Clients can tap it directly from your bio.
+                  <div className="mt-2 rounded-lg bg-purple-50 border border-purple-100 px-3 py-2 text-xs text-purple-800">
+                    <span className="font-semibold">Instagram:</span> Go to your profile → <strong>Edit profile</strong> → paste your booking link (or bio page link) in the <strong>Website</strong> field. Clients can tap it directly from your bio.
                   </div>
                   <div className="mt-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
                     <span className="font-semibold">Google Business:</span> Go to your Google Business Profile → <strong>Edit profile</strong> → <strong>Website</strong> → paste your link so clients who find you on Google can book instantly.
+                  </div>
+                  <div className="mt-2 rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-xs text-green-800">
+                    <span className="font-semibold">Facebook Page:</span> Go to your Page → <strong>Edit</strong> → <strong>Add a Button</strong> → choose <strong>Book Now</strong> → paste your booking link.
                   </div>
                 </div>
 

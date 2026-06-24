@@ -220,6 +220,14 @@ export class ClientsService {
     return this.prisma.client.update({ where: { id: client.id, businessId: client.businessId }, data: dto });
   }
 
+  async setBlocked(id: string, businessId: string, isBlocked: boolean, blockedReason?: string) {
+    const client = await this.findOne(id, businessId);
+    return this.prisma.client.update({
+      where: { id: client.id, businessId: client.businessId },
+      data: { isBlocked, blockedReason: isBlocked ? (blockedReason ?? null) : null },
+    });
+  }
+
   async remove(id: string, businessId?: string) {
     const client = await this.findOne(id, businessId);
     return this.prisma.$transaction(async (tx) => {

@@ -4,7 +4,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import { ClientsService } from './clients.service';
-import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto } from './dto/client.dto';
+import { CreateClientSchema, UpdateClientSchema, CreateClientDto, UpdateClientDto, MergeClientsSchema, MergeClientsDto, BlockClientSchema, BlockClientDto } from './dto/client.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
@@ -166,6 +166,17 @@ export class ClientsController {
     @Body(new ZodValidationPipe(UpdateClientSchema)) dto: UpdateClientDto,
   ) {
     return this.clientService.update(id, dto, businessId);
+  }
+
+  @Patch(':id/block')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  block(
+    @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @Body(new ZodValidationPipe(BlockClientSchema)) dto: BlockClientDto,
+  ) {
+    return this.clientService.setBlocked(id, businessId, dto.isBlocked, dto.blockedReason);
   }
 
   @Delete(':id')

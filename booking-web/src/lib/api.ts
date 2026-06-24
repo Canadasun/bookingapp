@@ -89,6 +89,7 @@ export interface Business {
   minNoticeMinutes: number; maxAdvanceDays: number; maxAdvanceMinutes?: number;
   cancellationWindowHours: number; cancellationWindowMinutes?: number; requireDeposit: boolean;
   depositPercent: number; noShowFeeCents: number; cancellationFeeCents: number; collectCardOnFile: boolean; allowClientReschedule: boolean;
+  allowClientCancel: boolean; bookingApprovalMode: "AUTO" | "MANUAL";
   cancellationPolicy: string;
   currency: "CAD" | "USD";
   plan: "FREE" | "BASIC" | "PRO" | "UNLIMITED";
@@ -195,6 +196,8 @@ export interface Slot {
 export interface Client {
   id: string; name: string; email?: string | null; phone?: string; notes?: string; tags?: string[]; birthday?: string;
   businessId: string; createdAt: string; updatedAt: string;
+  isBlocked?: boolean; blockedReason?: string | null;
+  marketingOptOut?: boolean;
 }
 
 export interface ClientWithStats extends Client {
@@ -911,6 +914,8 @@ export const api = {
       req<{ ok: boolean; merged: number }>(`/businesses/${businessId}/clients/merge`, { method: "POST", body: JSON.stringify(data) }),
     delete: (businessId: string, id: string) =>
       req<{ ok: boolean; deletedAppointments: number }>(`/businesses/${businessId}/clients/${id}`, { method: "DELETE" }),
+    setBlocked: (businessId: string, id: string, isBlocked: boolean, blockedReason?: string) =>
+      req<Client>(`/businesses/${businessId}/clients/${id}/block`, { method: "PATCH", body: JSON.stringify({ isBlocked, blockedReason }) }),
     exportCsv: (businessId: string) => `/proxy/businesses/${businessId}/clients/export-csv`,
     importCsv: (businessId: string, rows: unknown[]) =>
       req<{ created: number; updated: number; total: number }>(`/businesses/${businessId}/clients/import-csv`, { method: "POST", body: JSON.stringify({ rows }) }),

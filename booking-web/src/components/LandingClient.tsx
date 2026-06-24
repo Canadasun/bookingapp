@@ -150,20 +150,34 @@ export function LandingFooterLinks() {
       <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
     </>
   );
+  const publicLinks = (
+    <>
+      <Link href="/for" className="hover:text-indigo-600 transition-colors">Industries</Link>
+      <Link href="/compare" className="hover:text-indigo-600 transition-colors">Compare</Link>
+      <Link href="/pricing" className="hover:text-indigo-600 transition-colors">Pricing</Link>
+      <Link href="/changelog" className="hover:text-indigo-600 transition-colors">Changelog</Link>
+      <Link href="/security" className="hover:text-indigo-600 transition-colors">Security</Link>
+      <Link href="/canadian-privacy" className="hover:text-indigo-600 transition-colors">Canadian Privacy</Link>
+      <Link href="/support" className="hover:text-indigo-600 transition-colors">Support</Link>
+      <Link href="/status" className="hover:text-indigo-600 transition-colors">Status</Link>
+    </>
+  );
   if (user && home) {
     return (
-      <div className="flex gap-6 text-sm text-slate-500">
+      <div className="flex flex-wrap gap-4 text-sm text-slate-500">
         <Link href={home} className="hover:text-indigo-600 transition-colors">Dashboard</Link>
         <Link href="/book" className="hover:text-indigo-600 transition-colors">Book</Link>
         {legalLinks}
+        {publicLinks}
       </div>
     );
   }
   return (
-    <div className="flex gap-6 text-sm text-slate-500">
+    <div className="flex flex-wrap gap-4 text-sm text-slate-500">
       <Link href="/register" className="hover:text-indigo-600 transition-colors">Get started</Link>
       <Link href="/login" className="hover:text-indigo-600 transition-colors">Sign in</Link>
       {legalLinks}
+      {publicLinks}
     </div>
   );
 }

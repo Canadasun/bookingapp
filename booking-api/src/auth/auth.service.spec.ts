@@ -148,6 +148,9 @@ describe('AuthService.register', () => {
       marketingConsent: false,
       trackingConsent: false,
     });
+    // Demo data seeding is fire-and-forget (void); flush microtasks so the
+    // createOwnerDemoData chain completes before assertions run.
+    await new Promise((r) => setImmediate(r));
 
     expect(result.user.businessId).toBe('biz1');
     expect(tx.staff.create).toHaveBeenCalledWith({ data: { userId: 'u1', businessId: 'biz1', active: true } });

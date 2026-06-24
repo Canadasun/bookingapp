@@ -290,7 +290,7 @@ describe('BookingsService', () => {
       });
 
       expect(prisma.promoCode.update).toHaveBeenCalledWith({
-        where: { id: 'promo1' }, data: { usageCount: { increment: 1 } },
+        where: { id: 'promo1', businessId: 'biz1' }, data: { usageCount: { increment: 1 } },
       });
       expect(prisma.$transaction).toHaveBeenCalled();
     });
@@ -549,7 +549,7 @@ describe('BookingsService', () => {
           desiredDate: SLOT_START,
         }),
       }));
-      expect(waitlistUpdate).toHaveBeenCalledWith({ where: { id: 'wait1' }, data: { status: 'NOTIFIED' } });
+      expect(waitlistUpdate).toHaveBeenCalledWith({ where: { id: 'wait1', businessId: 'biz1' }, data: { status: 'NOTIFIED' } });
     });
 
     it('cancels reminders when status set to CANCELLED', async () => {

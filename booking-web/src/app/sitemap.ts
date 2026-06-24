@@ -8,20 +8,40 @@ const API_URL = (
 ).replace(/\/+$/, "").replace(/\/api$/, "");
 
 // Update this date whenever meaningful static content changes are deployed.
-const CONTENT_DATE = new Date("2026-06-15");
+const CONTENT_DATE = new Date("2026-06-23");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${SITE_URL}/`,             lastModified: CONTENT_DATE, changeFrequency: "weekly",  priority: 1.0 },
-    { url: `${SITE_URL}/pricing`,      lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
-    { url: `${SITE_URL}/register`,     lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${SITE_URL}/login`,        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${SITE_URL}/book`,         lastModified: CONTENT_DATE, changeFrequency: "daily",   priority: 0.7 },
-    { url: `${SITE_URL}/support`,      lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${SITE_URL}/terms`,        lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
-    { url: `${SITE_URL}/privacy`,      lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
-    { url: `${SITE_URL}/accessibility`,lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
-    { url: `${SITE_URL}/status`,       lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${SITE_URL}/`,                                        lastModified: CONTENT_DATE, changeFrequency: "weekly",  priority: 1.0 },
+    { url: `${SITE_URL}/pricing`,                                 lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/register`,                                lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/login`,                                   lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/book`,                                    lastModified: CONTENT_DATE, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${SITE_URL}/support`,                                 lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/terms`,                                   lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
+    { url: `${SITE_URL}/privacy`,                                 lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
+    { url: `${SITE_URL}/accessibility`,                           lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
+    { url: `${SITE_URL}/status`,                                  lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${SITE_URL}/security`,                                lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.5 },
+    { url: `${SITE_URL}/canadian-privacy`,                        lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.5 },
+    { url: `${SITE_URL}/changelog`,                               lastModified: CONTENT_DATE, changeFrequency: "weekly",  priority: 0.5 },
+    { url: `${SITE_URL}/compare`,                                 lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/compare/pulse-vs-square-appointments`,    lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/compare/pulse-vs-calendly`,               lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/compare/pulse-vs-acuity-scheduling`,      lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/compare/pulse-vs-jane-app`,               lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/compare/pulse-vs-vagaro`,                 lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/compare/pulse-vs-glossgenius`,            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for`,                                     lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/for/salons`,                              lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/barbers`,                             lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/lash-techs`,                          lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/estheticians`,                        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/massage-therapists`,                  lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/pet-groomers`,                        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/consultants`,                         lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/wellness`,                            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/mobile-services`,                     lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
   ];
 
   // Dynamically include all public (non-suspended) business booking pages.

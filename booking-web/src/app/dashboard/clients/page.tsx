@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge, Download, Upload } from "lucide-react";
+import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge, Download, Upload, Ban, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
@@ -38,6 +38,7 @@ export default function ClientsPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const [deletingClient, setDeletingClient] = useState(false);
+  const [blockingClient, setBlockingClient] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", notes: "", birthday: "" });
   const [savingEdit, setSavingEdit] = useState(false);
@@ -148,6 +149,22 @@ export default function ClientsPage() {
   async function deleteClient() {
     if (!bizId || !selected) return;
     setDeleteDialog(true);
+  }
+
+  async function toggleBlock() {
+    if (!bizId || !selected) return;
+    const willBlock = !selected.isBlocked;
+    setBlockingClient(true);
+    try {
+      const updated = await api.clients.setBlocked(bizId, selected.id, willBlock);
+      setSelected((prev) => prev ? { ...prev, isBlocked: updated.isBlocked, blockedReason: updated.blockedReason } : prev);
+      setClients((prev) => prev.map((c) => c.id === selected.id ? { ...c, isBlocked: updated.isBlocked, blockedReason: updated.blockedReason } : c));
+      toast.success(willBlock ? "Client blocked from online booking" : "Client unblocked");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update block status");
+    } finally {
+      setBlockingClient(false);
+    }
   }
 
   async function confirmDeleteClient() {
@@ -403,7 +420,10 @@ export default function ClientsPage() {
             tabIndex={-1}
             className="dashboard-safe-bottom fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col focus:outline-none">
             <div className="flex flex-col gap-3 px-4 py-4 border-b border-gray-100 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
-              <h2 id="client-drawer-title" className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 id="client-drawer-title" className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
+                {selected.isBlocked && <span className="inline-flex items-center gap-1 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"><Ban className="w-3 h-3" /> Blocked</span>}
+              </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Button size="sm" onClick={rebook} className="gap-1.5">
                   <CalendarPlus className="w-4 h-4" />Book again
@@ -413,6 +433,14 @@ export default function ClientsPage() {
                   <>
                     <button onClick={startEdit} title="Edit contact" aria-label="Edit"
                       className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4" /></button>
+                    <button
+                      onClick={toggleBlock}
+                      disabled={blockingClient}
+                      title={selected.isBlocked ? "Unblock client" : "Block client from online booking"}
+                      aria-label={selected.isBlocked ? "Unblock client" : "Block client"}
+                      className={cn("p-2 rounded-lg transition-colors disabled:opacity-50", selected.isBlocked ? "text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50")}>
+                      {selected.isBlocked ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                    </button>
                     <button onClick={deleteClient} disabled={deletingClient} title="Delete contact" aria-label="Delete client"
                       className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
                   </>

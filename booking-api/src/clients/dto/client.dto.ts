@@ -44,10 +44,18 @@ export const CreateClientSchema = ClientFieldsSchema.refine((v) => Boolean(v.ema
   path: ['email'],
 });
 
-export const UpdateClientSchema = ClientFieldsSchema.partial().refine(
+export const UpdateClientSchema = ClientFieldsSchema.extend({
+  isBlocked: z.boolean().optional(),
+  blockedReason: z.string().max(500).optional(),
+}).partial().refine(
   (v) => v.email !== undefined || v.phone !== undefined || Object.keys(v).length > 0,
   { message: 'Provide at least one field to update' },
 );
+
+export const BlockClientSchema = z.object({
+  isBlocked: z.boolean(),
+  blockedReason: z.string().max(500).optional(),
+});
 
 // Merge duplicates into one primary; the owner picks the canonical name/email/phone.
 export const MergeClientsSchema = z.object({
@@ -61,3 +69,4 @@ export const MergeClientsSchema = z.object({
 export type CreateClientDto = z.infer<typeof CreateClientSchema>;
 export type UpdateClientDto = z.infer<typeof UpdateClientSchema>;
 export type MergeClientsDto = z.infer<typeof MergeClientsSchema>;
+export type BlockClientDto = z.infer<typeof BlockClientSchema>;
