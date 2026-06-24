@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
-import { applyPlanLimits, isUnlimitedPlan } from '../common/util/plan-features';
+import { applyPlanLimits, isUnlimitedPlan, isProPlan } from '../common/util/plan-features';
 import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 import { getCapabilities } from '../common/util/plan';
 import { ResendEmailProvider } from '../notifications/providers/email.provider';
@@ -542,5 +542,153 @@ export class BusinessesService {
       await deleteUploadByUrl(this.prisma, current.logoUrl);
     }
     return result;
+  }
+
+  async getReports(businessId: string) {
+    const biz = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true, currency: true } });
+    if (!isProPlan(biz.plan)) {
+      return { gated: true, plan: biz.plan };
+    }
+
+    const now = new Date();
+    // Month buckets: last 12 calendar months (current month + 11 prior).
+    const months: { year: number; month: number; label: string }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ year: d.getFullYear(), month: d.getMonth() + 1, label: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` });
+    }
+
+    const [bookingCounts, revenueByMonth, topServices, topStaff, topClients, revenueProtected] = await Promise.all([
+      // All-time booking outcome counts
+      this.prisma.appointment.groupBy({
+        by: ['status'],
+        where: { businessId },
+        _count: { _all: true },
+      }),
+
+      // Collected revenue net of refunds, grouped by year+month, last 12 months
+      this.prisma.payment.findMany({
+        where: {
+          businessId,
+          status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] },
+          createdAt: { gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) },
+        },
+        select: { amountCents: true, refundedCents: true, createdAt: true, kind: true },
+      }),
+
+      // Top 5 services by completed bookings
+      this.prisma.appointment.groupBy({
+        by: ['serviceId'],
+        where: { businessId, status: 'COMPLETED' },
+        _count: { _all: true },
+        orderBy: { _count: { serviceId: 'desc' } },
+        take: 5,
+      }),
+
+      // Top 5 staff by total bookings
+      this.prisma.appointment.groupBy({
+        by: ['staffId'],
+        where: { businessId },
+        _count: { _all: true },
+        orderBy: { _count: { staffId: 'desc' } },
+        take: 5,
+      }),
+
+      // Top 5 clients by total spent
+      this.prisma.client.findMany({
+        where: { businessId },
+        select: {
+          id: true, name: true,
+          payments: {
+            where: { status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] } },
+            select: { amountCents: true, refundedCents: true },
+          },
+          appointments: { where: { status: 'COMPLETED' }, select: { id: true } },
+        },
+        orderBy: { payments: { _count: 'desc' } },
+        take: 20,
+      }),
+
+      // Revenue protected breakdown
+      this.prisma.payment.findMany({
+        where: {
+          businessId,
+          status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] },
+          kind: { in: ['DEPOSIT', 'NO_SHOW_FEE', 'LATE_CANCEL_FEE'] },
+        },
+        select: { amountCents: true, refundedCents: true, kind: true },
+      }),
+    ]);
+
+    // Resolve service names
+    const serviceIds = topServices.map(s => s.serviceId);
+    const staffIds = topStaff.map(s => s.staffId);
+    const [serviceNames, staffNames] = await Promise.all([
+      this.prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { id: true, name: true } }),
+      this.prisma.staff.findMany({ where: { id: { in: staffIds } }, select: { id: true, user: { select: { name: true } } } }),
+    ]);
+    const svcMap = new Map(serviceNames.map(s => [s.id, s.name]));
+    const stfMap = new Map(staffNames.map(s => [s.id, s.user.name]));
+
+    // Build outcome summary
+    const outcomes = { total: 0, completed: 0, cancelled: 0, noShow: 0, pending: 0, confirmed: 0 };
+    for (const g of bookingCounts) {
+      const n = g._count._all;
+      outcomes.total += n;
+      if (g.status === 'COMPLETED') outcomes.completed = n;
+      else if (g.status === 'CANCELLED') outcomes.cancelled = n;
+      else if (g.status === 'NO_SHOW') outcomes.noShow = n;
+      else if (g.status === 'PENDING') outcomes.pending = n;
+      else if (g.status === 'CONFIRMED') outcomes.confirmed = n;
+    }
+
+    // Revenue by month
+    const monthMap = new Map<string, number>();
+    for (const p of revenueByMonth) {
+      const key = `${p.createdAt.getFullYear()}-${String(p.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      monthMap.set(key, (monthMap.get(key) ?? 0) + p.amountCents - (p.refundedCents ?? 0));
+    }
+    const byMonth = months.map(m => ({ label: m.label, cents: monthMap.get(m.label) ?? 0 }));
+
+    // Total collected
+    const collectedCents = revenueByMonth.reduce((s, p) => s + p.amountCents - (p.refundedCents ?? 0), 0);
+
+    // Revenue protected breakdown
+    const depositsCollectedCents = revenueProtected.filter(p => p.kind === 'DEPOSIT').reduce((s, p) => s + p.amountCents - (p.refundedCents ?? 0), 0);
+    const noShowFeesCents = revenueProtected.filter(p => p.kind === 'NO_SHOW_FEE').reduce((s, p) => s + p.amountCents - (p.refundedCents ?? 0), 0);
+    const cancelFeesCents = revenueProtected.filter(p => p.kind === 'LATE_CANCEL_FEE').reduce((s, p) => s + p.amountCents - (p.refundedCents ?? 0), 0);
+    const revenueProtectedCents = depositsCollectedCents + noShowFeesCents + cancelFeesCents;
+
+    // Top clients by spend
+    const clientsWithSpend = topClients
+      .map(c => ({
+        id: c.id, name: c.name,
+        totalSpentCents: c.payments.reduce((s, p) => s + p.amountCents - (p.refundedCents ?? 0), 0),
+        totalVisits: c.appointments.length,
+      }))
+      .sort((a, b) => b.totalSpentCents - a.totalSpentCents)
+      .filter(c => c.totalSpentCents > 0)
+      .slice(0, 5);
+
+    // New clients (last 30 days)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const newClients30d = await this.prisma.client.count({ where: { businessId, createdAt: { gte: thirtyDaysAgo } } });
+
+    return {
+      gated: false,
+      plan: biz.plan,
+      currency: biz.currency ?? 'CAD',
+      outcomes,
+      collectedCents,
+      revenueProtectedCents,
+      depositsCollectedCents,
+      noShowFeesCents,
+      cancelFeesCents,
+      byMonth,
+      newClients30d,
+      topServices: topServices.map(s => ({ name: svcMap.get(s.serviceId) ?? 'Unknown', count: s._count._all })),
+      topStaff: topStaff.map(s => ({ name: stfMap.get(s.staffId) ?? 'Unknown', count: s._count._all })),
+      topClients: clientsWithSpend,
+    };
   }
 }

@@ -82,6 +82,16 @@ export class BusinessesController {
     return this.businessService.dashboardOverview(id, user);
   }
 
+  @Get(':id/reports')
+  @UseGuards(JwtAuthGuard)
+  reports(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    this.assertTenantAccess(user, id);
+    return this.businessService.getReports(id);
+  }
+
   // Full business record (incl. email, plan) — owner dashboard only. The public
   // booking page uses GET /businesses/slug/:slug or /businesses/public/:id.
   @Get(':id')

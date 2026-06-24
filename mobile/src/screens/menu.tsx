@@ -27,8 +27,8 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 // Plan tiers mirror the web billing page.
 const PLANS = [
   { id:'FREE',      name:'Free',      price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page','Up to 5 staff members','1 location'] },
-  { id:'BASIC',     name:'Basic',     price:'$10', period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies','Manual charges','Up to 10 staff members'] },
-  { id:'PRO',       name:'Pro',       price:'$20', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Late-cancellation fees','Analytics & reports','Up to 10 staff members'] },
+  { id:'BASIC',     name:'Basic',     price:'$49', period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies','Manual charges','Up to 10 staff members'] },
+  { id:'PRO',       name:'Pro',       price:'$149', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Late-cancellation fees','Analytics & reports','Up to 10 staff members'] },
   { id:'UNLIMITED', name:'Unlimited', price:'$80', period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
 ] as const;
 
@@ -199,7 +199,6 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   const [verifEditor, setVerifEditor] = useState<{legalName:string;address:string;phone:string;govIdUrl:string;regDocUrl:string}|null>(null);
   const [verifSaving, setVerifSaving] = useState(false);
   // Reports date-range filter
-  const [reportRange, setReportRange] = useState<'week'|'month'|'all'>('all');
 
   useEffect(() => {
     if (view === 'settings') {
@@ -2271,83 +2270,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
   );
 
   if (view === 'reports') {
-    const now = renderedAt;
-    const cutoff = reportRange === 'week' ? now - 7*86400000 : reportRange === 'month' ? now - 30*86400000 : 0;
-    const allAppts = appts ?? [];
-    const list = cutoff ? allAppts.filter(a => +new Date(a.startsAt) >= cutoff) : allAppts;
-    const allPayments = payments ?? [];
-    const paymentRows = cutoff ? allPayments.filter(p => +new Date(p.createdAt) >= cutoff) : allPayments;
-    const todayKey = new Date(renderedAt).toDateString();
-    const todayCount = allAppts.filter(a => new Date(a.startsAt).toDateString()===todayKey).length;
-    const upcoming = allAppts.filter(a => ['PENDING','CONFIRMED'].includes(a.status) && +new Date(a.startsAt) > now).length;
-    const completed = list.filter(a => a.status==='COMPLETED');
-    const revenueCents = paymentRows
-      .filter(p => p.status === 'SUCCEEDED' || p.status === 'PARTIALLY_REFUNDED')
-      .reduce((sum:number,p:any)=> sum + (p.amountCents ?? 0) - (p.refundedCents ?? 0), 0);
-    const failedPayments = paymentRows.filter((p:any) => p.status === 'FAILED').length;
-    const noShows = list.filter(a => a.status==='NO_SHOW').length;
-    const cancelled = list.filter(a => a.status==='CANCELLED').length;
-    const total = list.length;
-    const cancellationRate = total ? Math.round(((cancelled + noShows) / total) * 100) : 0;
-    const byService = completed.reduce((map,a)=>{
-      const key = a.service?.name ?? 'Unknown';
-      map[key] = (map[key] ?? 0) + 1;
-      return map;
-    }, {} as Record<string,number>);
-    const serviceBreakdown = Object.entries(byService).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    const stats = [
-      { label:"Today's appointments", value:String(todayCount) },
-      { label:'Upcoming', value:String(upcoming) },
-      { label:'Completed', value:String(completed.length) },
-      { label:'Collected revenue', value:`$${(revenueCents/100).toFixed(2)}` },
-      { label:'Cancellation rate', value:`${cancellationRate}% (${cancelled + noShows} of ${total})` },
-      { label:'Failed payments', value:String(failedPayments) },
-    ];
-    return (
-      <SafeAreaView style={s.screen}>
-        {head('Reports')}
-        {loading ? loader : (
-          <ScrollView contentContainerStyle={{ padding:16 }} showsVerticalScrollIndicator={false}>
-            {/* Date range tabs */}
-            <View style={{ flexDirection:'row', gap:8, marginBottom:16 }}>
-              {([['week','7 days'],['month','30 days'],['all','All time']] as const).map(([r,label]) => (
-                <TouchableOpacity key={r} onPress={()=>setReportRange(r)}
-                  style={[ms.methodChip, reportRange===r && ms.methodChipOn, { flex:1, justifyContent:'center' }]}
-                  accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: reportRange===r }}>
-                  <Text style={[ms.methodChipText, reportRange===r && { color:BRAND }]}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {stats.map(st => (
-              <View key={st.label} style={[ms.card,{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }]}>
-                <Text style={ms.cardLabel}>{st.label}</Text>
-                <Text style={[ms.cardValue,{ marginTop:0 }]}>{st.value}</Text>
-              </View>
-            ))}
-            {serviceBreakdown.length > 0 && (
-              <View style={ms.card}>
-                <Text style={[ms.cardLabel,{ marginBottom:10 }]}>Top services (completed)</Text>
-                {serviceBreakdown.map(([name, count]) => {
-                  const pct = completed.length ? Math.round((count/completed.length)*100) : 0;
-                  return (
-                    <View key={name} style={{ marginBottom:8 }}>
-                      <View style={{ flexDirection:'row', justifyContent:'space-between', marginBottom:3 }}>
-                        <Text style={{ fontSize:13, color:GRAY_700, flex:1 }} numberOfLines={1}>{name}</Text>
-                        <Text style={{ fontSize:13, color:GRAY_500 }}>{count} · {pct}%</Text>
-                      </View>
-                      <View style={{ height:5, backgroundColor:GRAY_100, borderRadius:3 }}>
-                        <View style={{ height:5, borderRadius:3, backgroundColor:BRAND, width:`${pct}%` }}/>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-            <Text style={[ms.empty,{ marginTop:8 }]}>Full exports and charts are available on the web dashboard.</Text>
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    );
+    return <ReportsView onBack={() => open('menu')} onUpgrade={() => open('addons')} />;
   }
 
   if (view === 'transactions') {
@@ -4086,6 +4009,195 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
           <Text style={{color:'#EF4444',fontWeight:'600',fontSize:15}}>Sign out</Text>
         </TouchableOpacity>
       </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ── Reports sub-view ─────────────────────────────────────────────────────────
+
+type ReportData = {
+  gated: false;
+  plan: string;
+  currency: string;
+  outcomes: { total: number; completed: number; cancelled: number; noShow: number; pending: number; confirmed: number };
+  collectedCents: number;
+  revenueProtectedCents: number;
+  depositsCollectedCents: number;
+  noShowFeesCents: number;
+  cancelFeesCents: number;
+  byMonth: { label: string; cents: number }[];
+  newClients30d: number;
+  topServices: { name: string; count: number }[];
+  topStaff: { name: string; count: number }[];
+  topClients: { id: string; name: string; totalSpentCents: number; totalVisits: number }[];
+};
+
+function ReportsView({ onBack, onUpgrade }: { onBack: () => void; onUpgrade: () => void }) {
+  const [data, setData] = useState<ReportData | null>(null);
+  const [gated, setGated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    api<{ gated: boolean } | ReportData>(`/businesses/${bizId()}/reports`)
+      .then(res => {
+        if (res.gated) setGated(true);
+        else { setData(res as ReportData); setGated(false); }
+      })
+      .catch(e => setErr(e instanceof Error ? e.message : 'Could not load reports'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function fmtCAD(cents: number) {
+    const currency = data?.currency ?? 'CAD';
+    return new Intl.NumberFormat('en-CA', { style: 'currency', currency, maximumFractionDigits: 0 }).format(cents / 100);
+  }
+  function pct(n: number, d: number) { return d === 0 ? 0 : Math.round((n / d) * 100); }
+
+  return (
+    <SafeAreaView style={s.screen}>
+      <View style={[s.header, { justifyContent: 'space-between' }]}>
+        <TouchableOpacity onPress={onBack} style={{ padding: 8 }} accessibilityRole="button" accessibilityLabel="Back">
+          <Ionicons name="chevron-back" size={22} color={GRAY_900} />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Reports</Text>
+        <View style={{ width: 38 }} />
+      </View>
+
+      {loading && <ActivityIndicator color={BRAND} style={{ marginTop: 40 }} />}
+
+      {!loading && err ? (
+        <View style={{ alignItems: 'center', padding: 32 }}>
+          <Text style={{ color: '#DC2626', marginBottom: 8 }}>{err}</Text>
+        </View>
+      ) : null}
+
+      {!loading && gated && (
+        <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="bar-chart-outline" size={32} color={BRAND} />
+          </View>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: GRAY_900, textAlign: 'center', marginBottom: 8 }}>Analytics &amp; Reports</Text>
+          <Text style={{ fontSize: 14, color: GRAY_500, textAlign: 'center', marginBottom: 6 }}>
+            Upgrade to <Text style={{ fontWeight: '700' }}>Pro ($149/mo)</Text> to unlock:
+          </Text>
+          {['Revenue trends (last 12 months)', 'Revenue Protected by Pulse', 'Top services & provider performance', 'Top clients by spend', 'No-show & cancellation rates'].map(f => (
+            <View key={f} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, width: '100%' }}>
+              <Ionicons name="lock-closed-outline" size={14} color={GRAY_400} />
+              <Text style={{ fontSize: 13, color: GRAY_500 }}>{f}</Text>
+            </View>
+          ))}
+          <TouchableOpacity
+            onPress={onUpgrade}
+            style={{ backgroundColor: BRAND, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28, marginTop: 24, width: '100%', alignItems: 'center' }}
+            accessibilityRole="button" accessibilityLabel="Upgrade to Pro">
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Upgrade to Pro — $149/mo →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {!loading && !gated && data && (
+        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+          {/* KPIs */}
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            {[
+              { label: 'Revenue (12 mo)', value: fmtCAD(data.collectedCents) },
+              { label: 'New clients (30d)', value: String(data.newClients30d) },
+            ].map(k => (
+              <View key={k.label} style={[ms.card, { flex: 1, margin: 0 }]}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: GRAY_900 }}>{k.value}</Text>
+                <Text style={{ fontSize: 11, color: GRAY_500, marginTop: 2 }}>{k.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Revenue Protected */}
+          <View style={{ backgroundColor: '#ECFDF5', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#A7F3D0' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#065F46' }}>Revenue Protected by Pulse</Text>
+                <Text style={{ fontSize: 11, color: '#059669', marginTop: 2 }}>Deposits + no-show fees + late-cancel fees</Text>
+              </View>
+              <Text style={{ fontSize: 22, fontWeight: '800', color: '#065F46', marginLeft: 12 }}>{fmtCAD(data.revenueProtectedCents)}</Text>
+            </View>
+            {data.revenueProtectedCents > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#A7F3D0' }}>
+                <Text style={{ fontSize: 11, color: '#065F46' }}><Text style={{ fontWeight: '700' }}>{fmtCAD(data.depositsCollectedCents)}</Text> deposits</Text>
+                <Text style={{ fontSize: 11, color: '#065F46' }}><Text style={{ fontWeight: '700' }}>{fmtCAD(data.noShowFeesCents)}</Text> no-shows</Text>
+                <Text style={{ fontSize: 11, color: '#065F46' }}><Text style={{ fontWeight: '700' }}>{fmtCAD(data.cancelFeesCents)}</Text> late-cancels</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Outcomes */}
+          <View style={ms.card}>
+            <Text style={[ms.cardLabel, { marginBottom: 12 }]}>Booking outcomes (all time)</Text>
+            {[
+              { label: 'Completed', n: data.outcomes.completed, color: '#059669' },
+              { label: 'Cancelled', n: data.outcomes.cancelled, color: GRAY_400 },
+              { label: 'No-show', n: data.outcomes.noShow, color: '#DC2626' },
+              { label: 'Pending / Confirmed', n: data.outcomes.pending + data.outcomes.confirmed, color: BRAND },
+            ].map(row => (
+              <View key={row.label} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 13, color: GRAY_700 }}>{row.label}</Text>
+                  <Text style={{ fontSize: 13, color: GRAY_500 }}>{row.n} · {pct(row.n, data.outcomes.total)}%</Text>
+                </View>
+                <View style={{ height: 5, backgroundColor: GRAY_100, borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ height: 5, borderRadius: 3, backgroundColor: row.color, width: `${pct(row.n, data.outcomes.total)}%` }} />
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Top services */}
+          {data.topServices.length > 0 && (
+            <View style={ms.card}>
+              <Text style={[ms.cardLabel, { marginBottom: 10 }]}>Top services</Text>
+              {data.topServices.map(s => {
+                const p = pct(s.count, data.topServices[0]?.count ?? 1);
+                return (
+                  <View key={s.name} style={{ marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                      <Text style={{ fontSize: 13, color: GRAY_700, flex: 1 }} numberOfLines={1}>{s.name}</Text>
+                      <Text style={{ fontSize: 13, color: GRAY_500 }}>{s.count}</Text>
+                    </View>
+                    <View style={{ height: 5, backgroundColor: GRAY_100, borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: 5, borderRadius: 3, backgroundColor: BRAND, width: `${p}%` }} />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Top clients */}
+          {data.topClients.length > 0 && (
+            <View style={ms.card}>
+              <Text style={[ms.cardLabel, { marginBottom: 10 }]}>Top clients by spend</Text>
+              {data.topClients.map(c => (
+                <View key={c.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
+                  <Text style={{ fontSize: 13, color: GRAY_700, flex: 1 }} numberOfLines={1}>{c.name}</Text>
+                  <Text style={{ fontSize: 13, color: GRAY_500 }}>{fmtCAD(c.totalSpentCents)} · {c.totalVisits} visit{c.totalVisits === 1 ? '' : 's'}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Busiest staff */}
+          {data.topStaff.length > 0 && (
+            <View style={ms.card}>
+              <Text style={[ms.cardLabel, { marginBottom: 10 }]}>Busiest providers</Text>
+              {data.topStaff.map(s => (
+                <View key={s.name} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: GRAY_100 }}>
+                  <Text style={{ fontSize: 13, color: GRAY_700 }} numberOfLines={1}>{s.name}</Text>
+                  <Text style={{ fontSize: 13, color: GRAY_500 }}>{s.count} booking{s.count === 1 ? '' : 's'}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

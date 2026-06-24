@@ -444,6 +444,7 @@ export interface ServiceDueItem {
 // ── API client ────────────────────────────────────────────────────────────────
 
 export const api = {
+  get: <T>(path: string) => req<T>(path),
   events: {
     // Short-lived ticket for the realtime socket handshake (see useEvents).
     wsTicket: () => req<{ ticket: string }>("/events/ws-ticket"),
