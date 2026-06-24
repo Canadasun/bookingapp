@@ -1615,8 +1615,8 @@ function SettingsPage() {
 
                 {!isUnlimited ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-900">Multiple locations require Unlimited</p>
-                    <p className="text-xs text-amber-700 mt-1">Free, Basic, and Pro plans are for single-location businesses. Upgrade to <strong>Unlimited</strong> to manage multiple branches, each with their own staff and calendar, under one account.</p>
+                    <p className="text-sm font-semibold text-amber-900">Location limit reached</p>
+                    <p className="text-xs text-amber-700 mt-1">Free and Basic allow 1 location. Pro allows 2. Upgrade to <strong>Unlimited</strong> to manage up to 5 branches, each with their own staff and calendar, under one account.</p>
                     <button type="button" onClick={() => { goSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
                   </div>
                 ) : (

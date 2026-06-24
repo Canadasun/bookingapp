@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { verifyCookieValue } from "@/lib/cookie-sign";
-import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, Star } from "lucide-react";
+import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, Star, ClipboardList, Globe, Users } from "lucide-react";
 import {
   LandingAuthCta,
   LandingHeroCta,
@@ -50,17 +50,39 @@ const features = [
   },
   {
     icon: CreditCard,
-    title: "Deposits & Protection",
-    desc: "Basic and higher plans can collect deposits at booking; Pro adds automatic saved-card fee protection.",
+    title: "Deposits & No-Show Protection",
+    desc: "Collect deposits at booking on Basic+. Pro and Unlimited add automatic no-show and late-cancel fees charged to saved cards.",
     iconBg: "bg-emerald-50",
     iconColor: "text-emerald-600",
   },
+  {
+    icon: ClipboardList,
+    title: "Intake & Consent Forms",
+    desc: "Collect health notes, allergies, or custom client questions right in the booking flow — no extra app needed.",
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+  },
+  {
+    icon: Globe,
+    title: "Accept Apple Pay & Google Pay",
+    desc: "Clients pay at checkout with the tap of a finger. Powered by Stripe with CAD support, no extra setup required.",
+    iconBg: "bg-sky-50",
+    iconColor: "text-sky-600",
+  },
+  {
+    icon: Users,
+    title: "Multi-Provider & Multi-Location",
+    desc: "Add your whole team, each with their own calendar and services. Pro supports 2 locations; Unlimited supports up to 5.",
+    iconBg: "bg-violet-50",
+    iconColor: "text-violet-700",
+  },
 ];
 
+// Illustrative quotes — replace with real attributed testimonials before launch.
 const testimonials = [
-  { quote: "I set it up in 20 minutes and had my first online booking the same evening. Total game-changer.", name: "Amara O.", role: "Esthetician" },
-  { quote: "The deposit feature alone saved me from countless no-shows. Worth every penny.", name: "Jordan P.", role: "Hair Stylist" },
-  { quote: "My clients love booking from their phone at midnight. I wake up to confirmed appointments.", name: "Maya K.", role: "Massage Therapist" },
+  { quote: "I set it up in 20 minutes and had my first online booking the same evening. Total game-changer.", name: "Independent esthetician", role: "Early access user", illustrative: true },
+  { quote: "The deposit feature alone saved me from countless no-shows. Worth every penny.", name: "Hair stylist", role: "Early access user", illustrative: true },
+  { quote: "My clients love booking from their phone at midnight. I wake up to confirmed appointments.", name: "Massage therapist", role: "Early access user", illustrative: true },
 ];
 
 export default async function LandingPage() {
@@ -244,11 +266,11 @@ export default async function LandingPage() {
       <section className="py-24 bg-gradient-to-b from-[#FFFAF2] to-white border-t border-[#E9DDCB]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-ink mb-3">Loved by independent pros</h2>
-            <p className="text-slate-500 max-w-md mx-auto">From solo estheticians to growing salons — here&apos;s what they say.</p>
+            <h2 className="text-3xl font-bold text-ink mb-3">Built for appointment-based businesses</h2>
+            <p className="text-slate-500 max-w-md mx-auto">From solo estheticians to growing salons — Pulse handles the scheduling so you can focus on clients.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map(({ quote, name, role }) => (
+            {testimonials.map(({ quote, name, role, illustrative }) => (
               <div key={name} className="bg-white rounded-2xl border border-[#E9DDCB] p-7 shadow-sm hover:shadow-lg hover:shadow-amber-50 hover:-translate-y-0.5 transition-all duration-200">
                 <div className="flex gap-0.5 mb-4">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -258,11 +280,12 @@ export default async function LandingPage() {
                 <p className="text-slate-600 text-sm leading-relaxed mb-5">&ldquo;{quote}&rdquo;</p>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                    {name[0]}
+                    {name[0].toUpperCase()}
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-ink">{name}</p>
                     <p className="text-xs text-slate-400">{role}</p>
+                    {illustrative && <p className="text-[10px] text-slate-300 mt-0.5 italic">Illustrative</p>}
                   </div>
                 </div>
               </div>

@@ -14,6 +14,13 @@ export function isUnlimitedPlan(plan: PlanTier | undefined | null) {
   return featuresUnlocked() || plan === 'UNLIMITED';
 }
 
+// Returns how many automatic no-show/late-cancel fee charges a business may
+// make per calendar month. PRO+ is unlimited; FREE and BASIC each get 1/mo.
+export function getMonthlyFeeAllowance(plan: PlanTier | undefined | null): number {
+  if (isProPlan(plan)) return Infinity;
+  return 1; // FREE and BASIC: 1 per calendar month
+}
+
 export function applyPlanLimits<T extends {
   requireDeposit?: boolean;
   noShowFeeCents?: number;

@@ -61,7 +61,7 @@ export function LandingBottomCta() {
   return (
     <>
       <h2 className="text-3xl font-bold text-white mb-4">Ready to simplify your scheduling?</h2>
-      <p className="text-white/60 mb-8">Join thousands of businesses using Pulse.</p>
+      <p className="text-white/60 mb-8">Join appointment-based businesses already using Pulse.</p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
         <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
           <Sparkles className="w-5 h-5" /> Get started free

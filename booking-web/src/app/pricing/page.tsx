@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Check, X, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import type { Metadata } from "next";
+import { PLAN_DEFS, PLAN_FEATURES } from "@/lib/plans";
+import type { FeatureValue } from "@/lib/plans";
 
 export const metadata: Metadata = {
   title: "Pricing — Pulse Appointments",
@@ -12,80 +14,9 @@ export const metadata: Metadata = {
   },
 };
 
-interface Feature {
-  label: string;
-  free: boolean | string;
-  basic: boolean | string;
-  pro: boolean | string;
-  unlimited: boolean | string;
-}
-
-const features: Feature[] = [
-  { label: "Online booking page",                 free: true,        basic: true,       pro: true,       unlimited: true },
-  { label: "Unlimited appointments",              free: true,        basic: true,       pro: true,       unlimited: true },
-  { label: "Client management",                   free: true,        basic: true,       pro: true,       unlimited: true },
-  { label: "Booking confirmations (email)",       free: true,        basic: true,       pro: true,       unlimited: true },
-  { label: "In-app client messaging",             free: true,        basic: true,       pro: true,       unlimited: true },
-  { label: "Locations",                           free: "1",         basic: "1",        pro: "1",        unlimited: "Unlimited" },
-  { label: "Receive SMS from clients",            free: false,       basic: true,       pro: true,       unlimited: true },
-  { label: "Initiate SMS to clients",             free: false,       basic: false,      pro: true,       unlimited: true },
-  { label: "Automated SMS & email reminders",     free: false,       basic: false,      pro: true,       unlimited: true },
-  { label: "Deposits & card on file",             free: false,       basic: true,       pro: true,       unlimited: true },
-  { label: "Cancellation policies",               free: false,       basic: true,       pro: true,       unlimited: true },
-  { label: "Automatic no-show & late-cancel fees",free: false,       basic: false,      pro: true,       unlimited: true },
-  { label: "72-hour email reminder",              free: false,       basic: false,      pro: true,       unlimited: true },
-  { label: "Packages, gift cards & memberships",  free: false,       basic: true,       pro: true,       unlimited: true },
-  { label: "Reviews & marketing campaigns",       free: false,       basic: true,       pro: true,       unlimited: true },
-  { label: "Reports & analytics",                 free: false,       basic: true,       pro: true,       unlimited: true },
-  { label: "Google Calendar sync",                free: true,        basic: true,       pro: true,       unlimited: true },
-];
-
-const plans = [
-  {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    desc: "Everything you need to start taking bookings online.",
-    cta: "Get started free",
-    href: "/register",
-    highlight: false,
-  },
-  {
-    id: "basic",
-    name: "Basic",
-    price: "$49",
-    period: "/ month",
-    desc: "Accept payments, deposits, and client texts.",
-    cta: "Start with Basic",
-    href: "/register?plan=basic",
-    highlight: false,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$149",
-    period: "/ month",
-    desc: "Automated reminders, SMS outreach, and no-show protection.",
-    cta: "Start with Pro",
-    href: "/register?plan=pro",
-    highlight: true,
-  },
-  {
-    id: "unlimited",
-    name: "Unlimited",
-    price: "$80",
-    period: "/ month",
-    desc: "All Pro features across unlimited locations.",
-    cta: "Start with Unlimited",
-    href: "/register?plan=unlimited",
-    highlight: false,
-  },
-];
-
-function Cell({ value }: { value: boolean | string }) {
-  if (value === true)  return <Check className="mx-auto h-5 w-5 text-violet-600" aria-label="Included" />;
-  if (value === false) return <X className="mx-auto h-4 w-4 text-slate-300" aria-label="Not included" />;
+function Cell({ value }: { value: FeatureValue }) {
+  if (value === true)  return <span className="text-violet-600 font-bold text-base" aria-label="Included">✓</span>;
+  if (value === false) return <span className="text-slate-300 text-base" aria-label="Not included">—</span>;
   return <span className="text-sm font-semibold text-slate-700">{value}</span>;
 }
 
@@ -123,7 +54,7 @@ export default function PricingPage() {
 
         {/* Plan cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16">
-          {plans.map((plan) => (
+          {PLAN_DEFS.map((plan) => (
             <div
               key={plan.id}
               className={
@@ -139,8 +70,12 @@ export default function PricingPage() {
               )}
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">{plan.name}</p>
               <div className="flex items-end gap-1 mb-1">
-                <span className="text-4xl font-extrabold text-slate-900 tracking-tight">{plan.price}</span>
-                <span className="text-sm text-slate-400 mb-1.5">{plan.period}</span>
+                <span className="text-4xl font-extrabold text-slate-900 tracking-tight">
+                  {plan.price === 0 ? "Free" : `$${plan.price}`}
+                </span>
+                {plan.price > 0 && (
+                  <span className="text-sm text-slate-400 mb-1.5">{plan.period}</span>
+                )}
               </div>
               <p className="text-sm text-slate-500 mb-6 leading-relaxed">{plan.desc}</p>
               <Link
@@ -164,7 +99,7 @@ export default function PricingPage() {
             <thead>
               <tr className="border-b border-[#E9DDCB]">
                 <th className="text-left px-6 py-4 font-semibold text-slate-900 w-[40%]">Feature</th>
-                {plans.map((p) => (
+                {PLAN_DEFS.map((p) => (
                   <th
                     key={p.id}
                     className={
@@ -179,7 +114,7 @@ export default function PricingPage() {
               </tr>
             </thead>
             <tbody>
-              {features.map((f, i) => (
+              {PLAN_FEATURES.map((f, i) => (
                 <tr
                   key={f.label}
                   className={i % 2 === 0 ? "bg-white" : "bg-slate-50/60"}
@@ -193,6 +128,9 @@ export default function PricingPage() {
               ))}
             </tbody>
           </table>
+          <p className="text-xs text-slate-400 px-6 py-3 border-t border-[#E9DDCB]">
+            * 1/mo — one automatic fee per calendar month on Free and Basic plans. Upgrade to Pro for unlimited no-show and late-cancel fees.
+          </p>
         </div>
 
         {/* FAQ / reassurance */}
@@ -200,7 +138,7 @@ export default function PricingPage() {
           {[
             { q: "Is there a free trial?", a: "The Free plan has no time limit. Use it forever, then upgrade when you're ready." },
             { q: "Can I cancel anytime?", a: "Yes. Downgrade or cancel from your account settings at any time. No cancellation fees." },
-            { q: "What payment methods do you accept?", a: "All major credit and debit cards via Stripe. Payments are in CAD." },
+            { q: "What payment methods do you accept?", a: "All major credit and debit cards, Apple Pay, and Google Pay via Stripe. Payments are in CAD." },
           ].map(({ q, a }) => (
             <div key={q} className="rounded-2xl border border-[#E9DDCB] bg-white p-6">
               <p className="font-bold text-slate-900 mb-2">{q}</p>

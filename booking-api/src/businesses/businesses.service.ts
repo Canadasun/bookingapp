@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException, 
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
-import { applyPlanLimits, isUnlimitedPlan, isProPlan } from '../common/util/plan-features';
+import { applyPlanLimits, isUnlimitedPlan, isProPlan, isPaidPlan } from '../common/util/plan-features';
 import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 import { getCapabilities } from '../common/util/plan';
 import { ResendEmailProvider } from '../notifications/providers/email.provider';
@@ -546,7 +546,7 @@ export class BusinessesService {
 
   async getReports(businessId: string) {
     const biz = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true, currency: true } });
-    if (!isProPlan(biz.plan)) {
+    if (!isPaidPlan(biz.plan)) {
       return { gated: true, plan: biz.plan };
     }
 

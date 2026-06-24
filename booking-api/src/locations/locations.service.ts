@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { featuresUnlocked } from '../common/util/plan';
+import { isProPlan, isUnlimitedPlan } from '../common/util/plan-features';
 
 @Injectable()
 export class LocationsService {
@@ -21,9 +22,16 @@ export class LocationsService {
 
     const existing = await this.prisma.location.count({ where: { businessId, active: true } });
 
-    // Only UNLIMITED can add a second location; FREE/BASIC/PRO are single-location.
-    if (existing > 0 && !featuresUnlocked() && business.plan !== 'UNLIMITED') {
-      throw new ForbiddenException('Managing multiple locations requires an Unlimited plan.');
+    if (!featuresUnlocked()) {
+      // Location limits by plan: Free/Basic=1, Pro=2, Unlimited=5
+      const limit = isUnlimitedPlan(business.plan) ? 5 : isProPlan(business.plan) ? 2 : 1;
+      if (existing >= limit) {
+        const upgrade = isProPlan(business.plan) ? 'Unlimited' : isUnlimitedPlan(business.plan) ? null : 'Pro or Unlimited';
+        const msg = upgrade
+          ? `Your plan allows ${limit} location${limit === 1 ? '' : 's'}. Upgrade to ${upgrade} to add more.`
+          : `Unlimited plan supports up to 5 locations. Contact support if you need more.`;
+        throw new ForbiddenException(msg);
+      }
     }
 
     return this.prisma.location.create({

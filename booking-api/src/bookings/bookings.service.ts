@@ -14,7 +14,7 @@ import { CalendarSyncService } from '../calendar-sync/calendar-sync.service';
 import { CreateAppointmentDto, CreateRecurringDto, PublicCreateAppointmentDto, RescheduleDto, StatusDto, UpdateAppointmentDto } from './dto/appointment.dto';
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
-import { isPaidPlan } from '../common/util/plan-features';
+import { isPaidPlan, getMonthlyFeeAllowance } from '../common/util/plan-features';
 import { Prisma } from '@prisma/client';
 import { addMinutes, addWeeks, addMonths, differenceInMinutes } from 'date-fns';
 import { randomUUID } from 'node:crypto';
@@ -776,8 +776,17 @@ export class BookingsService {
 
     // Policy due: a no-show was just recorded and a fee is configured but wasn't
     // auto-collected here — prompt the owner in their dashboard to charge it.
+    // FREE/BASIC plans are limited to 1 automatic fee per calendar month.
     if (dto.status === 'NO_SHOW' && !cancelFee?.charged && updated.business.noShowFeeCents > 0) {
-      await this.promptOwnersToCharge(updated.businessId, id, 'NO_SHOW', updated.client.name, updated.business.noShowFeeCents);
+      const allowance = getMonthlyFeeAllowance(updated.business.plan as import('@prisma/client').PlanTier);
+      const allowed = allowance === Infinity || await (async () => {
+        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+        const used = await this.prisma.payment.count({
+          where: { businessId: updated.businessId, kind: { in: ['NO_SHOW_FEE', 'LATE_CANCEL_FEE'] }, createdAt: { gte: monthStart } },
+        });
+        return used < allowance;
+      })();
+      if (allowed) await this.promptOwnersToCharge(updated.businessId, id, 'NO_SHOW', updated.client.name, updated.business.noShowFeeCents);
     }
 
     return { ...updated, cancelFee };
@@ -822,8 +831,17 @@ export class BookingsService {
     }).catch(() => {});
 
     // Dashboard prompt to the owner when a late-cancel fee is configured.
+    // FREE/BASIC plans are limited to 1 automatic fee per calendar month.
     if (existing.business.cancellationFeeCents > 0) {
-      await this.promptOwnersToCharge(existing.businessId, id, 'LATE_CANCEL', existing.client.name, existing.business.cancellationFeeCents);
+      const allowance = getMonthlyFeeAllowance(existing.business.plan as import('@prisma/client').PlanTier);
+      const allowed = allowance === Infinity || await (async () => {
+        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+        const used = await this.prisma.payment.count({
+          where: { businessId: existing.businessId, kind: { in: ['NO_SHOW_FEE', 'LATE_CANCEL_FEE'] }, createdAt: { gte: monthStart } },
+        });
+        return used < allowance;
+      })();
+      if (allowed) await this.promptOwnersToCharge(existing.businessId, id, 'LATE_CANCEL', existing.client.name, existing.business.cancellationFeeCents);
     }
 
     await this.logAction('APPOINTMENT', id, 'LATE_CANCEL_REQUEST', {

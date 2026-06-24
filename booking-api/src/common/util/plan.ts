@@ -25,9 +25,9 @@ export function getCapabilities(plan: string | null | undefined) {
   return {
     deposits:          paid,
     cardOnFile:        paid,
-    memberships:       paid,
-    giftCards:         paid,
-    sms:               pro,
+    memberships:       pro,
+    giftCards:         pro,
+    sms:               paid,
     noShowFees:        pro,
     cancellationFees:  pro,
     marketing:         pro,

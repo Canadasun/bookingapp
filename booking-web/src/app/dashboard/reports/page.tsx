@@ -68,7 +68,7 @@ export default function ReportsPage() {
         <Lock className="w-7 h-7 text-violet-600" />
       </div>
       <h2 className="text-xl font-bold text-gray-900 mb-2">Analytics &amp; Reports</h2>
-      <p className="text-sm text-gray-500 mb-2">Upgrade to <strong>Pro ($149/mo)</strong> to unlock:</p>
+      <p className="text-sm text-gray-500 mb-2">Upgrade to <strong>Basic ($19/mo)</strong> or higher to unlock:</p>
       <ul className="text-sm text-gray-500 mb-6 space-y-1 text-left inline-block">
         <li>• Revenue trends (last 12 months)</li>
         <li>• Revenue Protected by Pulse</li>
@@ -78,7 +78,7 @@ export default function ReportsPage() {
       </ul>
       <div className="flex flex-col gap-3">
         <a href="/dashboard/settings#billing" className="inline-block bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
-          Upgrade to Pro — $149/mo →
+          Upgrade to Basic — $19/mo →
         </a>
         <a href="/pricing" className="text-sm text-gray-400 hover:text-gray-600">Compare all plans</a>
       </div>
