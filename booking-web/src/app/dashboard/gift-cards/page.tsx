@@ -215,7 +215,7 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
     <Card className="border-violet-200">
       <CardContent className="py-5 space-y-3">
         <div className="flex gap-2">
-          <Input placeholder="GIFT-XXXX-XXXX" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="font-mono" />
+          <Input placeholder="GIFT-XXXX-XXXX-XXXX-XXXX" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="font-mono" />
           <Button variant="outline" onClick={check} loading={checking}>Check</Button>
         </div>
         {bal && (
