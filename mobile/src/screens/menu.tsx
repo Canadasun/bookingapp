@@ -27,7 +27,7 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 // Plan tiers mirror the web billing page.
 const PLANS = [
   { id:'FREE',      name:'Free',      price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page','Up to 5 staff members','1 location'] },
-  { id:'BASIC',     name:'Basic',     price:'$19', period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Deposit collection','Cancellation policies','Reports & analytics','Manual charges','Up to 10 staff members'] },
+  { id:'BASIC',     name:'Basic',     price:'$19', period:'/mo', features:['Everything in Free','Receive & initiate SMS to clients','Deposits & card on file','Cancellation policies','Reports & analytics','No-show fees (1/mo)','Late-cancel fees (1/mo)','Up to 10 staff members'] },
   { id:'PRO',       name:'Pro',       price:'$39', period:'/mo', features:['Everything in Basic','Automated SMS & email reminders','Automatic no-show fees (unlimited)','Late-cancellation fees (unlimited)','Packages, gift cards & memberships','Reviews & marketing campaigns','2 locations'] },
   { id:'UNLIMITED', name:'Unlimited', price:'$79', period:'/mo', features:['Everything in Pro','Up to 5 locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
 ] as const;
@@ -856,7 +856,7 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
 
   async function saveSettings() {
     if (!settingsEditor) return;
-    const plan = ((biz as any)?.plan ?? 'FREE') as 'FREE'|'BASIC'|'PRO';
+    const plan = ((biz as any)?.plan ?? 'FREE') as 'FREE'|'BASIC'|'PRO'|'UNLIMITED';
     const depositPercent = Number.parseInt(settingsEditor.depositPercent, 10);
     if (settingsEditor.requireDeposit && plan === 'FREE') {
       Alert.alert(
@@ -1061,15 +1061,6 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
         if (!biz && bizResult.status === 'fulfilled') setBiz(bizResult.value);
         if (!deliveries && deliveriesResult.status === 'fulfilled') setDeliveries(deliveriesResult.value);
         else if (deliveriesResult.status === 'rejected') Alert.alert('Could not load deliveries', deliveriesResult.reason instanceof Error ? deliveriesResult.reason.message : 'Please try again.');
-      }
-      else if (v === 'reports' && !appts) {
-        setLoading(true);
-        const [bookingRows, paymentRows] = await Promise.all([
-          api<{data:Appointment[]}>(`/businesses/${bizId()}/bookings`),
-          api<any[]>(`/payments`).catch(() => []),
-        ]);
-        setAppts(bookingRows.data);
-        setPayments(paymentRows);
       }
       else if (v === 'transactions') { setLoading(true); setPayments(await api<any[]>(`/payments`)); }
       else if (v === 'payouts') { setLoading(true); setConnectStatus(await api<ConnectStatus>(`/payments/connect/status`)); }
