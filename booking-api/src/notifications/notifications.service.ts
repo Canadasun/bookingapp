@@ -255,7 +255,7 @@ export class NotificationsService implements OnModuleInit {
 
   // Security alert: a sign-in from a new device. Includes a reset link so the
   // user can lock the account if it wasn't them.
-  async sendSecurityAlert(userId: string, info: { ip?: string; userAgent?: string; resetToken: string }) {
+  async sendSecurityAlert(userId: string, info: { ip?: string; userAgent?: string; resetToken?: string }) {
     await this.queue.add(
       'security-alert',
       { userId, ip: info.ip, userAgent: info.userAgent, resetToken: info.resetToken },

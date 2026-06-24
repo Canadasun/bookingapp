@@ -18,9 +18,13 @@ import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeE
 import { hashRefreshToken, refreshTokenTtlMs } from '../common/util/refresh-token';
 import { normalizePhone } from '../common/util/phone';
 import { Prisma, User } from '@prisma/client';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 @Injectable()
 export class AuthService {
+  // Module-level JWKS instance so Apple's key set is cached across requests.
+  private readonly appleJWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
+
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
@@ -902,8 +906,12 @@ export class AuthService {
 
   async setTwoFactor(userId: string, enabled: boolean, method: 'EMAIL' | 'SMS' | undefined, currentPassword: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (!user.passwordHash || !await bcrypt.compare(currentPassword, user.passwordHash)) {
-      throw new UnauthorizedException('Current password is incorrect');
+    // SSO-only accounts have no password — they authenticated via a trusted provider,
+    // so skip password confirmation. Password accounts must confirm before changing 2FA.
+    if (user.passwordHash) {
+      if (!await bcrypt.compare(currentPassword, user.passwordHash)) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
     }
     const data: { twoFactorEnabled: boolean; twoFactorMethod?: string; twoFactorRecoveryCodes?: string[] } = {
       twoFactorEnabled: enabled,
@@ -965,11 +973,11 @@ export class AuthService {
         data: { userId: user.id, deviceKey: storedDeviceKey, ip, userAgent: ua.slice(0, 256) || null },
       });
       if (total > 0 && !priorSameDevice && !priorSameIp) {
-        const resetToken = this.jwt.sign(
-          { sub: user.id, kind: 'reset' },
-          { secret: this.resetSecret(user.passwordHash ?? ''), expiresIn: '15m' },
-        );
-        await this.notifications.sendSecurityAlert(user.id, { ip: ctx?.ip, userAgent: ua, resetToken });
+        // SSO-only users have no password to reset; skip the reset-token attachment.
+        const resetToken = user.passwordHash
+          ? this.jwt.sign({ sub: user.id, kind: 'reset' }, { secret: this.resetSecret(user.passwordHash), expiresIn: '15m' })
+          : undefined;
+        await this.notifications.sendSecurityAlert(user.id, { ip: ctx?.ip, userAgent: ua, ...(resetToken ? { resetToken } : {}) });
       }
     } catch { /* never block login on the alert path */ }
   }
@@ -1037,15 +1045,28 @@ export class AuthService {
 
   // ── SSO: Google + Apple ─────────────────────────────────────────────────────
 
-  async findOrCreateSSOUser(provider: string, subject: string, email: string, name: string): Promise<User> {
+  async findOrCreateSSOUser(provider: string, subject: string, email: string, name: string, ctx?: { ip?: string }): Promise<User> {
+    // 1. Fast path: already linked account.
     const existing = await this.prisma.user.findFirst({
       where: { oauthProvider: provider, oauthSubject: subject },
     });
     if (existing) return existing;
 
+    // 2. Email-match path: link to an existing account — but only if that account
+    //    has already verified the email (proves they own it) and is not an admin
+    //    (admin accounts must never be silently taken over via OAuth).
     if (email) {
       const byEmail = await this.prisma.user.findUnique({ where: { email } });
       if (byEmail) {
+        if (!byEmail.emailVerified) {
+          throw new UnauthorizedException(
+            'An account with this email exists but has not yet been verified. ' +
+            'Sign in with your password first to verify it, then link your social account from settings.',
+          );
+        }
+        if (byEmail.role === 'ADMIN') {
+          throw new UnauthorizedException('Admin accounts cannot be linked via social sign-in.');
+        }
         return this.prisma.user.update({
           where: { id: byEmail.id },
           data: { oauthProvider: provider, oauthSubject: subject },
@@ -1053,17 +1074,55 @@ export class AuthService {
       }
     }
 
-    return this.prisma.user.create({
-      data: {
-        name: name || (email ? email.split('@')[0] : `${provider}_user`),
-        email: email || `${provider}.${subject}@noreply.pulse`,
-        passwordHash: null,
-        oauthProvider: provider,
-        oauthSubject: subject,
-        role: 'CLIENT',
-        emailVerified: true,
-      },
-    });
+    // 3. New user: create inside a transaction so consent records are atomic.
+    //    Guard with a P2002 catch in case two concurrent requests race.
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: name || (email ? email.split('@')[0] : `${provider}_user`),
+            email: email || `${provider}.${subject}@noreply.pulse`,
+            passwordHash: null,
+            oauthProvider: provider,
+            oauthSubject: subject,
+            role: 'CLIENT',
+            emailVerified: true,
+          },
+        });
+        // Write TERMS + PRIVACY_POLICY consent — user accepted by clicking the
+        // SSO button, which is presented alongside the "By continuing you agree…" notice.
+        await tx.privacyConsent.createMany({
+          data: [
+            {
+              userId: user.id,
+              businessId: null,
+              type: 'TERMS',
+              granted: true,
+              version: '2026-06-13',
+              source: 'sso_registration',
+              ipAddress: ctx?.ip?.slice(0, 64) ?? null,
+            },
+            {
+              userId: user.id,
+              businessId: null,
+              type: 'PRIVACY_POLICY',
+              granted: true,
+              version: '2026-06-13',
+              source: 'sso_registration',
+              ipAddress: ctx?.ip?.slice(0, 64) ?? null,
+            },
+          ],
+        });
+        return user;
+      });
+    } catch (e) {
+      // Race condition: another concurrent request won the insert. Return the winner.
+      if ((e as { code?: string }).code === 'P2002') {
+        const winner = await this.prisma.user.findFirst({ where: { oauthProvider: provider, oauthSubject: subject } });
+        if (winner) return winner;
+      }
+      throw e;
+    }
   }
 
   async verifyGoogleCode(code: string, redirectUri: string, codeVerifier?: string): Promise<{ sub: string; email: string; name: string }> {
@@ -1093,8 +1152,9 @@ export class AuthService {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
     if (!infoRes.ok) throw new UnauthorizedException('Could not fetch Google profile');
-    const info = await infoRes.json() as { sub?: string; email?: string; name?: string };
+    const info = await infoRes.json() as { sub?: string; email?: string; name?: string; email_verified?: boolean };
     if (!info.sub || !info.email) throw new UnauthorizedException('Incomplete Google profile — email scope may be missing');
+    if (!info.email_verified) throw new UnauthorizedException('Google account email address is not verified');
     return { sub: info.sub, email: info.email, name: info.name ?? '' };
   }
 
@@ -1104,11 +1164,9 @@ export class AuthService {
       : process.env.APPLE_CLIENT_ID;
     if (!clientId) throw new ServiceUnavailableException('Apple sign-in is not configured');
 
-    const { createRemoteJWKSet, jwtVerify } = await import('jose');
-    const JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
     let payload: Record<string, unknown>;
     try {
-      const result = await jwtVerify(identityToken, JWKS, {
+      const result = await jwtVerify(identityToken, this.appleJWKS, {
         issuer: 'https://appleid.apple.com',
         audience: clientId,
       });

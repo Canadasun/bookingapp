@@ -192,21 +192,31 @@ export class AuthController {
   @Post('google/verify')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async googleVerify(@Body() body: { code?: string; redirectUri?: string; codeVerifier?: string }) {
+  async googleVerify(@Body() body: { code?: string; redirectUri?: string; codeVerifier?: string }, @Req() req: Request) {
     if (!body.code || !body.redirectUri) throw new BadRequestException('code and redirectUri are required');
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.pulseappointments.com').replace(/\/$/, '');
+    const allowedRedirectUris = new Set([
+      `${appUrl}/api/auth/google/callback`,
+      'pulseappointments://auth/google',
+    ]);
+    if (!allowedRedirectUris.has(body.redirectUri)) throw new BadRequestException('Invalid redirectUri');
+    const fwd = ((req as unknown as { headers: Record<string, string | undefined> }).headers['x-forwarded-for'])?.split(',')[0]?.trim();
+    const ip = fwd || (req as unknown as { ip?: string }).ip;
     const profile = await this.authService.verifyGoogleCode(body.code, body.redirectUri, body.codeVerifier);
-    const user = await this.authService.findOrCreateSSOUser('google', profile.sub, profile.email, profile.name);
+    const user = await this.authService.findOrCreateSSOUser('google', profile.sub, profile.email, profile.name, { ip });
     return this.authService['issueTokens'](user);
   }
 
   @Post('apple/verify')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async appleVerify(@Body() body: { identityToken?: string; email?: string; firstName?: string; lastName?: string; platform?: string }) {
+  async appleVerify(@Body() body: { identityToken?: string; email?: string; firstName?: string; lastName?: string; platform?: string }, @Req() req: Request) {
     if (!body.identityToken) throw new BadRequestException('identityToken is required');
     const platform = body.platform === 'mobile' ? 'mobile' : 'web';
+    const fwd = ((req as unknown as { headers: Record<string, string | undefined> }).headers['x-forwarded-for'])?.split(',')[0]?.trim();
+    const ip = fwd || (req as unknown as { ip?: string }).ip;
     const profile = await this.authService.verifyAppleToken(body.identityToken, platform, body.email, body.firstName, body.lastName);
-    const user = await this.authService.findOrCreateSSOUser('apple', profile.sub, profile.email, profile.name);
+    const user = await this.authService.findOrCreateSSOUser('apple', profile.sub, profile.email, profile.name, { ip });
     return this.authService['issueTokens'](user);
   }
 }
