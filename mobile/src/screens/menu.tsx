@@ -1666,6 +1666,47 @@ function MenuScreen({ onLogout }: { onLogout:()=>void }) {
     );
   }
 
+  if (view === 'marketing' || view === 'giftcards' || view === 'packages' || view === 'memberships') {
+    const _bizPlan = ((biz as any)?.plan ?? 'FREE') as string;
+    const _isProPlus = _bizPlan === 'PRO' || _bizPlan === 'UNLIMITED';
+    const _gateLabels: Record<string, { title: string; icon: string; desc: string }> = {
+      marketing:   { title: 'Marketing & Campaigns', icon: 'megaphone-outline',  desc: 'Email campaigns and review requests' },
+      giftcards:   { title: 'Gift Cards',            icon: 'gift-outline',       desc: 'Issue and sell gift cards to clients' },
+      packages:    { title: 'Packages',              icon: 'cube-outline',        desc: 'Prepaid service packages' },
+      memberships: { title: 'Memberships',           icon: 'card-outline',        desc: 'Recurring membership plans' },
+    };
+    if (!_isProPlus) {
+      const { title, icon, desc } = _gateLabels[view];
+      return (
+        <SafeAreaView style={s.screen}>
+          <View style={[s.header, { justifyContent: 'space-between' }]}>
+            <TouchableOpacity onPress={() => open('menu')} style={{ padding: 8 }} accessibilityRole="button" accessibilityLabel="Back">
+              <Ionicons name="chevron-back" size={22} color={GRAY_900} />
+            </TouchableOpacity>
+            <Text style={s.headerTitle}>{title}</Text>
+            <View style={{ width: 38 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Ionicons name={icon as any} size={32} color={BRAND} />
+            </View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: GRAY_900, textAlign: 'center', marginBottom: 8 }}>{title}</Text>
+            <Text style={{ fontSize: 14, color: GRAY_500, textAlign: 'center', marginBottom: 6 }}>
+              Upgrade to <Text style={{ fontWeight: '700' }}>Pro ($39/mo)</Text> to unlock:
+            </Text>
+            <Text style={{ fontSize: 13, color: GRAY_400, textAlign: 'center', marginBottom: 24 }}>{desc}</Text>
+            <TouchableOpacity
+              onPress={() => open('addons')}
+              style={{ backgroundColor: BRAND, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28, width: '100%', alignItems: 'center' }}
+              accessibilityRole="button" accessibilityLabel="Upgrade to Pro">
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Upgrade to Pro — $39/mo →</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+  }
+
   if (view === 'marketing') return (
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
