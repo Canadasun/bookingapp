@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
-import { isPaidPlan } from '../common/util/plan-features';
+import { isProPlan } from '../common/util/plan-features';
 
 @Injectable()
 export class MembershipsService {
@@ -10,7 +10,7 @@ export class MembershipsService {
   private async assertMembershipsEnabled(businessId: string) {
     const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
     if (!business) throw new NotFoundException('Business not found');
-    if (!isPaidPlan(business.plan)) throw new BadRequestException('Memberships require a paid Pulse plan');
+    if (!isProPlan(business.plan)) throw new BadRequestException('Memberships require a Pro or Unlimited plan');
   }
 
   // ── Plans ─────────────────────────────────────────────────────────────────

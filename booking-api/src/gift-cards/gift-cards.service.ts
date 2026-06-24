@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { IssueGiftCardDto, RedeemGiftCardDto } from './dto/gift-cards.dto';
+import { isProPlan } from '../common/util/plan-features';
 
 // Unambiguous alphabet (no 0/O, 1/I) for codes people read off a card.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,6 +23,8 @@ export class GiftCardsService {
   }
 
   async issue(businessId: string, dto: IssueGiftCardDto) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    if (!isProPlan(business.plan)) throw new ForbiddenException('Gift cards require a Pro or Unlimited plan');
     // Retry on the rare per-business code collision.
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = this.genCode();

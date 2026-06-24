@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { isProPlan } from '../common/util/plan-features';
 
 const dueInclude = {
   client: { select: { id: true, name: true, email: true } },
@@ -55,6 +56,8 @@ export class ServiceDueService {
   }
 
   async createPolicy(businessId: string, dto: { serviceId?: string | null; name: string; trigger: string; delayDays: number; subject: string; body: string; enabled?: boolean }) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    if (!isProPlan(business.plan)) throw new ForbiddenException('Automated follow-up policies require a Pro or Unlimited plan');
     if (dto.serviceId) {
       const service = await this.prisma.service.findFirst({ where: { id: dto.serviceId, businessId }, select: { id: true } });
       if (!service) throw new NotFoundException('Service not found');

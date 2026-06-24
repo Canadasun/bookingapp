@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateCampaignDto, UpdateCampaignDto } from './dto/campaigns.dto';
-import { isPaidPlan, isProPlan } from '../common/util/plan-features';
+import { isProPlan } from '../common/util/plan-features';
 
 const DAILY_CAMPAIGN_LIMIT = 3;
 
@@ -36,8 +36,8 @@ export class CampaignsService {
     if (channel === 'SMS' && !isProPlan(plan)) {
       throw new ForbiddenException('SMS campaigns require a Pro or Unlimited plan');
     }
-    if (channel === 'EMAIL' && !isPaidPlan(plan)) {
-      throw new ForbiddenException('Email campaigns require a paid plan');
+    if (channel === 'EMAIL' && !isProPlan(plan)) {
+      throw new ForbiddenException('Email campaigns require a Pro or Unlimited plan');
     }
   }
 

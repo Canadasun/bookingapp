@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { isProPlan } from '../common/util/plan-features';
 import {
   CreatePackageDto, UpdatePackageDto,
   IssueClientPackageDto, RedeemClientPackageDto,
@@ -21,6 +22,8 @@ export class PackagesService {
   }
 
   async createPackage(businessId: string, dto: CreatePackageDto) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    if (!isProPlan(business.plan)) throw new ForbiddenException('Packages require a Pro or Unlimited plan');
     await this.assertServiceInBusiness(businessId, dto.serviceId);
     return this.prisma.package.create({ data: { businessId, ...dto } });
   }
@@ -48,6 +51,8 @@ export class PackagesService {
 
   // ── Client packages (issued) ─────────────────────────────────────────
   async issue(businessId: string, dto: IssueClientPackageDto) {
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    if (!isProPlan(business.plan)) throw new ForbiddenException('Packages require a Pro or Unlimited plan');
     const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId }, select: { id: true } });
     if (!client) throw new NotFoundException('Client not found');
 
