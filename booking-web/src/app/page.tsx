@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { verifyCookieValue } from "@/lib/cookie-sign";
 import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, Star, ClipboardList, Globe, Users } from "lucide-react";
+import { PLAN_DEFS } from "@/lib/plans";
 import {
   LandingAuthCta,
   LandingHeroCta,
@@ -291,6 +292,58 @@ export default async function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Pricing comparison ── */}
+      <section className="py-24 bg-white/60 border-t border-[#E9DDCB]">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold text-ink mb-3">Plans for every stage</h2>
+            <p className="text-slate-500 max-w-md mx-auto">
+              Start free, no credit card. Upgrade the moment you need it.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {PLAN_DEFS.map((plan) => (
+              <div
+                key={plan.id}
+                className={
+                  plan.highlight
+                    ? "rounded-2xl border-2 border-violet-500 bg-white p-6 shadow-lg shadow-violet-100 relative flex flex-col"
+                    : "rounded-2xl border border-[#E9DDCB] bg-white p-6 shadow-sm flex flex-col"
+                }
+              >
+                {plan.highlight && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-[10px] font-bold px-3 py-0.5 rounded-full tracking-wider uppercase">
+                    Popular
+                  </span>
+                )}
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">{plan.name}</p>
+                <div className="flex items-end gap-1 mb-1">
+                  <span className="text-3xl font-extrabold text-slate-900">
+                    {plan.price === 0 ? "Free" : `$${plan.price}`}
+                  </span>
+                  {plan.price > 0 && <span className="text-xs text-slate-400 mb-1">/mo</span>}
+                </div>
+                <p className="text-xs text-slate-500 mb-5 leading-relaxed flex-1">{plan.desc}</p>
+                <a
+                  href={plan.href}
+                  className={
+                    plan.highlight
+                      ? "block text-center py-2.5 rounded-xl bg-violet-600 text-white font-semibold text-sm hover:bg-violet-700 transition-colors"
+                      : "block text-center py-2.5 rounded-xl border border-[#E9DDCB] text-slate-700 font-semibold text-sm hover:bg-violet-50 transition-colors"
+                  }
+                >
+                  {plan.cta}
+                </a>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-slate-400">
+            See the full feature breakdown on our{" "}
+            <a href="/pricing" className="text-violet-600 hover:underline font-medium">pricing page →</a>
+          </p>
         </div>
       </section>
 
