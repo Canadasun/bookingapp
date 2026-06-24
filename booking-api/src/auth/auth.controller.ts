@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, HttpCode, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, HttpCode, Req, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -185,5 +185,28 @@ export class AuthController {
       // Always clear the secret so a DB error can't leave the endpoint open for retry.
       delete process.env.BOOTSTRAP_ADMIN_SECRET;
     }
+  }
+
+  // ── SSO: Google + Apple ─────────────────────────────────────────────────────
+
+  @Post('google/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async googleVerify(@Body() body: { code?: string; redirectUri?: string; codeVerifier?: string }) {
+    if (!body.code || !body.redirectUri) throw new BadRequestException('code and redirectUri are required');
+    const profile = await this.authService.verifyGoogleCode(body.code, body.redirectUri, body.codeVerifier);
+    const user = await this.authService.findOrCreateSSOUser('google', profile.sub, profile.email, profile.name);
+    return this.authService['issueTokens'](user);
+  }
+
+  @Post('apple/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async appleVerify(@Body() body: { identityToken?: string; email?: string; firstName?: string; lastName?: string; platform?: string }) {
+    if (!body.identityToken) throw new BadRequestException('identityToken is required');
+    const platform = body.platform === 'mobile' ? 'mobile' : 'web';
+    const profile = await this.authService.verifyAppleToken(body.identityToken, platform, body.email, body.firstName, body.lastName);
+    const user = await this.authService.findOrCreateSSOUser('apple', profile.sub, profile.email, profile.name);
+    return this.authService['issueTokens'](user);
   }
 }

@@ -16,10 +16,100 @@ import { setAuth, getAuth, bizId, listeners, persistAuth, loadPersistedAuth, ref
 import { api, registerPushNotifications } from '../api';
 import { s, cal, co, ms, dst } from '../styles';
 import { Pill, PriceTag, VerifiedPill } from '../components';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
+
+// Required so the OAuth browser tab can close itself and return to the app.
+WebBrowser.maybeCompleteAuthSession();
+
+// Shared helper: sends an SSO token/code to the backend and calls onLogin.
+async function completeSSOLogin(
+  endpoint: string,
+  body: Record<string, unknown>,
+  onLogin: (t: string, r: string, u: User) => void,
+  setLoading: (v: boolean) => void,
+) {
+  setLoading(true);
+  try {
+    const res = await api<{ accessToken: string; refreshToken: string; user: User }>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    onLogin(res.accessToken, res.refreshToken, res.user);
+  } catch (err) {
+    Alert.alert('Sign-in failed', err instanceof Error ? err.message : 'Please try again.');
+  } finally {
+    setLoading(false);
+  }
+}
 
 function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:string,u:User)=>void; onRegister:()=>void; onForgot:()=>void }) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
+  const [ssoLoading, setSsoLoading] = useState(false);
+
+  // Google PKCE auth request — useAuthRequest handles code_challenge generation.
+  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+  const googleRedirectUri = AuthSession.makeRedirectUri({ scheme: 'pulseappointments', path: 'auth/google' });
+  const [googleRequest, , googlePrompt] = AuthSession.useAuthRequest(
+    {
+      clientId: googleClientId,
+      scopes: ['openid', 'email', 'profile'],
+      redirectUri: googleRedirectUri,
+    },
+    { authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth' },
+  );
+
+  async function loginWithGoogle() {
+    if (!googleClientId || !googleRequest) {
+      Alert.alert('Unavailable', 'Google sign-in is not configured in this build.');
+      return;
+    }
+    setSsoLoading(true);
+    try {
+      const result = await googlePrompt();
+      if (result.type !== 'success') { setSsoLoading(false); return; }
+      await completeSSOLogin(
+        '/auth/google/verify',
+        { code: result.params.code, redirectUri: googleRedirectUri, codeVerifier: googleRequest.codeVerifier },
+        onLogin,
+        setSsoLoading,
+      );
+    } catch (err) {
+      Alert.alert('Google sign-in failed', err instanceof Error ? err.message : 'Please try again.');
+      setSsoLoading(false);
+    }
+  }
+
+  async function loginWithApple() {
+    try {
+      const cred = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!cred.identityToken) { Alert.alert('Apple sign-in failed', 'No identity token received.'); return; }
+      await completeSSOLogin(
+        '/auth/apple/verify',
+        {
+          identityToken: cred.identityToken,
+          email: cred.email ?? undefined,
+          firstName: cred.fullName?.givenName ?? undefined,
+          lastName: cred.fullName?.familyName ?? undefined,
+          platform: 'mobile',
+        },
+        onLogin,
+        setSsoLoading,
+      );
+    } catch (err: unknown) {
+      // ERR_CANCELED = user dismissed the Apple sheet — not an error worth showing
+      if ((err as { code?: string }).code !== 'ERR_CANCELED') {
+        Alert.alert('Apple sign-in failed', err instanceof Error ? err.message : 'Please try again.');
+      }
+    }
+  }
   const [loading, setLoading]   = useState(false);
   const [showPw, setShowPw]     = useState(false);
   // 2FA: set once a password passes for an account with two-factor enabled.
@@ -135,6 +225,38 @@ function LoginScreen({ onLogin, onRegister, onForgot }: { onLogin:(t:string,r:st
         <TouchableOpacity style={[s.btnPrimary,{marginTop:16}]} disabled={loading||!email||!password} onPress={login} accessibilityRole="button" accessibilityLabel="Sign in">
           {loading?<ActivityIndicator color="#fff"/>:<Text style={s.btnPrimaryText}>Sign in</Text>}
         </TouchableOpacity>
+
+        {/* Social sign-in */}
+        <View style={{ flexDirection:'row', alignItems:'center', marginTop:24 }}>
+          <View style={{ flex:1, height:1, backgroundColor:GRAY_200 }}/>
+          <Text style={{ marginHorizontal:10, color:GRAY_400, fontSize:12, fontWeight:'600', textTransform:'uppercase', letterSpacing:0.5 }}>or</Text>
+          <View style={{ flex:1, height:1, backgroundColor:GRAY_200 }}/>
+        </View>
+
+        <TouchableOpacity
+          style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', gap:10, marginTop:14, height:46, borderRadius:10, borderWidth:1, borderColor:GRAY_200, backgroundColor:'#fff' }}
+          disabled={ssoLoading || !googleClientId}
+          onPress={loginWithGoogle}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Google"
+        >
+          {ssoLoading ? <ActivityIndicator color={GRAY_500}/> : (
+            <>
+              <Ionicons name="logo-google" size={18} color="#4285F4"/>
+              <Text style={{ color:GRAY_900, fontWeight:'600', fontSize:15 }}>Continue with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={10}
+            style={{ width:'100%', height:46, marginTop:10 }}
+            onPress={loginWithApple}
+          />
+        )}
 
         <View style={s.authSwitch}>
           <Text style={s.authSwitchText}>New here? </Text>

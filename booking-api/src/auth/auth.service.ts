@@ -651,7 +651,7 @@ export class AuthService {
   private trustedDeviceSecret(user: User): string {
     // Recovery codes are regenerated on each off→on transition, so including
     // them revokes all old trusted-device tokens when 2FA is reset.
-    return `td:${process.env.JWT_SECRET!}${user.passwordHash}:${user.twoFactorRecoveryCodes.join(':')}`;
+    return `td:${process.env.JWT_SECRET!}${user.passwordHash ?? ''}:${user.twoFactorRecoveryCodes.join(':')}`;
   }
   private mintTrustedDeviceToken(user: User, ctx?: { ip?: string; userAgent?: string }): string {
     const deviceKey = this.normalizedDeviceKey(ctx?.userAgent, ctx?.ip);
@@ -676,7 +676,7 @@ export class AuthService {
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Always succeed so we never reveal whether an email is registered.
-    if (user) {
+    if (user && user.passwordHash) {
       const token = this.jwt.sign(
         { sub: user.id, kind: 'reset' },
         { secret: this.resetSecret(user.passwordHash), expiresIn: '15m' },
@@ -693,7 +693,7 @@ export class AuthService {
     const decoded = this.jwt.decode(token) as { sub?: string; kind?: string } | null;
     if (!decoded?.sub || decoded.kind !== 'reset') throw new BadRequestException('Invalid or expired reset link');
     const user = await this.prisma.user.findUnique({ where: { id: decoded.sub } });
-    if (!user) throw new BadRequestException('Invalid or expired reset link');
+    if (!user || !user.passwordHash) throw new BadRequestException('Invalid or expired reset link');
     try {
       this.jwt.verify(token, { secret: this.resetSecret(user.passwordHash), algorithms: ['HS256'] });
     } catch {
@@ -730,6 +730,9 @@ export class AuthService {
       await bcrypt.compare(dto.password, AuthService.DUMMY_HASH);
       await this.authLock.recordFailure(dto.email).catch(() => {});
       throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('This account uses social sign-in. Please use the "Continue with Google" or "Continue with Apple" option.');
     }
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
@@ -899,7 +902,7 @@ export class AuthService {
 
   async setTwoFactor(userId: string, enabled: boolean, method: 'EMAIL' | 'SMS' | undefined, currentPassword: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (!await bcrypt.compare(currentPassword, user.passwordHash)) {
+    if (!user.passwordHash || !await bcrypt.compare(currentPassword, user.passwordHash)) {
       throw new UnauthorizedException('Current password is incorrect');
     }
     const data: { twoFactorEnabled: boolean; twoFactorMethod?: string; twoFactorRecoveryCodes?: string[] } = {
@@ -964,7 +967,7 @@ export class AuthService {
       if (total > 0 && !priorSameDevice && !priorSameIp) {
         const resetToken = this.jwt.sign(
           { sub: user.id, kind: 'reset' },
-          { secret: this.resetSecret(user.passwordHash), expiresIn: '15m' },
+          { secret: this.resetSecret(user.passwordHash ?? ''), expiresIn: '15m' },
         );
         await this.notifications.sendSecurityAlert(user.id, { ip: ctx?.ip, userAgent: ua, resetToken });
       }
@@ -1011,6 +1014,7 @@ export class AuthService {
   // one, and clears the mustResetPassword flag (used for forced first-login resets).
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.passwordHash) throw new BadRequestException('Social sign-in accounts cannot set a password here');
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Current password is incorrect');
     if (newPassword.length < 8) throw new BadRequestException('New password must be at least 8 characters');
@@ -1031,7 +1035,95 @@ export class AuthService {
     await this.redis.client.set(`auth:revoked:${jti}`, '1', 'EX', ttl).catch(() => {});
   }
 
-  private async issueTokens(user: User, opts: { userAgent?: string; replaceTokenHash?: string } = {}) {
+  // ── SSO: Google + Apple ─────────────────────────────────────────────────────
+
+  async findOrCreateSSOUser(provider: string, subject: string, email: string, name: string): Promise<User> {
+    const existing = await this.prisma.user.findFirst({
+      where: { oauthProvider: provider, oauthSubject: subject },
+    });
+    if (existing) return existing;
+
+    if (email) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email } });
+      if (byEmail) {
+        return this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { oauthProvider: provider, oauthSubject: subject },
+        });
+      }
+    }
+
+    return this.prisma.user.create({
+      data: {
+        name: name || (email ? email.split('@')[0] : `${provider}_user`),
+        email: email || `${provider}.${subject}@noreply.pulse`,
+        passwordHash: null,
+        oauthProvider: provider,
+        oauthSubject: subject,
+        role: 'CLIENT',
+        emailVerified: true,
+      },
+    });
+  }
+
+  async verifyGoogleCode(code: string, redirectUri: string, codeVerifier?: string): Promise<{ sub: string; email: string; name: string }> {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) throw new ServiceUnavailableException('Google sign-in is not configured');
+
+    const params = new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    });
+    if (codeVerifier) params.set('code_verifier', codeVerifier);
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+    if (!tokenRes.ok) throw new UnauthorizedException('Google token exchange failed');
+    const tokenData = await tokenRes.json() as { access_token?: string };
+    if (!tokenData.access_token) throw new UnauthorizedException('No access token from Google');
+
+    const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    if (!infoRes.ok) throw new UnauthorizedException('Could not fetch Google profile');
+    const info = await infoRes.json() as { sub?: string; email?: string; name?: string };
+    if (!info.sub || !info.email) throw new UnauthorizedException('Incomplete Google profile — email scope may be missing');
+    return { sub: info.sub, email: info.email, name: info.name ?? '' };
+  }
+
+  async verifyAppleToken(identityToken: string, platform: 'web' | 'mobile', email?: string, firstName?: string, lastName?: string): Promise<{ sub: string; email: string; name: string }> {
+    const clientId = platform === 'mobile'
+      ? (process.env.APPLE_MOBILE_CLIENT_ID ?? 'com.pulseappointments.app')
+      : process.env.APPLE_CLIENT_ID;
+    if (!clientId) throw new ServiceUnavailableException('Apple sign-in is not configured');
+
+    const { createRemoteJWKSet, jwtVerify } = await import('jose');
+    const JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
+    let payload: Record<string, unknown>;
+    try {
+      const result = await jwtVerify(identityToken, JWKS, {
+        issuer: 'https://appleid.apple.com',
+        audience: clientId,
+      });
+      payload = result.payload as Record<string, unknown>;
+    } catch {
+      throw new UnauthorizedException('Apple identity token verification failed');
+    }
+    const sub = payload.sub as string | undefined;
+    if (!sub) throw new UnauthorizedException('Apple token missing subject claim');
+    const resolvedEmail = email || (payload.email as string | undefined) || '';
+    const name = [firstName, lastName].filter(Boolean).join(' ');
+    return { sub, email: resolvedEmail, name };
+  }
+
+  protected async issueTokens(user: User, opts: { userAgent?: string; replaceTokenHash?: string } = {}) {
     const jti = randomBytes(8).toString('hex');
     const isAdmin = user.role === 'ADMIN';
     const payload = { sub: user.id, email: user.email, role: user.role, jti, ...(isAdmin ? { kind: 'admin' } : {}) };
