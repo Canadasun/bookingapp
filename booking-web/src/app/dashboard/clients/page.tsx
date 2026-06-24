@@ -376,6 +376,7 @@ export default function ClientsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900 truncate">{c.name}</p>
+                    {c.isBlocked && <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"><Ban className="w-2.5 h-2.5" />Blocked</span>}
                     {(c.tags ?? []).slice(0, 3).map((t) => (
                       <span key={t} className="rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 text-[10px] font-medium">{t}</span>
                     ))}
