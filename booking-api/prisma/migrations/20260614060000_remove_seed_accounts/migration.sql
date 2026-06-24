@@ -53,8 +53,8 @@ BEGIN
   END IF;
 END $$;
 
--- 4. Sample transactions inserted by seed_admin.js (no real Stripe charge ID)
+-- 4. Sample transactions inserted by seed_admin.js (no real provider charge ID)
 DELETE FROM "Transaction"
 WHERE type IN ('SUBSCRIPTION', 'COMMISSION')
   AND provider = 'STRIPE'
-  AND "stripeChargeId" IS NULL;
+  AND "providerId" IS NULL;
