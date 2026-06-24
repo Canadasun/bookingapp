@@ -836,9 +836,10 @@ export class BookingsService {
     if (existing.business.cancellationFeeCents > 0) {
       const allowance = getMonthlyFeeAllowance(existing.business.plan as PlanTier);
       const allowed = allowance === Infinity || await (async () => {
-        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+        // Count LATE_CANCEL_FEE only — no-show fees have their own separate 1/mo limit
         const used = await this.prisma.payment.count({
-          where: { businessId: existing.businessId, kind: { in: ['NO_SHOW_FEE', 'LATE_CANCEL_FEE'] }, createdAt: { gte: monthStart } },
+          where: { businessId: existing.businessId, kind: 'LATE_CANCEL_FEE', createdAt: { gte: monthStart } },
         });
         return used < allowance;
       })();

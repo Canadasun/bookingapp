@@ -26,7 +26,8 @@ export class LocationsService {
       // Location limits by plan: Free/Basic=1, Pro=2, Unlimited=5
       const limit = isUnlimitedPlan(business.plan) ? 5 : isProPlan(business.plan) ? 2 : 1;
       if (existing >= limit) {
-        const upgrade = isProPlan(business.plan) ? 'Unlimited' : isUnlimitedPlan(business.plan) ? null : 'Pro or Unlimited';
+        // Check isUnlimitedPlan first — isProPlan returns true for UNLIMITED too
+        const upgrade = isUnlimitedPlan(business.plan) ? null : isProPlan(business.plan) ? 'Unlimited' : 'Pro or Unlimited';
         const msg = upgrade
           ? `Your plan allows ${limit} location${limit === 1 ? '' : 's'}. Upgrade to ${upgrade} to add more.`
           : `Unlimited plan supports up to 5 locations. Contact support if you need more.`;

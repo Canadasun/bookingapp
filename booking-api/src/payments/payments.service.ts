@@ -5,7 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentKind, PaymentStatus, PlanTier, SubscriptionStatus } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import Stripe from 'stripe';
-import { isPaidPlan, isProPlan } from '../common/util/plan-features';
+import { isPaidPlan, isProPlan, getMonthlyFeeAllowance } from '../common/util/plan-features';
 import { ReferralsService } from '../referrals/referrals.service';
 import { EventsGateway } from '../events/events.gateway';
 
@@ -213,7 +213,7 @@ export class PaymentsService {
 
     // Card-on-file (no upfront charge): collect a saveable card when the owner
     // turned on "always collect a card", or (Pro) when a no-show fee is set.
-    if (b.collectCardOnFile || (isProPlan(b.plan) && b.noShowFeeCents > 0)) {
+    if (b.collectCardOnFile || (isPaidPlan(b.plan) && b.noShowFeeCents > 0)) {
       const intent = await this.getStripe().setupIntents.create({
         customer,
         usage: 'off_session',
@@ -1113,9 +1113,18 @@ export class PaymentsService {
     });
     if (!apt) throw new BadRequestException('Appointment not found');
     if (apt.status !== 'CONFIRMED') throw new BadRequestException(`Cannot mark as NO_SHOW: appointment is ${apt.status}`);
-    if (!isProPlan(apt.business.plan)) {
-      await this.prisma.appointment.update({ where: { id: appointmentId, businessId: apt.businessId }, data: { status: 'NO_SHOW' } });
-      return { charged: false, feeCents: 0, message: 'Marked NO_SHOW. Automatic no-show charging requires Pro; collect manually on Basic.' };
+
+    // Monthly allowance: PRO+ unlimited, FREE/BASIC 1 per calendar month
+    const noShowAllowance = getMonthlyFeeAllowance(apt.business.plan);
+    if (noShowAllowance !== Infinity) {
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const usedThisMonth = await this.prisma.payment.count({
+        where: { businessId, kind: 'NO_SHOW_FEE', createdAt: { gte: monthStart } },
+      });
+      if (usedThisMonth >= noShowAllowance) {
+        await this.prisma.appointment.update({ where: { id: appointmentId, businessId: apt.businessId }, data: { status: 'NO_SHOW' } });
+        return { charged: false, feeCents: 0, message: 'Monthly no-show fee limit reached for your plan. Upgrade to Pro for unlimited charges.' };
+      }
     }
 
     if ((apt.business.noShowFeeCents ?? 0) === 0) {
@@ -1168,7 +1177,17 @@ export class PaymentsService {
       include: { service: true, client: true, business: true },
     });
     if (!apt) return { charged: false, feeCents: 0, reason: 'not_found' };
-    if (!isProPlan(apt.business.plan)) return { charged: false, feeCents: 0, reason: 'plan_requires_pro' };
+
+    // Monthly allowance: PRO+ unlimited, FREE/BASIC 1 per calendar month
+    const cancelAllowance = getMonthlyFeeAllowance(apt.business.plan);
+    if (cancelAllowance !== Infinity) {
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const usedThisMonth = await this.prisma.payment.count({
+        where: { businessId, kind: 'LATE_CANCEL_FEE', createdAt: { gte: monthStart } },
+      });
+      if (usedThisMonth >= cancelAllowance) return { charged: false, feeCents: 0, reason: 'monthly_limit_reached' };
+    }
+
     const feeCents = apt.business.cancellationFeeCents;
     if (feeCents <= 0) return { charged: false, feeCents: 0, reason: 'no_fee' };
     if (!apt.client.stripeCustomerId || !apt.stripePaymentMethodId) {
