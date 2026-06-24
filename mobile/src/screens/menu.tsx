@@ -27,9 +27,9 @@ type MoreView = 'menu' | 'services' | 'staff' | 'offers' | 'waitlist' | 'reviews
 // Plan tiers mirror the web billing page.
 const PLANS = [
   { id:'FREE',      name:'Free',      price:'$0',  period:'/mo', features:['Unlimited bookings','Client management','Email confirmations','Public booking page','Up to 5 staff members','1 location'] },
-  { id:'BASIC',     name:'Basic',     price:'$49', period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Email reminders (24h)','Deposit collection','Cancellation policies','Manual charges','Up to 10 staff members'] },
-  { id:'PRO',       name:'Pro',       price:'$149', period:'/mo', features:['Everything in Basic','Initiate SMS to clients','SMS confirmations & 2h reminders','Automatic no-show fees','Late-cancellation fees','Analytics & reports','Up to 10 staff members'] },
-  { id:'UNLIMITED', name:'Unlimited', price:'$80', period:'/mo', features:['Everything in Pro','Unlimited locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
+  { id:'BASIC',     name:'Basic',     price:'$19', period:'/mo', features:['Everything in Free','Receive & reply to client SMS','Deposit collection','Cancellation policies','Reports & analytics','Manual charges','Up to 10 staff members'] },
+  { id:'PRO',       name:'Pro',       price:'$39', period:'/mo', features:['Everything in Basic','Automated SMS & email reminders','Automatic no-show fees (unlimited)','Late-cancellation fees (unlimited)','Packages, gift cards & memberships','Reviews & marketing campaigns','2 locations'] },
+  { id:'UNLIMITED', name:'Unlimited', price:'$79', period:'/mo', features:['Everything in Pro','Up to 5 locations','Full SMS across all locations','Remove Pulse branding','Unlimited staff accounts','Dedicated support','Early access to new features'] },
 ] as const;
 
 import * as ImagePicker from 'expo-image-picker';
@@ -4079,7 +4079,7 @@ function ReportsView({ onBack, onUpgrade }: { onBack: () => void; onUpgrade: () 
           </View>
           <Text style={{ fontSize: 20, fontWeight: '800', color: GRAY_900, textAlign: 'center', marginBottom: 8 }}>Analytics &amp; Reports</Text>
           <Text style={{ fontSize: 14, color: GRAY_500, textAlign: 'center', marginBottom: 6 }}>
-            Upgrade to <Text style={{ fontWeight: '700' }}>Pro ($149/mo)</Text> to unlock:
+            Upgrade to <Text style={{ fontWeight: '700' }}>Basic ($19/mo)</Text> or higher to unlock:
           </Text>
           {['Revenue trends (last 12 months)', 'Revenue Protected by Pulse', 'Top services & provider performance', 'Top clients by spend', 'No-show & cancellation rates'].map(f => (
             <View key={f} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, width: '100%' }}>
@@ -4090,8 +4090,8 @@ function ReportsView({ onBack, onUpgrade }: { onBack: () => void; onUpgrade: () 
           <TouchableOpacity
             onPress={onUpgrade}
             style={{ backgroundColor: BRAND, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28, marginTop: 24, width: '100%', alignItems: 'center' }}
-            accessibilityRole="button" accessibilityLabel="Upgrade to Pro">
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Upgrade to Pro — $149/mo →</Text>
+            accessibilityRole="button" accessibilityLabel="Upgrade to Basic">
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Upgrade to Basic — $19/mo →</Text>
           </TouchableOpacity>
         </ScrollView>
       )}

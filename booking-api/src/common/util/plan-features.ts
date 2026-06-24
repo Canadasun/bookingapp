@@ -29,22 +29,18 @@ export function applyPlanLimits<T extends {
   bookingApprovalMode?: string;
 }>(plan: PlanTier, data: T): T {
   if (!isPaidPlan(plan)) {
+    // FREE: no deposits, no card-on-file, no auto-confirm.
+    // noShowFeeCents/cancellationFeeCents are NOT zeroed — FREE gets 1 prompt/mo
+    // (enforced at charge time via getMonthlyFeeAllowance). Without a card on file
+    // the fee is owner-collected manually; the configuration is still saved.
     return {
       ...data,
       requireDeposit: false,
-      noShowFeeCents: 0,
-      cancellationFeeCents: 0,
       collectCardOnFile: false,
-      // AUTO instant-confirm is a paid feature; free plans stay on MANUAL queue
       bookingApprovalMode: 'MANUAL',
     };
   }
-  if (!isProPlan(plan)) {
-    return {
-      ...data,
-      noShowFeeCents: 0,
-      cancellationFeeCents: 0,
-    };
-  }
+  // BASIC and above: no limits applied here. Monthly fee cap (1/mo for BASIC)
+  // is enforced in bookings.service.ts and payments.service.ts at charge time.
   return data;
 }

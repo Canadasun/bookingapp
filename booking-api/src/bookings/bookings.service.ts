@@ -15,7 +15,7 @@ import { CreateAppointmentDto, CreateRecurringDto, PublicCreateAppointmentDto, R
 import { signAppointmentToken } from '../common/util/appointment-token';
 import { normalizePhone } from '../common/util/phone';
 import { isPaidPlan, getMonthlyFeeAllowance } from '../common/util/plan-features';
-import { Prisma } from '@prisma/client';
+import { Prisma, PlanTier } from '@prisma/client';
 import { addMinutes, addWeeks, addMonths, differenceInMinutes } from 'date-fns';
 import { randomUUID } from 'node:crypto';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -778,11 +778,12 @@ export class BookingsService {
     // auto-collected here — prompt the owner in their dashboard to charge it.
     // FREE/BASIC plans are limited to 1 automatic fee per calendar month.
     if (dto.status === 'NO_SHOW' && !cancelFee?.charged && updated.business.noShowFeeCents > 0) {
-      const allowance = getMonthlyFeeAllowance(updated.business.plan as import('@prisma/client').PlanTier);
+      const allowance = getMonthlyFeeAllowance(updated.business.plan as PlanTier);
       const allowed = allowance === Infinity || await (async () => {
-        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+        // Count NO_SHOW_FEE only — late-cancel fees have their own separate 1/mo limit
         const used = await this.prisma.payment.count({
-          where: { businessId: updated.businessId, kind: { in: ['NO_SHOW_FEE', 'LATE_CANCEL_FEE'] }, createdAt: { gte: monthStart } },
+          where: { businessId: updated.businessId, kind: 'NO_SHOW_FEE', createdAt: { gte: monthStart } },
         });
         return used < allowance;
       })();
@@ -833,7 +834,7 @@ export class BookingsService {
     // Dashboard prompt to the owner when a late-cancel fee is configured.
     // FREE/BASIC plans are limited to 1 automatic fee per calendar month.
     if (existing.business.cancellationFeeCents > 0) {
-      const allowance = getMonthlyFeeAllowance(existing.business.plan as import('@prisma/client').PlanTier);
+      const allowance = getMonthlyFeeAllowance(existing.business.plan as PlanTier);
       const allowed = allowance === Infinity || await (async () => {
         const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
         const used = await this.prisma.payment.count({
