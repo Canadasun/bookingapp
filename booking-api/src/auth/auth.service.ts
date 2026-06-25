@@ -714,8 +714,10 @@ export class AuthService {
   // leaking whether the email address exists in our database.
   async resendVerificationByEmail(email: string): Promise<{ ok: boolean }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
+    // Fire-and-forget so the response time is constant regardless of whether
+    // the address exists — prevents timing-based email enumeration.
     if (user && !user.emailVerified) {
-      await this.sendVerification(user.id).catch(() => {});
+      void this.sendVerification(user.id).catch(() => {});
     }
     return { ok: true };
   }

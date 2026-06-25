@@ -121,7 +121,9 @@ export function getUser(): SessionUser | null {
 
 export function clearSession() {
   invalidateCurrentUser();
-  for (const name of ["booking_token", "booking_refresh", "booking_user", "booking_td"]) {
+  // booking_td is HttpOnly and cannot be cleared by JS — it is cleared
+  // server-side by the logout route. Only non-HttpOnly cookies are listed here.
+  for (const name of ["booking_token", "booking_refresh", "booking_user"]) {
     document.cookie = `${name}=; Max-Age=0; path=/`;
   }
 }
