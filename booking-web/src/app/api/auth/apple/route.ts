@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { encodeState, setSSOStateCookie, APP_URL } from "@/lib/sso-cookies";
 
 export async function GET(req: NextRequest) {
-  const clientId = process.env.APPLE_CLIENT_ID;
+  const clientId = process.env.APPLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
   if (!clientId) {
     return NextResponse.json({ error: "Apple sign-in is not configured" }, { status: 503 });
   }
