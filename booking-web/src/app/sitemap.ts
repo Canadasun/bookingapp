@@ -41,6 +41,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/for/consultants`,                         lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/for/wellness`,                            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/for/mobile-services`,                     lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/hair-stylists`,                       lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/nail-techs`,                          lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/spas`,                                lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/yoga-studios`,                        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/for/toronto`,                             lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/for/vancouver`,                           lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
   ];
 
   // Dynamically include all public (non-suspended) business booking pages.
