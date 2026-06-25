@@ -6,9 +6,21 @@ export const metadata: Metadata = {
   description: "Compare Pulse and Square Appointments for Canadian service businesses. CAD pricing, no hardware required, PIPEDA compliance, and no-show protection without a POS terminal.",
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Compare", item: "https://www.pulseappointments.com/compare" },
+    { "@type": "ListItem", position: 3, name: "Pulse vs. Square Appointments", item: "https://www.pulseappointments.com/compare/pulse-vs-square-appointments" },
+  ],
+};
+
 export default function VsSquarePage() {
   return (
-    <ComparePage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <ComparePage
       competitor="Square Appointments"
       tagline="Pulse vs. Square Appointments"
       summary="Square is great if you need a physical POS terminal. Pulse is for service businesses that book online first — mobile therapists, lash artists, trainers, and cleaners who don't want to be squeezed into a retail-shaped product."
@@ -61,5 +73,6 @@ export default function VsSquarePage() {
         themNote: "+ mandatory Square payment processing fees on every transaction",
       }}
     />
+    </>
   );
 }

@@ -149,6 +149,20 @@ body {
 /* Firefox equivalent */
 * { scrollbar-width: thin; scrollbar-color: #D1D5DB transparent; }
 
+/* Respect user motion preferences — WCAG 2.1 §2.3.3 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob,
+  .animate-blob-alt,
+  .animate-fade-up,
+  .animate-fade-up-d1,
+  .animate-fade-up-d2,
+  .animate-fade-up-d3,
+  [class*="animate-"] {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* ── Motion primitives ───────────────────────────────────────────────────── */
 @keyframes blob-drift {
   0%, 100% { transform: translate(0, 0) scale(1); }

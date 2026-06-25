@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Massage Therapy Booking Software | Pulse Appointments", description: "Online booking with health intake forms and no-show protection for massage therapists." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Massage Therapists", item: "https://www.pulseappointments.com/for/massage-therapists" },
+  ],
+};
+
 export default function MassageTherapistsPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Massage Therapists"
       headline="Booking software for Canadian massage therapists"
       subheadline="A no-show on a 90-minute deep tissue slot costs you real money. Pulse protects that revenue with deposits — and handles health intake forms before clients arrive."
@@ -52,5 +63,6 @@ export default function MassageTherapistsPage() {
         city: "Mississauga, ON",
       }}
     />
+    </>
   );
 }

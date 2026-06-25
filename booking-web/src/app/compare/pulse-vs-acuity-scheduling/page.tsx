@@ -6,9 +6,21 @@ export const metadata: Metadata = {
   description: "Compare Pulse and Acuity Scheduling for Canadian service businesses. CAD pricing, active development, no Squarespace account required, and automated no-show protection.",
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Compare", item: "https://www.pulseappointments.com/compare" },
+    { "@type": "ListItem", position: 3, name: "Pulse vs. Acuity Scheduling", item: "https://www.pulseappointments.com/compare/pulse-vs-acuity-scheduling" },
+  ],
+};
+
 export default function VsAcuityPage() {
   return (
-    <ComparePage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <ComparePage
       competitor="Acuity Scheduling"
       tagline="Pulse vs. Acuity Scheduling"
       summary="Acuity was a great tool — before Squarespace acquired it. Development has stalled, support has deteriorated, and users report a frustrating forced re-login bug. Pulse is actively built for Canadian service businesses with CAD pricing and no USD conversion surprises."
@@ -60,5 +72,6 @@ export default function VsAcuityPage() {
         themNote: "Price changes monthly with CAD/USD exchange rate",
       }}
     />
+    </>
   );
 }

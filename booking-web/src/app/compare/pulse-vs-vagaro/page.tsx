@@ -6,9 +6,21 @@ export const metadata: Metadata = {
   description: "Compare Pulse and Vagaro for Canadian service businesses. CAD pricing, no per-add-on fees, clients book without creating an account, and no marketplace listing fees.",
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Compare", item: "https://www.pulseappointments.com/compare" },
+    { "@type": "ListItem", position: 3, name: "Pulse vs. Vagaro", item: "https://www.pulseappointments.com/compare/pulse-vs-vagaro" },
+  ],
+};
+
 export default function VsVagaroPage() {
   return (
-    <ComparePage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <ComparePage
       competitor="Vagaro"
       tagline="Pulse vs. Vagaro"
       summary="Vagaro's real monthly cost is 2–3× the advertised price once you add forms, text marketing, and check-in tools. Pulse bundles everything your service business needs at one flat CAD price — and clients can book without creating an account."
@@ -60,5 +72,6 @@ export default function VsVagaroPage() {
         themNote: "Forms, SMS & check-in each billed separately",
       }}
     />
+    </>
   );
 }

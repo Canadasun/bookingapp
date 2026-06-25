@@ -1,9 +1,19 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { verifyCookieValue } from "@/lib/cookie-sign";
-import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, Star, ClipboardList, Globe, Users } from "lucide-react";
+import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, ClipboardList, Globe, Users } from "lucide-react";
 import { PLAN_DEFS } from "@/lib/plans";
+
+export const metadata: Metadata = {
+  title: "Online Booking Software for Canadian Service Businesses | Pulse Appointments",
+  description: "Pulse is the simplest online booking software for Canadian salons, spas, and service businesses. Automated reminders, deposit collection, and no-show protection — free to start.",
+  openGraph: {
+    title: "Online Booking Software for Canadian Service Businesses | Pulse Appointments",
+    description: "Pulse is the simplest online booking software for Canadian salons, spas, and service businesses. Free to start.",
+  },
+};
 import {
   LandingAuthCta,
   LandingHeroCta,
@@ -79,12 +89,6 @@ const features = [
   },
 ];
 
-// Illustrative quotes — replace with real attributed testimonials before launch.
-const testimonials = [
-  { quote: "I set it up in 20 minutes and had my first online booking the same evening. Total game-changer.", name: "Independent esthetician", role: "Early access user", illustrative: true },
-  { quote: "The deposit feature alone saved me from countless no-shows. Worth every penny.", name: "Hair stylist", role: "Early access user", illustrative: true },
-  { quote: "My clients love booking from their phone at midnight. I wake up to confirmed appointments.", name: "Massage therapist", role: "Early access user", illustrative: true },
-];
 
 export default async function LandingPage() {
   const { role, authed } = await sessionInfo();
@@ -103,14 +107,36 @@ export default async function LandingPage() {
   const jsonLdSite = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    url: "https://www.pulseappointments.com",
     name: "Pulse Appointments",
+    url: "https://www.pulseappointments.com",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: "https://www.pulseappointments.com/book?q={search_term_string}" },
+      "query-input": "required name=search_term_string",
+    },
+  };
+  const jsonLdApp = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Pulse Appointments",
+    applicationCategory: "BusinessApplication",
+    applicationSubCategory: "Appointment Scheduling Software",
+    operatingSystem: "Web, iOS, Android",
+    url: "https://www.pulseappointments.com",
+    description: "Online booking software for Canadian service businesses. Automated reminders, deposits, and no-show protection.",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "CAD",
+      description: "Free plan available. Paid plans from $19 CAD/month.",
+    },
   };
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSite) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdApp) }} />
     <div className="flex flex-col min-h-screen brand-shell">
 
       {/* ── Nav ── */}
@@ -142,10 +168,9 @@ export default async function LandingPage() {
 
           {/* Headline */}
           <h1 className="animate-fade-up-d1 text-5xl sm:text-6xl font-extrabold text-ink tracking-tight leading-[1.08] mb-6">
-            The simplest way<br />
-            to take{" "}
+            The simplest online booking software for{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600">
-              bookings
+              Canadian service businesses
             </span>
           </h1>
 
@@ -263,33 +288,13 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── Testimonials ── */}
-      <section className="py-24 bg-gradient-to-b from-[#FFFAF2] to-white border-t border-[#E9DDCB]">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-ink mb-3">Built for appointment-based businesses</h2>
-            <p className="text-slate-500 max-w-md mx-auto">From solo estheticians to growing salons — Pulse handles the scheduling so you can focus on clients.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map(({ quote, name, role, illustrative }) => (
-              <div key={name} className="bg-white rounded-2xl border border-[#E9DDCB] p-7 shadow-sm hover:shadow-lg hover:shadow-amber-50 hover:-translate-y-0.5 transition-all duration-200">
-                <div className="flex gap-0.5 mb-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-                <p className="text-slate-600 text-sm leading-relaxed mb-5">&ldquo;{quote}&rdquo;</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
-                    {name[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{name}</p>
-                    <p className="text-xs text-slate-400">{role}</p>
-                    {illustrative && <p className="text-[10px] text-slate-300 mt-0.5 italic">Illustrative</p>}
-                  </div>
-                </div>
-              </div>
+      {/* ── Social proof strip ── */}
+      <section className="py-16 bg-gradient-to-b from-[#FFFAF2] to-white border-t border-[#E9DDCB]">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <p className="text-sm text-slate-500 mb-6">Trusted by service businesses across Canada</p>
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs text-slate-400 font-medium uppercase tracking-wider">
+            {["Salons", "Spas", "Lash Studios", "Massage Therapy", "Wellness Clinics", "Barbers"].map((niche) => (
+              <span key={niche}>{niche}</span>
             ))}
           </div>
         </div>

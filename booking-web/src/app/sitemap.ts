@@ -7,8 +7,7 @@ const API_URL = (
   "http://localhost:3001"
 ).replace(/\/+$/, "").replace(/\/api$/, "");
 
-// Update this date whenever meaningful static content changes are deployed.
-const CONTENT_DATE = new Date("2026-06-23");
+const CONTENT_DATE = new Date();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [

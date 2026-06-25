@@ -1,15 +1,16 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import { PLAN_DEFS, PLAN_FEATURES } from "@/lib/plans";
 import type { FeatureValue } from "@/lib/plans";
 
 export const metadata: Metadata = {
-  title: "Pricing — Pulse Appointments",
+  title: "Appointment Booking Software Pricing | Pulse Appointments",
   description:
-    "Simple, transparent pricing for independent professionals and growing teams. Start free, upgrade when you need it.",
+    "Simple, transparent pricing for Canadian service businesses. Start free — no credit card required. Upgrade when you're ready.",
   openGraph: {
-    title: "Pricing — Pulse Appointments",
+    title: "Appointment Booking Software Pricing | Pulse Appointments",
     description: "Start free, upgrade when you need SMS reminders, deposits, and no-show protection.",
   },
 };
@@ -20,15 +21,37 @@ function Cell({ value }: { value: FeatureValue }) {
   return <span className="text-sm font-semibold text-slate-700">{value}</span>;
 }
 
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Is there a free trial?",
+      acceptedAnswer: { "@type": "Answer", text: "The Free plan has no time limit. Use it forever, then upgrade when you're ready." },
+    },
+    {
+      "@type": "Question",
+      name: "Can I cancel anytime?",
+      acceptedAnswer: { "@type": "Answer", text: "Yes. Downgrade or cancel from your account settings at any time. No cancellation fees." },
+    },
+    {
+      "@type": "Question",
+      name: "What payment methods do you accept?",
+      acceptedAnswer: { "@type": "Answer", text: "All major credit and debit cards, Apple Pay, and Google Pay via Stripe. Payments are in CAD." },
+    },
+  ],
+};
+
 export default function PricingPage() {
   return (
     <main id="main-content" className="min-h-screen bg-[#F8F5EF]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       {/* Nav */}
       <nav className="bg-white/80 backdrop-blur-xl border-b border-[#E9DDCB] sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
+            <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
             <span className="text-base font-bold text-slate-900 tracking-tight">Pulse Booking</span>
           </Link>
           <Link

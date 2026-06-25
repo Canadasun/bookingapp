@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Wellness Booking Software | Pulse Appointments", description: "Memberships, packages, and no-show protection for Canadian wellness providers." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Wellness Providers", item: "https://www.pulseappointments.com/for/wellness" },
+  ],
+};
+
 export default function WellnessPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Wellness"
       headline="Booking software for Canadian wellness professionals"
       subheadline="Run memberships, sell packages, and protect appointments with deposits. Pulse gives you the tools to grow predictable, recurring wellness revenue."
@@ -52,5 +63,6 @@ export default function WellnessPage() {
         city: "Halifax, NS",
       }}
     />
+    </>
   );
 }

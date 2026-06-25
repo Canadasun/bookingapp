@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Esthetician Booking Software | Pulse Appointments", description: "Online booking with intake forms and no-show protection for estheticians." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Estheticians", item: "https://www.pulseappointments.com/for/estheticians" },
+  ],
+};
+
 export default function EstheticiansPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Estheticians"
       headline="Booking software for Canadian estheticians"
       subheadline="Collect skin history before they arrive. Sell facial packages online. Stop chasing cancellations. Pulse handles it all — with Canadian privacy built in."
@@ -52,5 +63,6 @@ export default function EstheticiansPage() {
         city: "Vancouver, BC",
       }}
     />
+    </>
   );
 }

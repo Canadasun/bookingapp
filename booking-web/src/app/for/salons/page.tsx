@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Booking Software for Canadian Salons | Pulse Appointments", description: "Salon booking with deposits, no-show protection, and SMS reminders. CAD pricing." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Salons", item: "https://www.pulseappointments.com/for/salons" },
+  ],
+};
+
 export default function SalonsPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Salons"
       headline="Booking software built for Canadian salons"
       subheadline="Stop losing money to last-minute cancellations. Pulse lets you require a deposit when clients book — and charges the card automatically if they no-show."
@@ -52,5 +63,6 @@ export default function SalonsPage() {
         city: "Ottawa, ON",
       }}
     />
+    </>
   );
 }

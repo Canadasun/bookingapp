@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Mobile Service Booking Software | Pulse Appointments", description: "Booking with location and travel buffer for Canadian mobile service providers." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Mobile Services", item: "https://www.pulseappointments.com/for/mobile-services" },
+  ],
+};
+
 export default function MobileServicesPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Mobile Services"
       headline="Online booking for mobile service professionals"
       subheadline="You go to them. Pulse handles the scheduling. Collect client addresses at booking, build in travel time, and require a deposit so your drive is never wasted."
@@ -52,5 +63,6 @@ export default function MobileServicesPage() {
         city: "Surrey, BC",
       }}
     />
+    </>
   );
 }

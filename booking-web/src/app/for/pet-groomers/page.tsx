@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Pet Grooming Booking Software | Pulse Appointments", description: "Online booking with pet-specific intake forms and no-show protection for groomers." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Pet Groomers", item: "https://www.pulseappointments.com/for/pet-groomers" },
+  ],
+};
+
 export default function PetGroomersPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Pet Groomers"
       headline="Booking software built for Canadian pet groomers"
       subheadline="Get breed, size, coat type, and behavioural notes before every appointment. Protect against last-minute cancellations with deposits. Done."
@@ -52,5 +63,6 @@ export default function PetGroomersPage() {
         city: "Winnipeg, MB",
       }}
     />
+    </>
   );
 }

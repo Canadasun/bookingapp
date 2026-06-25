@@ -32,7 +32,7 @@ export default function ForPage() {
         <div className="grid sm:grid-cols-2 gap-3">
           {industries.map((i) => (
             <Link key={i.href} href={i.href} className="flex items-start gap-3 bg-white rounded-2xl border border-slate-200 p-4 hover:border-violet-300 hover:shadow-sm transition-all group">
-              <span className="text-2xl">{i.emoji}</span>
+              <span className="text-2xl" aria-hidden="true">{i.emoji}</span>
               <div>
                 <p className="text-sm font-semibold text-slate-900 group-hover:text-violet-700">{i.label}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{i.desc}</p>

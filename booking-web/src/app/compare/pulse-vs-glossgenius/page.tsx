@@ -6,9 +6,21 @@ export const metadata: Metadata = {
   description: "GlossGenius is built for US salons only. Pulse is built for Canadian service businesses — CAD pricing, PIPEDA compliance, multi-location support, and no USD conversion headaches.",
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Compare", item: "https://www.pulseappointments.com/compare" },
+    { "@type": "ListItem", position: 3, name: "Pulse vs. GlossGenius", item: "https://www.pulseappointments.com/compare/pulse-vs-glossgenius" },
+  ],
+};
+
 export default function VsGlossGeniusPage() {
   return (
-    <ComparePage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <ComparePage
       competitor="GlossGenius"
       tagline="Pulse vs. GlossGenius"
       summary="GlossGenius is a polished US-only beauty platform. It doesn't officially operate in Canada — there's no CAD billing, no PIPEDA compliance, no Canadian support, and no multi-location tools. Pulse delivers the same premium experience purpose-built for Canadian service businesses."
@@ -58,5 +70,6 @@ export default function VsGlossGeniusPage() {
         themNote: "Not officially available in Canada",
       }}
     />
+    </>
   );
 }

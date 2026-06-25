@@ -6,9 +6,21 @@ export const metadata: Metadata = {
   description: "Jane App is forcing a mandatory payment processor change. If you're a non-clinical service business — salon, spa, groomer, trainer — Pulse is built for you at a fraction of the cost.",
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Compare", item: "https://www.pulseappointments.com/compare" },
+    { "@type": "ListItem", position: 3, name: "Pulse vs. Jane App", item: "https://www.pulseappointments.com/compare/pulse-vs-jane-app" },
+  ],
+};
+
 export default function VsJanePage() {
   return (
-    <ComparePage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <ComparePage
       competitor="Jane App"
       tagline="Pulse vs. Jane App"
       summary="Jane App is excellent for regulated health clinics that need SOAP notes and insurance billing. If you run a salon, spa, grooming studio, or wellness business, you're paying for clinical features you'll never use — and now Jane is forcing you onto their payment processor too."
@@ -66,5 +78,6 @@ export default function VsJanePage() {
         themNote: "Does not include Jane Payments processing fees",
       }}
     />
+    </>
   );
 }

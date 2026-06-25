@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Lash Tech Booking Software | Pulse Appointments", description: "No-show protection and fill reminders for Canadian lash artists." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Lash Techs", item: "https://www.pulseappointments.com/for/lash-techs" },
+  ],
+};
+
 export default function LashTechsPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Lash Techs"
       headline="Booking software that protects lash tech appointments"
       subheadline="Full sets take 2-3 hours. A no-show at that slot costs you real money. Pulse requires a deposit — and charges automatically if they cancel last minute."
@@ -52,5 +63,6 @@ export default function LashTechsPage() {
         city: "Toronto, ON",
       }}
     />
+    </>
   );
 }

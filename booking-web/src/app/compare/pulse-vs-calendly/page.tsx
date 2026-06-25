@@ -6,9 +6,21 @@ export const metadata: Metadata = {
   description: "Calendly books meetings. Pulse books services. Compare deposits, no-show fees, client management, payments, and CAD pricing — everything Calendly doesn't have.",
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Compare", item: "https://www.pulseappointments.com/compare" },
+    { "@type": "ListItem", position: 3, name: "Pulse vs. Calendly", item: "https://www.pulseappointments.com/compare/pulse-vs-calendly" },
+  ],
+};
+
 export default function VsCalendlyPage() {
   return (
-    <ComparePage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <ComparePage
       competitor="Calendly"
       tagline="Pulse vs. Calendly"
       summary="Calendly schedules meetings. Pulse runs service businesses. If you need deposits, no-show protection, client management, SMS reminders, gift cards, and CAD billing — Calendly can't help you with any of that."
@@ -62,5 +74,6 @@ export default function VsCalendlyPage() {
         themNote: "No deposits, no client mgmt, no payments at any tier",
       }}
     />
+    </>
   );
 }

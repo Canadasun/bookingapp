@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Barber Shop Booking Software | Pulse Appointments", description: "No-show protection and automated reminders for Canadian barbers." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Barbers", item: "https://www.pulseappointments.com/for/barbers" },
+  ],
+};
+
 export default function BarbersPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Barbers"
       headline="The booking platform Canadian barbers actually use"
       subheadline="Fill every chair, protect every cut. Pulse automates reminders, deposits, and rebooking so you can focus on the craft."
@@ -52,5 +63,6 @@ export default function BarbersPage() {
         city: "Calgary, AB",
       }}
     />
+    </>
   );
 }

@@ -8,9 +8,20 @@ export const metadata: Metadata = {
   openGraph: { title: "Consultant Booking Software | Pulse Appointments", description: "Online booking with calendar sync and no-show protection for Canadian consultants." },
 };
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
+    { "@type": "ListItem", position: 2, name: "Booking Software for Consultants", item: "https://www.pulseappointments.com/for/consultants" },
+  ],
+};
+
 export default function ConsultantsPage() {
   return (
-    <IndustryPage
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }} />
+      <IndustryPage
       title="Consultants"
       headline="Stop losing billable hours to no-shows"
       subheadline="Pulse lets clients book consultation slots online — while you stay in control. Require a deposit, approve bookings manually, and sync to your calendar automatically."
@@ -52,5 +63,6 @@ export default function ConsultantsPage() {
         city: "Edmonton, AB",
       }}
     />
+    </>
   );
 }
