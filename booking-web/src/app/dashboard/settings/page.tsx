@@ -381,10 +381,14 @@ function SettingsPage() {
   // Load this business's own referral code + count.
   useEffect(() => {
     if (!isOwner) return;
+    const savedReferral = searchParams.get("ref") ?? searchParams.get("referral") ?? localStorage.getItem("pulse_referral_code");
+    if (savedReferral && /^PULSE-[A-Z0-9]{6}$/i.test(savedReferral)) {
+      setReferralInput(savedReferral.toUpperCase());
+    }
     api.referrals.get()
       .then((r) => { setMyReferral({ code: r.code, referredCount: r.referredCount }); clearFeatureError("referrals"); })
       .catch((e) => recordFeatureError("referrals", e, "Could not load referral details"));
-  }, [isOwner, clearFeatureError, recordFeatureError]);
+  }, [isOwner, searchParams, clearFeatureError, recordFeatureError]);
 
   // Business verification status.
   const [verif, setVerif] = useState<{ status: VerificationStatus; note: string | null } | null>(null);
@@ -2124,10 +2128,10 @@ function SettingsPage() {
                 </div>
 
                 {/* Referral: apply a code for a discount + share your own */}
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-amber-900">Have a referral code?</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Enter it before upgrading to get a discount on your subscription.</p>
+                    <p className="text-xs text-amber-700 mt-0.5">Enter it before upgrading. If the code is valid and the referral coupon is configured, Stripe applies the discount at checkout.</p>
                     <input
                       aria-label="Referral code"
                       value={referralInput}
@@ -2138,15 +2142,21 @@ function SettingsPage() {
                   </div>
                   {myReferral && (
                     <div className="border-t border-amber-200 pt-3">
-                      <p className="text-xs text-amber-700">Your referral code — share it so friends get a discount{myReferral.referredCount > 0 ? ` (${myReferral.referredCount} referred so far)` : ""}:</p>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <code className="text-sm font-bold text-amber-900 bg-white border border-amber-300 rounded-lg px-3 py-1.5">{myReferral.code}</code>
+                      <p className="text-sm font-semibold text-amber-900">Share Pulse</p>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        Send your link to another Canadian business. When they subscribe with your code, Pulse records the referral and credits your account after their subscription starts{myReferral.referredCount > 0 ? ` (${myReferral.referredCount} referred so far)` : ""}.
+                      </p>
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <code className="text-xs font-bold text-amber-900 bg-white border border-amber-300 rounded-lg px-3 py-2 break-all">
+                          https://www.pulseappointments.com/register?ref={myReferral.code}
+                        </code>
                         <button type="button"
-                          onClick={() => { navigator.clipboard.writeText(myReferral.code).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }).catch(() => toast.error("Could not copy code")); }}
-                          className="text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-2.5 py-1.5 hover:bg-amber-100 transition-colors">
-                          {refCopied ? "Copied!" : "Copy"}
+                          onClick={() => { navigator.clipboard.writeText(`https://www.pulseappointments.com/register?ref=${myReferral.code}`).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }).catch(() => toast.error("Could not copy link")); }}
+                          className="w-fit text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-2.5 py-2 hover:bg-amber-100 transition-colors">
+                          {refCopied ? "Copied!" : "Copy link"}
                         </button>
                       </div>
+                      <p className="mt-2 text-[11px] text-amber-700">Code: <span className="font-semibold tracking-wide">{myReferral.code}</span></p>
                     </div>
                   )}
                 </div>

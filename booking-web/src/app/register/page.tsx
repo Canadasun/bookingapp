@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,12 +15,19 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const ssoError = searchParams.get("error");
+  const referralCode = (searchParams.get("ref") ?? searchParams.get("referral") ?? "").trim().toUpperCase();
   const [form, setForm] = useState({ name: "", businessName: "", phone: "", email: "", password: "", confirm: "" });
   const [terms, setTerms] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errs, setErrs] = useState<Partial<typeof form>>({});
   const [emailExists, setEmailExists] = useState(false);
+
+  useEffect(() => {
+    if (/^PULSE-[A-Z0-9]{6}$/.test(referralCode)) {
+      localStorage.setItem("pulse_referral_code", referralCode);
+    }
+  }, [referralCode]);
 
   function validate() {
     const e: Partial<typeof form> = {};
@@ -95,6 +102,11 @@ function RegisterForm() {
             {ssoError && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
                 {ssoError}
+              </div>
+            )}
+            {/^PULSE-[A-Z0-9]{6}$/.test(referralCode) && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Referral code saved: <span className="font-semibold tracking-wide">{referralCode}</span>
               </div>
             )}
 
