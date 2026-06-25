@@ -15,8 +15,6 @@ interface Step {
   done: boolean;
 }
 
-const DISMISSED_KEY = "pulse_onboarding_dismissed";
-
 export function OnboardingWizard() {
   const { user, loading: userLoading } = useCurrentUser();
   const bizId = user?.businessId ?? "";
@@ -32,6 +30,7 @@ export function OnboardingWizard() {
         api.staff.list(bizId!).catch(() => [] as unknown[]),
         api.business.get(bizId!).catch(() => null),
       ]);
+      if (biz?.onboardingDismissed) { setLoading(false); return; }
       const hasServices = Array.isArray(services) && services.length > 0;
       const hasStaff = Array.isArray(staff) && staff.length > 0;
       const hasStripe = !!(biz as { stripeConnectOnboarded?: boolean } | null)?.stripeConnectOnboarded;
@@ -57,12 +56,11 @@ export function OnboardingWizard() {
   useEffect(() => {
     if (userLoading) return;
     if (!bizId || user?.role === "STAFF") { setLoading(false); return; }
-    if (typeof window !== "undefined" && localStorage.getItem(DISMISSED_KEY) === "1") { setLoading(false); return; }
     void check();
   }, [userLoading, bizId, user?.role, check]);
 
   function dismiss() {
-    localStorage.setItem(DISMISSED_KEY, "1");
+    if (bizId) api.business.dismissOnboarding(bizId).catch(() => {});
     setDismissed(true);
   }
 

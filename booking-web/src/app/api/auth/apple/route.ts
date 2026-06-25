@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  encodeState, setSSOStateCookie,
+  encodeState, setAppleSSOStateCookie,
   generateNonce, hashNonce, setSSONonceCookie,
   APP_URL,
 } from "@/lib/sso-cookies";
@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(
     `https://appleid.apple.com/auth/authorize?${params}`,
   );
-  setSSOStateCookie(res, state);
+  // Apple uses form_post (cross-site POST) — must use SameSite=None cookies.
+  setAppleSSOStateCookie(res, state);
   setSSONonceCookie(res, rawNonce);
   return res;
 }

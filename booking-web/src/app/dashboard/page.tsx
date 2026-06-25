@@ -87,12 +87,12 @@ export default function OverviewPage() {
   const bizId   = user?.businessId ?? "";
 
   useEffect(() => {
-    if (!userLoading && user?.role === "OWNER" && typeof window !== "undefined") {
-      if (!localStorage.getItem("pulse-demo-dismissed")) {
-        setShowDemoBanner(true);
-      }
+    if (!userLoading && user?.role === "OWNER" && bizId) {
+      api.business.get(bizId).then(biz => {
+        if (!biz?.demoSeeded) setShowDemoBanner(true);
+      }).catch(() => {});
     }
-  }, [user, userLoading]);
+  }, [user, userLoading, bizId]);
 
   async function loadDemoData() {
     setSeedingDemo(true);
@@ -106,7 +106,6 @@ export default function OverviewPage() {
         toast.success("Demo data added! Browse each dashboard section to see examples.");
         load();
       }
-      localStorage.setItem("pulse-demo-dismissed", "1");
       setShowDemoBanner(false);
     } catch {
       toast.error("Could not load demo data. Please try again.");
@@ -116,7 +115,7 @@ export default function OverviewPage() {
   }
 
   function dismissDemoBanner() {
-    localStorage.setItem("pulse-demo-dismissed", "1");
+    fetch("/api/auth/dismiss-demo", { method: "POST" }).catch(() => {});
     setShowDemoBanner(false);
   }
 

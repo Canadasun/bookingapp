@@ -106,6 +106,8 @@ export interface Business {
   locations?: { id: string; name: string; address?: string | null }[];
   suspectedDuplicateOfId?: string | null;
   stripeConnectOnboarded?: boolean;
+  demoSeeded?: boolean;
+  onboardingDismissed?: boolean;
   createdAt: string; updatedAt: string;
 }
 
@@ -738,6 +740,7 @@ export const api = {
     getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
     update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt" | "plan" | "planExpiresAt" | "suspended" | "verificationStatus" | "stripeConnectOnboarded" | "capabilities" | "suspectedDuplicateOfId">>) =>
       req<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    dismissOnboarding: (id: string) => req<{ ok: boolean }>(`/businesses/${id}/dismiss-onboarding`, { method: "POST" }),
     deactivate: (id: string) => req<Business>(`/businesses/${id}/deactivate`, { method: "POST" }),
     reactivate: (id: string) => req<Business>(`/businesses/${id}/reactivate`, { method: "POST" }),
     remove: (id: string, confirmation: string) =>

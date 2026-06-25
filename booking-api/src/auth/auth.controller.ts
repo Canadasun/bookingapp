@@ -161,6 +161,18 @@ export class AuthController {
     return this.authService.seedDemoData(user.id);
   }
 
+  // Marks the demo banner as permanently dismissed (without seeding demo data).
+  // Sets demoSeeded = true so the banner never reappears — the user opted out.
+  @Post('dismiss-demo')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async dismissDemo(@CurrentUser() user: User) {
+    if (!user.businessId) throw new ForbiddenException('No business attached to account');
+    await this.prisma.business.update({ where: { id: user.businessId }, data: { demoSeeded: true } });
+    return { ok: true };
+  }
+
   // Authenticated — complete owner registration after SSO sign-up.
   // SSO always creates a CLIENT first; this upgrades the account to OWNER,
   // creates the business, and issues fresh tokens with the new role.

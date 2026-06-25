@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MessageCircle, Building2, Mail, ExternalLink, Clock, HelpCircle } from "lucide-react";
+import { MessageCircle, Building2, Mail, ExternalLink, Clock, HelpCircle, PenLine } from "lucide-react";
+import { SupportForm } from "./SupportForm";
 
 export const metadata: Metadata = {
   title: "Support — Pulse",
@@ -99,6 +100,20 @@ export default function SupportPage() {
               </div>
             </section>
 
+            {/* Contact form */}
+            <section>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                  <PenLine className="w-5 h-5 text-violet-600" />
+                </div>
+                <h2 className="text-lg font-bold text-slate-900">Send us a message</h2>
+              </div>
+              <p className="text-sm text-slate-500 mb-5">
+                Can&apos;t use email? Fill out the form below and we&apos;ll get back to you within one business day.
+              </p>
+              <SupportForm />
+            </section>
+
             {/* FAQ */}
             <section>
               <div className="flex items-center gap-3 mb-4">
@@ -114,7 +129,7 @@ export default function SupportPage() {
                     <span className="text-slate-400 group-open:rotate-180 transition-transform text-xs">▼</span>
                   </summary>
                   <p className="mt-3 leading-relaxed text-slate-600">
-                    Log in at <Link href="/my/login" className="text-violet-600 hover:underline">my.pulseappointments.com</Link>, go to My Bookings, and select the appointment. Cancellations are subject to the individual business&apos;s cancellation policy.
+                    Log in at <Link href="/my/login" className="text-violet-600 hover:underline">the client portal</Link>, select the appointment from your upcoming or past bookings, and choose Cancel or Reschedule. Cancellations are subject to the individual business&apos;s cancellation policy.
                   </p>
                 </details>
                 <details className="rounded-xl border border-slate-100 bg-slate-50 px-5 py-3 group">

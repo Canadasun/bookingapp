@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException, HttpCode } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -124,6 +124,15 @@ export class BusinessesController {
       });
     }
     return result;
+  }
+
+  @Post(':id/dismiss-onboarding')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER)
+  dismissOnboarding(@Param('id') id: string, @CurrentUser() user: User) {
+    this.assertTenantAccess(user, id);
+    return this.businessService.dismissOnboarding(id);
   }
 
   // Pause the business (reversible) — hides the public booking page, keeps data.

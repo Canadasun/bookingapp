@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import {
   applySessionCookies,
-  clearSSOStateCookie,
+  clearAppleSSOStateCookie,
   clearSSONonceCookie,
   parseStateIntent,
   roleHome,
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const base = APP_URL();
   const makeErrRedirect = (page: string) => (msg: string) => {
     const r = NextResponse.redirect(`${base}${page}?error=${encodeURIComponent(msg)}`);
-    clearSSOStateCookie(r);
+    clearAppleSSOStateCookie(r);
     return r;
   };
   const defaultErr = makeErrRedirect("/login");
@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
 
   if (!identityToken || !state) return defaultErr("Missing Apple identity token");
 
-  const cookieState = req.cookies.get("pulse_sso_state")?.value;
+  // Apple sends a cross-site form_post, so cookies are in pulse_sso_state_apple
+  // (set with SameSite=None; Secure). SameSite=Lax cookies are not sent on cross-site POSTs.
+  const cookieState = req.cookies.get("pulse_sso_state_apple")?.value;
   if (!cookieState || cookieState !== state) {
     return defaultErr("Invalid state — please try again");
   }
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
     destination = roleHome(data.user.role);
   }
   const res = NextResponse.redirect(`${base}${destination}`);
-  clearSSOStateCookie(res);
+  clearAppleSSOStateCookie(res);
   clearSSONonceCookie(res);
   applySessionCookies(res, data);
   return res;

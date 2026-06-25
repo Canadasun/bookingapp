@@ -21,10 +21,15 @@ export type SSOTokens = {
   user: SSOUser;
 };
 
-const SSO_STATE_COOKIE = "pulse_sso_state";
-const SSO_NONCE_COOKIE = "pulse_sso_nonce";
-const SSO_PKCE_COOKIE  = "pulse_pkce_verifier";
+const SSO_STATE_COOKIE       = "pulse_sso_state";
+const SSO_STATE_APPLE_COOKIE = "pulse_sso_state_apple";
+const SSO_NONCE_COOKIE       = "pulse_sso_nonce";
+const SSO_PKCE_COOKIE        = "pulse_pkce_verifier";
 const secure = () => process.env.NODE_ENV === "production";
+// Apple uses form_post (cross-site POST) so its cookies must be SameSite=None; Secure.
+// Browsers block SameSite=Lax cookies on cross-site POSTs, which breaks the callback.
+// Falls back to "lax" in dev since Apple requires HTTPS anyway and won't run on localhost.
+const appleSameSite = (): "none" | "lax" => (secure() ? "none" : "lax");
 
 export function encodeState(intent: "owner" | "client"): string {
   return `${randomBytes(16).toString("hex")}:${intent}`;
@@ -32,6 +37,7 @@ export function encodeState(intent: "owner" | "client"): string {
 
 // Apple nonce helpers — nonce is hashed before sending to Apple;
 // the raw value is kept in a short-lived HttpOnly cookie for callback verification.
+// Must be SameSite=None; Secure so it survives Apple's cross-site form_post.
 export function generateNonce(): string {
   return randomBytes(32).toString("hex");
 }
@@ -40,12 +46,12 @@ export function hashNonce(raw: string): string {
 }
 export function setSSONonceCookie(res: NextResponse, raw: string) {
   res.cookies.set(SSO_NONCE_COOKIE, raw, {
-    httpOnly: true, secure: secure(), sameSite: "lax", maxAge: 600, path: "/",
+    httpOnly: true, secure: secure(), sameSite: appleSameSite(), maxAge: 600, path: "/",
   });
 }
 export function clearSSONonceCookie(res: NextResponse) {
   res.cookies.set(SSO_NONCE_COOKIE, "", {
-    httpOnly: true, secure: secure(), sameSite: "lax", maxAge: 0, path: "/",
+    httpOnly: true, secure: secure(), sameSite: appleSameSite(), maxAge: 0, path: "/",
   });
 }
 
@@ -71,6 +77,7 @@ export function parseStateIntent(state: string): "owner" | "client" {
   return state.split(":")[1] === "owner" ? "owner" : "client";
 }
 
+// Google state cookie — SameSite=Lax is fine (Google redirects via GET).
 export function setSSOStateCookie(res: NextResponse, state: string) {
   res.cookies.set(SSO_STATE_COOKIE, state, {
     httpOnly: true,
@@ -80,12 +87,32 @@ export function setSSOStateCookie(res: NextResponse, state: string) {
     path: "/",
   });
 }
-
 export function clearSSOStateCookie(res: NextResponse) {
   res.cookies.set(SSO_STATE_COOKIE, "", {
     httpOnly: true,
     secure: secure(),
     sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
+}
+
+// Apple state cookie — must be SameSite=None; Secure because Apple uses form_post
+// (cross-site POST). Uses a distinct cookie name so it doesn't conflict with Google's.
+export function setAppleSSOStateCookie(res: NextResponse, state: string) {
+  res.cookies.set(SSO_STATE_APPLE_COOKIE, state, {
+    httpOnly: true,
+    secure: secure(),
+    sameSite: appleSameSite(),
+    maxAge: 600,
+    path: "/",
+  });
+}
+export function clearAppleSSOStateCookie(res: NextResponse) {
+  res.cookies.set(SSO_STATE_APPLE_COOKIE, "", {
+    httpOnly: true,
+    secure: secure(),
+    sameSite: appleSameSite(),
     maxAge: 0,
     path: "/",
   });

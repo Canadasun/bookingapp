@@ -9,7 +9,7 @@ import {
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
-  ShieldCheck,
+  ShieldCheck, LifeBuoy,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
@@ -81,6 +81,7 @@ const FOOTER_PAGES = [
   { href: "/dashboard/notifications", label: "Notifications" },
   { href: "/dashboard/account",       label: "Account" },
   { href: "/dashboard/settings",      label: "Settings" },
+  { href: "/support",                 label: "Help & Support" },
 ];
 
 function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
@@ -511,6 +512,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard/settings" onClick={() => setOpen(false)}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
             <SettingsIcon className="w-4 h-4" /> Settings
+          </Link>
+          <Link href="/support" onClick={() => setOpen(false)}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
+            <LifeBuoy className="w-4 h-4" /> Help & Support
           </Link>
           <button onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">

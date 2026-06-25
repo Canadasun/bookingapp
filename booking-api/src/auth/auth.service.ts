@@ -255,7 +255,10 @@ export class AuthService {
       where: { businessId: user.businessId, name: 'Demo Client' },
       select: { id: true },
     });
-    if (already) return { ok: true, skipped: true };
+    if (already) {
+      await this.prisma.business.update({ where: { id: user.businessId }, data: { demoSeeded: true } });
+      return { ok: true, skipped: true };
+    }
     const staff = await this.prisma.staff.findUnique({
       where: { userId: user.id },
       select: { id: true },
@@ -327,6 +330,7 @@ export class AuthService {
           emailCancellation: true,
           emailReschedule: true,
         },
+        demoSeeded: true,
       },
     });
 
@@ -716,7 +720,7 @@ export class AuthService {
     const normalizedUa = (userAgent ?? '')
       .toLowerCase()
       .replace(/([a-z][a-z0-9._-]*)\/[\d._]+/g, '$1')
-      .replace(/\b(os(?: x)?|android) [\d._]+/g, '$1')
+      .replace(/\b(os(?: x)?|android|windows nt) [\d._]+/g, '$1')
       .replace(/\s+/g, ' ')
       .trim();
     if (!normalizedUa) return null;
@@ -1289,17 +1293,20 @@ export class AuthService {
       // like "15m" are valid at runtime, so cast past the stricter literal type.
       expiresIn: (isAdmin ? '5m' : (process.env.JWT_EXPIRES_IN ?? '15m')) as unknown as number,
     });
+    const isSSO = !!(user.oauthProvider);
+    const refreshExpiry = isAdmin ? '1h' : isSSO ? '30d' : (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d');
     const refreshToken = this.jwt.sign(payload, {
       secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: (isAdmin ? '1h' : (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d')) as unknown as number,
+      expiresIn: refreshExpiry as unknown as number,
     });
 
     // Persist the session as a hash only — a DB leak then can't replay live
     // sessions. On refresh we ROTATE the presented session's row in place (one
     // row per device); on login we add a NEW row so web + mobile coexist.
     const tokenHash = hashRefreshToken(refreshToken);
+    const SSO_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     // Admin refresh tokens are capped at 1h in the JWT; keep the DB row in sync.
-    const expiresAt = new Date(Date.now() + (isAdmin ? 60 * 60 * 1000 : refreshTokenTtlMs()));
+    const expiresAt = new Date(Date.now() + (isAdmin ? 60 * 60 * 1000 : isSSO ? SSO_REFRESH_TTL_MS : refreshTokenTtlMs()));
     const userAgent = opts.userAgent?.slice(0, 256) ?? null;
     if (opts.replaceTokenHash) {
       const { count } = await this.prisma.refreshSession.updateMany({

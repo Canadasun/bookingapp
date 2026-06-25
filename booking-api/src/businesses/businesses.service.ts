@@ -76,6 +76,11 @@ export class BusinessesService {
     return { ...business, capabilities: getCapabilities(business.plan) };
   }
 
+  async dismissOnboarding(id: string) {
+    await this.prisma.business.update({ where: { id }, data: { onboardingDismissed: true } });
+    return { ok: true };
+  }
+
   private zonedBounds(now: Date, timezone: string) {
     const localNow = toZonedTime(now, timezone);
     const today = formatTZ(localNow, 'yyyy-MM-dd', { timeZone: timezone });
