@@ -47,6 +47,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/for/yoga-studios`,                        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/for/toronto`,                             lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
     { url: `${SITE_URL}/for/vancouver`,                           lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/blog`,                                     lastModified: CONTENT_DATE, changeFrequency: "weekly",  priority: 0.8 },
+    { url: `${SITE_URL}/blog/how-to-reduce-no-shows-canadian-service-businesses`, lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/blog/best-appointment-booking-software-canada-2026`,      lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
   ];
 
   // Dynamically include all public (non-suspended) business booking pages.
