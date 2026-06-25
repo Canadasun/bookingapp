@@ -27,7 +27,13 @@ function RegisterForm() {
     if (!form.name.trim()) e.name = "Required";
     if (!form.businessName.trim()) e.businessName = "Required";
     if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
-    if (form.password.length < 8) e.password = "At least 8 characters";
+    if (form.password.length < 8) {
+      e.password = "At least 8 characters";
+    } else if (!/[a-zA-Z]/.test(form.password)) {
+      e.password = "Must contain at least one letter";
+    } else if (!/[\d!@#$%^&*()\-_+=[\]{};':"\\|,.<>/?`~]/.test(form.password)) {
+      e.password = "Must contain at least one number or special character";
+    }
     if (form.password !== form.confirm) e.confirm = "Passwords don't match";
     setErrs(e);
     if (!terms) { toast.error("Please accept the Terms of Service & Privacy Policy"); return false; }

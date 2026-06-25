@@ -135,6 +135,15 @@ export class AuthController {
     return this.authService.resendVerification(user.id);
   }
 
+  // Public — resend verification by email for users blocked by the emailVerified gate.
+  // Always 200; never reveals whether the address exists.
+  @Post('resend-verification-public')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
+  resendVerificationPublic(@Body(new ZodValidationPipe(z.object({ email: z.string().email() }))) body: { email: string }) {
+    return this.authService.resendVerificationByEmail(body.email);
+  }
+
   // Public — start a self-service reset. Always 200 (never reveals if the email
   // exists). Throttled to blunt enumeration / email-bombing.
   @Post('forgot-password')

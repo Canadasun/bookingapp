@@ -709,6 +709,17 @@ export class AuthService {
     return { ok: true };
   }
 
+  // Public (pre-login) variant — accepts email so unauthenticated users blocked
+  // by the emailVerified gate can request a new link. Always returns ok to avoid
+  // leaking whether the email address exists in our database.
+  async resendVerificationByEmail(email: string): Promise<{ ok: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user && !user.emailVerified) {
+      await this.sendVerification(user.id).catch(() => {});
+    }
+    return { ok: true };
+  }
+
   // ── Self-service password reset ─────────────────────────────────────────────
   // The reset token is a short-lived JWT signed with JWT_SECRET + the user's
   // CURRENT password hash. That makes it single-use for free: once the password
@@ -772,7 +783,6 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string) {
-    if (newPassword.length < 8) throw new BadRequestException('New password must be at least 8 characters');
     // Decode (unverified) to find which user the token is for, then verify with
     // that user's hash-derived secret.
     const decoded = this.jwt.decode(token) as { sub?: string; kind?: string } | null;
@@ -786,11 +796,12 @@ export class AuthService {
     }
     await this.prisma.user.update({
       where: { id: user.id },
-      // Clear any forced-reset flag since the user has now set a fresh password.
-      data: { passwordHash: await bcrypt.hash(newPassword, 12), mustResetPassword: false },
+      // Clear forced-reset flag; mark email verified — successful reset proves ownership.
+      data: { passwordHash: await bcrypt.hash(newPassword, 12), mustResetPassword: false, emailVerified: true },
     });
     // Revoke every device session so a reset logs the account out everywhere.
     await this.prisma.refreshSession.deleteMany({ where: { userId: user.id } });
+    await this.invalidateUserAccessTokens(user.id);
     return { ok: true };
   }
 
@@ -828,6 +839,14 @@ export class AuthService {
     await this.authLock.clearFailures(dto.email).catch(() => {});
 
     if (user.suspended) throw new ForbiddenException('This account has been suspended.');
+
+    if (!user.emailVerified) {
+      this.sendVerification(user.id).catch(() => {});
+      throw new HttpException(
+        { message: "Please verify your email address. We've resent the verification link.", code: 'EMAIL_NOT_VERIFIED', statusCode: 403 },
+        403,
+      );
+    }
 
     if (user.role === 'ADMIN') {
       // In production, reject login attempts from unrecognized browser origins.
@@ -1113,7 +1132,6 @@ export class AuthService {
     if (!user.passwordHash) throw new BadRequestException('Social sign-in accounts cannot set a password here');
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Current password is incorrect');
-    if (newPassword.length < 8) throw new BadRequestException('New password must be at least 8 characters');
     if (await bcrypt.compare(newPassword, user.passwordHash)) {
       throw new BadRequestException('New password must be different from the current one');
     }
@@ -1123,12 +1141,21 @@ export class AuthService {
     });
     // Revoke all sessions so concurrent devices are logged out after a password change.
     await this.prisma.refreshSession.deleteMany({ where: { userId } });
+    await this.invalidateUserAccessTokens(userId);
     return { ok: true };
   }
 
   async revokeAccessToken(jti: string, exp: number) {
     const ttl = Math.max(1, exp - Math.floor(Date.now() / 1000));
     await this.redis.client.set(`auth:revoked:${jti}`, '1', 'EX', ttl).catch(() => {});
+  }
+
+  private async invalidateUserAccessTokens(userId: string): Promise<void> {
+    await this.redis.client.set(
+      `auth:pwd_changed:${userId}`,
+      Date.now().toString(),
+      'EX', 60 * 60 * 24 * 31,
+    ).catch(() => {});
   }
 
   // ── SSO: Google + Apple ─────────────────────────────────────────────────────
@@ -1278,11 +1305,8 @@ export class AuthService {
     const sub = payload.sub as string | undefined;
     if (!sub) throw new UnauthorizedException('Apple token missing subject claim');
 
-    // Web flows must always include rawNonce for replay protection. Mobile flows
-    // should also send it; for backwards-compatibility with existing app versions
-    // it is currently optional on mobile, but required for all other platforms.
-    if (platform !== 'mobile' && !rawNonce) {
-      throw new UnauthorizedException('Apple identity token nonce is required for web sign-in');
+    if (!rawNonce) {
+      throw new UnauthorizedException('Apple identity token nonce is required');
     }
     if (rawNonce) {
       const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
@@ -1326,30 +1350,32 @@ export class AuthService {
     // Admin refresh tokens are capped at 1h in the JWT; keep the DB row in sync.
     const expiresAt = new Date(Date.now() + (isAdmin ? 60 * 60 * 1000 : isSSO ? SSO_REFRESH_TTL_MS : refreshTokenTtlMs()));
     const userAgent = opts.userAgent?.slice(0, 256) ?? null;
-    if (opts.replaceTokenHash) {
-      const { count } = await this.prisma.refreshSession.updateMany({
-        where: { userId: user.id, tokenHash: opts.replaceTokenHash },
-        data: { tokenHash, expiresAt, userAgent },
-      });
-      if (count === 0) {
-        await this.prisma.refreshSession.create({ data: { userId: user.id, tokenHash, expiresAt, userAgent } });
+    await this.prisma.$transaction(async (tx) => {
+      if (opts.replaceTokenHash) {
+        const { count } = await tx.refreshSession.updateMany({
+          where: { userId: user.id, tokenHash: opts.replaceTokenHash },
+          data: { tokenHash, expiresAt, userAgent },
+        });
+        if (count === 0) {
+          await tx.refreshSession.create({ data: { userId: user.id, tokenHash, expiresAt, userAgent } });
+        }
+      } else {
+        await tx.refreshSession.create({ data: { userId: user.id, tokenHash, expiresAt, userAgent } });
       }
-    } else {
-      await this.prisma.refreshSession.create({ data: { userId: user.id, tokenHash, expiresAt, userAgent } });
-    }
-    // Opportunistic cleanup of this user's expired sessions.
-    await this.prisma.refreshSession.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
-    // Enforce session cap: evict oldest sessions beyond the limit.
-    const MAX_SESSIONS = 10;
-    const allSessions = await this.prisma.refreshSession.findMany({
-      where: { userId: user.id },
-      orderBy: { expiresAt: 'asc' },
-      select: { id: true },
+      // Opportunistic cleanup of this user's expired sessions.
+      await tx.refreshSession.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
+      // Enforce session cap: evict oldest sessions beyond the limit.
+      const MAX_SESSIONS = 10;
+      const allSessions = await tx.refreshSession.findMany({
+        where: { userId: user.id },
+        orderBy: { expiresAt: 'asc' },
+        select: { id: true },
+      });
+      if (allSessions.length > MAX_SESSIONS) {
+        const excess = allSessions.slice(0, allSessions.length - MAX_SESSIONS);
+        await tx.refreshSession.deleteMany({ where: { id: { in: excess.map((s) => s.id) } } });
+      }
     });
-    if (allSessions.length > MAX_SESSIONS) {
-      const excess = allSessions.slice(0, allSessions.length - MAX_SESSIONS);
-      await this.prisma.refreshSession.deleteMany({ where: { id: { in: excess.map((s) => s.id) } } });
-    }
 
     let staffId: string | null = null;
     let permissions: string[] = [];

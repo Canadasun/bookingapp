@@ -9,6 +9,7 @@ export interface JwtPayload {
   email: string;
   role: string;
   jti?: string;
+  iat?: number;
   exp?: number;
 }
 
@@ -68,6 +69,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (!user) throw new UnauthorizedException();
     if (user.suspended) throw new UnauthorizedException();
+
+    if (payload.iat) {
+      const pwdChanged = await this.redis.client.get(`auth:pwd_changed:${payload.sub}`).catch(() => null);
+      if (pwdChanged && payload.iat * 1000 < parseInt(pwdChanged)) throw new UnauthorizedException();
+    }
 
     if (payload.jti) {
       const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`).catch((err) => {

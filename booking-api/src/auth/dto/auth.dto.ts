@@ -1,9 +1,18 @@
 import { z } from 'zod';
 
+const passwordSchema = z
+  .string()
+  .min(8)
+  .max(1024)
+  .refine((p) => /[a-zA-Z]/.test(p), { message: 'Password must contain at least one letter' })
+  .refine((p) => /[\d!@#$%^&*()_\-+=[\]{};':"\\|,.<>/?`~]/.test(p), {
+    message: 'Password must contain at least one number or special character',
+  });
+
 export const RegisterSchema = z.object({
   name: z.string().trim().min(1).max(200),
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(8).max(1024),
+  password: passwordSchema,
   // Public self-signup is restricted to business owners and clients only.
   // STAFF are created by an owner via the staff-invite endpoint; ADMIN via seed.
   role: z.enum(['OWNER', 'CLIENT']).default('CLIENT'),
@@ -35,7 +44,7 @@ export const RefreshSchema = z.object({
 
 export const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(1024),
-  newPassword: z.string().min(8).max(1024),
+  newPassword: passwordSchema,
 });
 
 export const ForgotPasswordSchema = z.object({
@@ -44,7 +53,7 @@ export const ForgotPasswordSchema = z.object({
 
 export const ResetPasswordSchema = z.object({
   token: z.string().min(1),
-  newPassword: z.string().min(8).max(1024),
+  newPassword: passwordSchema,
 });
 
 export const VerifyTwoFactorSchema = z.object({

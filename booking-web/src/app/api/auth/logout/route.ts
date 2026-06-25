@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
   res.cookies.delete("booking_token");
   res.cookies.delete("booking_refresh");
   res.cookies.delete("booking_user");
-  // booking_td (trusted-device) is intentionally kept across logout so the
-  // 30-day device trust survives sign-out/sign-in cycles.
+  res.cookies.delete("booking_td");
   return res;
 }
