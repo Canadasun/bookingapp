@@ -229,12 +229,12 @@ export class AuthController {
   @Post('apple/verify')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async appleVerify(@Body() body: { identityToken?: string; email?: string; firstName?: string; lastName?: string; platform?: string; allowCreate?: boolean }, @Req() req: Request) {
+  async appleVerify(@Body() body: { identityToken?: string; email?: string; firstName?: string; lastName?: string; platform?: string; allowCreate?: boolean; nonce?: string }, @Req() req: Request) {
     if (!body.identityToken) throw new BadRequestException('identityToken is required');
     const platform = body.platform === 'mobile' ? 'mobile' : 'web';
     const fwd = ((req as unknown as { headers: Record<string, string | undefined> }).headers['x-forwarded-for'])?.split(',')[0]?.trim();
     const ip = fwd || (req as unknown as { ip?: string }).ip;
-    const profile = await this.authService.verifyAppleToken(body.identityToken, platform, body.email, body.firstName, body.lastName);
+    const profile = await this.authService.verifyAppleToken(body.identityToken, platform, body.email, body.firstName, body.lastName, body.nonce);
     const ua = (req as unknown as { headers: Record<string, string | undefined> }).headers['user-agent'];
     const user = await this.authService.findOrCreateSSOUser('apple', profile.sub, profile.email, profile.name, { ip }, body.allowCreate ?? true);
     await this.authService.recordSSOLogin(user, 'APPLE', { ip, userAgent: ua });

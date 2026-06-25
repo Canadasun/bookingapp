@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { encodeState, setSSOStateCookie, APP_URL } from "@/lib/sso-cookies";
+import {
+  encodeState, setSSOStateCookie,
+  generateNonce, hashNonce, setSSONonceCookie,
+  APP_URL,
+} from "@/lib/sso-cookies";
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.APPLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
@@ -10,6 +14,7 @@ export async function GET(req: NextRequest) {
   const intent = req.nextUrl.searchParams.get("intent") === "owner" ? "owner" : "client";
   const state = encodeState(intent);
   const redirectUri = `${APP_URL()}/api/auth/apple/callback`;
+  const rawNonce = generateNonce();
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -18,11 +23,13 @@ export async function GET(req: NextRequest) {
     scope: "name email",
     response_mode: "form_post",
     state,
+    nonce: hashNonce(rawNonce),
   });
 
   const res = NextResponse.redirect(
     `https://appleid.apple.com/auth/authorize?${params}`,
   );
   setSSOStateCookie(res, state);
+  setSSONonceCookie(res, rawNonce);
   return res;
 }

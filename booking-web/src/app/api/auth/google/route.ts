@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { encodeState, setSSOStateCookie, APP_URL } from "@/lib/sso-cookies";
+import {
+  encodeState, setSSOStateCookie,
+  generateCodeVerifier, computeCodeChallenge, setPKCECookie,
+  APP_URL,
+} from "@/lib/sso-cookies";
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -10,6 +14,7 @@ export async function GET(req: NextRequest) {
   const intent = req.nextUrl.searchParams.get("intent") === "owner" ? "owner" : "client";
   const state = encodeState(intent);
   const redirectUri = `${APP_URL()}/api/auth/google/callback`;
+  const codeVerifier = generateCodeVerifier();
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -19,11 +24,14 @@ export async function GET(req: NextRequest) {
     state,
     access_type: "online",
     prompt: "select_account",
+    code_challenge: computeCodeChallenge(codeVerifier),
+    code_challenge_method: "S256",
   });
 
   const res = NextResponse.redirect(
     `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
   );
   setSSOStateCookie(res, state);
+  setPKCECookie(res, codeVerifier);
   return res;
 }

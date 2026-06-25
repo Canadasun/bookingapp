@@ -3,6 +3,7 @@ import { apiBase } from "@/lib/server-api";
 import {
   applySessionCookies,
   clearSSOStateCookie,
+  clearPKCECookie,
   parseStateIntent,
   roleHome,
   APP_URL,
@@ -34,6 +35,7 @@ export async function GET(req: NextRequest) {
   const intent = parseStateIntent(cookieState);
   const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
 
+  const codeVerifier = req.cookies.get("pulse_pkce_verifier")?.value;
   const redirectUri = `${base}/api/auth/google/callback`;
   const API = apiBase();
 
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
     upstream = await fetch(`${API}/auth/google/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, redirectUri, allowCreate: intent === "owner" }),
+      body: JSON.stringify({ code, redirectUri, codeVerifier, allowCreate: intent === "owner" }),
     });
   } catch {
     return errRedirect("Could not reach the authentication server");
@@ -63,6 +65,7 @@ export async function GET(req: NextRequest) {
   }
   const res = NextResponse.redirect(`${base}${destination}`);
   clearSSOStateCookie(res);
+  clearPKCECookie(res);
   applySessionCookies(res, data);
   return res;
 }

@@ -3,6 +3,7 @@ import { apiBase } from "@/lib/server-api";
 import {
   applySessionCookies,
   clearSSOStateCookie,
+  clearSSONonceCookie,
   parseStateIntent,
   roleHome,
   APP_URL,
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
 
   const intent = parseStateIntent(cookieState);
   const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
+  const rawNonce = req.cookies.get("pulse_sso_nonce")?.value;
 
   let firstName: string | undefined;
   let lastName: string | undefined;
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
     upstream = await fetch(`${API}/auth/apple/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identityToken, email, firstName, lastName, platform: "web", allowCreate: intent === "owner" }),
+      body: JSON.stringify({ identityToken, email, firstName, lastName, platform: "web", allowCreate: intent === "owner", nonce: rawNonce }),
     });
   } catch {
     return errRedirect("Could not reach the authentication server");
@@ -83,6 +85,7 @@ export async function POST(req: NextRequest) {
   }
   const res = NextResponse.redirect(`${base}${destination}`);
   clearSSOStateCookie(res);
+  clearSSONonceCookie(res);
   applySessionCookies(res, data);
   return res;
 }

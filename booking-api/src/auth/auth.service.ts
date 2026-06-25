@@ -1121,7 +1121,10 @@ export class AuthService {
     const existing = await this.prisma.user.findFirst({
       where: { oauthProvider: provider, oauthSubject: subject },
     });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.suspended) throw new ForbiddenException('This account has been suspended.');
+      return existing;
+    }
 
     // 2. Email-match path: link to an existing account — but only if that account
     //    has already verified the email (proves they own it) and is not an admin
@@ -1129,6 +1132,7 @@ export class AuthService {
     if (email) {
       const byEmail = await this.prisma.user.findUnique({ where: { email } });
       if (byEmail) {
+        if (byEmail.suspended) throw new ForbiddenException('This account has been suspended.');
         if (!byEmail.emailVerified) {
           throw new UnauthorizedException(
             'An account with this email exists but has not yet been verified. ' +
@@ -1237,7 +1241,7 @@ export class AuthService {
     return { sub: info.sub, email: info.email, name: info.name ?? '' };
   }
 
-  async verifyAppleToken(identityToken: string, platform: 'web' | 'mobile', email?: string, firstName?: string, lastName?: string): Promise<{ sub: string; email: string; name: string }> {
+  async verifyAppleToken(identityToken: string, platform: 'web' | 'mobile', email?: string, firstName?: string, lastName?: string, rawNonce?: string): Promise<{ sub: string; email: string; name: string }> {
     const clientId = platform === 'mobile'
       ? (process.env.APPLE_MOBILE_CLIENT_ID ?? 'com.pulseappointments.app')
       : process.env.APPLE_CLIENT_ID;
@@ -1255,6 +1259,17 @@ export class AuthService {
     }
     const sub = payload.sub as string | undefined;
     if (!sub) throw new UnauthorizedException('Apple token missing subject claim');
+
+    // Verify nonce for replay protection — web flows always send rawNonce;
+    // mobile flows (no nonce in authorize URL) omit it, so we skip the check.
+    if (rawNonce) {
+      const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
+      const tokenNonce = payload.nonce as string | undefined;
+      if (!tokenNonce || tokenNonce !== expectedNonce) {
+        throw new UnauthorizedException('Apple identity token nonce mismatch');
+      }
+    }
+
     const resolvedEmail = email || (payload.email as string | undefined) || '';
     const name = [firstName, lastName].filter(Boolean).join(' ');
     return { sub, email: resolvedEmail, name };

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { signCookieValue } from "./cookie-sign";
 
 export type SSOUser = {
@@ -22,10 +22,49 @@ export type SSOTokens = {
 };
 
 const SSO_STATE_COOKIE = "pulse_sso_state";
+const SSO_NONCE_COOKIE = "pulse_sso_nonce";
+const SSO_PKCE_COOKIE  = "pulse_pkce_verifier";
 const secure = () => process.env.NODE_ENV === "production";
 
 export function encodeState(intent: "owner" | "client"): string {
   return `${randomBytes(16).toString("hex")}:${intent}`;
+}
+
+// Apple nonce helpers — nonce is hashed before sending to Apple;
+// the raw value is kept in a short-lived HttpOnly cookie for callback verification.
+export function generateNonce(): string {
+  return randomBytes(32).toString("hex");
+}
+export function hashNonce(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
+export function setSSONonceCookie(res: NextResponse, raw: string) {
+  res.cookies.set(SSO_NONCE_COOKIE, raw, {
+    httpOnly: true, secure: secure(), sameSite: "lax", maxAge: 600, path: "/",
+  });
+}
+export function clearSSONonceCookie(res: NextResponse) {
+  res.cookies.set(SSO_NONCE_COOKIE, "", {
+    httpOnly: true, secure: secure(), sameSite: "lax", maxAge: 0, path: "/",
+  });
+}
+
+// Google PKCE helpers — code_verifier stored in cookie, challenge sent to Google.
+export function generateCodeVerifier(): string {
+  return randomBytes(32).toString("base64url");
+}
+export function computeCodeChallenge(verifier: string): string {
+  return createHash("sha256").update(verifier).digest("base64url");
+}
+export function setPKCECookie(res: NextResponse, verifier: string) {
+  res.cookies.set(SSO_PKCE_COOKIE, verifier, {
+    httpOnly: true, secure: secure(), sameSite: "lax", maxAge: 600, path: "/",
+  });
+}
+export function clearPKCECookie(res: NextResponse) {
+  res.cookies.set(SSO_PKCE_COOKIE, "", {
+    httpOnly: true, secure: secure(), sameSite: "lax", maxAge: 0, path: "/",
+  });
 }
 
 export function parseStateIntent(state: string): "owner" | "client" {

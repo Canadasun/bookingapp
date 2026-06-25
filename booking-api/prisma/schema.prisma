@@ -385,6 +385,7 @@ model User {
   businessId             String?
   avatarUrl              String?
   emailVerified          Boolean  @default(false)
+  suspended              Boolean  @default(false)
   mustResetPassword      Boolean  @default(false)
   twoFactorEnabled       Boolean  @default(false)
   twoFactorMethod        String   @default("EMAIL") // EMAIL | SMS
