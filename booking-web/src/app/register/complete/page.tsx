@@ -12,6 +12,7 @@ import { getUser } from "@/lib/auth";
 
 export default function CompleteOwnerRegistrationPage() {
   const router = useRouter();
+  const [ready, setReady] = useState(false);
   const [businessName, setBusinessName] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -19,8 +20,11 @@ export default function CompleteOwnerRegistrationPage() {
   useEffect(() => {
     const user = getUser();
     if (!user) { router.replace("/register"); return; }
-    if (user.role === "OWNER" && user.businessId) { router.replace("/dashboard"); }
+    if (user.role === "OWNER" && user.businessId) { router.replace("/dashboard"); return; }
+    setReady(true);
   }, [router]);
+
+  if (!ready) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

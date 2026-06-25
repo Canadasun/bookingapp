@@ -24,10 +24,6 @@ export type SSOTokens = {
 const SSO_STATE_COOKIE = "pulse_sso_state";
 const secure = () => process.env.NODE_ENV === "production";
 
-export function generateState(): string {
-  return randomBytes(16).toString("hex");
-}
-
 export function encodeState(intent: "owner" | "client"): string {
   return `${randomBytes(16).toString("hex")}:${intent}`;
 }

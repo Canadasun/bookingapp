@@ -179,6 +179,13 @@ export class AuthService {
       select: { id: true, name: true, email: true, role: true, businessId: true },
     });
 
+    // Only CLIENT accounts may be upgraded. ADMIN and STAFF must never be
+    // silently overwritten — ADMIN because it would destroy elevated privileges,
+    // STAFF because it would corrupt their existing business association.
+    if (user.role !== 'CLIENT' && !(user.role === 'OWNER' && user.businessId)) {
+      throw new ForbiddenException('Only client accounts can complete owner registration');
+    }
+
     // Idempotent — already set up
     if (user.role === 'OWNER' && user.businessId) {
       const full = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
