@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
 import { assertSameOrigin } from "@/lib/same-origin";
+import { refreshMaxAge } from "@/lib/sso-cookies";
 
 const API = apiBase();
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
-    httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: refreshMaxAge(data.refreshToken),
   });
   const { email: _e, mustResetPassword: _mr, ...hint } = data.user;
   void _e; void _mr;

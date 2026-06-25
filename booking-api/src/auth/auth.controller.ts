@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
+import { z } from 'zod';
 import { AuthService } from './auth.service';
 import { RegisterSchema, LoginSchema, ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema, VerifyTwoFactorSchema, SetTwoFactorSchema, VerifyEmailSchema, RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto, VerifyTwoFactorDto, SetTwoFactorDto, VerifyEmailDto } from './dto/auth.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -180,7 +181,10 @@ export class AuthController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  completeOwnerRegistration(@CurrentUser() user: User, @Body() body: { businessName?: string }) {
+  completeOwnerRegistration(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(z.object({ businessName: z.string().max(120).optional() }))) body: { businessName?: string },
+  ) {
     return this.authService.completeOwnerRegistration(user.id, body.businessName ?? '');
   }
 
@@ -211,7 +215,9 @@ export class AuthController {
       });
       return { ok: true, user };
     } finally {
-      // Always clear the secret so a DB error can't leave the endpoint open for retry.
+      // Clear in this pod's process so it can't be retried here. Other pods retain
+      // the env var but the DB guard (existingAdmins > 0) permanently closes the
+      // endpoint across all pods after first use.
       delete process.env.BOOTSTRAP_ADMIN_SECRET;
     }
   }

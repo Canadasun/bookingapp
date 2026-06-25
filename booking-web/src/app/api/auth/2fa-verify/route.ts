@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
 import { assertSameOrigin } from "@/lib/same-origin";
+import { refreshMaxAge as decodeRefreshMaxAge } from "@/lib/sso-cookies";
 
 const API = apiBase();
 
@@ -62,8 +63,9 @@ export async function POST(req: NextRequest) {
   const secure = process.env.NODE_ENV === "production";
   const isAdmin = data.user.role === "ADMIN";
   // Admin tokens are short-lived (5m access / 1h refresh); cookie TTLs must match.
+  // Non-admin: decode JWT exp so SSO users (30d) get a 30d cookie, not a hardcoded 7d.
   const accessMaxAge = isAdmin ? 60 * 5 : 60 * 15;
-  const refreshMaxAge = isAdmin ? 60 * 60 : 60 * 60 * 24 * 7;
+  const refreshMaxAge = isAdmin ? 60 * 60 : decodeRefreshMaxAge(data.refreshToken);
 
   const res = NextResponse.json({ user: data.user });
   // "Remember this device": skip for admin — trusted-device bypass is disabled for

@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
+import { refreshMaxAge } from "@/lib/sso-cookies";
 
 const API = apiBase();
 
@@ -47,7 +48,7 @@ function applySessionCookies(res: NextResponse, data: RefreshData) {
     httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
-    httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: refreshMaxAge(data.refreshToken),
   });
   const { email: _e, mustResetPassword: _mr, twoFactorEnabled: _tfe, twoFactorMethod: _tfm, ...hint } = data.user;
   void _e; void _mr; void _tfe; void _tfm;

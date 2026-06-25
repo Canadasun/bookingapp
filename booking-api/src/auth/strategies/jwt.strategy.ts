@@ -48,16 +48,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (payload.kind === 'ws') throw new UnauthorizedException();
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { 
-        id: true, 
-        email: true, 
+      select: {
+        id: true,
+        email: true,
         name: true,
         phone: true,
-        role: true, 
+        role: true,
         businessId: true,
         avatarUrl: true,
         emailVerified: true,
         mustResetPassword: true,
+        suspended: true,
         twoFactorEnabled: true,
         twoFactorMethod: true,
         createdAt: true,
@@ -66,6 +67,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user) throw new UnauthorizedException();
+    if (user.suspended) throw new UnauthorizedException();
 
     if (payload.jti) {
       const revoked = await this.redis.client.exists(`auth:revoked:${payload.jti}`).catch((err) => {

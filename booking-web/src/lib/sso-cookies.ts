@@ -127,7 +127,7 @@ export function clearAppleSSOStateCookie(res: NextResponse) {
 // Decode the JWT exp claim so the cookie lifetime matches the token lifetime.
 // SSO tokens are 30 days; password tokens follow JWT_REFRESH_EXPIRES_IN (default 7d).
 // We trust the API response — no signature verification needed here.
-function refreshMaxAge(token: string): number {
+export function refreshMaxAge(token: string): number {
   try {
     const [, payload] = token.split(".");
     const decoded = JSON.parse(Buffer.from(payload, "base64url").toString()) as { exp?: number };

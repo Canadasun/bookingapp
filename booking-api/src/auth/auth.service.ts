@@ -37,6 +37,9 @@ export class AuthService {
   async register(dto: RegisterDto, ctx?: { ip?: string }) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException("Email already registered");
+    // Note: the findUnique + user.create below is not atomic; concurrent requests
+    // for the same email can both pass the check. P2002 from the constraint is
+    // caught at the bottom and re-thrown as 409 rather than 500.
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
@@ -144,6 +147,9 @@ export class AuthService {
       });
 
       return { user, ownerStaffId };
+    }).catch((e: unknown) => {
+      if ((e as { code?: string }).code === 'P2002') throw new ConflictException('Email already registered');
+      throw e;
     });
 
     // Seed demo data outside the transaction so any failure is silent and never
@@ -821,13 +827,19 @@ export class AuthService {
 
     await this.authLock.clearFailures(dto.email).catch(() => {});
 
+    if (user.suspended) throw new ForbiddenException('This account has been suspended.');
+
     if (user.role === 'ADMIN') {
       // In production, reject login attempts from unrecognized browser origins.
       // Allowed: corsOrigins (the main web app) + the dedicated admin subdomain.
       // Requests with no Origin header (server-to-server, CLI tools) are permitted.
       const adminOrigin = process.env.ADMIN_PANEL_URL ?? process.env.ADMIN_DOMAIN;
       const isProd = process.env.NODE_ENV === 'production';
-      if (isProd && ctx?.origin) {
+      if (isProd) {
+        // In production, admin login MUST carry an Origin header. Headless/tooling
+        // requests without Origin are blocked here — unlike regular login, admin
+        // access is too sensitive to allow an Origin-bypass.
+        if (!ctx?.origin) throw new ForbiddenException('Admin login requires a browser Origin header');
         const normalizedAdmin = adminOrigin
           ? (adminOrigin.startsWith('https://') ? adminOrigin : `https://${adminOrigin}`)
           : null;
@@ -966,6 +978,7 @@ export class AuthService {
     });
     if (!consumed) throw new UnauthorizedException('Invalid or expired code');
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ch.userId } });
+    if (user.suspended) throw new ForbiddenException('This account has been suspended.');
     await this.recordLoginAndMaybeAlert(user, ctx);
     const tokens = await this.issueTokens(user, { userAgent: ctx?.userAgent });
     // "Remember this device": hand back a trusted-device token the client stores,
@@ -1212,7 +1225,7 @@ export class AuthService {
     }
   }
 
-  async verifyGoogleCode(code: string, redirectUri: string, codeVerifier?: string): Promise<{ sub: string; email: string; name: string }> {
+  async verifyGoogleCode(code: string, redirectUri: string, codeVerifier: string | undefined): Promise<{ sub: string; email: string; name: string }> {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     if (!clientId || !clientSecret) throw new ServiceUnavailableException('Google sign-in is not configured');
@@ -1224,7 +1237,8 @@ export class AuthService {
       redirect_uri: redirectUri,
       grant_type: 'authorization_code',
     });
-    if (codeVerifier) params.set('code_verifier', codeVerifier);
+    if (!codeVerifier) throw new BadRequestException('PKCE code verifier is required');
+    params.set('code_verifier', codeVerifier);
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -1264,8 +1278,12 @@ export class AuthService {
     const sub = payload.sub as string | undefined;
     if (!sub) throw new UnauthorizedException('Apple token missing subject claim');
 
-    // Verify nonce for replay protection — web flows always send rawNonce;
-    // mobile flows (no nonce in authorize URL) omit it, so we skip the check.
+    // Web flows must always include rawNonce for replay protection. Mobile flows
+    // should also send it; for backwards-compatibility with existing app versions
+    // it is currently optional on mobile, but required for all other platforms.
+    if (platform !== 'mobile' && !rawNonce) {
+      throw new UnauthorizedException('Apple identity token nonce is required for web sign-in');
+    }
     if (rawNonce) {
       const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
       const tokenNonce = payload.nonce as string | undefined;
