@@ -90,7 +90,7 @@ function RegisterForm() {
             {/* Social sign-up — SSO creates a CLIENT account automatically */}
             <div className="space-y-2 mb-4">
               <a
-                href="/api/auth/google"
+                href="/api/auth/google?intent=register"
                 className="flex items-center justify-center gap-3 w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
               >
                 <svg className="w-4 h-4 flex-none" viewBox="0 0 24 24" aria-hidden="true">
@@ -102,7 +102,7 @@ function RegisterForm() {
                 Sign up with Google
               </a>
               <a
-                href="/api/auth/apple"
+                href="/api/auth/apple?intent=register"
                 className="flex items-center justify-center gap-3 w-full rounded-lg border border-gray-900 bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
               >
                 <svg className="w-4 h-4 flex-none" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

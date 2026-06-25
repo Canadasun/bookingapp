@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   }
 
   const intent = parseStateIntent(cookieState);
-  const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
+  const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : intent === "register" ? "/my/register" : "/login");
 
   const codeVerifier = req.cookies.get("pulse_pkce_verifier")?.value;
   if (!codeVerifier) return errRedirect("Sign-in session expired — please try again");
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     upstream = await fetch(`${API}/auth/google/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, redirectUri, codeVerifier, allowCreate: intent === "owner" }),
+      body: JSON.stringify({ code, redirectUri, codeVerifier, allowCreate: intent === "owner" || intent === "register" }),
     });
   } catch {
     return errRedirect("Could not reach the authentication server");
@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
   } else {
     destination = roleHome(data.user.role);
   }
+  // "register" intent: roleHome already sends CLIENT → /my/dashboard
   const res = NextResponse.redirect(`${base}${destination}`);
   clearSSOStateCookie(res);
   clearPKCECookie(res);

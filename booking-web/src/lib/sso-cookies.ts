@@ -31,7 +31,10 @@ const secure = () => process.env.NODE_ENV === "production";
 // Falls back to "lax" in dev since Apple requires HTTPS anyway and won't run on localhost.
 const appleSameSite = (): "none" | "lax" => (secure() ? "none" : "lax");
 
-export function encodeState(intent: "owner" | "client"): string {
+// "register" = client self-registration (allowCreate true, routes to /my/dashboard)
+export type SSOIntent = "owner" | "client" | "register";
+
+export function encodeState(intent: SSOIntent): string {
   return `${randomBytes(16).toString("hex")}:${intent}`;
 }
 
@@ -73,8 +76,11 @@ export function clearPKCECookie(res: NextResponse) {
   });
 }
 
-export function parseStateIntent(state: string): "owner" | "client" {
-  return state.split(":")[1] === "owner" ? "owner" : "client";
+export function parseStateIntent(state: string): SSOIntent {
+  const seg = state.split(":")[1];
+  if (seg === "owner")    return "owner";
+  if (seg === "register") return "register";
+  return "client";
 }
 
 // Google state cookie — SameSite=Lax is fine (Google redirects via GET).
@@ -118,13 +124,25 @@ export function clearAppleSSOStateCookie(res: NextResponse) {
   });
 }
 
+// Decode the JWT exp claim so the cookie lifetime matches the token lifetime.
+// SSO tokens are 30 days; password tokens follow JWT_REFRESH_EXPIRES_IN (default 7d).
+// We trust the API response — no signature verification needed here.
+function refreshMaxAge(token: string): number {
+  try {
+    const [, payload] = token.split(".");
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString()) as { exp?: number };
+    if (decoded.exp) return Math.max(60, decoded.exp - Math.floor(Date.now() / 1000));
+  } catch { /* fall through */ }
+  return 60 * 60 * 24 * 7;
+}
+
 export function applySessionCookies(res: NextResponse, data: SSOTokens) {
   const sec = secure();
   res.cookies.set("booking_token", data.accessToken, {
     httpOnly: true, secure: sec, sameSite: "lax", path: "/", maxAge: 60 * 15,
   });
   res.cookies.set("booking_refresh", data.refreshToken, {
-    httpOnly: true, secure: sec, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true, secure: sec, sameSite: "lax", path: "/", maxAge: refreshMaxAge(data.refreshToken),
   });
   const { email: _e, mustResetPassword: _mr, emailVerified: _ev,
     twoFactorEnabled: _tfe, twoFactorMethod: _tfm, ...hint } =

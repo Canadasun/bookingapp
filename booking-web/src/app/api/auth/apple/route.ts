@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   encodeState, setAppleSSOStateCookie,
   generateNonce, hashNonce, setSSONonceCookie,
-  APP_URL,
+  APP_URL, type SSOIntent,
 } from "@/lib/sso-cookies";
 
 export async function GET(req: NextRequest) {
@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Apple sign-in is not configured" }, { status: 503 });
   }
 
-  const intent = req.nextUrl.searchParams.get("intent") === "owner" ? "owner" : "client";
+  const raw = req.nextUrl.searchParams.get("intent");
+  const intent: SSOIntent = raw === "owner" ? "owner" : raw === "register" ? "register" : "client";
   const state = encodeState(intent);
   const redirectUri = `${APP_URL()}/api/auth/apple/callback`;
   const rawNonce = generateNonce();

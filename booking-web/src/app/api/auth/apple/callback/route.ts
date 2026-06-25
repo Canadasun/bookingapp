@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   const intent = parseStateIntent(cookieState);
-  const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
+  const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : intent === "register" ? "/my/register" : "/login");
   const rawNonce = req.cookies.get("pulse_sso_nonce")?.value;
 
   let firstName: string | undefined;
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     upstream = await fetch(`${API}/auth/apple/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identityToken, email, firstName, lastName, platform: "web", allowCreate: intent === "owner", nonce: rawNonce }),
+      body: JSON.stringify({ identityToken, email, firstName, lastName, platform: "web", allowCreate: intent === "owner" || intent === "register", nonce: rawNonce }),
     });
   } catch {
     return errRedirect("Could not reach the authentication server");
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
   } else {
     destination = roleHome(data.user.role);
   }
+  // "register" intent lands at the client portal — roleHome already sends CLIENT → /my/dashboard
   const res = NextResponse.redirect(`${base}${destination}`);
   clearAppleSSOStateCookie(res);
   clearSSONonceCookie(res);
