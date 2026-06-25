@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Check, ShieldCheck, Star } from "lucide-react";
+import Image from "next/image";
+import { Check, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface IndustryFeature {
@@ -15,7 +16,6 @@ export interface IndustryPageProps {
   heroEmoji: string;
   features: IndustryFeature[];
   checklist: string[];
-  testimonial?: { quote: string; name: string; city: string };
   ctaLabel?: string;
 }
 
@@ -25,7 +25,6 @@ export function IndustryPage({
   heroEmoji,
   features,
   checklist,
-  testimonial,
   ctaLabel = "Start free — no credit card required",
 }: IndustryPageProps) {
   return (
@@ -34,8 +33,7 @@ export function IndustryPage({
       <nav className="border-b border-slate-100 bg-white/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.png" alt="Pulse" className="w-7 h-7 object-contain" />
+            <Image src="/logo-icon.png" alt="Pulse" width={28} height={28} className="w-7 h-7 object-contain" />
             <span className="text-lg font-bold text-slate-900">Pulse</span>
           </Link>
           <div className="flex items-center gap-4">
@@ -49,7 +47,7 @@ export function IndustryPage({
       {/* Hero */}
       <div className="bg-gradient-to-b from-violet-50 to-white">
         <div className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-          <div className="text-6xl mb-6">{heroEmoji}</div>
+          <div className="text-6xl mb-6" aria-hidden="true">{heroEmoji}</div>
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4 leading-tight">{headline}</h1>
           <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">{subheadline}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -71,7 +69,7 @@ export function IndustryPage({
           <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-violet-600" /> Online deposits</span>
           <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-violet-600" /> SMS reminders</span>
           <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-green-600" /> PIPEDA-aware</span>
-          <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-violet-600" /> 🇨🇦 CAD pricing</span>
+          <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-violet-600" /> <span aria-hidden="true">🇨🇦</span> CAD pricing</span>
         </div>
       </div>
 
@@ -110,25 +108,36 @@ export function IndustryPage({
         </div>
       </div>
 
-      {/* Testimonial */}
-      {testimonial && (
-        <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-          <div className="flex justify-center mb-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} className="w-5 h-5 text-amber-400 fill-amber-400" />
+      {/* Verifiable trust foundation */}
+      <div className="max-w-4xl mx-auto px-6 py-16">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest text-violet-600 mb-3">Trust foundation</p>
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">Built around verifiable signals, not placeholder testimonials</h2>
+          <p className="text-sm text-slate-500 leading-relaxed mb-6">
+            Pulse uses real review requests after completed appointments, verified-business badges for identity-checked businesses, and public security and privacy pages so clients can evaluate the booking experience before they commit.
+          </p>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { label: "Security", href: "/security" },
+              { label: "Canadian Privacy", href: "/canadian-privacy" },
+              { label: "Changelog", href: "/changelog" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700 transition-colors"
+              >
+                {item.label}
+              </Link>
             ))}
           </div>
-          <blockquote className="text-xl font-medium text-slate-800 mb-4 leading-relaxed">
-            &ldquo;{testimonial.quote}&rdquo;
-          </blockquote>
-          <p className="text-sm text-slate-500">{testimonial.name} · {testimonial.city}</p>
         </div>
-      )}
+      </div>
 
       {/* Canada callout */}
       <div className="bg-violet-600">
         <div className="max-w-4xl mx-auto px-6 py-12 text-center text-white">
-          <p className="text-sm font-semibold uppercase tracking-wider text-violet-200 mb-2">🇨🇦 Built for Canada</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-violet-200 mb-2"><span aria-hidden="true">🇨🇦</span> Built for Canada</p>
           <h2 className="text-2xl font-bold mb-3">Prices in CAD. GST/HST built in. PIPEDA-aware.</h2>
           <p className="text-violet-100 text-base mb-6 max-w-xl mx-auto">No currency conversion surprises. Tax fields included. Privacy practices aligned with Canadian law.</p>
           <Link href="/register" className="inline-block bg-white text-violet-700 font-semibold text-base rounded-xl px-6 py-3 hover:bg-violet-50 transition-colors">

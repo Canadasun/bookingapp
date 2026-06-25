@@ -57,11 +57,6 @@ export default function MobileServicesPage() {
         "CAD invoices with HST for clients",
         "Mobile app to manage bookings on the go",
       ]}
-      testimonial={{
-        quote: "I do mobile dog grooming and I was wasting fuel on no-shows constantly. Deposits solved it completely. I haven't had a no-show since I turned it on.",
-        name: "Tyler C.",
-        city: "Surrey, BC",
-      }}
     />
     </>
   );

@@ -57,11 +57,6 @@ export default function BarbersPage() {
         "CAD pricing with HST/GST fields",
         "Google Calendar sync",
       ]}
-      testimonial={{
-        quote: "The reminders alone were worth it. No-shows went from 4-5 a week to maybe one. My schedule is actually predictable now.",
-        name: "Marcus J.",
-        city: "Calgary, AB",
-      }}
     />
     </>
   );

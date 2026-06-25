@@ -57,11 +57,6 @@ export default function HairStylistsPage() {
           "CAD pricing with HST/GST on invoices",
           "Google Calendar two-way sync",
         ]}
-        testimonial={{
-          quote: "I was losing a full colour appointment slot every week to no-shows. Deposits fixed it instantly. My revenue went up $600/month just from that one change.",
-          name: "Jessica T.",
-          city: "Brampton, ON",
-        }}
       />
     </>
   );

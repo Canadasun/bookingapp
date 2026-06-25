@@ -57,11 +57,6 @@ export default function PetGroomersPage() {
         "Client notes and history per visit",
         "CAD pricing with GST/HST on invoices",
       ]}
-      testimonial={{
-        quote: "I used to spend 2 hours a week on the phone booking appointments. Now clients book online, I get a notification, and I just show up and groom. Life-changing.",
-        name: "Karen L.",
-        city: "Winnipeg, MB",
-      }}
     />
     </>
   );

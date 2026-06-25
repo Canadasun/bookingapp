@@ -17,6 +17,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/login`,                                   lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/book`,                                    lastModified: CONTENT_DATE, changeFrequency: "daily",   priority: 0.7 },
     { url: `${SITE_URL}/support`,                                 lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/about`,                                   lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/trust`,                                   lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/terms`,                                   lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
     { url: `${SITE_URL}/privacy`,                                 lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
     { url: `${SITE_URL}/accessibility`,                           lastModified: CONTENT_DATE, changeFrequency: "yearly",  priority: 0.3 },
@@ -47,6 +49,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/for/yoga-studios`,                        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/for/toronto`,                             lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
     { url: `${SITE_URL}/for/vancouver`,                           lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/for/calgary`,                             lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/for/ottawa`,                              lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/for/edmonton`,                            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/for/winnipeg`,                            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.9 },
     { url: `${SITE_URL}/features/online-booking`,                  lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/features/deposits`,                        lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/features/no-show-protection`,              lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
@@ -54,6 +60,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/blog`,                                     lastModified: CONTENT_DATE, changeFrequency: "weekly",  priority: 0.8 },
     { url: `${SITE_URL}/blog/how-to-reduce-no-shows-canadian-service-businesses`, lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/blog/best-appointment-booking-software-canada-2026`,      lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/blog/how-to-take-appointment-deposits-canada`,            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/blog/salon-cancellation-policy-canada`,                   lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
   ];
 
   // Dynamically include all public (non-suspended) business booking pages.

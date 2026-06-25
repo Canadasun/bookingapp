@@ -24,6 +24,22 @@ const posts = [
     date: "June 25, 2026",
     readTime: "12 min read",
   },
+  {
+    slug: "how-to-take-appointment-deposits-canada",
+    category: "Deposits",
+    title: "How to Take Appointment Deposits in Canada",
+    excerpt: "A practical guide to deposit amounts, booking policy language, refunds, and card-on-file basics for Canadian service businesses.",
+    date: "June 25, 2026",
+    readTime: "7 min read",
+  },
+  {
+    slug: "salon-cancellation-policy-canada",
+    category: "Policy",
+    title: "Salon Cancellation Policy Canada: Practical Template",
+    excerpt: "A clear cancellation policy template with notice windows, deposit handling, reminders, and enforcement tips for Canadian salons.",
+    date: "June 25, 2026",
+    readTime: "8 min read",
+  },
 ];
 
 const blogSchema = {

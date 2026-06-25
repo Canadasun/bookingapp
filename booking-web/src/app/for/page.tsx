@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -22,13 +23,21 @@ const industries = [
   { href: "/for/yoga-studios", emoji: "🧘", label: "Yoga Studios", desc: "Group classes, memberships, class passes" },
 ];
 
+const cities = [
+  { href: "/for/toronto", label: "Toronto", desc: "Appointment booking software for Toronto service businesses" },
+  { href: "/for/vancouver", label: "Vancouver", desc: "Salon and wellness booking software for Vancouver" },
+  { href: "/for/calgary", label: "Calgary", desc: "Booking software for Calgary salons, spas, and mobile services" },
+  { href: "/for/ottawa", label: "Ottawa", desc: "Appointment booking software for Ottawa service providers" },
+  { href: "/for/edmonton", label: "Edmonton", desc: "Online appointment booking for Edmonton businesses" },
+  { href: "/for/winnipeg", label: "Winnipeg", desc: "Booking software for Winnipeg service businesses" },
+];
+
 export default function ForPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-2xl mx-auto px-6 py-16">
         <Link href="/" className="inline-flex items-center gap-2 mb-10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
+          <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse Appointments</span>
         </Link>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Built for your industry</h1>
@@ -41,6 +50,16 @@ export default function ForPage() {
                 <p className="text-sm font-semibold text-slate-900 group-hover:text-violet-700">{i.label}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{i.desc}</p>
               </div>
+            </Link>
+          ))}
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mt-14 mb-2">Built for Canadian cities</h2>
+        <p className="text-slate-500 mb-6">Local landing pages for high-intent city searches.</p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {cities.map((city) => (
+            <Link key={city.href} href={city.href} className="block bg-white rounded-2xl border border-slate-200 p-4 hover:border-violet-300 hover:shadow-sm transition-all group">
+              <p className="text-sm font-semibold text-slate-900 group-hover:text-violet-700">{city.label}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{city.desc}</p>
             </Link>
           ))}
         </div>

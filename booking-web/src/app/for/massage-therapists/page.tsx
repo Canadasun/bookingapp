@@ -57,11 +57,6 @@ export default function MassageTherapistsPage() {
         "Client visit history and treatment notes",
         "CAD invoices with HST for receipts",
       ]}
-      testimonial={{
-        quote: "My clients are mostly regulars. The rebooking reminders have increased repeat visits by about 30%. It's like having a front-desk person without the cost.",
-        name: "Priya N.",
-        city: "Mississauga, ON",
-      }}
     />
     </>
   );

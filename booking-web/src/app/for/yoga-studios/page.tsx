@@ -57,11 +57,6 @@ export default function YogaStudiosPage() {
           "CAD pricing with GST/HST",
           "PIPEDA-aware health data handling",
         ]}
-        testimonial={{
-          quote: "Memberships on Pulse changed my studio's finances completely. I went from stressing about every week's revenue to having $5,000/month locked in before the month starts.",
-          name: "Meera S.",
-          city: "Ottawa, ON",
-        }}
       />
     </>
   );

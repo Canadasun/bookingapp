@@ -57,11 +57,6 @@ export default function SpasPage() {
           "GST/HST on all invoices",
           "CAD pricing — no USD conversion surprises",
         ]}
-        testimonial={{
-          quote: "We have 6 therapists and managing the schedule used to be a nightmare. Pulse handles it completely — bookings, reminders, deposits. We focus on the guests.",
-          name: "Sandra M.",
-          city: "Kelowna, BC",
-        }}
       />
     </>
   );

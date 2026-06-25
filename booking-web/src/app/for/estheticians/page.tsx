@@ -57,11 +57,6 @@ export default function EstheticiansPage() {
         "Google review automation",
         "CAD invoices with HST",
       ]}
-      testimonial={{
-        quote: "The intake form alone saved me 15 minutes per appointment. Clients come prepared and I can focus on the treatment, not the consultation.",
-        name: "Sophie R.",
-        city: "Vancouver, BC",
-      }}
     />
     </>
   );

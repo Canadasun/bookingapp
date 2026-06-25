@@ -57,11 +57,6 @@ export default function ConsultantsPage() {
         "CAD pricing — no currency conversion",
         "PIPEDA-compliant data handling",
       ]}
-      testimonial={{
-        quote: "I set up Pulse in an afternoon. Now my discovery call calendar manages itself. I focus on the work, not on booking coordination.",
-        name: "James H.",
-        city: "Edmonton, AB",
-      }}
     />
     </>
   );

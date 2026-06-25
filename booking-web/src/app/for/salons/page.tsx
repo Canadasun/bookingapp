@@ -57,11 +57,6 @@ export default function SalonsPage() {
         "CAD pricing — no USD surprises",
         "Mobile app for you and your staff",
       ]}
-      testimonial={{
-        quote: "We reduced no-shows by 80% in the first month by turning on deposits. Pulse paid for itself in week one.",
-        name: "Alicia T.",
-        city: "Ottawa, ON",
-      }}
     />
     </>
   );

@@ -57,11 +57,6 @@ export default function WellnessPage() {
         "CAD pricing with GST/HST",
         "PIPEDA-aware health data handling",
       ]}
-      testimonial={{
-        quote: "Memberships changed my business. I went from unpredictable weekly revenue to $4,000/month baseline — with bookings that fill themselves.",
-        name: "Amara B.",
-        city: "Halifax, NS",
-      }}
     />
     </>
   );

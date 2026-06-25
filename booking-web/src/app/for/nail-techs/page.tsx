@@ -57,11 +57,6 @@ export default function NailTechsPage() {
           "Booking link for Instagram bio",
           "CAD pricing with HST/GST on invoices",
         ]}
-        testimonial={{
-          quote: "I do full sets that take 3 hours. One no-show used to ruin my whole afternoon. Deposits changed everything — clients who pay upfront actually show up.",
-          name: "Linh N.",
-          city: "Richmond, BC",
-        }}
       />
     </>
   );

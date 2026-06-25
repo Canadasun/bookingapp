@@ -57,11 +57,6 @@ export default function LashTechsPage() {
         "CAD pricing — invoice with HST",
         "Booking page for Instagram bio link",
       ]}
-      testimonial={{
-        quote: "I was losing $300-400 a week to no-shows. With Pulse deposits, that's basically zero now. It's the best business decision I made.",
-        name: "Destiny M.",
-        city: "Toronto, ON",
-      }}
     />
     </>
   );
