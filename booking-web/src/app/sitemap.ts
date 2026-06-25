@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+export const dynamic = "force-dynamic";
+
 const SITE_URL = "https://www.pulseappointments.com";
 const RAW_API_URL = (
   process.env.API_INTERNAL_URL ??
@@ -77,7 +79,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Dynamically include all public (non-suspended) business booking pages.
   const publicBusinessRoutes: MetadataRoute.Sitemap = await fetch(
     `${API_URL}/api/businesses/public-slugs`,
-    { next: { revalidate: 3600 } }, // cache for 1 hour
+    { cache: "no-store" },
   )
     .then((r) => r.json() as Promise<{ slug: string; updatedAt: string }[]>)
     .then((slugs) => slugs.flatMap(({ slug, updatedAt }) => {
