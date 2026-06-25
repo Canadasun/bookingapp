@@ -36,6 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/compare/pulse-vs-jane-app`,               lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/compare/pulse-vs-vagaro`,                 lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/compare/pulse-vs-glossgenius`,            lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/features`,                                lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/for`,                                     lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/for/salons`,                              lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/for/barbers`,                             lastModified: CONTENT_DATE, changeFrequency: "monthly", priority: 0.8 },
@@ -72,20 +73,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Dynamically include all public (non-suspended) business booking pages.
-  const businessRoutes: MetadataRoute.Sitemap = await fetch(
+  const publicBusinessRoutes: MetadataRoute.Sitemap = await fetch(
     `${API_URL}/api/businesses/public-slugs`,
     { next: { revalidate: 3600 } }, // cache for 1 hour
   )
     .then((r) => r.json() as Promise<{ slug: string; updatedAt: string }[]>)
-    .then((slugs) =>
-      slugs.map(({ slug, updatedAt }) => ({
-        url: `${SITE_URL}/book/${slug}`,
-        lastModified: new Date(updatedAt),
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
-      })),
-    )
+    .then((slugs) => slugs.flatMap(({ slug, updatedAt }) => {
+      const lastModified = new Date(updatedAt);
+      return [
+        {
+          url: `${SITE_URL}/book/${slug}`,
+          lastModified,
+          changeFrequency: "weekly" as const,
+          priority: 0.8,
+        },
+        {
+          url: `${SITE_URL}/bio/${slug}`,
+          lastModified,
+          changeFrequency: "weekly" as const,
+          priority: 0.7,
+        },
+      ];
+    }))
     .catch(() => []); // if API is unreachable, degrade gracefully
 
-  return [...staticRoutes, ...businessRoutes];
+  return [...staticRoutes, ...publicBusinessRoutes];
 }
