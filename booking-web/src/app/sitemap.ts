@@ -10,8 +10,29 @@ const RAW_API_URL = (
   "http://localhost:3001"
 ).replace(/\/+$/, "").replace(/\/api$/, "");
 const API_URL = /^https?:\/\//i.test(RAW_API_URL) ? RAW_API_URL : `https://${RAW_API_URL}`;
+const RAW_PUBLIC_API_URL = (
+  process.env.NEXT_PUBLIC_API_URL ??
+  process.env.RAILWAY_SERVICE_BOOKINGAPP_URL ??
+  "http://localhost:3001"
+).replace(/\/+$/, "").replace(/\/api$/, "");
+const PUBLIC_API_URL = /^https?:\/\//i.test(RAW_PUBLIC_API_URL) ? RAW_PUBLIC_API_URL : `https://${RAW_PUBLIC_API_URL}`;
+const API_CANDIDATES = Array.from(new Set([API_URL, PUBLIC_API_URL]));
 
 const CONTENT_DATE = new Date();
+
+async function fetchPublicSlugs(): Promise<{ slug: string; updatedAt: string }[]> {
+  for (const apiUrl of API_CANDIDATES) {
+    try {
+      const response = await fetch(`${apiUrl}/api/businesses/public-slugs`, { cache: "no-store" });
+      if (!response.ok) continue;
+      const slugs = await response.json();
+      if (Array.isArray(slugs)) return slugs as { slug: string; updatedAt: string }[];
+    } catch {
+      // Try the next configured API URL.
+    }
+  }
+  return [];
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -77,12 +98,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Dynamically include all public (non-suspended) business booking pages.
-  const publicBusinessRoutes: MetadataRoute.Sitemap = await fetch(
-    `${API_URL}/api/businesses/public-slugs`,
-    { cache: "no-store" },
-  )
-    .then((r) => r.json() as Promise<{ slug: string; updatedAt: string }[]>)
-    .then((slugs) => slugs.flatMap(({ slug, updatedAt }) => {
+  const publicBusinessRoutes: MetadataRoute.Sitemap = (await fetchPublicSlugs())
+    .flatMap(({ slug, updatedAt }) => {
       const lastModified = new Date(updatedAt);
       return [
         {
@@ -98,8 +115,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.7,
         },
       ];
-    }))
-    .catch(() => []); // if API is unreachable, degrade gracefully
+    });
 
   return [...staticRoutes, ...publicBusinessRoutes];
 }
