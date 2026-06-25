@@ -45,6 +45,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/sitemap.xml",
+        destination: "/generated-sitemap",
+      },
+      {
         source: "/proxy/:path*",
         destination: `${API_INTERNAL}/api/:path*`,
       },
