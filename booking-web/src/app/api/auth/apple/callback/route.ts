@@ -3,6 +3,7 @@ import { apiBase } from "@/lib/server-api";
 import {
   applySessionCookies,
   clearSSOStateCookie,
+  parseStateIntent,
   roleHome,
   APP_URL,
   type SSOTokens,
@@ -12,31 +13,33 @@ import {
 // The body contains: code, id_token, state, and optionally user (JSON, first auth only).
 export async function POST(req: NextRequest) {
   const base = APP_URL();
-  const errRedirect = (msg: string) => {
-    const r = NextResponse.redirect(
-      `${base}/login?error=${encodeURIComponent(msg)}`,
-    );
+  const makeErrRedirect = (page: string) => (msg: string) => {
+    const r = NextResponse.redirect(`${base}${page}?error=${encodeURIComponent(msg)}`);
     clearSSOStateCookie(r);
     return r;
   };
+  const defaultErr = makeErrRedirect("/login");
 
   let formData: FormData;
   try {
     formData = await req.formData();
   } catch {
-    return errRedirect("Invalid Apple response");
+    return defaultErr("Invalid Apple response");
   }
 
   const state = formData.get("state") as string | null;
   const identityToken = formData.get("id_token") as string | null;
   const userJson = formData.get("user") as string | null;
 
-  if (!identityToken || !state) return errRedirect("Missing Apple identity token");
+  if (!identityToken || !state) return defaultErr("Missing Apple identity token");
 
   const cookieState = req.cookies.get("pulse_sso_state")?.value;
   if (!cookieState || cookieState !== state) {
-    return errRedirect("Invalid state — please try again");
+    return defaultErr("Invalid state — please try again");
   }
+
+  const intent = parseStateIntent(cookieState);
+  const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
 
   let firstName: string | undefined;
   let lastName: string | undefined;
@@ -72,8 +75,13 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await upstream.json() as SSOTokens;
-  const home = roleHome(data.user.role);
-  const res = NextResponse.redirect(`${base}${home}`);
+  let destination: string;
+  if (intent === "owner" && !(data.user.role === "OWNER" && data.user.businessId)) {
+    destination = "/register/complete";
+  } else {
+    destination = roleHome(data.user.role);
+  }
+  const res = NextResponse.redirect(`${base}${destination}`);
   clearSSOStateCookie(res);
   applySessionCookies(res, data);
   return res;

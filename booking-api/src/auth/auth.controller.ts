@@ -161,6 +161,17 @@ export class AuthController {
     return this.authService.seedDemoData(user.id);
   }
 
+  // Authenticated — complete owner registration after SSO sign-up.
+  // SSO always creates a CLIENT first; this upgrades the account to OWNER,
+  // creates the business, and issues fresh tokens with the new role.
+  @Post('complete-owner-registration')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  completeOwnerRegistration(@CurrentUser() user: User, @Body() body: { businessName?: string }) {
+    return this.authService.completeOwnerRegistration(user.id, body.businessName ?? '');
+  }
+
   // One-time bootstrap: promote BOOTSTRAP_ADMIN_EMAIL to ADMIN role.
   // Only active when BOOTSTRAP_ADMIN_SECRET env var is set. Remove the env var to disable.
   @Post('bootstrap-admin')

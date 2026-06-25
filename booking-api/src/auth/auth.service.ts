@@ -170,6 +170,69 @@ export class AuthService {
     return this.issueTokens(result);
   }
 
+  // Completes owner registration for users who signed up via Google/Apple SSO.
+  // The SSO flow creates a CLIENT account first; this upgrades it to OWNER,
+  // creates the business, and issues fresh tokens reflecting the new role.
+  async completeOwnerRegistration(userId: string, businessName: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true, businessId: true },
+    });
+
+    // Idempotent — already set up
+    if (user.role === 'OWNER' && user.businessId) {
+      const full = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+      return this.issueTokens(full);
+    }
+
+    const name = (businessName?.trim()) || `${user.name}'s Business`;
+    const slugSource = name.toLowerCase();
+    const baseSlug = slugSource.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'business';
+
+    let ownerStaffId: string;
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      const business = await tx.business.create({
+        data: {
+          name,
+          slug: `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`,
+          email: user.email,
+        },
+      });
+
+      const promoted = await tx.user.update({
+        where: { id: userId },
+        data: { role: 'OWNER', businessId: business.id },
+      });
+
+      const staff = await tx.staff.create({
+        data: { userId, businessId: business.id, active: true },
+      });
+      ownerStaffId = staff.id;
+
+      await tx.privacyConsent.createMany({
+        data: [
+          { userId, businessId: business.id, type: 'TERMS', granted: true, version: '2026-06-13', source: 'sso_owner_registration', ipAddress: null },
+          { userId, businessId: business.id, type: 'PRIVACY_POLICY', granted: true, version: '2026-06-13', source: 'sso_owner_registration', ipAddress: null },
+        ],
+        skipDuplicates: true,
+      });
+
+      return promoted;
+    });
+
+    void this.prisma.$transaction((tx) =>
+      this.createOwnerDemoData(tx, {
+        businessId: updatedUser.businessId!,
+        userId,
+        staffId: ownerStaffId,
+        businessName: name,
+      }),
+    ).catch(() => {});
+    this.notifications.sendWelcome(userId).catch(() => {});
+
+    return this.issueTokens(updatedUser);
+  }
+
   // Allow existing owners to seed demo data on demand (e.g., accounts created
   // before this feature was shipped). Idempotent — skips if already seeded.
   async seedDemoData(userId: string) {

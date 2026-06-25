@@ -3,6 +3,7 @@ import { apiBase } from "@/lib/server-api";
 import {
   applySessionCookies,
   clearSSOStateCookie,
+  parseStateIntent,
   roleHome,
   APP_URL,
   type SSOTokens,
@@ -15,21 +16,23 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get("error");
 
   const base = APP_URL();
-  const errRedirect = (msg: string) => {
-    const r = NextResponse.redirect(
-      `${base}/login?error=${encodeURIComponent(msg)}`,
-    );
+  const makeErrRedirect = (page: string) => (msg: string) => {
+    const r = NextResponse.redirect(`${base}${page}?error=${encodeURIComponent(msg)}`);
     clearSSOStateCookie(r);
     return r;
   };
+  const defaultErr = makeErrRedirect("/login");
 
-  if (error) return errRedirect("Google sign-in was cancelled");
-  if (!code || !state) return errRedirect("Invalid OAuth response");
+  if (error) return defaultErr("Google sign-in was cancelled");
+  if (!code || !state) return defaultErr("Invalid OAuth response");
 
   const cookieState = req.cookies.get("pulse_sso_state")?.value;
   if (!cookieState || cookieState !== state) {
-    return errRedirect("Invalid state — please try again");
+    return defaultErr("Invalid state — please try again");
   }
+
+  const intent = parseStateIntent(cookieState);
+  const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
 
   const redirectUri = `${base}/api/auth/google/callback`;
   const API = apiBase();
@@ -52,8 +55,13 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await upstream.json() as SSOTokens;
-  const home = roleHome(data.user.role);
-  const res = NextResponse.redirect(`${base}${home}`);
+  let destination: string;
+  if (intent === "owner" && !(data.user.role === "OWNER" && data.user.businessId)) {
+    destination = "/register/complete";
+  } else {
+    destination = roleHome(data.user.role);
+  }
+  const res = NextResponse.redirect(`${base}${destination}`);
   clearSSOStateCookie(res);
   applySessionCookies(res, data);
   return res;

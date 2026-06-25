@@ -28,6 +28,14 @@ export function generateState(): string {
   return randomBytes(16).toString("hex");
 }
 
+export function encodeState(intent: "owner" | "client"): string {
+  return `${randomBytes(16).toString("hex")}:${intent}`;
+}
+
+export function parseStateIntent(state: string): "owner" | "client" {
+  return state.split(":")[1] === "owner" ? "owner" : "client";
+}
+
 export function setSSOStateCookie(res: NextResponse, state: string) {
   res.cookies.set(SSO_STATE_COOKIE, state, {
     httpOnly: true,
