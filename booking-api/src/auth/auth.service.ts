@@ -1265,7 +1265,10 @@ export class AuthService {
     if (rawNonce) {
       const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
       const tokenNonce = payload.nonce as string | undefined;
-      if (!tokenNonce || tokenNonce !== expectedNonce) {
+      if (!tokenNonce) {
+        throw new UnauthorizedException('Apple identity token is missing nonce claim');
+      }
+      if (tokenNonce !== expectedNonce) {
         throw new UnauthorizedException('Apple identity token nonce mismatch');
       }
     }

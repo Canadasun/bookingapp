@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
   const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : "/login");
 
   const codeVerifier = req.cookies.get("pulse_pkce_verifier")?.value;
+  if (!codeVerifier) return errRedirect("Sign-in session expired — please try again");
+
   const redirectUri = `${base}/api/auth/google/callback`;
   const API = apiBase();
 
