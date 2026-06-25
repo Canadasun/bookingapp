@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  NotFoundException,
   HttpException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -1115,7 +1116,7 @@ export class AuthService {
 
   // ── SSO: Google + Apple ─────────────────────────────────────────────────────
 
-  async findOrCreateSSOUser(provider: string, subject: string, email: string, name: string, ctx?: { ip?: string }): Promise<User> {
+  async findOrCreateSSOUser(provider: string, subject: string, email: string, name: string, ctx?: { ip?: string }, allowCreate = true): Promise<User> {
     // 1. Fast path: already linked account.
     const existing = await this.prisma.user.findFirst({
       where: { oauthProvider: provider, oauthSubject: subject },
@@ -1144,7 +1145,15 @@ export class AuthService {
       }
     }
 
-    // 3. New user: create inside a transaction so consent records are atomic.
+    // 3. No existing account — block creation when caller is a login-only flow.
+    if (!allowCreate) {
+      const label = provider === 'google' ? 'Google' : provider === 'apple' ? 'Apple' : provider;
+      throw new NotFoundException(
+        `No account found linked to this ${label} account. Please register first.`,
+      );
+    }
+
+    // 4. New user: create inside a transaction so consent records are atomic.
     //    Guard with a P2002 catch in case two concurrent requests race.
     try {
       return await this.prisma.$transaction(async (tx) => {

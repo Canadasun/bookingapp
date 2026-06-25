@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { CookieConsent } from "@/components/CookieConsent";
+import { SessionRefresher } from "@/components/SessionRefresher";
 import "./globals.css";
 
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID ?? "";
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to main content
         </a>
+        <SessionRefresher />
         {children}
         <Toaster richColors position="top-right" />
         <CookieConsent clarityId={CLARITY_ID || undefined} />

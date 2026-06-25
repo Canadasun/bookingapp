@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     upstream = await fetch(`${API}/auth/google/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, redirectUri }),
+      body: JSON.stringify({ code, redirectUri, allowCreate: intent === "owner" }),
     });
   } catch {
     return errRedirect("Could not reach the authentication server");

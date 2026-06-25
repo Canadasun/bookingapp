@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     upstream = await fetch(`${API}/auth/apple/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identityToken, email, firstName, lastName, platform: "web" }),
+      body: JSON.stringify({ identityToken, email, firstName, lastName, platform: "web", allowCreate: intent === "owner" }),
     });
   } catch {
     return errRedirect("Could not reach the authentication server");
