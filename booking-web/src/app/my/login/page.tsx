@@ -31,6 +31,8 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [challenge, setChallenge] = useState<{ id: string; method: string } | null>(null);
   const [code, setCode] = useState("");
   const [recoveryMode, setRecoveryMode] = useState(false);
@@ -51,9 +53,14 @@ function LoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const body = await readJson<{ message?: string }>(res);
+        const body = await readJson<{ message?: string; code?: string }>(res);
+        if (body?.code === "EMAIL_NOT_VERIFIED") {
+          setUnverified(true);
+          return;
+        }
         throw new Error(body?.message ?? "Invalid credentials");
       }
+      setUnverified(false);
       const data = await readJson<{ twoFactorRequired?: boolean; challengeId?: string; method?: string; user?: { role: string } }>(res);
       if (data?.twoFactorRequired && data.challengeId) {
         setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL" });
@@ -101,6 +108,39 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setResendLoading(true);
+    try {
+      await fetch("/api/auth/resend-verification-public", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      toast.success("Verification email sent — check your inbox.");
+    } catch {
+      toast.error("Could not send verification email. Please try again.");
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
+  if (unverified) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="text-sm text-gray-700">
+          Your email address hasn&apos;t been verified yet. We&apos;ve sent a new link to <strong>{email}</strong>.
+        </p>
+        <p className="text-xs text-gray-500">Didn&apos;t receive it?</p>
+        <Button onClick={handleResend} loading={resendLoading} variant="outline" className="w-full">
+          Resend verification email
+        </Button>
+        <button type="button" onClick={() => setUnverified(false)} className="text-xs text-violet-600 hover:underline">
+          Back to login
+        </button>
+      </div>
+    );
   }
 
   if (challenge) {

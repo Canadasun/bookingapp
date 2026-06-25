@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiBase } from "@/lib/server-api";
 import { signCookieValue } from "@/lib/cookie-sign";
 import { assertSameOrigin } from "@/lib/same-origin";
+import { refreshMaxAge } from "@/lib/sso-cookies";
 
 const API = apiBase();
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
       secure,
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: refreshMaxAge(refreshed.refreshToken),
     });
   }
   if (data.user) {

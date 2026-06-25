@@ -1308,15 +1308,13 @@ export class AuthService {
     if (!rawNonce) {
       throw new UnauthorizedException('Apple identity token nonce is required');
     }
-    if (rawNonce) {
-      const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
-      const tokenNonce = payload.nonce as string | undefined;
-      if (!tokenNonce) {
-        throw new UnauthorizedException('Apple identity token is missing nonce claim');
-      }
-      if (tokenNonce !== expectedNonce) {
-        throw new UnauthorizedException('Apple identity token nonce mismatch');
-      }
+    const expectedNonce = createHash('sha256').update(rawNonce).digest('hex');
+    const tokenNonce = payload.nonce as string | undefined;
+    if (!tokenNonce) {
+      throw new UnauthorizedException('Apple identity token is missing nonce claim');
+    }
+    if (tokenNonce !== expectedNonce) {
+      throw new UnauthorizedException('Apple identity token nonce mismatch');
     }
 
     const resolvedEmail = email || (payload.email as string | undefined) || '';

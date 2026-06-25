@@ -72,7 +72,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (payload.iat) {
       const pwdChanged = await this.redis.client.get(`auth:pwd_changed:${payload.sub}`).catch(() => null);
-      if (pwdChanged && payload.iat * 1000 < parseInt(pwdChanged)) throw new UnauthorizedException();
+      const pwdChangedMs = pwdChanged ? Number(pwdChanged) : NaN;
+      if (!isNaN(pwdChangedMs) && payload.iat * 1000 < pwdChangedMs) throw new UnauthorizedException();
     }
 
     if (payload.jti) {
