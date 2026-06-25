@@ -1,11 +1,13 @@
 import type { MetadataRoute } from "next";
 
 const SITE_URL = "https://www.pulseappointments.com";
-const API_URL = (
+const RAW_API_URL = (
   process.env.API_INTERNAL_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
+  process.env.RAILWAY_SERVICE_BOOKINGAPP_URL ??
   "http://localhost:3001"
 ).replace(/\/+$/, "").replace(/\/api$/, "");
+const API_URL = /^https?:\/\//i.test(RAW_API_URL) ? RAW_API_URL : `https://${RAW_API_URL}`;
 
 const CONTENT_DATE = new Date();
 
