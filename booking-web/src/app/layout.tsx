@@ -6,6 +6,11 @@ import { SessionRefresher } from "@/components/SessionRefresher";
 import "./globals.css";
 
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID ?? "";
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "";
+const GOOGLE_SITE_VERIFICATION =
+  process.env.GOOGLE_SITE_VERIFICATION ??
+  process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ??
+  "";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -33,6 +38,9 @@ export const metadata: Metadata = {
     description: "Book appointments online, 24/7.",
     images: [`${SITE_URL}/opengraph-image`],
   },
+  verification: GOOGLE_SITE_VERIFICATION
+    ? { google: GOOGLE_SITE_VERIFICATION }
+    : undefined,
   other: {
     'apple-itunes-app': 'app-id=6774881206, app-argument=https://www.pulseappointments.com',
   },
@@ -58,7 +66,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SessionRefresher />
         {children}
         <Toaster richColors position="top-right" />
-        <CookieConsent clarityId={CLARITY_ID || undefined} />
+        <CookieConsent
+          clarityId={CLARITY_ID || undefined}
+          gaMeasurementId={GA_MEASUREMENT_ID || undefined}
+        />
       </body>
     </html>
   );
