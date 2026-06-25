@@ -155,6 +155,9 @@ export function LandingFooterLinks() {
       <Link href="/for" className="hover:text-indigo-600 transition-colors">Industries</Link>
       <Link href="/compare" className="hover:text-indigo-600 transition-colors">Compare</Link>
       <Link href="/pricing" className="hover:text-indigo-600 transition-colors">Pricing</Link>
+      <Link href="/demo" className="hover:text-indigo-600 transition-colors">Demo</Link>
+      <Link href="/reviews" className="hover:text-indigo-600 transition-colors">Reviews</Link>
+      <Link href="/referrals" className="hover:text-indigo-600 transition-colors">Referrals</Link>
       <Link href="/changelog" className="hover:text-indigo-600 transition-colors">Changelog</Link>
       <Link href="/security" className="hover:text-indigo-600 transition-colors">Security</Link>
       <Link href="/canadian-privacy" className="hover:text-indigo-600 transition-colors">Canadian Privacy</Link>

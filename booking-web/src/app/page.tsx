@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { verifyCookieValue } from "@/lib/cookie-sign";
-import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, ClipboardList, Globe, Users } from "lucide-react";
+import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, ClipboardList, Globe, Users, Star, ShieldCheck, MousePointerClick } from "lucide-react";
 import { PLAN_DEFS } from "@/lib/plans";
 
 export const metadata: Metadata = {
@@ -244,6 +244,97 @@ export default async function LandingPage() {
       {/* ── Logged-in owner shortcuts ── */}
       <LandingResources />
       <LandingSolutions />
+
+      {/* ── Product tour ── */}
+      <section className="py-20 border-y border-[#E9DDCB] bg-white">
+        <div className="max-w-6xl mx-auto px-6 grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-violet-600 mb-3">Product tour</p>
+            <h2 className="text-3xl font-bold text-ink mb-4">See the booking flow before you commit</h2>
+            <p className="text-slate-500 leading-relaxed mb-6">
+              Pulse is built around the work that actually affects revenue: clients book online, pay deposits when needed, get reminders automatically, and leave real reviews after completed appointments.
+            </p>
+            <div className="space-y-3">
+              {[
+                { icon: MousePointerClick, title: "Client picks a service", desc: "Your public booking page shows services, staff, locations, and available times." },
+                { icon: CreditCard, title: "Deposit or card hold protects the slot", desc: "Paid plans can collect deposits and save cards for no-show protection." },
+                { icon: Star, title: "Completed visits become review requests", desc: "Pulse sends signed review links so published feedback comes from real appointments." },
+              ].map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="flex gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50">
+                    <Icon className="h-4 w-4 text-violet-700" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a href="/demo" className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
+                View product tour <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <a href="/reviews" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E9DDCB] bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-violet-50 transition-colors">
+                Review collection
+              </a>
+            </div>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-[#E9DDCB] bg-[#F8F5EF] p-4 shadow-xl shadow-amber-100/60">
+            <div className="overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white">
+              <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                <span className="ml-3 rounded-md bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">pulseappointments.com/book/studio</span>
+              </div>
+              <div className="grid md:grid-cols-[0.8fr_1.2fr]">
+                <div className="bg-[#19212B] p-5 text-white">
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500" />
+                    <div>
+                      <p className="text-sm font-bold">Northline Studio</p>
+                      <p className="text-xs text-white/45">Toronto, ON</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {["Lash lift", "Brow shape", "Facial"].map((service, index) => (
+                      <div key={service} className="rounded-2xl bg-white/[0.07] p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">{service}</span>
+                          <span className="text-xs text-white/50">{index === 0 ? "$95" : index === 1 ? "$45" : "$120"}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-white/40">{index === 0 ? "Deposit required" : "Online booking enabled"}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Available times</p>
+                      <p className="text-lg font-bold text-slate-900">Thursday, June 25</p>
+                    </div>
+                    <ShieldCheck className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["10:00 AM", "11:30 AM", "1:00 PM", "3:15 PM"].map((time, index) => (
+                      <div key={time} className={index === 2 ? "rounded-xl bg-violet-600 px-3 py-3 text-center text-sm font-semibold text-white" : "rounded-xl border border-slate-200 px-3 py-3 text-center text-sm font-semibold text-slate-700"}>
+                        {time}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-sm font-semibold text-emerald-900">$25 deposit collected</p>
+                    <p className="mt-1 text-xs leading-relaxed text-emerald-700">Confirmation, reminder, and review request are queued automatically.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── How it works ── */}
       <section className="py-24 bg-white/60 border-y border-[#E9DDCB]">
