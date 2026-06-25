@@ -213,6 +213,30 @@ describe('PaymentsService subscriptions', () => {
     );
   });
 
+  it('creates annual checkout when annual price is configured', async () => {
+    const { svc, stripe } = await buildSub({
+      STRIPE_PRICE_BASIC: 'price_basic_123',
+      STRIPE_PRICE_BASIC_ANNUAL: 'price_basic_annual_123',
+      STRIPE_CURRENCY: 'CAD',
+    });
+    await expect(svc.createSubscriptionCheckout('biz1', 'BASIC', undefined, 'year')).resolves.toEqual({ url: 'https://stripe.test/checkout' });
+    expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        line_items: [{ price: 'price_basic_annual_123', quantity: 1 }],
+        metadata: expect.objectContaining({ billingInterval: 'year' }),
+        subscription_data: expect.objectContaining({
+          metadata: expect.objectContaining({ billingInterval: 'year' }),
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('rejects annual checkout when annual price is not configured', async () => {
+    const { svc } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123' });
+    await expect(svc.createSubscriptionCheckout('biz1', 'BASIC', undefined, 'year')).rejects.toThrow(BadRequestException);
+  });
+
   it('confirms a completed checkout and activates the paid plan immediately', async () => {
     const { svc } = await buildSub({ STRIPE_PRICE_BASIC: 'price_basic_123' });
     await expect(svc.confirmSubscriptionCheckout('biz1', 'cs_1')).resolves.toMatchObject({

@@ -9,7 +9,11 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
-const CheckoutSchema = z.object({ plan: z.enum(['BASIC', 'PRO', 'UNLIMITED']), referralCode: z.string().trim().max(40).optional() });
+const CheckoutSchema = z.object({
+  plan: z.enum(['BASIC', 'PRO', 'UNLIMITED']),
+  billingInterval: z.enum(['month', 'year']).default('month'),
+  referralCode: z.string().trim().max(40).optional(),
+});
 const ConfirmCheckoutSchema = z.object({ sessionId: z.string().trim().min(1).max(255) });
 
 @ApiTags('subscriptions')
@@ -35,7 +39,12 @@ export class SubscriptionsController {
     const parsed = CheckoutSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('A valid plan (BASIC or PRO) is required');
     if (!user.businessId) throw new ForbiddenException('No business on this account');
-    return this.payments.createSubscriptionCheckout(user.businessId, parsed.data.plan, parsed.data.referralCode);
+    return this.payments.createSubscriptionCheckout(
+      user.businessId,
+      parsed.data.plan,
+      parsed.data.referralCode,
+      parsed.data.billingInterval,
+    );
   }
 
   // Owner/Admin — verify a completed Checkout Session and activate the plan now,

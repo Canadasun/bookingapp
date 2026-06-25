@@ -9,6 +9,13 @@ export const PLAN_PRICES = {
   UNLIMITED: 79,
 } as const;
 
+export const PLAN_ANNUAL_PRICES = {
+  FREE:      0,
+  BASIC:    PLAN_PRICES.BASIC * 10,
+  PRO:      PLAN_PRICES.PRO * 10,
+  UNLIMITED: PLAN_PRICES.UNLIMITED * 10,
+} as const;
+
 export const PLAN_ORDER = ['FREE', 'BASIC', 'PRO', 'UNLIMITED'] as const;
 export type PlanId = (typeof PLAN_ORDER)[number];
 export type FeatureValue = boolean | string;
@@ -46,6 +53,7 @@ export const PLAN_DEFS = [
     id: 'FREE' as const,
     name: 'Free',
     price: PLAN_PRICES.FREE,
+    annualPrice: PLAN_ANNUAL_PRICES.FREE,
     period: 'forever' as const,
     desc: 'Everything you need to start taking bookings online.',
     cta: 'Get started free',
@@ -56,6 +64,7 @@ export const PLAN_DEFS = [
     id: 'BASIC' as const,
     name: 'Basic',
     price: PLAN_PRICES.BASIC,
+    annualPrice: PLAN_ANNUAL_PRICES.BASIC,
     period: '/ month' as const,
     desc: 'Accept payments, deposits, and client texts.',
     cta: 'Start with Basic',
@@ -66,6 +75,7 @@ export const PLAN_DEFS = [
     id: 'PRO' as const,
     name: 'Pro',
     price: PLAN_PRICES.PRO,
+    annualPrice: PLAN_ANNUAL_PRICES.PRO,
     period: '/ month' as const,
     desc: 'Automated reminders, no-show protection, and team tools.',
     cta: 'Start with Pro',
@@ -76,6 +86,7 @@ export const PLAN_DEFS = [
     id: 'UNLIMITED' as const,
     name: 'Unlimited',
     price: PLAN_PRICES.UNLIMITED,
+    annualPrice: PLAN_ANNUAL_PRICES.UNLIMITED,
     period: '/ month' as const,
     desc: 'All Pro features across up to 5 locations.',
     cta: 'Start with Unlimited',

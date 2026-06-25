@@ -101,8 +101,16 @@ export default function PricingPage() {
                 )}
               </div>
               <p className="text-sm text-slate-500 mb-6 leading-relaxed">{plan.desc}</p>
+              {plan.price > 0 && (
+                <div className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Annual option</p>
+                  <p className="mt-1 text-sm text-emerald-900">
+                    ${plan.annualPrice}/yr CAD <span className="text-emerald-700">· 2 months free</span>
+                  </p>
+                </div>
+              )}
               <Link
-                href={plan.href}
+                href={plan.price > 0 ? `${plan.href}&billing=monthly` : plan.href}
                 className={
                   plan.highlight
                     ? "flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-violet-600 text-white font-semibold text-sm hover:bg-violet-700 transition-colors"
@@ -112,6 +120,14 @@ export default function PricingPage() {
                 {plan.highlight && <Sparkles className="h-4 w-4" />}
                 {plan.cta}
               </Link>
+              {plan.price > 0 && (
+                <Link
+                  href={`${plan.href}&billing=annual`}
+                  className="mt-2 flex items-center justify-center w-full py-3 rounded-xl bg-emerald-50 text-emerald-700 font-semibold text-sm hover:bg-emerald-100 transition-colors"
+                >
+                  Choose annual
+                </Link>
+              )}
             </div>
           ))}
         </div>

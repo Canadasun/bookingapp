@@ -553,8 +553,8 @@ export const api = {
 
   subscriptions: {
     get: () => req<{ plan: string; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean; hasBilling: boolean }>("/subscriptions"),
-    checkout: (plan: "BASIC" | "PRO" | "UNLIMITED", referralCode?: string) =>
-      req<{ url?: string; updated?: boolean; plan?: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
+    checkout: (plan: "BASIC" | "PRO" | "UNLIMITED", referralCode?: string, billingInterval: "month" | "year" = "month") =>
+      req<{ url?: string; updated?: boolean; plan?: string }>("/subscriptions/checkout", { method: "POST", body: JSON.stringify({ plan, billingInterval, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) }) }),
     confirmCheckout: (sessionId: string) =>
       req<{ confirmed: boolean; plan?: string; status?: string; reason?: string }>("/subscriptions/confirm-checkout", { method: "POST", body: JSON.stringify({ sessionId }) }),
     portal: () => req<{ url: string }>("/subscriptions/portal", { method: "POST" }),

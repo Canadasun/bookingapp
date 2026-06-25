@@ -328,6 +328,7 @@ function SettingsPage() {
   }, [currentBrandColor]);
 
   const [billingBusy, setBillingBusy] = useState<string | null>(null);
+  const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [referralInput, setReferralInput] = useState("");
   const [myReferral, setMyReferral] = useState<{ code: string; referredCount: number } | null>(null);
@@ -533,7 +534,7 @@ function SettingsPage() {
   async function upgrade(plan: "BASIC" | "PRO" | "UNLIMITED") {
     setBillingBusy(plan);
     try {
-      const result = await api.subscriptions.checkout(plan, referralInput);
+      const result = await api.subscriptions.checkout(plan, referralInput, billingInterval);
       if (result.url) window.location.assign(result.url);
       else {
         toast.success(`Switched to ${plan}. Stripe applied the prorated difference.`);
@@ -2150,30 +2151,52 @@ function SettingsPage() {
                   )}
                 </div>
 
+                <div className="mb-4 inline-flex rounded-xl border border-gray-200 bg-white p-1">
+                  {[
+                    { id: "month" as const, label: "Monthly" },
+                    { id: "year" as const, label: "Annual", suffix: "2 months free" },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setBillingInterval(option.id)}
+                      className={cn(
+                        "rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
+                        billingInterval === option.id
+                          ? "bg-violet-600 text-white"
+                          : "text-gray-500 hover:bg-gray-50",
+                      )}
+                    >
+                      {option.label}
+                      {option.suffix && <span className="ml-1 opacity-80">· {option.suffix}</span>}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="grid gap-4">
                   {[
                     {
-                      id: "FREE", name: "Free", price: "$0", period: "/mo",
+                      id: "FREE", name: "Free", monthlyPrice: 0, annualPrice: 0,
                       desc: "Get started with the essentials",
                       features: ["Unlimited bookings","Client management","Public booking page","Email confirmations, cancellations & reschedules","Recurring appointment series","Dashboard & notification center","Up to 5 staff members","1 location"],
                       cta: "Current plan", disabled: true,
                     },
                     {
-                      id: "BASIC", name: "Basic", price: "$10", period: "/mo",
+                      id: "BASIC", name: "Basic", monthlyPrice: 19, annualPrice: 190,
                       desc: "Great for growing businesses",
                       recommended: true,
                       features: ["Everything in Free","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies","Up to 10 staff members"],
                       cta: "Upgrade to Basic", disabled: false,
                     },
                     {
-                      id: "PRO", name: "Pro", price: "$20", period: "/mo",
+                      id: "PRO", name: "Pro", monthlyPrice: 39, annualPrice: 390,
                       desc: "Full power for busy businesses",
                       highlight: true,
                       features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics & reports","Up to 10 staff members"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
                     {
-                      id: "UNLIMITED", name: "Unlimited", price: "$80", period: "/mo",
+                      id: "UNLIMITED", name: "Unlimited", monthlyPrice: 79, annualPrice: 790,
                       desc: "Multi-location — for enterprise businesses",
                       features: ["Everything in Pro","Unlimited locations","Full SMS across all locations","Remove Pulse branding","Unlimited staff accounts","Dedicated support","Early access to new features"],
                       cta: "Upgrade to Unlimited", disabled: false,
@@ -2198,11 +2221,16 @@ function SettingsPage() {
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-bold text-gray-900">{plan.price}</span>
-                            <span className="text-sm text-gray-400">{plan.period}</span>
+                            <span className="text-2xl font-bold text-gray-900">
+                              {plan.monthlyPrice === 0 ? "$0" : billingInterval === "year" ? `$${plan.annualPrice}` : `$${plan.monthlyPrice}`}
+                            </span>
+                            <span className="text-sm text-gray-400">{plan.monthlyPrice === 0 ? "/mo" : billingInterval === "year" ? "/yr" : "/mo"}</span>
                           </div>
                           <p className="font-semibold text-gray-800 mt-0.5">{plan.name}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{plan.desc}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {plan.desc}
+                            {billingInterval === "year" && plan.monthlyPrice > 0 ? " Annual billing gives you 2 months free." : ""}
+                          </p>
                         </div>
                         {(() => {
                           const RANK: Record<string, number> = { FREE: 0, BASIC: 1, PRO: 2, UNLIMITED: 3 };

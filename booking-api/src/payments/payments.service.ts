@@ -606,8 +606,10 @@ export class PaymentsService {
   }
 
   // ── SaaS subscription billing ────────────────────────────────────────────────
-  private priceIdForPlan(plan: 'BASIC' | 'PRO' | 'UNLIMITED'): string | null {
-    const keyMap = { BASIC: 'STRIPE_PRICE_BASIC', PRO: 'STRIPE_PRICE_PRO', UNLIMITED: 'STRIPE_PRICE_UNLIMITED' };
+  private priceIdForPlan(plan: 'BASIC' | 'PRO' | 'UNLIMITED', billingInterval: 'month' | 'year' = 'month'): string | null {
+    const monthlyKeyMap = { BASIC: 'STRIPE_PRICE_BASIC', PRO: 'STRIPE_PRICE_PRO', UNLIMITED: 'STRIPE_PRICE_UNLIMITED' };
+    const annualKeyMap = { BASIC: 'STRIPE_PRICE_BASIC_ANNUAL', PRO: 'STRIPE_PRICE_PRO_ANNUAL', UNLIMITED: 'STRIPE_PRICE_UNLIMITED_ANNUAL' };
+    const keyMap = billingInterval === 'year' ? annualKeyMap : monthlyKeyMap;
     return this.configService.get<string>(keyMap[plan]) || null;
   }
 
@@ -616,6 +618,9 @@ export class PaymentsService {
     if (priceId === this.configService.get<string>('STRIPE_PRICE_BASIC')) return 'BASIC';
     if (priceId === this.configService.get<string>('STRIPE_PRICE_PRO')) return 'PRO';
     if (priceId === this.configService.get<string>('STRIPE_PRICE_UNLIMITED')) return 'UNLIMITED';
+    if (priceId === this.configService.get<string>('STRIPE_PRICE_BASIC_ANNUAL')) return 'BASIC';
+    if (priceId === this.configService.get<string>('STRIPE_PRICE_PRO_ANNUAL')) return 'PRO';
+    if (priceId === this.configService.get<string>('STRIPE_PRICE_UNLIMITED_ANNUAL')) return 'UNLIMITED';
     return 'FREE';
   }
 
@@ -870,9 +875,17 @@ export class PaymentsService {
   }
 
   // Owner — start a Stripe Checkout session to subscribe to a paid plan.
-  async createSubscriptionCheckout(businessId: string, plan: 'BASIC' | 'PRO' | 'UNLIMITED', referralCode?: string) {
-    const priceId = this.priceIdForPlan(plan);
-    if (!priceId) throw new BadRequestException(`The ${plan} plan is not available for purchase yet.`);
+  async createSubscriptionCheckout(
+    businessId: string,
+    plan: 'BASIC' | 'PRO' | 'UNLIMITED',
+    referralCode?: string,
+    billingInterval: 'month' | 'year' = 'month',
+  ) {
+    const priceId = this.priceIdForPlan(plan, billingInterval);
+    if (!priceId) {
+      const intervalLabel = billingInterval === 'year' ? 'annual' : 'monthly';
+      throw new BadRequestException(`The ${intervalLabel} ${plan} plan is not available for purchase yet.`);
+    }
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId } });
     const customerId = await this.ensureBusinessCustomer(business);
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
@@ -910,7 +923,7 @@ export class PaymentsService {
           const updated = await this.getStripe().subscriptions.update(activeSubId, {
             items: [{ id: itemId, price: priceId }],
             proration_behavior: 'always_invoice', // charge/credit the difference now
-            metadata: { businessId, plan },
+            metadata: { businessId, plan, billingInterval },
           });
           await this.applySubscription(businessId, updated);
           return { updated: true as const, plan };
@@ -950,14 +963,14 @@ export class PaymentsService {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${webUrl}/dashboard/settings?billing=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${webUrl}/dashboard/settings?billing=cancel`,
-      metadata: { businessId, plan, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) },
-      subscription_data: { metadata: { businessId, plan } },
+      metadata: { businessId, plan, billingInterval, ...(referralCode?.trim() ? { referralCode: referralCode.trim() } : {}) },
+      subscription_data: { metadata: { businessId, plan, billingInterval } },
       ...(discounts ? { discounts } : { allow_promotion_codes: true }),
     }, {
       // Deduplicate double-clicks without returning an expired Checkout Session
       // forever when the same business retries the same plan later.
       idempotencyKey: this.idempotencyKey([
-        'subscription-checkout', businessId, plan, referralCode ?? '', Math.floor(Date.now() / (5 * 60 * 1000)),
+        'subscription-checkout', businessId, plan, billingInterval, referralCode ?? '', Math.floor(Date.now() / (5 * 60 * 1000)),
       ]),
     });
     return { url: session.url };
