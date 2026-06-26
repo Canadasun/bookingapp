@@ -202,16 +202,16 @@ export default async function LandingPage() {
               {/* Appointment cards */}
               <div className="space-y-2.5">
                 {[
-                  { time: "10:00", name: "Amara Lee",   service: "Lash lift & tint",  color: "bg-violet-400" },
-                  { time: "1:30",  name: "Jordan Kim",  service: "Brow lamination",   color: "bg-amber-400" },
-                  { time: "3:15",  name: "Maya Chen",   service: "Facial + gua sha",  color: "bg-teal-400" },
-                ].map(({ time, name, service, color }) => (
-                  <div key={name} className="flex items-center gap-3 bg-white/[0.07] rounded-2xl px-4 py-3 hover:bg-white/[0.10] transition-colors">
+                  { time: "10:00", label: "Online booking", detail: "Deposit collected", color: "bg-violet-400" },
+                  { time: "1:30",  label: "Reminder queued", detail: "SMS + email",      color: "bg-amber-400" },
+                  { time: "3:15",  label: "Card on file",   detail: "No-show protected", color: "bg-teal-400" },
+                ].map(({ time, label, detail, color }) => (
+                  <div key={label} className="flex items-center gap-3 bg-white/[0.07] rounded-2xl px-4 py-3 hover:bg-white/[0.10] transition-colors">
                     <p className="text-xs font-bold text-white/50 w-10 shrink-0">{time}</p>
                     <div className={`w-1 h-8 rounded-full ${color} shrink-0`} />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold leading-tight">{name}</p>
-                      <p className="text-xs text-white/45 truncate">{service}</p>
+                      <p className="text-sm font-semibold leading-tight">{label}</p>
+                      <p className="text-xs text-white/45 truncate">{detail}</p>
                     </div>
                     <span className="ml-auto rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-white/70 shrink-0">
                       Confirmed
@@ -222,7 +222,7 @@ export default async function LandingPage() {
 
               {/* New booking pill */}
               <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold shadow-lg shadow-amber-500/25">
-                <Bell className="w-4 h-4" /> New booking just arrived
+                <Bell className="w-4 h-4" /> Booking workflow automated
               </div>
             </div>
           </div>
