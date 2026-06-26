@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { PLAN_PRICES, PLAN_ORDER } from '../lib/plans';
 
 describe('plan prices', () => {
