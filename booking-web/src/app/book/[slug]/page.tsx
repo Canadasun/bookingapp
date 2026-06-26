@@ -249,6 +249,23 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     if (selectedStaff || staffList.length > 0) loadSlots(date);
   }
 
+  function focusBookingField(fieldKey: string) {
+    const id = fieldKey.startsWith("intake_")
+      ? `intake-${fieldKey.replace("intake_", "")}`
+      : fieldKey === "policyAccepted"
+        ? "policy-accepted"
+        : `field-${fieldKey}`;
+
+    window.setTimeout(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || el instanceof HTMLButtonElement) {
+        el.focus({ preventScroll: true });
+      }
+    }, 0);
+  }
+
   function validate() {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Required";
@@ -259,12 +276,18 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       if (q.required && !(intake[q.id] ?? "").trim()) e[`intake_${q.id}`] = "Required";
     }
     setErrs(e);
-    return Object.keys(e).length === 0;
+    const firstError = Object.keys(e)[0];
+    if (firstError) focusBookingField(firstError);
+    return !firstError;
   }
 
   async function confirm() {
     if (!validate()) return;
-    if (!policyAccepted) { toast.error("Please accept the cancellation policy"); return; }
+    if (!policyAccepted) {
+      toast.error("Please accept the cancellation policy");
+      focusBookingField("policyAccepted");
+      return;
+    }
     if (!selectedSlot || selectedServices.length === 0 || !bizId) return;
     setSubmitting(true);
     try {
@@ -990,6 +1013,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         onChange={(e) => { setIntake((p) => ({ ...p, [q.id]: e.target.value })); setErrs((p) => ({ ...p, [`intake_${q.id}`]: "" })); }}
                         placeholder="Your answer"
                         aria-required={q.required || undefined}
+                        aria-invalid={!!errs[`intake_${q.id}`]}
                         aria-describedby={errs[`intake_${q.id}`] ? `intake-err-${q.id}` : undefined}
                         className={cn(
                           "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 min-h-[64px]",
@@ -1062,6 +1086,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     <p className="text-xs text-amber-800 leading-relaxed">{policy}</p>
                     <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
                       <input
+                        id="policy-accepted"
                         type="checkbox"
                         checked={policyAccepted}
                         onChange={(e) => setPolicyAccepted(e.target.checked)}
