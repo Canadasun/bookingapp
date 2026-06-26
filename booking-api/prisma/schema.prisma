@@ -199,6 +199,9 @@ model Business {
   clientMemberships   ClientMembership[]
   businessHours       BusinessHours[]
   businessClosures    BusinessClosure[]
+  migrationRequests   MigrationRequest[]
+  migrationBatches    MigrationImportBatch[]
+  migrationRows       MigrationImportRow[]
 }
 
 model Review {
@@ -844,11 +847,82 @@ model Client {
   messageThreadStates MessageThreadState[]
   invoices            Invoice[]
   memberships         ClientMembership[]
+  migrationRows       MigrationImportRow[]
 
   @@unique([businessId, email])
   @@index([businessId])
   @@index([email])
   @@index([userId])
+}
+
+model MigrationRequest {
+  id              String   @id @default(cuid())
+  businessId      String
+  sourcePlatform  String
+  mode            String   @default("SELF_SERVICE") // SELF_SERVICE, DONE_FOR_YOU, ASSISTED_CALL
+  status          String   @default("DRAFT") // DRAFT, SUBMITTED, IN_REVIEW, READY_TO_IMPORT, IMPORTED, CANCELLED
+  approximateSize Int?
+  requestedHelp   Boolean  @default(false)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  batches  MigrationImportBatch[]
+
+  @@index([businessId, status])
+  @@index([sourcePlatform])
+}
+
+model MigrationImportBatch {
+  id              String    @id @default(cuid())
+  businessId      String
+  requestId       String?
+  sourcePlatform  String
+  fileName        String?
+  status          String    @default("STAGED") // STAGED, IMPORTED, UNDONE, CANCELLED
+  totalRows       Int       @default(0)
+  validRows       Int       @default(0)
+  invalidRows     Int       @default(0)
+  duplicateRows   Int       @default(0)
+  importedRows    Int       @default(0)
+  confidenceScore Int       @default(0)
+  summary         Json      @default("{}")
+  createdByUserId String?
+  importedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  business Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  request  MigrationRequest?     @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  rows     MigrationImportRow[]
+
+  @@index([businessId, status])
+  @@index([requestId])
+}
+
+model MigrationImportRow {
+  id              String   @id @default(cuid())
+  businessId      String
+  batchId         String
+  rowNumber       Int
+  status          String   @default("VALID") // VALID, INVALID, DUPLICATE, IMPORTED, SKIPPED
+  raw             Json
+  normalized      Json     @default("{}")
+  errors          String[] @default([])
+  warnings        String[] @default([])
+  duplicateClientId String?
+  importedClientId  String?
+  createdAt       DateTime @default(now())
+
+  business        Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  batch           MigrationImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  duplicateClient Client?              @relation(fields: [duplicateClientId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@index([batchId])
+  @@index([duplicateClientId])
 }
 
 model Appointment {

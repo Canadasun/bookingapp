@@ -39,6 +39,7 @@ import { VerificationModule } from './verification/verification.module';
 import { SystemErrorsModule } from './system-errors/system-errors.module';
 import { PromoCodesModule } from './promo-codes/promo-codes.module';
 import { MembershipsModule } from './memberships/memberships.module';
+import { MigrationsModule } from './migrations/migrations.module';
 import { RedisModule } from './common/redis/redis.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ZodValidationPipe } from './common/pipes/zod-validation.pipe';
@@ -103,6 +104,7 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
     SystemErrorsModule,
     PromoCodesModule,
     MembershipsModule,
+    MigrationsModule,
   ],
 
   providers: [

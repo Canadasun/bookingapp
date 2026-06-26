@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge, Download, Upload, Ban, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { api, ClientPackage, Payment, ClientWithStats } from "@/lib/api";
+import { api, ClientPackage, MigrationImportBatch, MigrationMode, MigrationSourcePlatform, Payment, ClientWithStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,72 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatPrice, cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 
 const DAY_MS = 86_400_000;
+
+const MIGRATION_SOURCES: Array<{ value: MigrationSourcePlatform; label: string; hint: string }> = [
+  { value: "square-appointments", label: "Square Appointments", hint: "Customer Directory export" },
+  { value: "jane-app", label: "Jane App", hint: "Client list export" },
+  { value: "vagaro", label: "Vagaro", hint: "Customer export" },
+  { value: "acuity-scheduling", label: "Acuity Scheduling", hint: "Clients import/export CSV" },
+  { value: "calendly", label: "Calendly", hint: "Contacts CSV" },
+  { value: "fresha", label: "Fresha", hint: "Client export" },
+  { value: "glossgenius", label: "GlossGenius", hint: "Client list export" },
+  { value: "mindbody", label: "Mindbody", hint: "Assisted export recommended" },
+  { value: "setmore", label: "Setmore", hint: "Customer CSV" },
+  { value: "google-contacts", label: "Google Contacts", hint: "Google CSV export" },
+  { value: "phone-contacts", label: "Phone contacts", hint: "CSV or vCard export" },
+  { value: "csv", label: "Spreadsheet / CSV", hint: "Names, emails, phones, notes, tags" },
+  { value: "other", label: "Other software", hint: "Pulse will inspect the file" },
+  { value: "starting-fresh", label: "I'm starting fresh", hint: "No import needed" },
+];
+
+function parseCsv(data: string): string[][] {
+  const result: string[][] = [];
+  let row: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < data.length; i++) {
+    const ch = data[i];
+    const next = data[i + 1];
+    if (inQ) {
+      if (ch === '"' && next === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === '"') { inQ = true; }
+      else if (ch === ",") { row.push(cur.trim()); cur = ""; }
+      else if (ch === "\n" || (ch === "\r" && next === "\n")) {
+        row.push(cur.trim());
+        result.push(row);
+        row = [];
+        cur = "";
+        if (ch === "\r") i++;
+      } else { cur += ch; }
+    }
+  }
+  if (cur || row.length) { row.push(cur.trim()); result.push(row); }
+  return result.filter((r) => r.some(Boolean));
+}
+
+function normalizeHeader(header: string) {
+  return header.trim().toLowerCase();
+}
+
+function rowsFromCsv(text: string) {
+  const allRows = parseCsv(text);
+  if (allRows.length < 2) return [];
+  const headers = allRows[0].map(normalizeHeader);
+  return allRows.slice(1).map((vals) => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
+    return {
+      name: obj.name ?? obj["full name"] ?? obj.fullname ?? obj["client name"] ?? "",
+      email: obj.email ?? obj["email address"] ?? obj["e-mail"] ?? "",
+      phone: obj.phone ?? obj.mobile ?? obj["phone number"] ?? obj["mobile phone"] ?? "",
+      tags: obj.tags ?? obj.tag ?? "",
+      notes: obj.notes ?? obj.note ?? obj["client notes"] ?? "",
+    };
+  }).filter((row) => row.name || row.email || row.phone);
+}
 
 function dueAtForCadence(cadenceDays: number) {
   return new Date(Date.now() + cadenceDays * DAY_MS).toISOString();
@@ -48,9 +114,17 @@ export default function ClientsPage() {
   const [tagBusy, setTagBusy] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ businessId: string | null; role: string } | null>(null);
+  const [showMigration, setShowMigration] = useState(false);
+  const [migrationSource, setMigrationSource] = useState<MigrationSourcePlatform>("square-appointments");
+  const [migrationMode, setMigrationMode] = useState<MigrationMode>("SELF_SERVICE");
+  const [migrationNotes, setMigrationNotes] = useState("");
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const [migrationBatch, setMigrationBatch] = useState<MigrationImportBatch | null>(null);
+  const [migrationFileName, setMigrationFileName] = useState("");
+  const [migrationSubmitted, setMigrationSubmitted] = useState(false);
 
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const migrationFileInputRef = useRef<HTMLInputElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const openClientIdRef = useRef<string | null>(null);
 
@@ -258,12 +332,97 @@ export default function ClientsPage() {
     } finally { setDueBusy(false); }
   }
 
+  function resetMigration() {
+    setMigrationSource("square-appointments");
+    setMigrationMode("SELF_SERVICE");
+    setMigrationNotes("");
+    setMigrationBusy(false);
+    setMigrationBatch(null);
+    setMigrationFileName("");
+    setMigrationSubmitted(false);
+    if (migrationFileInputRef.current) migrationFileInputRef.current.value = "";
+  }
+
+  function closeMigration() {
+    setShowMigration(false);
+    resetMigration();
+  }
+
+  async function submitMigrationHelp() {
+    if (!bizId) return;
+    setMigrationBusy(true);
+    try {
+      await api.migrations.create(bizId, {
+        sourcePlatform: migrationSource,
+        mode: migrationMode,
+        requestedHelp: migrationMode !== "SELF_SERVICE",
+        notes: migrationNotes.trim() || undefined,
+      });
+      setMigrationSubmitted(true);
+      toast.success(migrationSource === "starting-fresh" ? "Marked as starting fresh" : "Migration request saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save migration request");
+    } finally {
+      setMigrationBusy(false);
+    }
+  }
+
+  async function stageMigrationFile(file: File) {
+    if (!bizId) return;
+    setMigrationBusy(true);
+    try {
+      const text = await file.text();
+      const rows = rowsFromCsv(text).slice(0, 1000);
+      if (!rows.length) {
+        toast.error("No client rows found. Make sure the file has columns for name, email, or phone.");
+        return;
+      }
+      if (rows.length >= 1000) {
+        toast.message("Preview limited to 1,000 rows. Split larger lists before importing.");
+      }
+      const request = await api.migrations.create(bizId, {
+        sourcePlatform: migrationSource,
+        mode: "SELF_SERVICE",
+        notes: migrationNotes.trim() || undefined,
+      });
+      const batch = await api.migrations.stage(bizId, request.id, {
+        sourcePlatform: migrationSource,
+        fileName: file.name,
+        rows,
+      });
+      setMigrationFileName(file.name);
+      setMigrationBatch(batch);
+      toast.success(`Reviewed ${batch.totalRows} clients before import`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not stage client import");
+    } finally {
+      setMigrationBusy(false);
+      if (migrationFileInputRef.current) migrationFileInputRef.current.value = "";
+    }
+  }
+
+  async function confirmMigrationImport() {
+    if (!bizId || !migrationBatch) return;
+    setMigrationBusy(true);
+    try {
+      const imported = await api.migrations.importBatch(bizId, migrationBatch.id, true);
+      setMigrationBatch(imported);
+      toast.success(`Imported ${imported.importedRows} client${imported.importedRows === 1 ? "" : "s"}`);
+      await load(search, 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setMigrationBusy(false);
+    }
+  }
+
   const detail = selected as (ClientWithStats & {
     appointments?: Array<{ id: string; startsAt: string; status: string; service: { name: string }; staff: { user: { name: string } } }>;
     payments?: Payment[];
     packages?: ClientPackage[];
     messages?: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }>;
   }) | null;
+  const migrationSourceLabel = MIGRATION_SOURCES.find((source) => source.value === migrationSource)?.label ?? "your old app";
 
   return (
     <>
@@ -292,59 +451,10 @@ export default function ClientsPage() {
             </a>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setShowMigration(true)}
               className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
-              <Upload className="w-4 h-4" />Import CSV
+              <Upload className="w-4 h-4" />Move clients to Pulse
             </button>
-            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={async (e) => {
-                const file = e.target.files?.[0]; if (!file) return;
-                const text = await file.text();
-                // RFC 4180-compliant parser: handles commas and newlines inside
-                // quoted fields and escaped double-quotes ("").
-                function parseCsv(data: string): string[][] {
-                  const result: string[][] = [];
-                  let row: string[] = [];
-                  let cur = "";
-                  let inQ = false;
-                  for (let i = 0; i < data.length; i++) {
-                    const ch = data[i];
-                    const next = data[i + 1];
-                    if (inQ) {
-                      if (ch === '"' && next === '"') { cur += '"'; i++; }
-                      else if (ch === '"') { inQ = false; }
-                      else { cur += ch; }
-                    } else {
-                      if (ch === '"') { inQ = true; }
-                      else if (ch === ',') { row.push(cur.trim()); cur = ""; }
-                      else if (ch === '\n' || (ch === '\r' && next === '\n')) {
-                        row.push(cur.trim());
-                        result.push(row);
-                        row = [];
-                        cur = "";
-                        if (ch === '\r') i++;
-                      }
-                      else { cur += ch; }
-                    }
-                  }
-                  if (cur || row.length) { row.push(cur.trim()); result.push(row); }
-                  return result;
-                }
-                const allRows = parseCsv(text);
-                if (allRows.length < 2) { toast.error("No valid rows found"); return; }
-                const headers = allRows[0].map(h => h.toLowerCase());
-                const rows = allRows.slice(1).map(vals => {
-                  const obj: Record<string, string> = {};
-                  headers.forEach((h, i) => { obj[h] = vals[i] ?? ""; });
-                  return { name: obj.name ?? obj["full name"] ?? "", email: obj.email || undefined, phone: obj.phone || undefined, tags: obj.tags || undefined, notes: obj.notes || undefined };
-                }).filter(r => r.name);
-                if (!rows.length) { toast.error("No valid rows found after parsing"); return; }
-                try {
-                  const r = await api.clients.importCsv(bizId, rows);
-                  toast.success(`Imported ${r.created} new, updated ${r.updated}`);
-                  await load(search, 1);
-                } catch (err) { toast.error(err instanceof Error ? err.message : "Import failed"); }
-                e.target.value = "";
-              }} />
             <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
           </div>
         )}
@@ -659,6 +769,168 @@ export default function ClientsPage() {
                 <Button variant="secondary" className="flex-1" onClick={() => setShowAdd(false)}>Cancel</Button>
                 <Button className="flex-1" loading={saving} onClick={addClient}>Add</Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showMigration && (
+        <div className="dashboard-safe-bottom fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeMigration} aria-hidden="true" />
+          <Card
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="migration-modal-title"
+            onKeyDown={(e) => { if (e.key === "Escape") closeMigration(); }}
+            tabIndex={-1}
+            className="relative z-10 w-full max-w-2xl">
+            <CardHeader>
+              <CardTitle id="migration-modal-title">Move clients to Pulse</CardTitle>
+              <p className="text-sm text-gray-500">Choose where you are moving from, then upload a file for review or ask Pulse to help.</p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {migrationSubmitted ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="font-semibold text-emerald-900">Migration request saved</p>
+                  <p className="mt-1 text-sm text-emerald-800">
+                    Your request for {migrationSourceLabel} is ready for follow-up. You can keep adding clients manually while migration is reviewed.
+                  </p>
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={closeMigration}>Done</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label htmlFor="migration-source" className="block text-sm font-medium text-gray-700 mb-1">Where are you moving from?</label>
+                    <select
+                      id="migration-source"
+                      value={migrationSource}
+                      onChange={(e) => {
+                        const nextSource = e.target.value as MigrationSourcePlatform;
+                        setMigrationSource(nextSource);
+                        if (nextSource === "starting-fresh") setMigrationMode("SELF_SERVICE");
+                      }}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200">
+                      {MIGRATION_SOURCES.map((source) => (
+                        <option key={source.value} value={source.value}>{source.label} - {source.hint}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {migrationSource !== "starting-fresh" && (
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {([
+                        { mode: "DONE_FOR_YOU", title: "Let Pulse migrate", desc: "Best if you want help reviewing the file." },
+                        { mode: "SELF_SERVICE", title: "I'll upload a file", desc: "Preview, catch issues, then import valid rows." },
+                        { mode: "ASSISTED_CALL", title: "Book guided help", desc: "Use this for complex exports or large lists." },
+                      ] as const).map((option) => (
+                        <button
+                          key={option.mode}
+                          type="button"
+                          onClick={() => setMigrationMode(option.mode)}
+                          className={cn(
+                            "rounded-xl border p-3 text-left transition-colors",
+                            migrationMode === option.mode ? "border-violet-300 bg-violet-50" : "border-gray-200 bg-white hover:bg-gray-50"
+                          )}>
+                          <p className="text-sm font-semibold text-gray-900">{option.title}</p>
+                          <p className="mt-1 text-xs text-gray-500">{option.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div>
+                    <label htmlFor="migration-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes for migration</label>
+                    <textarea
+                      id="migration-notes"
+                      value={migrationNotes}
+                      onChange={(e) => setMigrationNotes(e.target.value)}
+                      rows={3}
+                      maxLength={2000}
+                      placeholder="Example: I have about 400 clients and want tags/notes preserved."
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" />
+                  </div>
+
+                  {migrationSource === "starting-fresh" ? (
+                    <div className="flex justify-end gap-2">
+                      <Button variant="secondary" onClick={closeMigration}>Cancel</Button>
+                      <Button loading={migrationBusy} onClick={submitMigrationHelp}>Save</Button>
+                    </div>
+                  ) : migrationMode === "SELF_SERVICE" ? (
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+                        <p className="text-sm font-semibold text-gray-900">Upload a CSV from {migrationSourceLabel}</p>
+                        <p className="mt-1 text-xs text-gray-500">Pulse will stage the file first. Nothing is imported until you review and confirm.</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button variant="secondary" loading={migrationBusy} onClick={() => migrationFileInputRef.current?.click()}>
+                            <Upload className="w-4 h-4 mr-1.5" />Choose CSV
+                          </Button>
+                          <input
+                            ref={migrationFileInputRef}
+                            type="file"
+                            accept=".csv,text/csv"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) stageMigrationFile(file);
+                            }} />
+                          {migrationFileName && <span className="self-center text-xs text-gray-500">{migrationFileName}</span>}
+                        </div>
+                      </div>
+
+                      {migrationBatch && (
+                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">Migration confidence: {migrationBatch.confidenceScore}%</p>
+                              <p className="mt-1 text-xs text-gray-500">{migrationBatch.totalRows} rows reviewed before import</p>
+                            </div>
+                            <Button
+                              loading={migrationBusy}
+                              disabled={migrationBatch.status === "IMPORTED" || migrationBatch.validRows === 0}
+                              onClick={confirmMigrationImport}>
+                              {migrationBatch.status === "IMPORTED" ? "Imported" : "Import valid clients"}
+                            </Button>
+                          </div>
+                          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {[
+                              ["Valid", migrationBatch.validRows, "text-emerald-700 bg-emerald-50"],
+                              ["Duplicates", migrationBatch.duplicateRows, "text-amber-700 bg-amber-50"],
+                              ["Need fixes", migrationBatch.invalidRows, "text-red-700 bg-red-50"],
+                              ["Imported", migrationBatch.importedRows, "text-violet-700 bg-violet-50"],
+                            ].map(([label, value, tone]) => (
+                              <div key={label} className={cn("rounded-lg px-3 py-2 text-center", tone as string)}>
+                                <p className="text-base font-bold">{value}</p>
+                                <p className="text-[11px] font-medium">{label}</p>
+                              </div>
+                            ))}
+                          </div>
+                          {(migrationBatch.rows ?? []).some((row) => row.status !== "VALID") && (
+                            <div className="mt-4 max-h-36 overflow-y-auto rounded-lg border border-gray-100">
+                              {(migrationBatch.rows ?? []).filter((row) => row.status !== "VALID").slice(0, 8).map((row) => (
+                                <div key={row.id} className="border-b border-gray-100 px-3 py-2 text-xs last:border-b-0">
+                                  <p className="font-semibold text-gray-700">Row {row.rowNumber}: {row.status}</p>
+                                  <p className="mt-0.5 text-gray-500">{[...row.errors, ...row.warnings].join(", ") || "Possible duplicate"}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2">
+                        <Button variant="secondary" onClick={closeMigration}>Close</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end gap-2">
+                      <Button variant="secondary" onClick={closeMigration}>Cancel</Button>
+                      <Button loading={migrationBusy} onClick={submitMigrationHelp}>Request migration help</Button>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -283,6 +283,66 @@ export interface MembershipMember {
 }
 export type PaymentKind = "DEPOSIT" | "NO_SHOW_FEE" | "LATE_CANCEL_FEE" | "IN_PERSON" | "OTHER";
 export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "REFUNDED" | "PARTIALLY_REFUNDED";
+
+export type MigrationSourcePlatform =
+  | "square-appointments"
+  | "jane-app"
+  | "vagaro"
+  | "acuity-scheduling"
+  | "calendly"
+  | "fresha"
+  | "glossgenius"
+  | "mindbody"
+  | "setmore"
+  | "google-contacts"
+  | "phone-contacts"
+  | "csv"
+  | "other"
+  | "starting-fresh";
+export type MigrationMode = "SELF_SERVICE" | "DONE_FOR_YOU" | "ASSISTED_CALL";
+export interface MigrationImportRow {
+  id: string;
+  rowNumber: number;
+  status: "VALID" | "INVALID" | "DUPLICATE" | "IMPORTED" | string;
+  raw: Record<string, unknown>;
+  normalized: { name?: string; email?: string; phone?: string; notes?: string; tags?: string[] };
+  errors: string[];
+  warnings: string[];
+  duplicateClientId?: string | null;
+  importedClientId?: string | null;
+  createdAt: string;
+}
+export interface MigrationImportBatch {
+  id: string;
+  businessId: string;
+  requestId?: string | null;
+  sourcePlatform: MigrationSourcePlatform | string;
+  fileName?: string | null;
+  status: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  importedRows: number;
+  confidenceScore: number;
+  summary: Record<string, unknown>;
+  rows?: MigrationImportRow[];
+  createdAt: string;
+  importedAt?: string | null;
+}
+export interface MigrationRequest {
+  id: string;
+  businessId: string;
+  sourcePlatform: MigrationSourcePlatform | string;
+  mode: MigrationMode | string;
+  status: string;
+  approximateSize?: number | null;
+  requestedHelp: boolean;
+  notes?: string | null;
+  batches?: MigrationImportBatch[];
+  createdAt: string;
+  updatedAt: string;
+}
 export interface RefundRow {
   id: string; amountCents: number; reason?: string | null; status: string; createdAt: string;
 }
@@ -923,6 +983,29 @@ export const api = {
     exportCsv: (businessId: string) => `/proxy/businesses/${businessId}/clients/export-csv`,
     importCsv: (businessId: string, rows: unknown[]) =>
       req<{ created: number; updated: number; total: number }>(`/businesses/${businessId}/clients/import-csv`, { method: "POST", body: JSON.stringify({ rows }) }),
+  },
+
+  migrations: {
+    list: (businessId: string) =>
+      req<MigrationRequest[]>(`/businesses/${businessId}/migrations`),
+    create: (businessId: string, data: {
+      sourcePlatform: MigrationSourcePlatform;
+      mode?: MigrationMode;
+      approximateSize?: number;
+      requestedHelp?: boolean;
+      notes?: string;
+    }) =>
+      req<MigrationRequest>(`/businesses/${businessId}/migrations`, { method: "POST", body: JSON.stringify(data) }),
+    get: (businessId: string, id: string) =>
+      req<MigrationRequest>(`/businesses/${businessId}/migrations/${id}`),
+    stage: (businessId: string, id: string, data: {
+      sourcePlatform?: MigrationSourcePlatform;
+      fileName?: string;
+      rows: Array<Record<string, unknown>>;
+    }) =>
+      req<MigrationImportBatch>(`/businesses/${businessId}/migrations/${id}/stage`, { method: "POST", body: JSON.stringify(data) }),
+    importBatch: (businessId: string, batchId: string, importValidOnly = true) =>
+      req<MigrationImportBatch>(`/businesses/${businessId}/migrations/batches/${batchId}/import`, { method: "POST", body: JSON.stringify({ importValidOnly }) }),
   },
 
   appointments: {
