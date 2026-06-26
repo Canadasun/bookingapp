@@ -234,6 +234,27 @@ describe('BookingsService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it('prevents staff from creating bookings for another provider', async () => {
+      const { svc } = await buildService({
+        staff: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'staff2', businessId: 'biz1', active: true }),
+        },
+      });
+
+      await expect(
+        svc.create(
+          'biz1',
+          {
+            staffId: 'staff1',
+            serviceId: 'svc1',
+            clientId: 'client1',
+            startsAt: SLOT_START.toISOString(),
+          },
+          { confirmed: true, actor: { id: 'user2', role: 'STAFF' } },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('rejects a slot that overlaps an existing appointment buffer', async () => {
       const { svc } = await buildService(mockPrisma({ bufferConflict: true }));
       await expect(
@@ -449,6 +470,18 @@ describe('BookingsService', () => {
       });
 
       await expect(svc.confirm('apt1', 'biz1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('prevents staff from confirming another provider appointment', async () => {
+      const { svc } = await buildService({
+        staff: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'staff2', businessId: 'biz1', active: true }),
+        },
+      });
+
+      await expect(
+        svc.confirm('apt1', 'biz1', 'user2', { id: 'user2', role: 'STAFF' }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

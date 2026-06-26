@@ -33,7 +33,8 @@ export class StaffController {
 
   @Get('all')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_STAFF')
   findAllIncludingInactive(@Param('businessId') businessId: string) {
     return this.staffService.findAllIncludingInactive(businessId);
   }
@@ -42,7 +43,8 @@ export class StaffController {
   // the business. The public booking flow uses GET /staff (names only).
   @Get(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_STAFF')
   findOne(
     @Param('id') id: string,
     @Param('businessId') businessId: string,

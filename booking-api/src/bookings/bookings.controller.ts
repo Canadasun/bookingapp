@@ -167,7 +167,7 @@ export class BookingsController {
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
     const canOverride = dto.allowOverride === true && (user.role === 'OWNER' || user.role === 'ADMIN');
-    return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: canOverride });
+    return this.appointmentService.create(businessId, dto, { confirmed: true, overrideConflicts: canOverride, actor: user });
   }
 
   // Owner/staff-initiated recurring series (dashboard). Creates N confirmed
@@ -181,7 +181,7 @@ export class BookingsController {
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
     const canOverride = dto.allowOverride === true && (user.role === 'OWNER' || user.role === 'ADMIN');
-    return this.appointmentService.createRecurring(businessId, { ...dto, allowOverride: canOverride }, { confirmed: true });
+    return this.appointmentService.createRecurring(businessId, { ...dto, allowOverride: canOverride }, { confirmed: true, actor: user });
   }
 
   @Patch(':id/confirm')
@@ -191,7 +191,7 @@ export class BookingsController {
     @Param('businessId') businessId: string,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    return this.appointmentService.confirm(id, businessId, user.id);
+    return this.appointmentService.confirm(id, businessId, user.id, user);
   }
 
   @Patch(':id/reschedule')
@@ -202,7 +202,7 @@ export class BookingsController {
     @Body(new ZodValidationPipe(RescheduleSchema)) dto: RescheduleDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    return this.appointmentService.reschedule(id, dto, businessId, { userId: user.id });
+    return this.appointmentService.reschedule(id, dto, businessId, { userId: user.id, actor: user });
   }
 
   @Patch(':id')
@@ -213,7 +213,7 @@ export class BookingsController {
     @Body(new ZodValidationPipe(UpdateAppointmentSchema)) dto: UpdateAppointmentDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    return this.appointmentService.updateDetails(id, dto, businessId, user.id);
+    return this.appointmentService.updateDetails(id, dto, businessId, user.id, user);
   }
 
   @Patch(':id/status')
@@ -224,6 +224,6 @@ export class BookingsController {
     @Body(new ZodValidationPipe(StatusSchema)) dto: StatusDto,
     @CurrentUser() user: { id: string; role: string; businessId: string | null },
   ) {
-    return this.appointmentService.updateStatus(id, dto, businessId, true, user.id);
+    return this.appointmentService.updateStatus(id, dto, businessId, true, user.id, user);
   }
 }

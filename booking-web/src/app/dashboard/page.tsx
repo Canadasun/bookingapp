@@ -131,7 +131,9 @@ export default function OverviewPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally { setLoading(false); }
-  }, [userLoading, bizId]);
+  // React Compiler needs `user` here because `bizId` is derived from it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLoading, user, bizId]);
 
   useEvents(bizId || null, useCallback(() => {
     load();
@@ -280,7 +282,7 @@ export default function OverviewPage() {
         </div>
       )}
 
-      {/* Today's schedule + stats grid */}
+      {/* Live schedule + stats grid */}
       <div className="grid md:grid-cols-5 gap-5">
 
         {/* Today timeline */}

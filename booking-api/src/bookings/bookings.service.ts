@@ -31,6 +31,8 @@ type BookingServiceForValidation = {
   resourceId?: string | null;
 };
 
+type AuthActor = { id: string; role: string };
+
 @Injectable()
 export class BookingsService {
   constructor(
@@ -217,11 +219,44 @@ export class BookingsService {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
+  private async staffIdForActor(businessId: string, actor: AuthActor) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { userId: actor.id, businessId },
+      select: { id: true },
+    });
+    if (!staff) throw new ForbiddenException('No staff profile is linked to this account');
+    return staff.id;
+  }
+
+  private async assertStaffCanBookFor(businessId: string, staffId: string, actor?: AuthActor) {
+    if (actor?.role !== 'STAFF') return;
+    const actorStaffId = await this.staffIdForActor(businessId, actor);
+    if (actorStaffId !== staffId) {
+      throw new ForbiddenException('Staff can only manage their own appointments');
+    }
+  }
+
+  private async assertStaffCanManageAppointment(
+    appointment: { businessId: string; staffId: string },
+    actor?: AuthActor,
+  ) {
+    if (actor?.role !== 'STAFF') return;
+    const actorStaffId = await this.staffIdForActor(appointment.businessId, actor);
+    if (actorStaffId !== appointment.staffId) {
+      throw new ForbiddenException('Staff can only manage their own appointments');
+    }
+  }
+
   /**
    * Creates an appointment with SERIALIZABLE isolation + SELECT FOR UPDATE
    * to guarantee exactly-once booking under concurrent requests.
    */
-  async create(businessId: string, dto: CreateAppointmentDto, opts: { confirmed?: boolean; overrideConflicts?: boolean; recurringGroupId?: string } = {}) {
+  async create(
+    businessId: string,
+    dto: CreateAppointmentDto,
+    opts: { confirmed?: boolean; overrideConflicts?: boolean; recurringGroupId?: string; actor?: AuthActor } = {},
+  ) {
+    await this.assertStaffCanBookFor(businessId, dto.staffId, opts.actor);
     const primaryService = await this.prisma.service.findFirst({
       where: { id: dto.serviceId, businessId },
     });
@@ -439,7 +474,11 @@ export class BookingsService {
   // chosen frequency, all sharing a recurringGroupId. The first occurrence must
   // succeed; later occurrences that hit a conflict are skipped and reported so the
   // owner can rebook those individually.
-  async createRecurring(businessId: string, dto: CreateRecurringDto, opts: { confirmed?: boolean } = {}) {
+  async createRecurring(
+    businessId: string,
+    dto: CreateRecurringDto,
+    opts: { confirmed?: boolean; actor?: AuthActor } = {},
+  ) {
     const { frequency, count } = dto;
     const base: CreateAppointmentDto = {
       staffId: dto.staffId, serviceId: dto.serviceId, additionalServiceIds: dto.additionalServiceIds,
@@ -459,7 +498,7 @@ export class BookingsService {
         const apt = await this.create(
           businessId,
           { ...base, startsAt: occStart.toISOString() },
-          { confirmed: opts.confirmed, overrideConflicts: base.allowOverride === true, recurringGroupId: groupId },
+          { confirmed: opts.confirmed, overrideConflicts: base.allowOverride === true, recurringGroupId: groupId, actor: opts.actor },
         );
         created.push({ id: apt.id, startsAt: apt.startsAt });
       } catch (err) {
@@ -471,8 +510,9 @@ export class BookingsService {
     return { groupId, created, skipped };
   }
 
-  async confirm(id: string, businessId?: string, userId?: string) {
+  async confirm(id: string, businessId?: string, userId?: string, actor?: AuthActor) {
     const apt = await this.findOne(id, businessId);
+    await this.assertStaffCanManageAppointment(apt, actor);
     if (isPaidPlan(apt.business.plan) && apt.business.requireDeposit && apt.status === 'PENDING') {
       const paidDeposit = await this.prisma.payment.findFirst({
         where: {
@@ -511,9 +551,10 @@ export class BookingsService {
     id: string,
     dto: RescheduleDto,
     businessId?: string,
-    opts: { byClient?: boolean; userId?: string } = {},
+    opts: { byClient?: boolean; userId?: string; actor?: AuthActor } = {},
   ) {
     const existing = await this.findOne(id, businessId);
+    await this.assertStaffCanManageAppointment(existing, opts.actor);
     const service = await this.prisma.service.findFirstOrThrow({
       where: { id: existing.serviceId, businessId: existing.businessId },
     });
@@ -636,8 +677,16 @@ export class BookingsService {
     CANCELLED: [],
   };
 
-  async updateStatus(id: string, dto: StatusDto, businessId?: string, byStaff = false, userId?: string) {
+  async updateStatus(
+    id: string,
+    dto: StatusDto,
+    businessId?: string,
+    byStaff = false,
+    userId?: string,
+    actor?: AuthActor,
+  ) {
     const existing = await this.findOne(id, businessId);
+    await this.assertStaffCanManageAppointment(existing, actor);
     const allowed = BookingsService.VALID_TRANSITIONS[existing.status] ?? [];
     if (!allowed.includes(dto.status)) {
       throw new BadRequestException(`Cannot transition appointment from ${existing.status} to ${dto.status}`);
@@ -860,8 +909,9 @@ export class BookingsService {
     };
   }
 
-  async updateDetails(id: string, dto: UpdateAppointmentDto, businessId: string, userId?: string) {
+  async updateDetails(id: string, dto: UpdateAppointmentDto, businessId: string, userId?: string, actor?: AuthActor) {
     const existing = await this.findOne(id, businessId);
+    await this.assertStaffCanManageAppointment(existing, actor);
     let startsAt = existing.startsAt;
     let endsAt = existing.endsAt;
     let timeChanged = false;

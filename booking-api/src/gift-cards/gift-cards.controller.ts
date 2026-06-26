@@ -7,7 +7,9 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { Role } from '@prisma/client';
 
 @ApiTags('gift-cards')
@@ -25,14 +27,16 @@ export class GiftCardsController {
 
   @Get()
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
+  @RequirePermissions('VIEW_MONEY')
   list(@Param('businessId') businessId: string) {
     return this.svc.list(businessId);
   }
 
   @Get(':id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
+  @RequirePermissions('VIEW_MONEY')
   get(@Param('businessId') businessId: string, @Param('id') id: string) {
     return this.svc.get(businessId, id);
   }
@@ -50,7 +54,8 @@ export class GiftCardsController {
 
   @Post('redeem')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
+  @RequirePermissions('VIEW_MONEY')
   redeem(
     @Param('businessId') businessId: string,
     @Body(new ZodValidationPipe(RedeemGiftCardSchema)) dto: RedeemGiftCardDto,

@@ -2222,7 +2222,7 @@ function SettingsPage() {
                     {
                       id: "UNLIMITED", name: "Unlimited", monthlyPrice: 79, annualPrice: 790,
                       desc: "Multi-location — for enterprise businesses",
-                      features: ["Everything in Pro","Unlimited locations","Full SMS across all locations","Remove Pulse branding","Unlimited staff accounts","Dedicated support","Early access to new features"],
+                      features: ["Everything in Pro","Up to 5 locations","Full SMS across all locations","Remove Pulse branding","Unlimited staff accounts","Dedicated support","Early access to new features"],
                       cta: "Upgrade to Unlimited", disabled: false,
                     },
                   ].map((plan) => (

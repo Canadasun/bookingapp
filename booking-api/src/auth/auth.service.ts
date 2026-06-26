@@ -634,17 +634,6 @@ export class AuthService {
         currentPeriodEnd: addDays(30, 23, 59),
       },
     });
-    await tx.review.create({
-      data: {
-        businessId: args.businessId,
-        appointmentId: completedAppointment.id,
-        staffId: args.staffId,
-        clientName: 'Demo Client',
-        rating: 5,
-        comment: 'Demo review showing where client feedback appears.',
-      },
-    });
-
     await tx.notification.create({
       data: {
         userId: args.userId,

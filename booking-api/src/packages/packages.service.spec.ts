@@ -17,6 +17,9 @@ function makeCP(over: Partial<Record<string, unknown>> = {}) {
 
 function build() {
   const prisma: Record<string, any> = {
+    business: {
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ plan: 'PRO' }),
+    },
     package: { findFirst: jest.fn() },
     service: { findFirst: jest.fn().mockResolvedValue({ id: 'svc1' }) },
     appointment: { findFirst: jest.fn() },

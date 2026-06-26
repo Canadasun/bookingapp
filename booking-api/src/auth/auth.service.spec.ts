@@ -109,9 +109,13 @@ describe('AuthService.register', () => {
       packageRedemption: { create: jest.fn().mockResolvedValue({ id: 'package-redemption1' }) },
       membershipPlan: { create: jest.fn().mockResolvedValue({ id: 'membership-plan1' }) },
       clientMembership: { create: jest.fn().mockResolvedValue({ id: 'membership1' }) },
-      review: { create: jest.fn().mockResolvedValue({ id: 'review1' }) },
       notification: { create: jest.fn().mockResolvedValue({ id: 'notification1' }) },
       notificationDelivery: { create: jest.fn().mockResolvedValue({ id: 'delivery1' }) },
+      refreshSession: {
+        create: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     const prisma = {
       user: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -168,7 +172,6 @@ describe('AuthService.register', () => {
     expect(tx.waitlistEntry.create).toHaveBeenCalled();
     expect(tx.message.createMany).toHaveBeenCalled();
     expect(tx.invoice.create).toHaveBeenCalled();
-    expect(tx.review.create).toHaveBeenCalled();
     expect(tx.notification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ title: 'Demo examples added' }) }));
   });
 });

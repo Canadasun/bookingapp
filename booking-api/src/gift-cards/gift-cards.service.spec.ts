@@ -17,6 +17,9 @@ function makeCard(over: Partial<Record<string, unknown>> = {}) {
 
 function build(prismaOver: Record<string, unknown> = {}) {
   const prisma: Record<string, any> = {
+    business: {
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ plan: 'PRO' }),
+    },
     giftCard: {
       findFirst: jest.fn(),
       findUnique: jest.fn(),

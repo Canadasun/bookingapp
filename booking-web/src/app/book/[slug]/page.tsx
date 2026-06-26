@@ -33,6 +33,39 @@ function fmtDuration(mins: number) {
 function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
+function normalizeHexColor(value: unknown, fallback = "#7C3AED") {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  const short = /^#([0-9A-Fa-f]{3})$/.exec(trimmed);
+  if (short) return `#${short[1].split("").map((c) => c + c).join("")}`;
+  return /^#[0-9A-Fa-f]{6}$/.test(trimmed) ? trimmed : fallback;
+}
+function hexToRgb(hex: string) {
+  const clean = hex.replace("#", "");
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+function relativeLuminance(hex: string) {
+  const { r, g, b } = hexToRgb(hex);
+  const toLinear = (channel: number) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+function contrastRatio(a: string, b: string) {
+  const l1 = relativeLuminance(a);
+  const l2 = relativeLuminance(b);
+  const light = Math.max(l1, l2);
+  const dark = Math.min(l1, l2);
+  return (light + 0.05) / (dark + 0.05);
+}
+function bestTextOn(hex: string) {
+  return contrastRatio(hex, "#FFFFFF") >= contrastRatio(hex, "#1F2937") ? "#FFFFFF" : "#1F2937";
+}
 function groupSlots<T extends Slot>(slots: T[]) {
   const m: T[] = [], a: T[] = [], e: T[] = [];
   for (const s of slots) {
@@ -56,8 +89,8 @@ function StepBar({ labels, current }: { labels: string[]; current: number }) {
         <li key={label} className="flex items-center gap-2 shrink-0" aria-current={i === current ? "step" : undefined}>
           <div className={cn(
             "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
-            i < current ? "bg-violet-600 text-white" :
-            i === current ? "bg-violet-600 text-white ring-4 ring-violet-100" :
+            i < current ? "bk-step-active" :
+            i === current ? "bk-step-active bk-step-current" :
             "bg-gray-100 text-gray-400",
           )}>
             {i < current ? <Check className="w-3.5 h-3.5" /> : i + 1}
@@ -76,17 +109,17 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
   const total = services.reduce((s, x) => s + x.priceCents, 0);
   const duration = services.reduce((s, x) => s + x.durationMinutes, 0);
   return (
-    <div className="mt-4 bg-violet-50 border border-violet-100 rounded-xl p-3">
+    <div className="mt-4 bk-brand-soft border bk-brand-border-soft rounded-xl p-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Selected services</p>
-        <div className="flex items-center gap-3 text-sm font-bold text-violet-700">
+        <p className="text-xs font-semibold bk-brand-text uppercase tracking-wide">Selected services</p>
+        <div className="flex items-center gap-3 text-sm font-bold bk-brand-text">
           <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{fmtDuration(duration)}</span>
           <span>{fmtPrice(total)}</span>
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {services.map((s) => (
-          <span key={s.id} className="inline-flex items-center gap-1 bg-white border border-violet-200 rounded-lg px-2.5 py-1 text-xs text-violet-700 font-medium">
+          <span key={s.id} className="inline-flex items-center gap-1 bg-white border bk-brand-border-soft rounded-lg px-2.5 py-1 text-xs bk-brand-text font-medium">
             {s.name}
             <button onClick={() => onClear(s.id)} aria-label={`Remove ${s.name}`} className="ml-0.5 hover:text-red-500 transition-colors">
               <X className="w-3 h-3" aria-hidden="true" />
@@ -408,11 +441,24 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     setPolicyAccepted(false); setBooking(null); setSlots([]); setSelectedLocationId("");
   }
 
-  const rawBrandColor = (biz?.bookingPageSettings as Record<string, unknown> | null)?.brandColor as string ?? '';
-  // Only allow valid CSS hex colours to prevent CSS injection via style tag.
-  const brandColor = /^#[0-9A-Fa-f]{3,8}$/.test(rawBrandColor) ? rawBrandColor : '#7C3AED';
-  const hidePouredBy = !!(biz?.bookingPageSettings as Record<string, unknown> | null)?.hidePouredBy;
-  const bookingTagline = (biz?.bookingPageSettings as Record<string, unknown> | null)?.tagline as string ?? '';
+  const bookingSettings = (biz?.bookingPageSettings as Record<string, unknown> | null) ?? {};
+  const brandColor = normalizeHexColor(bookingSettings.brandColor);
+  const brandTextColor = bestTextOn(brandColor);
+  const brandSoft = `${brandColor}18`;
+  const hidePouredBy = !!bookingSettings.hidePouredBy;
+  const bookingTagline = typeof bookingSettings.tagline === "string" ? bookingSettings.tagline.trim() : "";
+  const bookingHeadline = typeof bookingSettings.headline === "string" && bookingSettings.headline.trim()
+    ? bookingSettings.headline.trim()
+    : `Book with ${biz?.name ?? "us"}`;
+  const bookingIntro = typeof bookingSettings.intro === "string" ? bookingSettings.intro.trim() : "";
+  const fontFamily = typeof bookingSettings.fontFamily === "string" ? bookingSettings.fontFamily : "default";
+  const fontClass = {
+    default: "font-sans",
+    modern: "font-sans",
+    elegant: "font-serif",
+    bold: "font-sans",
+  }[fontFamily] ?? "font-sans";
+  const headlineClass = fontFamily === "bold" ? "font-black" : fontFamily === "modern" ? "tracking-tight" : "";
 
   if (loadingBiz) return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>;
   if (!biz) return (
@@ -502,16 +548,26 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const visualStep  = multiProvider ? step : (step === 0 ? 0 : step - 1);
 
   return (
-    <div className={isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]"}>
+    <div className={cn(isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]", fontClass)}>
       {/* Brand colour injection — scoped to booking page only */}
       <style>{`
-        .bk-cta { background-color: ${brandColor}; }
+        .bk-cta { background-color: ${brandColor}; color: ${brandTextColor}; }
         .bk-cta:hover { filter: brightness(0.88); }
         .bk-cta:disabled { filter: none; opacity: 0.4; }
         .bk-accent { background-color: ${brandColor}; }
-        .bk-selected { border-color: ${brandColor} !important; background-color: ${brandColor}18 !important; }
+        .bk-brand-soft { background-color: ${brandSoft}; }
+        .bk-brand-text { color: ${brandColor}; }
+        .bk-brand-border { border-color: ${brandColor}; }
+        .bk-brand-border-soft { border-color: ${brandColor}33; }
+        .bk-step-active { background-color: ${brandColor}; color: ${brandTextColor}; }
+        .bk-step-current { box-shadow: 0 0 0 4px ${brandSoft}; }
+        .bk-selected { border-color: ${brandColor} !important; background-color: ${brandSoft} !important; }
         .bk-selected-text { color: ${brandColor} !important; }
-        .bk-slot-sel { background-color: ${brandColor} !important; border-color: ${brandColor} !important; color: #fff !important; }
+        .bk-slot-sel { background-color: ${brandColor} !important; border-color: ${brandColor} !important; color: ${brandTextColor} !important; }
+        .bk-option:hover { border-color: ${brandColor}66; background-color: ${brandSoft}; }
+        .bk-link:hover { color: ${brandColor}; }
+        .bk-input:focus { outline: none; box-shadow: 0 0 0 2px ${brandColor}55; }
+        .bk-check { accent-color: ${brandColor}; }
       `}</style>
 
       {/* Nav — hidden in embed mode (the widget lives on the salon's own site) */}
@@ -523,7 +579,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               <Image src={biz.logoUrl} alt={`${biz.name} logo`} width={28} height={28} className="w-7 h-7 rounded-xl object-cover shrink-0" priority />
             ) : (
               <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bk-accent">
-                <Calendar className="w-3.5 h-3.5 text-white" />
+                <Calendar className="w-3.5 h-3.5" style={{ color: brandTextColor }} />
               </div>
             )}
             <span className="font-bold text-gray-900 truncate">{biz?.name ?? "Pulse"}</span>
@@ -533,7 +589,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
           {homeHref && (
             <div className="flex items-center gap-3 text-sm shrink-0">
               <Link href={homeHref}
-                className="text-xs font-medium text-gray-600 hover:text-violet-600 transition-colors border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg">
+                className="text-xs font-medium text-gray-600 transition-colors border border-gray-200 px-3 py-1.5 rounded-lg bk-option">
                 {navUser?.role === "CLIENT" ? "My bookings" : "Back to dashboard"}
               </Link>
             </div>
@@ -543,12 +599,32 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       )}
 
       <main id="main-content" className="max-w-2xl mx-auto px-5 py-8">
+        {step !== 4 && !slotTaken && (
+          <section className="mb-5 rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              {biz?.logoUrl ? (
+                <Image src={biz.logoUrl} alt={`${biz.name} logo`} width={44} height={44} className="h-11 w-11 rounded-xl object-cover shrink-0" priority />
+              ) : (
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 bk-accent">
+                  <Calendar className="h-5 w-5" style={{ color: brandTextColor }} />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{biz?.name}</p>
+                <h1 className={cn("text-xl font-bold text-gray-950 leading-tight", headlineClass)}>{bookingHeadline}</h1>
+                {bookingIntro && <p className="mt-1.5 text-sm leading-relaxed text-gray-500">{bookingIntro}</p>}
+                {bookingTagline && <p className="mt-1.5 text-sm italic text-gray-500">{bookingTagline}</p>}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Prestige: verified businesses get a trust strip that reassures clients */}
         {biz?.verificationStatus === "VERIFIED" && step !== 4 && !slotTaken && (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50 to-sky-50 px-3 py-2">
-            <ShieldCheck className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+          <div className="mb-4 flex items-center gap-2 rounded-xl border bk-brand-border-soft bk-brand-soft px-3 py-2">
+            <ShieldCheck className="w-3.5 h-3.5 bk-brand-text shrink-0" />
             <p className="text-xs text-gray-700">
-              <span className="font-semibold text-gray-900">{biz?.name}</span> is a <span className="font-semibold text-violet-700">Pulse-verified business</span> — identity confirmed for safe, trusted booking.
+              <span className="font-semibold text-gray-900">{biz?.name}</span> is a <span className="font-semibold bk-brand-text">Pulse-verified business</span> — identity confirmed for safe, trusted booking.
             </p>
           </div>
         )}
@@ -563,7 +639,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re on the waitlist</h2>
                 <p className="text-gray-500 mb-6">We&apos;ll email <span className="font-medium text-gray-800">{form.email}</span> the moment a matching spot opens up.</p>
                 <button onClick={() => { setSlotTaken(false); setWlDone(false); pickAnotherTime(); }}
-                  className="w-full py-3 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors">
+                  className="w-full py-3 rounded-xl text-sm font-semibold transition-colors bk-cta">
                   Try another time
                 </button>
               </div>
@@ -590,7 +666,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     Pick another time
                   </button>
                   <button onClick={joinWaitlistFromBooking} disabled={wlSaving}
-                    className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-60 transition-colors">
+                    className="flex-1 py-3 rounded-xl text-sm font-semibold disabled:opacity-60 transition-colors bk-cta">
                     {wlSaving ? "Adding you…" : "Yes, add me to the waitlist"}
                   </button>
                 </div>
@@ -603,11 +679,11 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               <Check className="w-8 h-8 text-emerald-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Booking is Confirmed</h2>
-            <p className="text-sm text-violet-600 font-medium mb-2">You&apos;re all set!</p>
+            <p className="text-sm bk-brand-text font-medium mb-2">You&apos;re all set!</p>
             <p className="text-gray-500 mb-1">Confirmation sent to <span className="font-medium text-gray-800">{[form.email, form.phone].filter(Boolean).join(" and ")}</span></p>
             <p className="text-xs text-gray-400 font-mono mb-3">#{booking.id.slice(-8).toUpperCase()}</p>
             {clientMatched && (
-              <p className="mb-6 inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-100 px-3 py-1 text-xs font-medium text-violet-700">
+              <p className="mb-6 inline-flex items-center gap-1.5 rounded-full bk-brand-soft border bk-brand-border-soft px-3 py-1 text-xs font-medium bk-brand-text">
                 <Check className="w-3.5 h-3.5" /> Synced to your existing profile with {biz?.name ?? "this business"}
               </p>
             )}
@@ -633,7 +709,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               )}
               <div className="flex justify-between font-semibold">
                 <span>Total</span>
-                <span className="text-violet-700">{fmtPrice(totalCents + Math.round(totalCents * ((biz?.taxRatePercent ?? 0) / 100)))}</span>
+                <span className="bk-brand-text">{fmtPrice(totalCents + Math.round(totalCents * ((biz?.taxRatePercent ?? 0) / 100)))}</span>
               </div>
               <div className="flex justify-between text-gray-500 text-xs pt-1">
                 <span>Duration</span><span>{fmtDuration(totalMins)}</span>
@@ -663,7 +739,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 Manage booking
               </Link>
               <button onClick={reset}
-                className="flex-1 py-3 rounded-xl text-white text-sm font-semibold transition-colors bk-cta">
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-colors bk-cta">
                 Book another
               </button>
             </div>
@@ -674,7 +750,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {cardSaved && (
               <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-3 text-left">
                 <p className="text-xs font-semibold text-gray-700 mb-0.5">Card on file</p>
-                <p className="text-xs text-gray-500">Your card has been securely saved with Stripe for no-show/cancellation protection. You can remove it anytime from your <a href="/my/dashboard" className="text-violet-600 font-medium hover:underline">client portal</a>.</p>
+                <p className="text-xs text-gray-500">Your card has been securely saved with Stripe for no-show/cancellation protection. You can remove it anytime from your <a href="/my/dashboard" className="bk-brand-text font-medium hover:underline">client portal</a>.</p>
               </div>
             )}
           </div>
@@ -695,8 +771,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       {biz!.locations!.map((l) => (
                         <button key={l.id} onClick={() => setSelectedLocationId((cur) => cur === l.id ? "" : l.id)}
                           className={cn("rounded-xl border px-3 py-2 text-left transition-colors",
-                            selectedLocationId === l.id ? "border-violet-500 bg-violet-50" : "border-gray-200 hover:bg-gray-50")}>
-                          <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "text-violet-700" : "text-gray-800")}>{l.name}</span>
+                            selectedLocationId === l.id ? "bk-selected" : "border-gray-200 bk-option")}>
+                          <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "bk-selected-text" : "text-gray-800")}>{l.name}</span>
                           {l.address && <span className="block text-xs text-gray-400">{l.address}</span>}
                         </button>
                       ))}
@@ -705,7 +781,6 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 )}
 
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Choose services</h2>
-                {bookingTagline && <p className="text-sm text-gray-500 italic mb-1">{bookingTagline}</p>}
                 <p className="text-sm text-gray-400 mb-4">Select one or more services</p>
 
                 {revStats && revStats.count > 0 && (
@@ -754,24 +829,24 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                               <button key={svc.id} onClick={() => toggleService(svc)} aria-pressed={selected}
                                 className={cn(
                                   "w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all",
-                                  selected ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50",
+                                  selected ? "bk-selected" : "border-gray-100 bk-option",
                                 )}>
                                 <div className="w-2.5 h-10 rounded-full shrink-0" style={{ background: svc.color }} />
                                 <div className="flex-1 min-w-0">
-                                  <p className={cn("font-semibold text-sm", selected ? "text-violet-700" : "text-gray-900")}>{svc.name}</p>
+                                  <p className={cn("font-semibold text-sm", selected ? "bk-selected-text" : "text-gray-900")}>{svc.name}</p>
                                   {svc.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{svc.description}</p>}
                                   <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                                     <Clock className="w-3 h-3" />{fmtDuration(svc.durationMinutes)}
                                   </p>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <p className={cn("font-bold text-sm", selected ? "text-violet-600" : "text-gray-700")}>{fmtPrice(svc.priceCents)}</p>
+                                  <p className={cn("font-bold text-sm", selected ? "bk-selected-text" : "text-gray-700")}>{fmtPrice(svc.priceCents)}</p>
                                 </div>
                                 <div className={cn(
                                   "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-                                  selected ? "border-violet-600 bg-violet-600" : "border-gray-300",
+                                  selected ? "bk-accent bk-brand-border" : "border-gray-300",
                                 )}>
-                                  {selected && <Check className="w-3 h-3 text-white" />}
+	                                  {selected && <Check className="w-3 h-3" style={{ color: brandTextColor }} />}
                                 </div>
                               </button>
                             );
@@ -788,7 +863,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   <button
                     onClick={() => { if (multiProvider) { setStep(1); } else { setSelectedStaff(activeStaff[0] ?? "any"); setStep(2); } }}
                     disabled={selectedServices.length === 0}
-                    className="w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-colors bk-cta">
+	                    className="w-full py-3.5 rounded-xl font-semibold text-sm transition-colors bk-cta">
                     Continue — {selectedServices.length > 0 ? `${selectedServices.length} service${selectedServices.length > 1 ? "s" : ""} · ${fmtPrice(totalCents)}` : "select services"}
                   </button>
                 </div>
@@ -798,7 +873,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 1: Staff ─────────────────────────────────────────── */}
             {step === 1 && (
               <div className="px-6 pb-6">
-                <button onClick={() => setStep(0)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
+	                <button onClick={() => setStep(0)} className="flex items-center gap-1 text-sm text-gray-400 bk-link mb-4 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Choose a provider</h2>
@@ -812,7 +887,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     className={cn(
                       "w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all",
                       staffList.length === 0 && "opacity-50 cursor-not-allowed",
-                      selectedStaff === "any" ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50",
+	                      selectedStaff === "any" ? "bk-selected" : "border-gray-100 bk-option",
                     )}>
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-lg">✨</div>
                     <div className="flex-1">
@@ -834,10 +909,10 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       className={cn(
                         "w-full flex items-center gap-4 p-4 rounded-xl border text-left transition-all",
                         selectedStaff !== "any" && (selectedStaff as StaffMember)?.id === st.id
-                          ? "border-violet-300 bg-violet-50"
-                          : "border-gray-100 hover:border-violet-200 hover:bg-gray-50",
+	                          ? "bk-selected"
+	                          : "border-gray-100 bk-option",
                       )}>
-                      <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm shrink-0">
+	                      <div className="w-10 h-10 rounded-full bk-brand-soft flex items-center justify-center bk-brand-text font-bold text-sm shrink-0">
                         {st.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1">
@@ -854,7 +929,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 2: Date + Time ───────────────────────────────────── */}
             {step === 2 && (
               <div className="px-6 pb-6">
-                <button onClick={() => setStep(multiProvider ? 1 : 0)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
+	                <button onClick={() => setStep(multiProvider ? 1 : 0)} className="flex items-center gap-1 text-sm text-gray-400 bk-link mb-4 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Pick a date &amp; time</h2>
@@ -887,8 +962,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         ) : (
                           <div className="rounded-2xl border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-5">
                             <div className="flex items-start gap-3 mb-4">
-                              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
-                                <Clock className="w-5 h-5 text-violet-600" />
+	                              <div className="w-10 h-10 rounded-xl bk-brand-soft flex items-center justify-center shrink-0">
+	                                <Clock className="w-5 h-5 bk-brand-text" />
                               </div>
                               <div>
                                 <h3 className="text-sm font-bold text-gray-900">Fully booked on this day</h3>
@@ -896,12 +971,12 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                               </div>
                             </div>
                             <div className="space-y-2.5">
-                              <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow"
+	                              <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 bk-input transition-shadow"
                                 placeholder="Your name" value={wl.name} onChange={(e) => setWl((p) => ({ ...p, name: e.target.value }))} />
-                              <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow"
+	                              <input className="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 bk-input transition-shadow"
                                 placeholder="you@example.com" type="email" value={wl.email} onChange={(e) => setWl((p) => ({ ...p, email: e.target.value }))} />
                               <button type="button" onClick={joinWaitlist} disabled={wlSaving}
-                                className="w-full text-white text-sm font-semibold rounded-xl py-3 transition-colors bk-cta">
+	                                className="w-full text-sm font-semibold rounded-xl py-3 transition-colors bk-cta">
                                 {wlSaving ? "Joining…" : "Notify me when a spot opens"}
                               </button>
                             </div>
@@ -926,8 +1001,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                                   className={cn(
                                     "py-2.5 rounded-xl border text-xs font-semibold transition-all",
                                     selectedSlot?.startsAt === sl.startsAt
-                                      ? "bg-violet-600 text-white border-violet-600"
-                                      : "border-gray-200 text-gray-700 hover:border-violet-400 hover:bg-violet-50",
+	                                      ? "bk-slot-sel"
+	                                      : "border-gray-200 text-gray-700 bk-option",
                                   )}>
                                   {format(parseISO(sl.startsAtLocal.slice(0, 19)), "h:mm a")}
                                   {selectedStaff === "any" && sl.staffName && <span className="block truncate px-1 text-[10px] font-medium opacity-70">{sl.staffName}</span>}
@@ -946,27 +1021,27 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 3: Details + Policy ──────────────────────────────── */}
             {step === 3 && (
               <div className="px-6 pb-6">
-                <button onClick={() => setStep(2)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
+	                <button onClick={() => setStep(2)} className="flex items-center gap-1 text-sm text-gray-400 bk-link mb-4 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Your details</h2>
 
                 {/* Booking summary */}
-                <div className="bg-violet-50 rounded-xl p-4 mb-5 text-sm">
+	                <div className="bk-brand-soft rounded-xl p-4 mb-5 text-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-violet-800">
+	                      <p className="font-semibold bk-brand-text">
                         {selectedServices.map((s) => s.name).join(" + ")}
                       </p>
-                      <p className="text-violet-600 mt-0.5">
+	                      <p className="bk-brand-text mt-0.5 opacity-80">
                         {selectedDate && format(selectedDate, "EEE, MMM d")}
                         {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a")}`}
                         {` · ${providerText(chosenStaffName)}`}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-bold text-violet-700">{fmtPrice(totalCents)}</p>
-                      <p className="text-violet-500 text-xs">{fmtDuration(totalMins)}</p>
+	                      <p className="font-bold bk-brand-text">{fmtPrice(totalCents)}</p>
+	                      <p className="bk-brand-text text-xs opacity-70">{fmtDuration(totalMins)}</p>
                     </div>
                   </div>
                 </div>
@@ -993,7 +1068,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                           setErrs((p) => ({ ...p, [k]: "" }));
                         }}
                         className={cn(
-                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-shadow",
+	                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 bk-input transition-shadow",
                           errs[k] ? "border-red-400" : "border-gray-200",
                         )}
                       />
@@ -1016,7 +1091,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         aria-invalid={!!errs[`intake_${q.id}`]}
                         aria-describedby={errs[`intake_${q.id}`] ? `intake-err-${q.id}` : undefined}
                         className={cn(
-                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 min-h-[64px]",
+	                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 bk-input min-h-[64px]",
                           errs[`intake_${q.id}`] ? "border-red-400" : "border-gray-200",
                         )} />
                       {errs[`intake_${q.id}`] && <p id={`intake-err-${q.id}`} className="text-xs text-red-500 mt-1">{errs[`intake_${q.id}`]}</p>}
@@ -1032,7 +1107,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         placeholder="e.g. SUMMER20"
                         value={promoCode}
                         onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
-                        className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 uppercase"
+	                        className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 bk-input uppercase"
                       />
                       <button
                         type="button"
@@ -1046,7 +1121,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                           } catch { setPromoResult(null); toast.error("Invalid or expired promo code"); }
                           finally { setPromoChecking(false); }
                         }}
-                        className="px-4 py-2.5 text-sm bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 disabled:opacity-40 transition-colors"
+	                        className="px-4 py-2.5 text-sm rounded-xl font-medium disabled:opacity-40 transition-colors bk-cta"
                       >
                         {promoChecking ? "…" : "Apply"}
                       </button>
@@ -1064,7 +1139,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     <select
                       value={referralSource}
                       onChange={(e) => setReferralSource(e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+	                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 bk-input"
                     >
                       <option value="">Select one…</option>
                       <option value="Instagram">Instagram</option>
@@ -1090,7 +1165,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         type="checkbox"
                         checked={policyAccepted}
                         onChange={(e) => setPolicyAccepted(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 accent-violet-600 shrink-0"
+	                        className="mt-0.5 w-4 h-4 bk-check shrink-0"
                       />
                       <span className="text-xs text-amber-800 font-medium">
                         I have read and agree to the cancellation policy
@@ -1102,7 +1177,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     <button
                       onClick={confirm}
                       disabled={submitting || !policyAccepted}
-                      className="w-full py-4 rounded-xl text-white font-semibold text-sm transition-colors bk-cta">
+	                      className="w-full py-4 rounded-xl font-semibold text-sm transition-colors bk-cta">
                       {submitting ? "Booking…" : `Confirm booking · ${fmtPrice(totalCents)}`}
                     </button>
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
@@ -1110,9 +1185,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     </p>
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
                       By confirming, your name, contact details, and appointment information are collected and stored by this business and processed by{" "}
-                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-violet-500">Pulse</a>{" "}
+	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">Pulse</a>{" "}
                       as its booking platform. View Pulse&apos;s{" "}
-                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-violet-500">Privacy Policy</a>.
+	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">Privacy Policy</a>.
                     </p>
                   </div>
                 </div>
@@ -1123,7 +1198,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
         {!hidePouredBy && (
           <p className="text-center text-xs text-gray-400 mt-4">
-            Powered by <span className="text-violet-500 font-medium">Pulse</span>
+	            Powered by <span className="bk-brand-text font-medium">Pulse</span>
           </p>
         )}
       </main>
