@@ -184,43 +184,40 @@ export default async function LandingPage() {
           </div>
         </div>
 
-        {/* Mock UI card */}
+        {/* Product workflow card */}
         <div className="relative max-w-sm mx-auto px-6 pb-24">
           <div className="brand-panel rounded-[2rem] p-4 shadow-2xl shadow-amber-100">
             <div className="bg-[#19212B] rounded-[1.5rem] p-5 text-white">
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <p className="text-[11px] text-white/45 uppercase tracking-widest mb-0.5">Today&apos;s schedule</p>
-                  <p className="text-xl font-bold">3 bookings</p>
+                  <p className="text-[11px] text-white/45 uppercase tracking-widest mb-0.5">Booking workflow</p>
+                  <p className="text-xl font-bold">Automation steps</p>
                 </div>
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
                   <Zap className="w-4 h-4" />
                 </div>
               </div>
 
-              {/* Appointment cards */}
+              {/* Workflow cards */}
               <div className="space-y-2.5">
                 {[
-                  { time: "10:00", label: "Online booking", detail: "Deposit collected", color: "bg-violet-400" },
-                  { time: "1:30",  label: "Reminder queued", detail: "SMS + email",      color: "bg-amber-400" },
-                  { time: "3:15",  label: "Card on file",   detail: "No-show protected", color: "bg-teal-400" },
-                ].map(({ time, label, detail, color }) => (
+                  { step: "01", label: "Online booking", detail: "Client chooses a time", color: "bg-violet-400" },
+                  { step: "02", label: "Deposit collected", detail: "Payment handled by Stripe", color: "bg-amber-400" },
+                  { step: "03", label: "Reminder queued", detail: "Email and SMS on paid plans", color: "bg-teal-400" },
+                ].map(({ step, label, detail, color }) => (
                   <div key={label} className="flex items-center gap-3 bg-white/[0.07] rounded-2xl px-4 py-3 hover:bg-white/[0.10] transition-colors">
-                    <p className="text-xs font-bold text-white/50 w-10 shrink-0">{time}</p>
+                    <p className="text-xs font-bold text-white/50 w-10 shrink-0">{step}</p>
                     <div className={`w-1 h-8 rounded-full ${color} shrink-0`} />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold leading-tight">{label}</p>
                       <p className="text-xs text-white/45 truncate">{detail}</p>
                     </div>
-                    <span className="ml-auto rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-white/70 shrink-0">
-                      Confirmed
-                    </span>
                   </div>
                 ))}
               </div>
 
-              {/* New booking pill */}
+              {/* Automation pill */}
               <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-semibold shadow-lg shadow-amber-500/25">
                 <Bell className="w-4 h-4" /> Booking workflow automated
               </div>
