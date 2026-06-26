@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 import { Gift, Copy, ArrowRight } from "lucide-react";
 
 function ReferralPrompt({ onContinue }: { onContinue: () => void }) {
@@ -28,6 +29,7 @@ function ReferralPrompt({ onContinue }: { onContinue: () => void }) {
 
   function copyLink() {
     if (!referralUrl) return;
+    trackEvent("referral_link_copy", { placement: "register_complete" });
     navigator.clipboard.writeText(referralUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
@@ -114,6 +116,7 @@ export default function CompleteOwnerRegistrationPage() {
         return;
       }
       toast.success("Business created! Welcome to Pulse.");
+      trackEvent("owner_registration_complete", { method: "sso_completion" });
       setDone(true);
     } catch {
       toast.error("Something went wrong, please try again");

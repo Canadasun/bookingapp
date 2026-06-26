@@ -14,6 +14,7 @@ import {
 import { api, type Business } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { trackEvent } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
 
@@ -250,13 +251,21 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
+  useEffect(() => {
+    if (user && user.role !== "ADMIN" && user.emailVerified === false && !dismissed) {
+      trackEvent("email_verification_wall_shown", { role: user.role });
+    }
+  }, [dismissed, user]);
+
   if (!user || user.role === "ADMIN" || user.emailVerified !== false || dismissed) return null;
 
   async function resend() {
+    if (!user) return;
     setSending(true);
     try {
       await fetch("/proxy/auth/resend-verification", { method: "POST" });
       setSent(true);
+      trackEvent("email_verification_resend", { role: user.role });
     } finally {
       setSending(false);
     }

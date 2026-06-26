@@ -18,6 +18,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { trackEvent } from "@/lib/analytics";
 
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
@@ -537,11 +538,24 @@ function SettingsPage() {
 
   async function upgrade(plan: "BASIC" | "PRO" | "UNLIMITED") {
     setBillingBusy(plan);
+    trackEvent("checkout_start", {
+      plan,
+      billing_interval: billingInterval,
+      has_referral_code: Boolean(referralInput.trim()),
+    });
     try {
       const result = await api.subscriptions.checkout(plan, referralInput, billingInterval);
-      if (result.url) window.location.assign(result.url);
+      if (result.url) {
+        trackEvent("checkout_redirect", {
+          plan,
+          billing_interval: billingInterval,
+          has_referral_code: Boolean(referralInput.trim()),
+        });
+        window.location.assign(result.url);
+      }
       else {
         toast.success(`Switched to ${plan}. Stripe applied the prorated difference.`);
+        trackEvent("subscription_plan_changed", { plan, billing_interval: billingInterval });
         if (bizId) Promise.all([api.business.get(bizId), loadSubscription()]).then(([b]) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch(() => {});
         setBillingBusy(null);
       }

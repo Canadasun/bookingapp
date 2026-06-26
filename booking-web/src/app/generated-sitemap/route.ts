@@ -60,6 +60,7 @@ const staticRoutes: SitemapRoute[] = [
   ["/for/consultants", "monthly", 0.8],
   ["/for/wellness", "monthly", 0.8],
   ["/for/mobile-services", "monthly", 0.8],
+  ["/for/personal-trainers", "monthly", 0.8],
   ["/for/hair-stylists", "monthly", 0.8],
   ["/for/nail-techs", "monthly", 0.8],
   ["/for/spas", "monthly", 0.8],

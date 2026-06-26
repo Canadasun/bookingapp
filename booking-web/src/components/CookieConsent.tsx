@@ -53,9 +53,9 @@ export function CookieConsent({ clarityId, gaMeasurementId }: CookieConsentProps
           />
           <Script id="ga4-init" strategy="afterInteractive">{`
             window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag("js", new Date());
-            gtag("config", "${gaMeasurementId}", { anonymize_ip: true });
+            window.gtag = function(){dataLayer.push(arguments);}
+            window.gtag("js", new Date());
+            window.gtag("config", "${gaMeasurementId}", { anonymize_ip: true });
           `}</Script>
         </>
       )}

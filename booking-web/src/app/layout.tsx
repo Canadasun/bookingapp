@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { CookieConsent } from "@/components/CookieConsent";
+import { MarketingEventTracker } from "@/components/MarketingEventTracker";
 import { SessionRefresher } from "@/components/SessionRefresher";
 import "./globals.css";
 
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to main content
         </a>
+        <MarketingEventTracker />
         <SessionRefresher />
         {children}
         <Toaster richColors position="top-right" />

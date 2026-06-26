@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { trackEvent } from "@/lib/analytics";
 import { formatPhoneInput } from "@/lib/utils";
 
 function RegisterForm() {
@@ -49,6 +50,11 @@ function RegisterForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    trackEvent("sign_up_start", {
+      method: "email",
+      has_referral_code: /^PULSE-[A-Z0-9]{6}$/.test(referralCode),
+      selected_plan: searchParams.get("plan") ?? "unknown",
+    });
     if (!validate()) return;
     setLoading(true);
     try {
@@ -77,6 +83,11 @@ function RegisterForm() {
         return;
       }
       toast.success("Account created! Welcome.");
+      trackEvent("sign_up_complete", {
+        method: "email",
+        has_referral_code: /^PULSE-[A-Z0-9]{6}$/.test(referralCode),
+        selected_plan: searchParams.get("plan") ?? "unknown",
+      });
       router.push("/dashboard");
     } catch {
       toast.error("Something went wrong, please try again");

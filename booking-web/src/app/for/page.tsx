@@ -17,6 +17,7 @@ const industries = [
   { href: "/for/consultants", emoji: "💼", label: "Consultants", desc: "Manual approval, deposit, Google Calendar sync" },
   { href: "/for/wellness", emoji: "🧘", label: "Wellness Providers", desc: "Memberships, group classes, rebooking automations" },
   { href: "/for/mobile-services", emoji: "🚐", label: "Mobile Services", desc: "Address intake, travel buffer time, deposit protection" },
+  { href: "/for/personal-trainers", emoji: "🏋️", label: "Personal Trainers", desc: "Recurring sessions, deposits, calendar sync, SMS reminders" },
   { href: "/for/hair-stylists", emoji: "💇‍♀️", label: "Hair Stylists", desc: "Colour service protection, deposits, rebooking reminders" },
   { href: "/for/nail-techs", emoji: "💅", label: "Nail Techs", desc: "Deposit protection for gel sets and acrylics" },
   { href: "/for/spas", emoji: "🧖", label: "Spas", desc: "Multi-therapist scheduling, packages, gift cards" },

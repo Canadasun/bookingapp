@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
-  title: "Pulse vs. GlossGenius | The Canadian Alternative",
+  title: "Pulse vs. GlossGenius | Canadian CAD Pricing Alternative",
   description: "GlossGenius is built for US salons only. Pulse is built for Canadian service businesses — CAD pricing, PIPEDA compliance, multi-location support, and no USD conversion headaches.",
 };
 

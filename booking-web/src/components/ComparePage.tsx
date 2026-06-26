@@ -42,8 +42,40 @@ export function ComparePage({
   competitor, tagline, summary, pulseWins, theyWin,
   features, pricingComparison, urgencyBanner,
 }: ComparePageProps) {
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: `Is Pulse better than ${competitor} for Canadian service businesses?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: `Pulse is usually a better fit when a Canadian service business needs CAD pricing, online booking, deposits, no-show protection, client records, and reminders in one workflow. ${competitor} may still be stronger for teams that need its specific ecosystem or integrations.`,
+        },
+      },
+      {
+        "@type": "Question",
+        name: `Does Pulse support CAD pricing compared with ${competitor}?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes. Pulse pricing is shown in Canadian dollars and is designed for Canadian service businesses that want fewer currency-conversion surprises.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: `Can I migrate from ${competitor} to Pulse?`,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes. Pulse offers free migration support for service menus, client lists, staff profiles, and core booking setup so businesses can switch with less manual work.",
+        },
+      },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       {/* Nav */}
       <nav className="border-b border-slate-100 bg-white/90 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -67,7 +99,7 @@ export function ComparePage({
         {/* Urgency banner (Jane forced payment etc.) */}
         {urgencyBanner && (
           <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 flex items-start gap-4">
-            <span className="text-2xl shrink-0">{urgencyBanner.icon}</span>
+            <span className="text-2xl shrink-0" aria-hidden="true">{urgencyBanner.icon}</span>
             <div>
               <p className="text-sm font-bold text-amber-900">{urgencyBanner.title}</p>
               <p className="text-sm text-amber-800 mt-1">{urgencyBanner.body}</p>

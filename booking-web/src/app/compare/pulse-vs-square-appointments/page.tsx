@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
-  title: "Pulse vs. Square Appointments | Best Canadian Booking Software",
+  title: "Pulse vs. Square Appointments | CAD Pricing Alternative",
   description: "Compare Pulse and Square Appointments for Canadian service businesses. CAD pricing, no hardware required, PIPEDA compliance, and no-show protection without a POS terminal.",
 };
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
-  title: "Pulse vs. Acuity Scheduling | Canada-First Alternative",
+  title: "Pulse vs. Acuity Scheduling | CAD Pricing Alternative",
   description: "Compare Pulse and Acuity Scheduling for Canadian service businesses. CAD pricing, active development, no Squarespace account required, and automated no-show protection.",
 };
 

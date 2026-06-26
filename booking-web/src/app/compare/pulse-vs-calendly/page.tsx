@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
-  title: "Pulse vs. Calendly | Best Alternative for Service Businesses",
+  title: "Pulse vs. Calendly | CAD Pricing for Service Businesses",
   description: "Calendly books meetings. Pulse books services. Compare deposits, no-show fees, client management, payments, and CAD pricing — everything Calendly doesn't have.",
 };
 
