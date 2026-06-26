@@ -400,11 +400,56 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     </div>
   );
 
+  async function leavePaymentStep(targetStep: 0 | 2 | 3) {
+    const pendingBooking = booking;
+    setPayInfo(null);
+    setBooking(null);
+    setCardSaved(false);
+    setErrs({});
+
+    if (targetStep === 0) {
+      setSelectedServices([]);
+      setSelectedStaff(null);
+      setSelectedDate(undefined);
+      setSelectedSlot(null);
+      setSlots([]);
+      setPolicyAccepted(false);
+      setPromoResult(null);
+      setStep(0);
+    } else if (targetStep === 2) {
+      setSelectedSlot(null);
+      setPolicyAccepted(false);
+      setStep(2);
+      if (selectedDate) loadSlots(selectedDate);
+    } else {
+      setPolicyAccepted(false);
+      setStep(3);
+    }
+
+    if (pendingBooking?.id && pendingBooking.manageToken) {
+      api.appointments.publicCancel(pendingBooking.id, "Changed booking details before payment", pendingBooking.manageToken).catch(() => {});
+    }
+  }
+
   // Payment step: only when the business requires a deposit / card-on-file
   // (booking is already created as PENDING; this collects the deposit/card).
   if (payInfo && booking) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-xs font-semibold text-amber-900">Need to change something?</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={() => leavePaymentStep(3)} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+              Edit details
+            </button>
+            <button type="button" onClick={() => leavePaymentStep(2)} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+              Change time
+            </button>
+            <button type="button" onClick={() => leavePaymentStep(0)} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+              Start over
+            </button>
+          </div>
+        </div>
         <BookingPayment info={payInfo} onPaid={() => { if (payInfo?.mode === "setup") setCardSaved(true); setPayInfo(null); setStep(4); }} />
       </div>
     </div>

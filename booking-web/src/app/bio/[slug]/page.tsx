@@ -191,7 +191,7 @@ export default async function BioPage({ params }: { params: Promise<{ slug: stri
 
         <p className="text-center text-xs text-slate-400">
           Powered by{" "}
-          <Link href="/" className="text-violet-500 hover:underline">Pulse Appointments</Link>
+          <Link href="/" target="_blank" rel="noopener noreferrer" className="text-violet-500 hover:underline">Pulse Appointments</Link>
         </p>
       </div>
     </div>

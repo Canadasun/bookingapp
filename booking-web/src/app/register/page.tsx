@@ -106,6 +106,9 @@ function RegisterForm() {
             <Image src="/logo.png" alt="Pulse Booking" width={80} height={80} className="w-20 h-auto mx-auto" />
           </Link>
           <p className="text-slate-600 mt-3 text-sm">Create your business account</p>
+          <Link href="/" className="mt-2 inline-block text-xs font-medium text-slate-500 hover:text-violet-600 hover:underline">
+            Back to homepage
+          </Link>
         </div>
 
         <Card>
