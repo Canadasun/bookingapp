@@ -108,7 +108,15 @@ const FOOTER_PAGES = [
 
 function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
   const pathname = usePathname();
-  const childActive = item.children?.some((c) => c.href && pathname.startsWith(c.href.split("?")[0])) ?? false;
+  const childActive = item.children?.some((c) => {
+    if (!c.href) return false;
+    const base = c.href.split("?")[0];
+    // A child that deep-links into another section's own page (e.g. Reminders →
+    // /dashboard/settings?tab=notifications) must not claim this group as active
+    // for every page of that section — Settings owns its own highlight.
+    if (c.href.includes("?") && base === "/dashboard/settings") return false;
+    return pathname.startsWith(base);
+  }) ?? false;
   const [open, setOpen] = useState(childActive);
   const active = item.href === "/dashboard"
     ? pathname === item.href
