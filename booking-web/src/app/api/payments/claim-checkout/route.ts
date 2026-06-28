@@ -8,7 +8,8 @@ const API = apiBase();
 // to the business they registered moments ago. Reads the auth cookie set by
 // registration and forwards it as a Bearer token to the API.
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const token = req.cookies.get("booking_token")?.value;
   if (!token) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 

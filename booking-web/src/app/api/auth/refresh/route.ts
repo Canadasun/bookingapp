@@ -7,7 +7,8 @@ import { refreshMaxAge } from "@/lib/sso-cookies";
 const API = apiBase();
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const refreshToken = req.cookies.get("booking_refresh")?.value;
   if (!refreshToken) return NextResponse.json({ error: "No refresh token" }, { status: 401 });
 

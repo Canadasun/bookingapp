@@ -5,7 +5,8 @@ import { assertSameOrigin } from "@/lib/same-origin";
 const API = apiBase();
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   let token = req.cookies.get("booking_token")?.value;
 
   // If the short-lived access token has expired, exchange the refresh token

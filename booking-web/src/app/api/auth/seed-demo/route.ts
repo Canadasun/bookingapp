@@ -5,7 +5,8 @@ import { assertSameOrigin } from "@/lib/same-origin";
 const API = apiBase();
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const token = req.cookies.get("booking_token")?.value;
   if (!token) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   const upstream = await fetch(`${API}/auth/seed-demo`, {

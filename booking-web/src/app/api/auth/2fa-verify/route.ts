@@ -29,7 +29,8 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
 // Second factor: exchange the OTP from the login challenge for session cookies.
 // Mirrors /api/auth/login's cookie handling exactly.
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const body = await req.json() as { challengeId: string; code: string; rememberDevice?: boolean };
   const upstream = await fetch(`${API}/auth/2fa/verify`, {
     method: "POST",

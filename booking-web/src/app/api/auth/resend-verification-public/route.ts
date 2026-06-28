@@ -5,7 +5,8 @@ import { assertSameOrigin } from "@/lib/same-origin";
 const API = apiBase();
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const body = await req.json().catch(() => ({})) as { email?: string };
   if (!body.email) return NextResponse.json({ error: "Email required" }, { status: 400 });
   const upstream = await fetch(`${API}/auth/resend-verification-public`, {

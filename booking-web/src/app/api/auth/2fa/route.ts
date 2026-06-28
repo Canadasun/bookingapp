@@ -7,7 +7,8 @@ import { refreshMaxAge } from "@/lib/sso-cookies";
 const API = apiBase();
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const body = await req.json() as { enabled: boolean; method?: "EMAIL" | "SMS"; currentPassword: string };
   const token = req.cookies.get("booking_token")?.value;
   const callSetTwoFactor = (accessToken?: string) => fetch(`${API}/auth/2fa`, {

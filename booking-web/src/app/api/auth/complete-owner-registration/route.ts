@@ -6,7 +6,8 @@ import { applySessionCookies, type SSOTokens } from "@/lib/sso-cookies";
 const API = apiBase();
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const token = req.cookies.get("booking_token")?.value;
   if (!token) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 

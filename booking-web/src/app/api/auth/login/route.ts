@@ -27,7 +27,8 @@ function errorMessage(body: Record<string, unknown> | null, fallback: string) {
 }
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const input = await req.json() as { email: string; password: string };
   // A prior "remember this device" token lets a 2FA user skip the OTP here.
   const trustedDeviceToken = req.cookies.get("booking_td")?.value;

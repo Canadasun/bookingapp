@@ -18,7 +18,8 @@ type RegisterData = {
 };
 
 export async function POST(req: NextRequest) {
-  assertSameOrigin(req);
+  const blocked = assertSameOrigin(req);
+  if (blocked) return blocked;
   const body = await req.json() as Record<string, unknown>;
   const upstream = await fetch(`${API}/auth/register`, {
     method: "POST",
