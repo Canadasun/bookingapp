@@ -8,6 +8,12 @@ export const CreateServiceSchema = z.object({
   durationMinutes: z.number().int().positive().max(1440),
   priceCents: z.number().int().nonnegative().max(100_000_00),
   priceType: z.enum(['FLAT', 'PER_HOUR', 'STARTING_AT']).default('FLAT'),
+  // Delivery mode (see Service.locationMode). VIRTUAL services may carry a
+  // default meeting link; kept lenient (not strict URL) since links like
+  // "meet.google.com/abc" omit a scheme. Empty/whitespace is normalised to null.
+  locationMode: z.enum(['IN_PERSON', 'VIRTUAL', 'CUSTOMER', 'PHONE']).default('IN_PERSON'),
+  virtualMeetingUrl: z.string().trim().max(500).optional().nullable()
+    .transform((v) => (v ? v : null)),
   bufferBeforeMin: z.number().int().nonnegative().max(480).default(0),
   bufferAfterMin: z.number().int().nonnegative().max(480).default(0),
   capacity: z.number().int().min(1).max(100).default(1),

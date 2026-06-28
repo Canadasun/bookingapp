@@ -622,6 +622,11 @@ model Service {
   durationMinutes Int
   priceCents      Int
   priceType       String   @default("FLAT") // FLAT, PER_HOUR, STARTING_AT
+  // Where this service is delivered: IN_PERSON (at the business), VIRTUAL (video
+  // call via virtualMeetingUrl), CUSTOMER (provider travels to the client), or
+  // PHONE (phone-only). Drives the booking flow and what reminders include.
+  locationMode      String  @default("IN_PERSON")
+  virtualMeetingUrl String? // default meeting link sent for VIRTUAL services
   bufferBeforeMin Int      @default(0)
   bufferAfterMin  Int      @default(0)
   capacity        Int      @default(1) // > 1 = group/class: that many clients can book the same slot
@@ -948,6 +953,11 @@ model Appointment {
   recurringGroupId      String? // shared id linking occurrences of a recurring series
   intakeAnswers         Json? // client's answers to the business intake questions, [{ label, answer }]
   locationId            String? // which location this appointment is at (multi-location)
+  // Snapshot of the service's delivery mode at booking time, so later edits to
+  // the service don't rewrite history. IN_PERSON | VIRTUAL | CUSTOMER | PHONE.
+  locationMode          String? // null = legacy/in-person
+  meetingUrl            String? // virtual meeting link for this appointment
+  customerAddress       String? // where to go for CUSTOMER (mobile) appointments
   referralSource        String? // "How did you hear about us?" — e.g. Instagram, Google, Referral, Walk-in
   promoCodeId           String? // promo code applied at booking
   discountCents         Int               @default(0) // discount applied via promo code

@@ -151,6 +151,9 @@ export class BookingsService {
       notes: appointment.notes,
       intakeAnswers: appointment.intakeAnswers,
       locationId: appointment.locationId,
+      locationMode: appointment.locationMode,
+      meetingUrl: appointment.meetingUrl,
+      customerAddress: appointment.customerAddress,
       discountCents: appointment.discountCents,
       createdAt: appointment.createdAt,
       updatedAt: appointment.updatedAt,
@@ -410,6 +413,14 @@ export class BookingsService {
               ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
               // Multi-location: the appointment inherits its provider's location.
               ...(staff.locationId ? { locationId: staff.locationId } : {}),
+              // Snapshot the service's delivery mode so reminders/confirmations
+              // know whether this is in-person, virtual, mobile, or phone — and
+              // carry the relevant link/address. Service edits won't rewrite it.
+              locationMode: primaryService.locationMode,
+              ...(primaryService.locationMode === 'VIRTUAL' && primaryService.virtualMeetingUrl
+                ? { meetingUrl: primaryService.virtualMeetingUrl } : {}),
+              ...(primaryService.locationMode === 'CUSTOMER' && dto.customerAddress
+                ? { customerAddress: dto.customerAddress.trim() } : {}),
               ...(dto.referralSource ? { referralSource: dto.referralSource } : {}),
               ...(dto.promoCodeId ? { promoCodeId: dto.promoCodeId, discountCents } : {}),
             },
