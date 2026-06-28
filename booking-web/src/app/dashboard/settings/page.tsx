@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense, useCallback, useRef, useMemo } from "rea
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, Bell, ShieldCheck, CalendarDays, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type, Braces } from "lucide-react";
+import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditCard, Zap, CheckCircle2, ShieldCheck, CalendarDays, AlertTriangle, MapPin, Banknote, ExternalLink, Download, QrCode, Palette, Type, Braces } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore – react-qr-code ships types but they're not resolved via "exports"; works fine at runtime
 import QRCode from "react-qr-code";
@@ -48,7 +48,6 @@ const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: str
   { id: "payments",      label: "Payments & fees",    icon: DollarSign,   desc: "Deposits, no-show fees",                group: "Payments" },
   { id: "payouts",       label: "Payouts",            icon: Banknote,     desc: "Connect bank account & withdraw",       group: "Payments" },
   { id: "billing",       label: "Billing & plan",     icon: CreditCard,   desc: "Subscription plan, upgrade",            group: "Payments" },
-  { id: "notifications", label: "Notifications",      icon: Bell,         desc: "Emails & SMS sent to clients",          group: "Account" },
   { id: "security",      label: "Security",           icon: ShieldCheck,  desc: "Two-factor sign-in, password",          group: "Account" },
 ];
 
@@ -247,14 +246,6 @@ function SettingsPage() {
     setForm((p) => ({ ...p, [k]: v }));
   };
   const bookingSettings = (form.bookingPageSettings ?? {}) as Record<string, unknown>;
-  const notificationSettings = (form.notificationSettings ?? {}) as NonNullable<Business["notificationSettings"]>;
-  const nf = (k: keyof NonNullable<Business["notificationSettings"]>, v: boolean) => {
-    setDirty(true);
-    setForm((p) => ({
-      ...p,
-      notificationSettings: { ...((p.notificationSettings ?? {}) as Record<string, unknown>), [k]: v },
-    }));
-  };
   const bf = (k: string, v: unknown) => {
     setDirty(true);
     setForm((p) => ({
@@ -546,7 +537,6 @@ function SettingsPage() {
         tiktokUrl: String(form.tiktokUrl ?? "").trim() || undefined,
         postVisitMessage: String(form.postVisitMessage ?? "").trim() || undefined,
         bookingPageSettings: bookingSettings,
-        notificationSettings: (form.notificationSettings ?? {}) as Business["notificationSettings"],
         minNoticeMinutes: Number(form.minNoticeMinutes ?? 120),
         maxAdvanceMinutes,
         maxAdvanceDays: Math.max(1, Math.ceil(maxAdvanceMinutes / 1440)),
@@ -1812,124 +1802,6 @@ function SettingsPage() {
                     </button>
                   </div>
                 )}
-              </div>
-            )}
-
-            {section === "notifications" && (
-              <div className="p-4 space-y-4 sm:p-6">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Choose what emails and SMS messages are sent to clients.</p>
-                </div>
-                <hr className="border-gray-100" />
-
-                {/* Plan capability summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                  {([
-                    { id: "FREE",      label: "Free",      lines: ["In-app messaging only", "Confirmation email", "Cancellation & reschedule"] },
-                    { id: "BASIC",     label: "Basic",     lines: ["Receive SMS from clients", "Reply when texted first", "24h email reminder", "+ all Free"] },
-                    { id: "PRO",       label: "Pro",       lines: ["Initiate SMS first", "SMS confirmation", "2h SMS reminder", "72h email reminder", "+ all Basic"] },
-                    { id: "UNLIMITED", label: "Unlimited", lines: ["All Pro features", "Across all locations", "Multi-location inbox"] },
-                  ] as const).map((p) => (
-                    <div key={p.id} className={cn("rounded-xl border p-3", plan === p.id ? "border-violet-300 bg-violet-50" : "border-gray-100 bg-gray-50")}>
-                      <p className={cn("font-semibold mb-1.5", plan === p.id ? "text-violet-700" : "text-gray-500")}>{p.label}{plan === p.id && " ✓"}</p>
-                      <p className="text-gray-500 leading-relaxed whitespace-pre-line text-left">{p.lines.join("\n")}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications</p>
-                {([
-                  { key: "emailConfirmation" as const,     label: "Booking confirmation",    desc: "Sent immediately when a new appointment is booked", tier: "FREE" as const },
-                  { key: "emailReminder72h" as const,      label: "72-hour reminder",         desc: "Sent 3 days before the appointment (Pro only)",     tier: "PRO"  as const },
-                  { key: "emailReminder24h" as const,      label: "24-hour reminder",         desc: "Sent the day before the appointment",               tier: "BASIC" as const },
-                  { key: "emailFollowUp" as const,         label: "Post-visit follow-up",     desc: "Thank-you email sent 24h after the appointment to encourage rebooking", tier: "BASIC" as const },
-                  { key: "emailCancellation" as const,     label: "Cancellation notice",      desc: "Sent when a booking is cancelled by client or business", tier: "FREE" as const },
-                  { key: "emailReschedule" as const,       label: "Reschedule notice",        desc: "Sent when an appointment is moved to a new time",   tier: "FREE" as const },
-                  { key: "emailStaffCancellation" as const,label: "Staff cancellation email", desc: "Special email when the business cancels on the client", tier: "FREE" as const },
-                ] as const).map(({ key, label, desc, tier }) => {
-                  const allowed = tier === "FREE" || (tier === "BASIC" && isPaid) || (tier === "PRO" && isPro);
-                  const enabled = notificationSettings[key] !== false;
-                  const badgeLabel = tier === "PRO" ? "Pro" : tier === "BASIC" ? "Basic+" : null;
-                  return (
-                    <div key={key} className="flex flex-col gap-3 py-3 border-b border-gray-50 last:border-0 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium text-gray-700">{label}</p>
-                          {badgeLabel && (
-                            <span className={cn("text-xs font-semibold px-1.5 py-0.5 rounded-md", tier === "PRO" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700")}>
-                              {badgeLabel}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                      </div>
-                      {allowed ? (
-                        <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
-                          {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
-                            <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
-                              aria-pressed={enabled === opt.value}
-                              className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                                enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <button type="button" onClick={() => promptUpgrade(tier === "PRO" ? "PRO" : "BASIC", label)}
-                          className="self-start text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors shrink-0">
-                          {tier === "PRO" ? "Upgrade to Pro" : "Basic+"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700">
-                  <p className="font-semibold text-blue-800 mb-0.5">Messaging tiers</p>
-                  <p><span className="font-semibold">Free:</span> In-app chat only — no SMS.</p>
-                  <p><span className="font-semibold">Basic:</span> Receive client SMS + reply when they text first.</p>
-                  <p><span className="font-semibold">Pro:</span> Initiate SMS to any client with a booking + automated reminders.</p>
-                  <p><span className="font-semibold">Unlimited:</span> All Pro features across every location.</p>
-                </div>
-
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-2">SMS notifications (Pro+)</p>
-                {([
-                  { key: "smsConfirmation" as const, label: "Booking confirmation SMS", desc: "Text sent immediately when a booking is confirmed" },
-                  { key: "smsReminder2h"   as const, label: "2-hour SMS reminder",      desc: "Sent 2 hours before the appointment via Twilio" },
-                ] as const).map(({ key, label, desc }) => {
-                  const enabled = notificationSettings[key] !== false;
-                  return (
-                    <div key={key} className="flex flex-col gap-3 py-3 border-b border-gray-50 last:border-0 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">{label}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                      </div>
-                      {isPro ? (
-                        <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
-                          {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
-                            <button key={opt.label} type="button" onClick={() => nf(key, opt.value)}
-                              aria-pressed={enabled === opt.value}
-                              className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                                enabled === opt.value ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <button type="button" onClick={() => goSection("billing")}
-                          className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1 hover:bg-violet-50 transition-colors shrink-0">
-                          Upgrade to Pro
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <p className="text-xs font-semibold text-blue-800 mb-1">Email provider: Resend · SMS provider: Twilio</p>
-                  <p className="text-xs text-blue-600">Confirmations, cancellations, and reschedules are always sent on every plan. Reminders, follow-ups, and SMS messages follow the plan gating shown above. All appointment emails include a calendar (.ics) attachment as a backup.</p>
-                </div>
               </div>
             )}
 

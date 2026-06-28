@@ -41,12 +41,12 @@ const OWNER_NAV: NavItem[] = [
   {
     // Everything client-facing & conversational in one place. Messages keeps its
     // unread badge (NavLink renders it for the /dashboard/messages child too).
-    href: "#", label: "Communication", icon: MessageSquare,
+    href: "/dashboard/communication", label: "Communication", icon: MessageSquare,
     children: [
-      { href: "/dashboard/messages",                 label: "Messages" },
-      { href: "/dashboard/forms",                    label: "Forms" },
-      { href: "/dashboard/settings?tab=notifications", label: "Reminders" },
-      { href: "/dashboard/reviews",                  label: "Reviews" },
+      { href: "/dashboard/messages",  label: "Messages" },
+      { href: "/dashboard/forms",     label: "Forms" },
+      { href: "/dashboard/reminders", label: "Reminders" },
+      { href: "/dashboard/reviews",   label: "Reviews" },
     ],
   },
   {
@@ -125,18 +125,26 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
   const Icon = item.icon;
 
   if (item.children) {
+    // A group whose header has a real href (not "#") is also a destination: the
+    // label navigates to that hub page, while a separate chevron toggles children.
+    const hasHub = item.href !== "#";
     return (
       <div>
-        <button
-          onClick={() => setOpen((o) => !o)}
+        <div
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
             active ? "bg-violet-100 text-violet-800 font-semibold" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
           )}>
           <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-700" : "text-gray-400 group-hover:text-gray-600")} />
-          <span className="flex-1 text-left">{item.label}</span>
-          <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
-        </button>
+          {hasHub ? (
+            <Link href={item.href} onClick={onClose} className="flex-1 text-left truncate">{item.label}</Link>
+          ) : (
+            <button type="button" onClick={() => setOpen((o) => !o)} className="flex-1 text-left">{item.label}</button>
+          )}
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-label={`Toggle ${item.label}`} className="-mr-1 p-0.5">
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
+          </button>
+        </div>
         {open && (
           <div className="ml-7 mt-0.5 space-y-0.5">
             {item.children.map((c, index) => {
