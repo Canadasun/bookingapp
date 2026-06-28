@@ -17,18 +17,37 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const ssoError = searchParams.get("error");
   const referralCode = (searchParams.get("ref") ?? searchParams.get("referral") ?? "").trim().toUpperCase();
+  // Set when Stripe redirects here after a paid Payment Link checkout.
+  const sessionId = searchParams.get("session_id");
   const [form, setForm] = useState({ name: "", businessName: "", phone: "", email: "", password: "", confirm: "" });
   const [terms, setTerms] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errs, setErrs] = useState<Partial<typeof form>>({});
   const [emailExists, setEmailExists] = useState(false);
+  const [paidPlan, setPaidPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (/^PULSE-[A-Z0-9]{6}$/.test(referralCode)) {
       localStorage.setItem("pulse_referral_code", referralCode);
     }
   }, [referralCode]);
+
+  // After a paid Payment Link checkout, prefill the email and show which plan
+  // was purchased so the visitor just finishes creating their account.
+  useEffect(() => {
+    if (!sessionId) return;
+    fetch(`/proxy/payments/checkout-prefill?session_id=${encodeURIComponent(sessionId)}`, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.paid) return;
+        if (data.plan) setPaidPlan(data.plan as string);
+        if (data.email) setForm((p) => (p.email ? p : { ...p, email: data.email as string }));
+      })
+      .catch(() => {});
+  }, [sessionId]);
 
   function validate() {
     const e: Partial<typeof form> = {};
@@ -86,8 +105,28 @@ function RegisterForm() {
       trackEvent("sign_up_complete", {
         method: "email",
         has_referral_code: /^PULSE-[A-Z0-9]{6}$/.test(referralCode),
-        selected_plan: searchParams.get("plan") ?? "unknown",
+        selected_plan: paidPlan ?? searchParams.get("plan") ?? "unknown",
       });
+      // Attach the subscription they already paid for (Payment Link flow) to the
+      // business just created. Best-effort: never trap the user on this screen —
+      // the Stripe webhook also reconciles, so we proceed to the dashboard either way.
+      if (sessionId) {
+        try {
+          const claimRes = await fetch("/api/payments/claim-checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }),
+          });
+          if (claimRes.ok) {
+            const claim = await claimRes.json().catch(() => ({})) as { plan?: string };
+            if (claim?.plan && claim.plan !== "FREE") toast.success(`${claim.plan} plan activated.`);
+          } else {
+            toast.error("Payment received — your plan will activate shortly. Contact support if it doesn't.");
+          }
+        } catch {
+          toast.error("Payment received — your plan will activate shortly. Contact support if it doesn't.");
+        }
+      }
       router.push("/dashboard");
     } catch {
       toast.error("Something went wrong, please try again");
@@ -121,6 +160,11 @@ function RegisterForm() {
             {/^PULSE-[A-Z0-9]{6}$/.test(referralCode) && (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 Referral code saved: <span className="font-semibold tracking-wide">{referralCode}</span>
+              </div>
+            )}
+            {paidPlan && (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                Payment received for the <span className="font-semibold">{paidPlan}</span> plan. Finish creating your account to activate it.
               </div>
             )}
 

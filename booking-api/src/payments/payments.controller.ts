@@ -37,6 +37,10 @@ const RefundSchema = z.object({
   reason: z.string().max(200).optional(),
 });
 
+const ClaimCheckoutSchema = z.object({
+  sessionId: z.string().trim().min(1).max(200),
+});
+
 @ApiTags('payments')
 @Controller('payments')
 export class PaymentsController {
@@ -61,6 +65,32 @@ export class PaymentsController {
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   planLinks() {
     return this.paymentService.getPlanPaymentLinks();
+  }
+
+  // Public — prefill the signup form after a visitor pays via a Payment Link.
+  // Returns the paid email + plan for the given Checkout Session id only.
+  @Get('checkout-prefill')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  checkoutPrefill(@Query('session_id') sessionId: string) {
+    if (!sessionId) throw new BadRequestException('session_id is required');
+    return this.paymentService.getCheckoutPrefill(sessionId);
+  }
+
+  // Owner — attach the just-paid payment-link subscription to the new business.
+  // Run once immediately after registration completes.
+  @Post('claim-checkout')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  claimCheckout(
+    @Body() body: unknown,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    const parsed = ClaimCheckoutSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('A valid sessionId is required');
+    if (!user.businessId) throw new ForbiddenException('No business on this account');
+    return this.paymentService.claimCheckoutSubscription(user.businessId, parsed.data.sessionId);
   }
 
   // Owner-initiated deposit (dashboard). Scoped to the owner's business.

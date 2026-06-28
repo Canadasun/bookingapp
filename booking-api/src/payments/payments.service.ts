@@ -636,13 +636,27 @@ export class PaymentsService {
     }
   }
 
-  private effectiveSubscriptionPlan(status: SubscriptionStatus, priceId: string | null, periodEnd: Date | null): PlanTier {
-    if (status === 'ACTIVE' || status === 'TRIALING') return this.planForPriceId(priceId);
+  // Resolve the tier for an entitled subscription. Prefer the plan recorded in
+  // subscription metadata (set on Checkout and on payment-link claims) since
+  // payment-link subscriptions use prices outside STRIPE_PRICE_*; fall back to
+  // mapping the price ID for older/dashboard subscriptions.
+  private tierFor(priceId: string | null, metadataPlan?: string | null): PlanTier {
+    if (metadataPlan === 'BASIC' || metadataPlan === 'PRO' || metadataPlan === 'UNLIMITED') return metadataPlan;
+    return this.planForPriceId(priceId);
+  }
+
+  private effectiveSubscriptionPlan(
+    status: SubscriptionStatus,
+    priceId: string | null,
+    periodEnd: Date | null,
+    metadataPlan?: string | null,
+  ): PlanTier {
+    if (status === 'ACTIVE' || status === 'TRIALING') return this.tierFor(priceId, metadataPlan);
     // Give past-due subscriptions access through the already-paid billing period.
     // Stripe may recover a failed renewal automatically; dropping the business to
     // Free immediately makes a temporary card failure unnecessarily disruptive.
     if (status === 'PAST_DUE' && periodEnd && periodEnd.getTime() + 3 * 24 * 60 * 60 * 1000 > Date.now()) {
-      return this.planForPriceId(priceId);
+      return this.tierFor(priceId, metadataPlan);
     }
     return 'FREE';
   }
@@ -653,7 +667,7 @@ export class PaymentsService {
     const status = this.mapSubStatus(sub.status);
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
     const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
-    const effectivePlan = this.effectiveSubscriptionPlan(status, priceId, periodEnd);
+    const effectivePlan = this.effectiveSubscriptionPlan(status, priceId, periodEnd, sub.metadata?.plan);
     const data = {
       stripeCustomerId: customerId,
       stripeSubscriptionId: sub.id,
@@ -880,15 +894,32 @@ export class PaymentsService {
   // logged-out visitors. URLs are stable, so the resolved map is cached in-memory.
   private planLinkCache: Record<string, { month?: string; year?: string }> | null = null;
 
+  // Env var holding the Stripe Payment Link ID (plink_...) for each plan/interval.
+  private readonly PLAN_LINK_ENV = {
+    BASIC: { month: 'BASIC_MONTHLY_PLAN', year: 'BASIC_ANNUAL_SUBSCRIPTION' },
+    PRO: { month: 'PRO_MONTHLY_PLAN', year: 'PRO_ANNUAL_SUBSCRIPTION' },
+    UNLIMITED: { month: 'UNLIMITED_MONTHLY_PLAN', year: 'UNLIMITED_ANNUAL_SUBSCRIPTION' },
+  } as const;
+
+  // Reverse a Stripe Payment Link ID back to the plan/interval it was created for.
+  // Payment-link subscriptions use their own Stripe prices (not STRIPE_PRICE_*), so
+  // this is how we recover the tier a logged-out visitor actually paid for.
+  private planForPaymentLink(plinkId?: string | null): { plan: 'BASIC' | 'PRO' | 'UNLIMITED'; interval: 'month' | 'year' } | null {
+    if (!plinkId) return null;
+    for (const [plan, intervals] of Object.entries(this.PLAN_LINK_ENV)) {
+      for (const [interval, envKey] of Object.entries(intervals)) {
+        if (this.configService.get<string>(envKey)?.trim() === plinkId) {
+          return { plan: plan as 'BASIC' | 'PRO' | 'UNLIMITED', interval: interval as 'month' | 'year' };
+        }
+      }
+    }
+    return null;
+  }
+
   async getPlanPaymentLinks(): Promise<Record<string, { month?: string; year?: string }>> {
     if (this.planLinkCache) return this.planLinkCache;
-    const envKeys = {
-      BASIC: { month: 'BASIC_MONTHLY_PLAN', year: 'BASIC_ANNUAL_SUBSCRIPTION' },
-      PRO: { month: 'PRO_MONTHLY_PLAN', year: 'PRO_ANNUAL_SUBSCRIPTION' },
-      UNLIMITED: { month: 'UNLIMITED_MONTHLY_PLAN', year: 'UNLIMITED_ANNUAL_SUBSCRIPTION' },
-    } as const;
     const result: Record<string, { month?: string; year?: string }> = {};
-    for (const [plan, intervals] of Object.entries(envKeys)) {
+    for (const [plan, intervals] of Object.entries(this.PLAN_LINK_ENV)) {
       for (const [interval, envKey] of Object.entries(intervals)) {
         const id = this.configService.get<string>(envKey)?.trim();
         if (!id || !id.startsWith('plink_')) continue;
@@ -905,6 +936,71 @@ export class PaymentsService {
     }
     this.planLinkCache = result;
     return result;
+  }
+
+  // Public — after a logged-out visitor pays via a Payment Link, Stripe redirects
+  // to /register?session_id=... . Return just enough to prefill the signup form
+  // (email + the plan they paid for). Only surfaces details once payment settled.
+  async getCheckoutPrefill(sessionId: string) {
+    if (!sessionId?.startsWith('cs_')) throw new BadRequestException('Invalid checkout session.');
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await this.getStripe().checkout.sessions.retrieve(sessionId);
+    } catch {
+      throw new NotFoundException('Checkout session not found.');
+    }
+    const paid = session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
+    const linkId = typeof session.payment_link === 'string' ? session.payment_link : session.payment_link?.id;
+    const mapped = this.planForPaymentLink(linkId);
+    return {
+      paid,
+      email: paid ? (session.customer_details?.email ?? null) : null,
+      plan: mapped?.plan ?? null,
+      billingInterval: mapped?.interval ?? null,
+    };
+  }
+
+  // Owner — attach the subscription a visitor already paid for (via Payment Link)
+  // to the business they just registered. Called once, right after registration.
+  // Idempotent: re-claiming the same session for the same business is a no-op.
+  async claimCheckoutSubscription(businessId: string, sessionId: string) {
+    if (!sessionId?.startsWith('cs_')) throw new BadRequestException('Invalid checkout session.');
+    const session = await this.getStripe().checkout.sessions.retrieve(sessionId).catch(() => null);
+    if (!session) throw new NotFoundException('Checkout session not found.');
+    if (session.mode !== 'subscription' || !session.subscription) {
+      throw new BadRequestException('This checkout session is not a subscription.');
+    }
+    if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+      throw new BadRequestException('This checkout has not been paid yet.');
+    }
+    const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+    const sub = await this.getStripe().subscriptions.retrieve(subId);
+
+    // A subscription can only ever belong to one business. If it is already linked
+    // elsewhere, refuse — this stops a replayed session_id from hijacking billing.
+    const ownerId = sub.metadata?.businessId;
+    if (ownerId && ownerId !== businessId) {
+      throw new BadRequestException('This subscription is already linked to another account.');
+    }
+    if (ownerId === businessId) {
+      return { claimed: true as const, plan: (await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } })).plan };
+    }
+
+    // Recover the tier from the Payment Link (the price ID won't match STRIPE_PRICE_*),
+    // then stamp it into subscription metadata so every later webhook reconciles to
+    // the right plan instead of silently dropping to Free.
+    const linkId = typeof session.payment_link === 'string' ? session.payment_link : session.payment_link?.id;
+    const mapped = this.planForPaymentLink(linkId);
+    const updated = await this.getStripe().subscriptions.update(subId, {
+      metadata: {
+        ...sub.metadata,
+        businessId,
+        ...(mapped ? { plan: mapped.plan, billingInterval: mapped.interval } : {}),
+      },
+    });
+    await this.applySubscription(businessId, updated);
+    const business = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true } });
+    return { claimed: true as const, plan: business.plan };
   }
 
   // Owner — start a Stripe Checkout session to subscribe to a paid plan.
@@ -1029,6 +1125,7 @@ export class PaymentsService {
         this.mapSubStatus(sub.status),
         sub.items.data[0]?.price?.id ?? null,
         sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+        sub.metadata?.plan,
       ),
       status: this.mapSubStatus(sub.status),
     };

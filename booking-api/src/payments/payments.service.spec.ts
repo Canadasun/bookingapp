@@ -411,3 +411,79 @@ describe('PaymentsService.getPlanPaymentLinks', () => {
     expect(retrieve).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('PaymentsService payment-link onboarding (prefill + claim)', () => {
+  async function buildClaim(env: Record<string, string | undefined>, session: any, subscription: any) {
+    const prisma = {
+      business: {
+        findUnique: jest.fn().mockResolvedValue({ plan: 'FREE' }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ plan: 'PRO' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      subscription: { upsert: jest.fn().mockResolvedValue({}) },
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
+        { provide: NotificationsService, useValue: { sendPlanChanged: jest.fn().mockResolvedValue(undefined) } },
+        { provide: ReferralsService, useValue: { recordReferral: jest.fn(), claimPendingReward: jest.fn().mockResolvedValue(null) } },
+        { provide: EventsGateway, useValue: { emitPlanUpdate: jest.fn() } },
+      ],
+    }).compile();
+    const svc = module.get<PaymentsService>(PaymentsService);
+    const subUpdate = jest.fn().mockImplementation((_id: string, params: any) =>
+      Promise.resolve({ ...subscription, metadata: { ...subscription.metadata, ...params.metadata } }),
+    );
+    const stripe = {
+      checkout: { sessions: { retrieve: jest.fn().mockResolvedValue(session) } },
+      subscriptions: { retrieve: jest.fn().mockResolvedValue(subscription), update: subUpdate },
+    };
+    (svc as unknown as { stripe: unknown }).stripe = stripe;
+    return { svc, prisma, stripe, subUpdate };
+  }
+
+  const PAID_SESSION = {
+    mode: 'subscription', payment_status: 'paid', subscription: 'sub_1',
+    payment_link: 'plink_pro_m', customer: 'cus_1',
+    customer_details: { email: 'owner@shop.com' },
+  };
+  const SUB = {
+    id: 'sub_1', status: 'active', customer: 'cus_1', metadata: {},
+    items: { data: [{ price: { id: 'price_from_payment_link' } }] },
+    current_period_end: Math.floor(Date.now() / 1000) + 86400, cancel_at_period_end: false,
+  };
+
+  it('prefill returns the paid email and the plan derived from the payment link', async () => {
+    const { svc } = await buildClaim({ PRO_MONTHLY_PLAN: 'plink_pro_m' }, PAID_SESSION, SUB);
+    const out = await svc.getCheckoutPrefill('cs_test_1');
+    expect(out).toEqual({ paid: true, email: 'owner@shop.com', plan: 'PRO', billingInterval: 'month' });
+  });
+
+  it('prefill withholds the email until payment has settled', async () => {
+    const { svc } = await buildClaim({ PRO_MONTHLY_PLAN: 'plink_pro_m' }, { ...PAID_SESSION, payment_status: 'unpaid' }, SUB);
+    const out = await svc.getCheckoutPrefill('cs_test_1');
+    expect(out).toEqual({ paid: false, email: null, plan: 'PRO', billingInterval: 'month' });
+  });
+
+  it('claim stamps the business + plan onto the subscription and activates the plan', async () => {
+    const { svc, prisma, subUpdate } = await buildClaim({ PRO_MONTHLY_PLAN: 'plink_pro_m' }, PAID_SESSION, SUB);
+    const res = await svc.claimCheckoutSubscription('biz1', 'cs_test_1');
+    expect(subUpdate).toHaveBeenCalledWith('sub_1', { metadata: { businessId: 'biz1', plan: 'PRO', billingInterval: 'month' } });
+    // Plan comes from metadata, not the (unknown) payment-link price ID.
+    expect(prisma.business.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ plan: 'PRO' }) }));
+    expect(res).toEqual({ claimed: true, plan: 'PRO' });
+  });
+
+  it('claim refuses a subscription already linked to another business', async () => {
+    const owned = { ...SUB, metadata: { businessId: 'someone_else' } };
+    const { svc } = await buildClaim({ PRO_MONTHLY_PLAN: 'plink_pro_m' }, PAID_SESSION, owned);
+    await expect(svc.claimCheckoutSubscription('biz1', 'cs_test_1')).rejects.toThrow(BadRequestException);
+  });
+
+  it('claim rejects an unpaid checkout session', async () => {
+    const { svc } = await buildClaim({ PRO_MONTHLY_PLAN: 'plink_pro_m' }, { ...PAID_SESSION, payment_status: 'unpaid' }, SUB);
+    await expect(svc.claimCheckoutSubscription('biz1', 'cs_test_1')).rejects.toThrow(BadRequestException);
+  });
+});
