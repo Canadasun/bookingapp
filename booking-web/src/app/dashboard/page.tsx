@@ -83,6 +83,9 @@ export default function OverviewPage() {
   const [error, setError]       = useState("");
   const [showDemoBanner, setShowDemoBanner] = useState(false);
   const [seedingDemo, setSeedingDemo] = useState(false);
+  // Best-effort setup status for the dashboard chips (never blocks the page).
+  const [calSync, setCalSync] = useState<{ connected: boolean; configured: boolean } | null>(null);
+  const [payoutsReady, setPayoutsReady] = useState<boolean | null>(null);
   const isStaff = user?.role === "STAFF";
   const bizId   = user?.businessId ?? "";
 
@@ -90,7 +93,11 @@ export default function OverviewPage() {
     if (!userLoading && user?.role === "OWNER" && bizId) {
       api.business.get(bizId).then(biz => {
         if (!biz?.demoSeeded) setShowDemoBanner(true);
+        setPayoutsReady(!!biz?.stripeConnectOnboarded);
       }).catch(() => {});
+      api.calendarSync.status()
+        .then(s => setCalSync({ connected: s.connected, configured: s.configured }))
+        .catch(() => {});
     }
   }, [user, userLoading, bizId]);
 
@@ -242,6 +249,34 @@ export default function OverviewPage() {
               <span className="text-sm font-semibold text-gray-800">{label}</span>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Setup status chips — a quick trust signal that billing & calendar are live. */}
+      {!isStaff && (calSync !== null || payoutsReady !== null) && (
+        <div className="flex flex-wrap gap-2">
+          {payoutsReady !== null && (
+            payoutsReady ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Payouts active
+              </span>
+            ) : (
+              <Link href="/dashboard/settings?tab=payouts" className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                <CreditCard className="w-3.5 h-3.5" /> Set up payouts
+              </Link>
+            )
+          )}
+          {calSync !== null && (
+            calSync.connected ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Calendar synced
+              </span>
+            ) : (
+              <Link href="/dashboard/settings?tab=calendar" className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                <CalendarDays className="w-3.5 h-3.5" /> Connect calendar
+              </Link>
+            )
+          )}
         </div>
       )}
 
