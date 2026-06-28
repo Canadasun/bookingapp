@@ -30,6 +30,7 @@ services:
       retries: 5
 
   booking-api:
+    image: canadasun/booking-api:latest
     build:
       context: ./booking-api
       dockerfile: Dockerfile
@@ -55,6 +56,7 @@ services:
       start_period: 40s
 
   booking-web:
+    image: canadasun/booking-web:latest
     build:
       context: ./booking-web
       dockerfile: Dockerfile
