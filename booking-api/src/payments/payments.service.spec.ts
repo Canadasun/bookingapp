@@ -487,3 +487,88 @@ describe('PaymentsService payment-link onboarding (prefill + claim)', () => {
     await expect(svc.claimCheckoutSubscription('biz1', 'cs_test_1')).rejects.toThrow(BadRequestException);
   });
 });
+
+describe('PaymentsService Stripe key failover (STRIPE_SECRET_KEY2)', () => {
+  const authError = () =>
+    Object.assign(new Error('Expired API Key provided'), { type: 'StripeAuthenticationError' });
+
+  it('uses the primary key when it works (no failover)', async () => {
+    const { svc } = await build(makePayment());
+    const create = jest.fn().mockResolvedValue({ id: 'cus_1' });
+    (svc as any).stripe = { customers: { create } };
+    const rotate = jest.spyOn(svc as any, 'rotateToFallbackStripeKey');
+
+    const stripe = (svc as any).getStripe();
+    await expect(stripe.customers.create({ email: 'a@b.co' })).resolves.toEqual({ id: 'cus_1' });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(rotate).not.toHaveBeenCalled();
+  });
+
+  it('fails over to the fallback key on an auth error and replays the call', async () => {
+    const { svc } = await build(makePayment());
+    const primaryCreate = jest.fn().mockRejectedValue(authError());
+    const fallbackCreate = jest.fn().mockResolvedValue({ id: 'cus_fallback' });
+    (svc as any).stripe = { customers: { create: primaryCreate } };
+    jest.spyOn(svc as any, 'rotateToFallbackStripeKey').mockImplementation(() => {
+      (svc as any).stripe = { customers: { create: fallbackCreate } };
+      return true;
+    });
+
+    const stripe = (svc as any).getStripe();
+    await expect(stripe.customers.create({ email: 'a@b.co' })).resolves.toEqual({ id: 'cus_fallback' });
+    expect(primaryCreate).toHaveBeenCalledTimes(1);
+    expect(fallbackCreate).toHaveBeenCalledWith({ email: 'a@b.co' });
+  });
+
+  it('fails over across nested resource paths (checkout.sessions.create)', async () => {
+    const { svc } = await build(makePayment());
+    const primary = jest.fn().mockRejectedValue(authError());
+    const fallback = jest.fn().mockResolvedValue({ id: 'cs_1' });
+    (svc as any).stripe = { checkout: { sessions: { create: primary } } };
+    jest.spyOn(svc as any, 'rotateToFallbackStripeKey').mockImplementation(() => {
+      (svc as any).stripe = { checkout: { sessions: { create: fallback } } };
+      return true;
+    });
+
+    const stripe = (svc as any).getStripe();
+    await expect(stripe.checkout.sessions.create({})).resolves.toEqual({ id: 'cs_1' });
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates the auth error when no fallback key is configured', async () => {
+    const { svc } = await build(makePayment());
+    const err = authError();
+    const create = jest.fn().mockRejectedValue(err);
+    (svc as any).stripe = { customers: { create } };
+    jest.spyOn(svc as any, 'rotateToFallbackStripeKey').mockReturnValue(false);
+
+    const stripe = (svc as any).getStripe();
+    await expect(stripe.customers.create({})).rejects.toBe(err);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fail over on non-auth errors (e.g. card declined)', async () => {
+    const { svc } = await build(makePayment());
+    const err = Object.assign(new Error('card declined'), { type: 'StripeCardError' });
+    const create = jest.fn().mockRejectedValue(err);
+    (svc as any).stripe = { customers: { create } };
+    const rotate = jest.spyOn(svc as any, 'rotateToFallbackStripeKey');
+
+    const stripe = (svc as any).getStripe();
+    await expect(stripe.customers.create({})).rejects.toBe(err);
+    expect(rotate).not.toHaveBeenCalled();
+  });
+
+  it('drops blank keys and orders primary before fallback', async () => {
+    const { svc } = await build(makePayment());
+    const cfg: Record<string, string> = {
+      STRIPE_SECRET_KEY: 'sk_live_primary',
+      STRIPE_SECRET_KEY2: 'sk_live_fallback',
+    };
+    (svc as any).configService = { get: (k: string) => cfg[k] };
+    expect((svc as any).getStripeSecretKeys()).toEqual(['sk_live_primary', 'sk_live_fallback']);
+
+    (svc as any).configService = { get: (k: string) => (k === 'STRIPE_SECRET_KEY' ? 'sk_live_primary' : '  ') };
+    expect((svc as any).getStripeSecretKeys()).toEqual(['sk_live_primary']);
+  });
+});

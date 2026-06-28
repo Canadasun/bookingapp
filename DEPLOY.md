@@ -44,9 +44,15 @@ OTP_PEPPER=<openssl rand -hex 32>
 **Stripe (required)**
 ```
 STRIPE_SECRET_KEY=sk_live_...
+STRIPE_SECRET_KEY2=sk_live_...   # optional fallback: used automatically if the primary key fails auth (expired/revoked)
 STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
+
+> `STRIPE_SECRET_KEY2` is an optional second secret key. If a Stripe call fails
+> with an authentication error (the primary key was revoked or expired), the API
+> transparently retries it against `STRIPE_SECRET_KEY2`. Leave it unset to run
+> with a single key.
 
 **Email / Resend (required)**
 ```

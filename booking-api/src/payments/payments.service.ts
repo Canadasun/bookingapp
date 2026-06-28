@@ -12,6 +12,8 @@ import { EventsGateway } from '../events/events.gateway';
 @Injectable()
 export class PaymentsService {
   private stripe: Stripe | null = null;
+  // Index (into getStripeSecretKeys()) of the key that built `this.stripe`.
+  private stripeKeyIndex = 0;
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
@@ -22,18 +24,106 @@ export class PaymentsService {
     private events: EventsGateway,
   ) {}
 
+  // Configured Stripe secret keys in priority order: STRIPE_SECRET_KEY (primary)
+  // then STRIPE_SECRET_KEY2 (fallback). Blank/unset entries are dropped so a
+  // single configured key still works. The fallback lets payments keep flowing
+  // when the primary key is revoked or expires (see the "Expired API Key" outage).
+  private getStripeSecretKeys(): string[] {
+    const keys = [
+      this.configService.get<string>('STRIPE_SECRET_KEY'),
+      this.configService.get<string>('STRIPE_SECRET_KEY2'),
+    ]
+      .map((k) => k?.trim())
+      .filter((k): k is string => !!k);
+    if (keys.length === 0) {
+      throw new BadRequestException('Payments are not configured: STRIPE_SECRET_KEY is not set.');
+    }
+    return keys;
+  }
+
   // Lazily construct Stripe so a missing STRIPE_SECRET_KEY can't crash the app
-  // at boot. Only payment paths reach this; if the key is unset they fail with a
-  // clear 400 instead of taking down the API.
+  // at boot. Only payment paths reach this; if no key is set they fail with a
+  // clear 400 instead of taking down the API. The returned client is wrapped so
+  // that a Stripe authentication failure (expired/revoked primary key) is
+  // transparently retried against the STRIPE_SECRET_KEY2 fallback.
   private getStripe(): Stripe {
     if (!this.stripe) {
-      const key = this.configService.get<string>('STRIPE_SECRET_KEY');
-      if (!key) {
-        throw new BadRequestException('Payments are not configured: STRIPE_SECRET_KEY is not set.');
-      }
-      this.stripe = new Stripe(key);
+      this.stripeKeyIndex = 0;
+      this.stripe = new Stripe(this.getStripeSecretKeys()[0]);
     }
-    return this.stripe;
+    return this.stripeFailoverProxy([]) as unknown as Stripe;
+  }
+
+  // A Stripe authentication error means the key is invalid/expired/revoked —
+  // exactly the case the fallback key recovers from. Stripe's SDK tags these
+  // with `type === 'StripeAuthenticationError'`.
+  private isStripeAuthError(err: unknown): boolean {
+    return (
+      !!err &&
+      typeof err === 'object' &&
+      (err as { type?: string }).type === 'StripeAuthenticationError'
+    );
+  }
+
+  // Rebuild the active client with the next configured key. Returns false when
+  // there is no further key to fall back to. The switch is sticky: once a
+  // fallback key works, subsequent calls use it directly (no repeated failures
+  // against a dead primary key).
+  private rotateToFallbackStripeKey(): boolean {
+    const keys = this.getStripeSecretKeys();
+    if (this.stripeKeyIndex >= keys.length - 1) return false;
+    this.stripeKeyIndex += 1;
+    this.stripe = new Stripe(keys[this.stripeKeyIndex]);
+    this.logger.warn(
+      `[stripe] key #${this.stripeKeyIndex} failed authentication; failing over to STRIPE_SECRET_KEY2`,
+    );
+    return true;
+  }
+
+  // Recursive proxy over the active Stripe client. It records the accessed
+  // property path (e.g. ["checkout","sessions","create"]) and, when a call
+  // rejects with an authentication error, rotates to the fallback key and
+  // replays the exact same call once. Property access always resolves against
+  // the *current* this.stripe, so a mid-flight rotation is picked up
+  // automatically. Synchronous calls (e.g. webhooks.constructEvent) and
+  // non-auth errors pass through unchanged.
+  private stripeFailoverProxy(path: string[]): unknown {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resolve = (segments: string[]): any =>
+      segments.reduce<any>((acc, key) => (acc == null ? acc : acc[key]), this.stripe);
+
+    // A plain function target makes the proxy both callable (apply trap) and
+    // indexable (get trap).
+    return new Proxy(function () {} as unknown as object, {
+      get: (_target, prop) => {
+        // Never present as a thenable: the proxy must not be mistaken for a
+        // promise if it is ever awaited or passed to Promise.resolve.
+        if (prop === 'then') return undefined;
+        if (typeof prop === 'symbol') {
+          const value = resolve(path);
+          const member = value == null ? value : value[prop as unknown as string];
+          return typeof member === 'function' ? member.bind(value) : member;
+        }
+        return this.stripeFailoverProxy([...path, prop]);
+      },
+      apply: (_target, _thisArg, args: unknown[]) => {
+        const callOnce = () => {
+          const holder = resolve(path.slice(0, -1));
+          const method = path[path.length - 1];
+          return holder[method](...args);
+        };
+        const result = callOnce();
+        if (result && typeof (result as { then?: unknown }).then === 'function') {
+          return (result as Promise<unknown>).catch((err: unknown) => {
+            if (this.isStripeAuthError(err) && this.rotateToFallbackStripeKey()) {
+              return callOnce();
+            }
+            throw err;
+          });
+        }
+        return result;
+      },
+    });
   }
 
   private async reconcileStripeRefund(stripeRefund: Stripe.Refund) {
