@@ -75,6 +75,7 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/checkout",     label: "Checkout" },
       { href: "/dashboard/transactions", label: "Transactions" },
       { href: "/dashboard/invoices",     label: "Invoices" },
+      { href: "/dashboard/settings?tab=payments", label: "Deposits & fees" },
     ],
   },
   { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },
