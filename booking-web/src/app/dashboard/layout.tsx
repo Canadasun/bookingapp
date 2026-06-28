@@ -9,7 +9,7 @@ import {
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
-  ShieldCheck, LifeBuoy,
+  ShieldCheck, LifeBuoy, Globe,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
@@ -37,6 +37,7 @@ const OWNER_NAV: NavItem[] = [
   { href: "/dashboard",              label: "Dashboard",    icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
+  { href: "/dashboard/booking-page", label: "Booking Page", icon: Globe },
   {
     // Everything client-facing & conversational in one place. Messages keeps its
     // unread badge (NavLink renders it for the /dashboard/messages child too).
