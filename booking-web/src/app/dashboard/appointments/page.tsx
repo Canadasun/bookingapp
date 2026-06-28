@@ -377,6 +377,7 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   const [date, setDate] = useState(initialTime.today);
   const [time, setTime] = useState(initialTime.nextHour);
   const [notes, setNotes] = useState("");
+  const [meetingUrl, setMeetingUrl] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [locationFilter, setLocationFilter] = useState("");
@@ -385,6 +386,7 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   const filteredStaff = locationFilter
     ? staffList.filter((s) => s.locationId === locationFilter)
     : staffList;
+  const selectedService = services.find((service) => service.id === serviceId);
 
   useEffect(() => {
     if (!bizId) return;
@@ -427,6 +429,9 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
         clientId: clientRes.id,
         startsAt: startsAt.toISOString(),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(selectedService?.locationMode === "VIRTUAL" && meetingUrl.trim()
+          ? { meetingUrl: meetingUrl.trim() }
+          : {}),
         ...(locationFilter ? { locationId: locationFilter } : {}),
       });
       toast.success("Appointment created");
@@ -504,6 +509,20 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
                   : filteredStaff.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)
                 }
               </select>
+            </div>
+          )}
+
+          {selectedService?.locationMode === "VIRTUAL" && (
+            <div>
+              <label htmlFor="new-apt-meeting-url" className="block text-sm font-medium text-gray-700 mb-1">Meeting link (optional)</label>
+              <Input
+                id="new-apt-meeting-url"
+                type="url"
+                placeholder={selectedService.virtualMeetingUrl || "https://meet.example.com/…"}
+                value={meetingUrl}
+                onChange={(e) => setMeetingUrl(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray-500">Leave blank to use the service&apos;s default meeting link.</p>
             </div>
           )}
 

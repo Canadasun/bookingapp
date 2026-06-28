@@ -417,8 +417,15 @@ export class BookingsService {
               // know whether this is in-person, virtual, mobile, or phone — and
               // carry the relevant link/address. Service edits won't rewrite it.
               locationMode: primaryService.locationMode,
-              ...(primaryService.locationMode === 'VIRTUAL' && primaryService.virtualMeetingUrl
-                ? { meetingUrl: primaryService.virtualMeetingUrl } : {}),
+              // Virtual link: prefer an owner-supplied per-appointment override
+              // (only on confirmed owner/staff bookings — never client input),
+              // otherwise fall back to the service's default link.
+              ...(primaryService.locationMode === 'VIRTUAL'
+                ? (() => {
+                    const link = (opts.confirmed ? dto.meetingUrl?.trim() : '') || primaryService.virtualMeetingUrl;
+                    return link ? { meetingUrl: link } : {};
+                  })()
+                : {}),
               ...(primaryService.locationMode === 'CUSTOMER' && dto.customerAddress
                 ? { customerAddress: dto.customerAddress.trim() } : {}),
               ...(dto.referralSource ? { referralSource: dto.referralSource } : {}),
@@ -494,6 +501,7 @@ export class BookingsService {
     const base: CreateAppointmentDto = {
       staffId: dto.staffId, serviceId: dto.serviceId, additionalServiceIds: dto.additionalServiceIds,
       clientId: dto.clientId, startsAt: dto.startsAt, notes: dto.notes, allowOverride: dto.allowOverride,
+      meetingUrl: dto.meetingUrl,
     };
     const baseStart = new Date(dto.startsAt);
     const groupId = randomUUID();

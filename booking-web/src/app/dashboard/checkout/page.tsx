@@ -50,6 +50,7 @@ export default function CheckoutPage() {
   const [customTime, setCustomTime]           = useState("");
   const [customStaffId, setCustomStaffId]     = useState("");
   const [overrideCalendar, setOverrideCalendar] = useState(false);
+  const [meetingUrl, setMeetingUrl] = useState("");
   const [recurring, setRecurring] = useState<{ enabled: boolean; frequency: "WEEKLY" | "BIWEEKLY" | "THREE_WEEKS" | "EIGHT_WEEKS" | "MONTHLY"; count: number }>({ enabled: false, frequency: "WEEKLY", count: 4 });
 
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -183,6 +184,9 @@ export default function CheckoutPage() {
         additionalServiceIds: selectedServices.slice(1).map((s) => s.id),
         clientId: client.id, startsAt,
         allowOverride: overrideCalendar || !!customStartsAt,
+        ...(selectedServices[0].locationMode === "VIRTUAL" && meetingUrl.trim()
+          ? { meetingUrl: meetingUrl.trim() }
+          : {}),
       };
       if (recurring.enabled) {
         const res = await api.appointments.createRecurring(bizId, { ...common, frequency: recurring.frequency, count: recurring.count });
@@ -204,6 +208,7 @@ export default function CheckoutPage() {
     setStep("client"); setSelectedClient(null); setSelectedServices([]);
     setSelectedStaff(null); setSelectedDate(undefined); setSelectedSlot(null);
     setCustomDate(""); setCustomTime(""); setCustomStaffId(""); setOverrideCalendar(false);
+    setMeetingUrl("");
     setRecurring({ enabled: false, frequency: "WEEKLY", count: 4 });
     setSlots([]); setBooked(null); setClientSearch(""); setClientResults([]);
   }
@@ -583,6 +588,20 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
+
+            {selectedServices[0]?.locationMode === "VIRTUAL" && (
+              <div className="mb-5">
+                <label htmlFor="checkout-meeting-url" className="block text-sm font-medium text-gray-700 mb-1">Meeting link (optional)</label>
+                <Input
+                  id="checkout-meeting-url"
+                  type="url"
+                  placeholder={selectedServices[0].virtualMeetingUrl || "https://meet.example.com/…"}
+                  value={meetingUrl}
+                  onChange={(e) => setMeetingUrl(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-gray-500">Leave blank to use the service&apos;s default meeting link.</p>
+              </div>
+            )}
 
             {/* Recurring series — repeat this booking on a schedule */}
             <div className="mb-5 rounded-xl border border-gray-100 p-3">

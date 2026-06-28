@@ -21,6 +21,8 @@ const AppointmentFieldsSchema = z.object({
 
 export const CreateAppointmentSchema = AppointmentFieldsSchema.extend({
   clientId: z.string().min(1),
+  // Owner/staff-only per-appointment override of the service's default link.
+  meetingUrl: z.string().trim().url().max(500).optional(),
 });
 
 export const PublicCreateAppointmentSchema = AppointmentFieldsSchema.extend({
