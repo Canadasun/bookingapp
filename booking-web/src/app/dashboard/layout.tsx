@@ -17,6 +17,8 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { trackEvent } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
+import { toast } from "sonner";
+import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
 
 interface NavItem {
   href: string;
@@ -332,6 +334,24 @@ function TwoFactorRecommendation({ user }: { user: SessionUser | null }) {
   );
 }
 
+// Backstop for the payment-link onboarding: an existing owner who buys via a
+// public pricing link is sent straight to the dashboard (not /register), so the
+// email/SSO claim never fires. Claim any stashed checkout once on dashboard load.
+function PendingCheckoutClaim({ enabled }: { enabled: boolean }) {
+  const ran = useRef(false);
+  useEffect(() => {
+    if (!enabled || ran.current) return;
+    ran.current = true;
+    const pending = readPendingCheckout();
+    if (!pending) return;
+    claimCheckout(pending).then((claim) => {
+      clearPendingCheckout();
+      if (claim.ok && claim.plan && claim.plan !== "FREE") toast.success(`${claim.plan} plan activated.`);
+    });
+  }, [enabled]);
+  return null;
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -603,6 +623,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
+        <PendingCheckoutClaim enabled={!!user?.businessId} />
         <EmailVerificationBanner user={user} />
         <TwoFactorRecommendation user={user} />
         <main id="main-content" className="flex-1 min-w-0 overflow-x-hidden p-3 sm:p-5 xl:p-6">{children}</main>
