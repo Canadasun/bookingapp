@@ -34,30 +34,39 @@ interface NavChild {
 }
 
 const OWNER_NAV: NavItem[] = [
-  { href: "/dashboard",              label: "Home",         icon: LayoutDashboard },
+  { href: "/dashboard",              label: "Dashboard",    icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
   { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
   {
-    href: "#", label: "Financials", icon: DollarSign,
+    // "Catalog" = the bookable building blocks (what you sell, who/where delivers it).
+    href: "#", label: "Catalog", icon: Scissors,
     children: [
-      { href: "/dashboard/transactions", label: "Transactions" },
-      { href: "/dashboard/invoices",     label: "Invoices" },
-      { href: "/dashboard/reports",      label: "Reports" },
+      { href: "/dashboard/services",     label: "Services" },
+      { href: "/dashboard/staff",        label: "Staff" },
+      { href: "/dashboard/resources",    label: "Resources" },
+      { href: "/dashboard/hours",        label: "Hours" },
     ],
   },
   {
-    href: "#", label: "Operations", icon: Scissors,
+    // "Workflow" = recurring daily work, split out of the old "Operations" junk drawer.
+    href: "#", label: "Workflow", icon: CheckSquare,
     children: [
-      { href: "/dashboard/staff",        label: "Staff" },
-      { href: "/dashboard/services",     label: "Services" },
-      { href: "/dashboard/resources",    label: "Resources" },
-      { href: "/dashboard/hours",        label: "Hours" },
       { href: "/dashboard/tasks",        label: "Tasks" },
       { href: "/dashboard/followups",    label: "Follow-ups" },
       { href: "/dashboard/waitlist",     label: "Waitlist" },
     ],
   },
+  {
+    // Renamed from "Financials" → owner-friendly "Payments"; Checkout surfaced here.
+    href: "#", label: "Payments", icon: DollarSign,
+    children: [
+      { href: "/dashboard/checkout",     label: "Checkout" },
+      { href: "/dashboard/transactions", label: "Transactions" },
+      { href: "/dashboard/invoices",     label: "Invoices" },
+    ],
+  },
+  { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },
   {
     href: "#", label: "Marketing",  icon: Megaphone,
     children: [
