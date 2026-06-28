@@ -119,7 +119,7 @@ export default function TasksPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <LoadingSpinner /> : tasks.length === 0 ? (
-        <EmptyState title="No tasks yet" description={isOwner ? "Add a task and assign it to a team member." : "Nothing assigned to you right now."} />
+        <EmptyState title="No tasks yet" icon={Check} description={isOwner ? "Add a task and assign it to a team member." : "Nothing assigned to you right now."} />
       ) : (
         <div className="space-y-5">
           <div className="space-y-2">

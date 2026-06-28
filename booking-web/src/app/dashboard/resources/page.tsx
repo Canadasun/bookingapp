@@ -78,7 +78,7 @@ export default function ResourcesPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Resources</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Spaces &amp; Equipment</h1>
           <p className="text-sm text-gray-500 mt-1">Rooms, chairs, equipment — assign to services to limit double-booking.</p>
         </div>
         <Button onClick={() => setShowAdd((s) => !s)} className="gap-2">

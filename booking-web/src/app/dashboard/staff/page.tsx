@@ -366,7 +366,7 @@ export default function StaffPage() {
           <p className="text-red-500 mb-3">{loadError}</p>
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
-      ) : loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" /> : (
+      ) : loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" icon={ShieldCheck} description="Add your team so bookings can be assigned to them and they get their own login." /> : (
         <div className="space-y-3">
           {staff.map((s) => (
             <Card key={s.id} className={!s.active ? "opacity-60" : ""}>
