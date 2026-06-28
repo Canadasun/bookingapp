@@ -171,6 +171,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [selectedSlot, setSelectedSlot]         = useState<BookingSlot | null>(null);
 
   const [form, setForm]     = useState({ name: "", email: "", phone: "", notes: "" });
+  // Where to meet the client, collected only when the primary service is an
+  // at-customer (mobile) service.
+  const [customerAddress, setCustomerAddress] = useState("");
   const [referralSource, setReferralSource] = useState("");
   const [promoCode, setPromoCode]           = useState("");
   const [promoResult, setPromoResult]       = useState<{ id: string; discountCents: number; label: string } | null>(null);
@@ -181,7 +184,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [submitting, setSubmitting]         = useState(false);
   const [loadingSlots, setLoadingSlots]     = useState(false);
   const [loadingBiz, setLoadingBiz]         = useState(true);
-  const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string } | null>(null);
+  const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string; locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null } | null>(null);
   const [clientMatched, setClientMatched]   = useState(false);
   const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
   const [cardSaved, setCardSaved]           = useState(false); // setup intent completed — card on file
@@ -305,6 +308,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     if (!form.email.trim() && !form.phone.trim()) e.email = "Enter an email address or phone number";
     else if (form.email && !/\S+@\S+\.\S+/.test(form.email)) e.email = "Enter a valid email or leave it blank";
     if (form.phone && !/^\+?[\d\s\-()+]{7,}$/.test(form.phone)) e.phone = "Invalid phone";
+    if ((selectedServices[0]?.locationMode ?? "IN_PERSON") === "CUSTOMER" && !customerAddress.trim()) {
+      e.customerAddress = "Enter the address we should come to";
+    }
     for (const q of biz?.intakeQuestions ?? []) {
       if (q.required && !(intake[q.id] ?? "").trim()) e[`intake_${q.id}`] = "Required";
     }
@@ -357,6 +363,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         intakeAnswers: intakeAnswers.length ? intakeAnswers : undefined,
         referralSource: referralSource || undefined,
         promoCodeId: promoResult?.id || undefined,
+        customerAddress: (selectedServices[0]?.locationMode ?? "IN_PERSON") === "CUSTOMER"
+          ? customerAddress.trim() : undefined,
       });
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before
@@ -437,7 +445,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
   function reset() {
     setStep(0); setSelectedServices([]); setSelectedStaff(null); setSelectedDate(undefined);
-    setSelectedSlot(null); setForm({ name: "", email: "", phone: "", notes: "" }); setErrs({});
+    setSelectedSlot(null); setForm({ name: "", email: "", phone: "", notes: "" }); setCustomerAddress(""); setErrs({});
     setPolicyAccepted(false); setBooking(null); setSlots([]); setSelectedLocationId("");
   }
 
@@ -719,6 +727,29 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a")}</span>
               </div>
             </div>
+
+            {booking.locationMode === "VIRTUAL" && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-left mb-6">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">💻 Online appointment</p>
+                {booking.meetingUrl ? (
+                  <a href={booking.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-indigo-700 underline break-all">Join the video call</a>
+                ) : (
+                  <p className="text-sm text-indigo-700">Your meeting link will be included in your confirmation email and reminders.</p>
+                )}
+              </div>
+            )}
+            {booking.locationMode === "CUSTOMER" && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-left mb-6">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">🚗 We come to you</p>
+                <p className="text-sm text-indigo-700">{booking.customerAddress || "We'll be in touch to confirm your address."}</p>
+              </div>
+            )}
+            {booking.locationMode === "PHONE" && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-left mb-6">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">📞 Phone appointment</p>
+                <p className="text-sm text-indigo-700">We&apos;ll call you at {form.phone || "your number"} at your appointment time.</p>
+              </div>
+            )}
 
             <div className="flex justify-center mb-4">
               {booking && selectedSlot && (
@@ -1075,6 +1106,38 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       {errs[k] && <p id={`error-${k}`} role="alert" className="text-xs text-red-500 mt-1">{errs[k]}</p>}
                     </div>
                   ))}
+
+                  {/* Delivery-mode specifics for the primary service. */}
+                  {(selectedServices[0]?.locationMode ?? "IN_PERSON") === "CUSTOMER" && (
+                    <div>
+                      <label htmlFor="field-customerAddress" className="block text-sm font-medium text-gray-700 mb-1.5">Your address *</label>
+                      <input
+                        id="field-customerAddress"
+                        type="text"
+                        placeholder="Street, unit, city"
+                        value={customerAddress}
+                        aria-invalid={!!errs.customerAddress}
+                        aria-describedby={errs.customerAddress ? "error-customerAddress" : undefined}
+                        onChange={(e) => { setCustomerAddress(e.target.value); setErrs((p) => ({ ...p, customerAddress: "" })); }}
+                        className={cn(
+                          "w-full px-3 py-2.5 text-sm border rounded-xl bg-white text-gray-900 placeholder:text-gray-400 bk-input transition-shadow",
+                          errs.customerAddress ? "border-red-400" : "border-gray-200",
+                        )}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">This is a mobile service — we&apos;ll come to you.</p>
+                      {errs.customerAddress && <p id="error-customerAddress" role="alert" className="text-xs text-red-500 mt-1">{errs.customerAddress}</p>}
+                    </div>
+                  )}
+                  {(selectedServices[0]?.locationMode ?? "IN_PERSON") === "VIRTUAL" && (
+                    <p className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5">
+                      💻 Online appointment — a video meeting link will be sent in your confirmation and reminders.
+                    </p>
+                  )}
+                  {(selectedServices[0]?.locationMode ?? "IN_PERSON") === "PHONE" && (
+                    <p className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5">
+                      📞 Phone appointment — we&apos;ll call you at the number above at your appointment time.
+                    </p>
+                  )}
 
                   {/* Intake / consultation questions (owner-defined) */}
                   {(biz?.intakeQuestions ?? []).map((q) => (

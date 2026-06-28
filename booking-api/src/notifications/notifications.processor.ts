@@ -62,15 +62,56 @@ function verifiedPill(status?: string | null) {
   return ` <span style="display:inline-block;background:#4F46E5;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;vertical-align:middle">&#10003; Verified</span>`;
 }
 
+// Plain-text "where to meet" line for SMS / calendar, mode-aware. Returns '' for
+// a plain in-person appointment with no address on file.
+function whereText(apt: {
+  locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null;
+  location?: { name?: string; address?: string | null } | null;
+  business?: { address?: string | null } | null;
+}): string {
+  switch (apt.locationMode) {
+    case 'VIRTUAL':
+      return apt.meetingUrl ? `Online video call: ${apt.meetingUrl}` : 'Online video call — link to follow';
+    case 'CUSTOMER':
+      return apt.customerAddress ? `We come to you: ${apt.customerAddress}` : 'We come to you';
+    case 'PHONE':
+      return "Phone call — we'll call you";
+    default: {
+      const addr = apt.location?.address ?? apt.business?.address ?? '';
+      return addr ? `Location: ${addr}` : '';
+    }
+  }
+}
+
 function aptDetails(apt: {
   service: { name: string; durationMinutes: number };
   staff: { user: { name: string } };
-  business: { name?: string; timezone?: string | null; verificationStatus?: string | null };
+  business: { name?: string; timezone?: string | null; verificationStatus?: string | null; address?: string | null };
+  location?: { name?: string; address?: string | null } | null;
+  locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null;
   startsAt: Date; endsAt: Date;
 }) {
   const tz = apt.business.timezone ?? 'UTC';
   const bizRow = apt.business.name
     ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Business</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.business.name)}${verifiedPill(apt.business.verificationStatus)}</td></tr>`
+    : '';
+  // Mode-aware "Where" row. Virtual links are rendered as a clickable anchor;
+  // everything else is escaped plain text.
+  let whereValue = '';
+  if (apt.locationMode === 'VIRTUAL') {
+    whereValue = apt.meetingUrl
+      ? `<a href="${esc(apt.meetingUrl)}" style="color:#4F46E5;font-weight:600">Join video call</a>`
+      : 'Online video call — link to follow';
+  } else if (apt.locationMode === 'CUSTOMER') {
+    whereValue = apt.customerAddress ? `We come to you — ${esc(apt.customerAddress)}` : 'We come to you';
+  } else if (apt.locationMode === 'PHONE') {
+    whereValue = "Phone call — we'll call you";
+  } else {
+    const addr = apt.location?.address ?? apt.business.address ?? '';
+    whereValue = addr ? esc(addr) : '';
+  }
+  const whereRow = whereValue
+    ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Where</td><td style="color:#111827;font-size:13px;font-weight:600">${whereValue}</td></tr>`
     : '';
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#F8F9FA;border-radius:12px">
@@ -81,6 +122,7 @@ function aptDetails(apt: {
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.staff.user.name)}</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'EEEE, MMMM d, yyyy')}</td></tr>
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'h:mm a')} - ${formatInTimeZone(apt.endsAt, tz, 'h:mm a')}</td></tr>
+      ${whereRow}
     </table>
   </td></tr>
 </table>`;
@@ -964,9 +1006,10 @@ ${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 
           attachments: [icsAttachment],
         });
         if (apt.client.phone && smsEnabled && shouldSend('smsConfirmation')) {
+          const where = whereText(apt);
           await this.sms.send({
             to: apt.client.phone,
-            body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
+            body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
           });
         }
         await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
@@ -1030,9 +1073,10 @@ ${aptDetails(apt)}
           break;
         }
         if (apt.client.phone && smsEnabled) {
+          const where = whereText(apt);
           await this.sms.send({
             to: apt.client.phone,
-            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
+            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
           });
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SENT');
         }

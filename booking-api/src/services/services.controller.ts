@@ -19,8 +19,12 @@ export class ServicesController {
   constructor(private serviceService: ServicesService) {}
 
   @Get()
-  findAll(@Param('businessId') businessId: string) {
-    return this.serviceService.findAll(businessId);
+  async findAll(@Param('businessId') businessId: string) {
+    // Public booking endpoint: expose locationMode (drives the flow) but never
+    // the default virtualMeetingUrl — the link is delivered to the client in
+    // their confirmation/reminders, not leaked to anyone browsing the page.
+    const services = await this.serviceService.findAll(businessId);
+    return services.map((s) => ({ ...s, virtualMeetingUrl: undefined }));
   }
 
   @Get('all')
