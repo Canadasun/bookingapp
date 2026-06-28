@@ -125,13 +125,24 @@ export function TodayScreen() {
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={BRAND} />}
       >
         {/* ── Header ── */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 13, color: GRAY_500, fontWeight: '500' }}>
-            {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
-          </Text>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: GRAY_900, marginTop: 2 }}>
-            {new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </Text>
+        <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, color: GRAY_500, fontWeight: '500' }}>
+              {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+            </Text>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: GRAY_900, marginTop: 2 }}>
+              {new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </Text>
+          </View>
+          {/* Notifications moved off the tab bar → header bell. */}
+          <TouchableOpacity
+            onPress={() => nav.navigate('Alerts')}
+            accessibilityLabel="Notifications"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}
+          >
+            <Ionicons name="notifications-outline" size={22} color={GRAY_900} />
+          </TouchableOpacity>
         </View>
 
         {/* ── Revenue Protected hero ── */}
