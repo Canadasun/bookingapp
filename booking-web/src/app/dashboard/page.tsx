@@ -370,19 +370,11 @@ export default function OverviewPage() {
             <p className="text-xs text-gray-400 mt-0.5">Next {upcoming.length} upcoming</p>
           </div>
           {!isStaff && (
-            <div className="grid grid-cols-2 gap-2 p-3 border-b border-gray-100">
-              {[
-                { label: "Cancelled (wk)", val: metrics.cancelledThisWeek },
-                { label: "No-shows (mo)",  val: metrics.noShowsThisMonth },
-                { label: "Top service",    val: metrics.topService ?? "—" },
-                { label: "Waitlist",       val: metrics.waitlistCount },
-              ].map((s) => (
-                <div key={s.label} className="bg-gray-50 rounded-xl px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
-                  <p className="mt-0.5 text-lg font-bold text-gray-900 truncate">{s.val}</p>
-                </div>
-              ))}
-            </div>
+            <Link href="/dashboard/reports"
+              className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100 text-xs font-medium text-violet-600 hover:bg-violet-50/40 transition-colors">
+              <span className="text-gray-500">No-shows, cancellations &amp; top services</span>
+              <span className="flex items-center gap-1">View in Reports <ArrowRight className="w-3 h-3" /></span>
+            </Link>
           )}
           <div className={`divide-y divide-gray-50 overflow-y-auto ${isStaff ? "max-h-80" : "max-h-64"}`}>
             {upcoming.length === 0 ? (
