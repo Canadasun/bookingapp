@@ -112,7 +112,7 @@ export default function PackagesPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <LoadingSpinner /> : tab === "products" ? (
-        products.length === 0 && !creating ? <EmptyState title="No package products yet" description="Define a bundle like “5x Haircut — $200”." /> : (
+        products.length === 0 && !creating ? <EmptyState title="No package products yet" icon={PackageIcon} description="Define a bundle like “5x Haircut — $200”." /> : (
           <div className="space-y-3 mt-4">
             {products.map((p) => (
               <Card key={p.id} className={p.active ? "" : "opacity-60"}>
@@ -134,7 +134,7 @@ export default function PackagesPage() {
           </div>
         )
       ) : (
-        issued.length === 0 && !issuing ? <EmptyState title="No issued packages yet" description="Issue a package to a client to track their credits." /> : (
+        issued.length === 0 && !issuing ? <EmptyState title="No issued packages yet" icon={Ticket} description="Issue a package to a client to track their credits." /> : (
           <div className="space-y-3 mt-4">
             {issued.map((cp) => (
               <Card key={cp.id} className={cp.status === "ACTIVE" ? "" : "opacity-70"}>

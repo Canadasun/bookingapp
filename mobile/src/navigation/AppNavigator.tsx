@@ -114,18 +114,23 @@ function MainTabs() {
           },
         })}
       >
-        <Tab.Screen name="Today" options={{ tabBarLabel: 'Today' }}>
+        {/* Visible tabs: Home · Calendar · Clients · Messages · More.
+            Checkout and Alerts stay registered (so nav.navigate('Checkout'/'Alerts')
+            still works) but are hidden from the bar — Checkout is reached from the
+            Home quick action, Alerts from the Home header bell. Route names are kept
+            unchanged so no string-based navigate() call breaks. */}
+        <Tab.Screen name="Today" options={{ tabBarLabel: 'Home' }}>
           {() => <ErrorBoundary><TodayScreen /></ErrorBoundary>}
         </Tab.Screen>
         <Tab.Screen name="Calendar">
           {() => <ErrorBoundary><CalendarStack /></ErrorBoundary>}
         </Tab.Screen>
         {canCheckout && (
-          <Tab.Screen name="Checkout">
+          <Tab.Screen name="Checkout" options={{ tabBarButton: () => null }}>
             {() => <ErrorBoundary><CheckoutScreen /></ErrorBoundary>}
           </Tab.Screen>
         )}
-        <Tab.Screen name="Customers">
+        <Tab.Screen name="Customers" options={{ tabBarLabel: 'Clients' }}>
           {() => <ErrorBoundary><ClientsScreen onMessage={c => setMsgClient(c)} /></ErrorBoundary>}
         </Tab.Screen>
         <Tab.Screen name="Messages" options={{
@@ -134,7 +139,7 @@ function MainTabs() {
         }}>
           {() => <ErrorBoundary><MessagesScreen initialClient={msgClient} onClearClient={() => setMsgClient(null)} onUnreadChanged={refreshUnreadMessages} /></ErrorBoundary>}
         </Tab.Screen>
-        <Tab.Screen name="Alerts">
+        <Tab.Screen name="Alerts" options={{ tabBarButton: () => null }}>
           {() => <ErrorBoundary><NotificationsScreen /></ErrorBoundary>}
         </Tab.Screen>
         <Tab.Screen name="More">

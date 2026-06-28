@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck, Sparkles, X, Globe } from "lucide-react";
 import { api, Appointment, DashboardOverview } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -83,6 +83,9 @@ export default function OverviewPage() {
   const [error, setError]       = useState("");
   const [showDemoBanner, setShowDemoBanner] = useState(false);
   const [seedingDemo, setSeedingDemo] = useState(false);
+  // Best-effort setup status for the dashboard chips (never blocks the page).
+  const [calSync, setCalSync] = useState<{ connected: boolean; configured: boolean } | null>(null);
+  const [payoutsReady, setPayoutsReady] = useState<boolean | null>(null);
   const isStaff = user?.role === "STAFF";
   const bizId   = user?.businessId ?? "";
 
@@ -90,7 +93,11 @@ export default function OverviewPage() {
     if (!userLoading && user?.role === "OWNER" && bizId) {
       api.business.get(bizId).then(biz => {
         if (!biz?.demoSeeded) setShowDemoBanner(true);
+        setPayoutsReady(!!biz?.stripeConnectOnboarded);
       }).catch(() => {});
+      api.calendarSync.status()
+        .then(s => setCalSync({ connected: s.connected, configured: s.configured }))
+        .catch(() => {});
     }
   }, [user, userLoading, bizId]);
 
@@ -225,6 +232,53 @@ export default function OverviewPage() {
         </Link>
       </div>
 
+      {/* Quick actions — the handful of things an owner does most, one tap away. */}
+      {!isStaff && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {[
+            { label: "New appointment",    href: "/dashboard/appointments?new=1", icon: CalendarDays },
+            { label: "Take payment",       href: "/dashboard/checkout",           icon: CreditCard },
+            { label: "Share booking link", href: "/dashboard/booking-page",       icon: Globe },
+            { label: "Add client",         href: "/dashboard/clients",            icon: Users },
+          ].map(({ label, href, icon: Icon }) => (
+            <Link key={label} href={href}
+              className="flex items-center gap-2.5 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm hover:border-violet-200 hover:bg-violet-50/40 transition-colors">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="text-sm font-semibold text-gray-800">{label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Setup status chips — a quick trust signal that billing & calendar are live. */}
+      {!isStaff && (calSync !== null || payoutsReady !== null) && (
+        <div className="flex flex-wrap gap-2">
+          {payoutsReady !== null && (
+            payoutsReady ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Payouts active
+              </span>
+            ) : (
+              <Link href="/dashboard/settings?tab=payouts" className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                <CreditCard className="w-3.5 h-3.5" /> Set up payouts
+              </Link>
+            )
+          )}
+          {calSync !== null && (
+            calSync.connected ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Calendar synced
+              </span>
+            ) : (
+              <Link href="/dashboard/settings?tab=calendar" className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                <CalendarDays className="w-3.5 h-3.5" /> Connect calendar
+              </Link>
+            )
+          )}
+        </div>
+      )}
 
       {actions.length > 0 && (
         <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-5">
@@ -316,19 +370,11 @@ export default function OverviewPage() {
             <p className="text-xs text-gray-400 mt-0.5">Next {upcoming.length} upcoming</p>
           </div>
           {!isStaff && (
-            <div className="grid grid-cols-2 gap-2 p-3 border-b border-gray-100">
-              {[
-                { label: "Cancelled (wk)", val: metrics.cancelledThisWeek },
-                { label: "No-shows (mo)",  val: metrics.noShowsThisMonth },
-                { label: "Top service",    val: metrics.topService ?? "—" },
-                { label: "Waitlist",       val: metrics.waitlistCount },
-              ].map((s) => (
-                <div key={s.label} className="bg-gray-50 rounded-xl px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
-                  <p className="mt-0.5 text-lg font-bold text-gray-900 truncate">{s.val}</p>
-                </div>
-              ))}
-            </div>
+            <Link href="/dashboard/reports"
+              className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100 text-xs font-medium text-violet-600 hover:bg-violet-50/40 transition-colors">
+              <span className="text-gray-500">No-shows, cancellations &amp; top services</span>
+              <span className="flex items-center gap-1">View in Reports <ArrowRight className="w-3 h-3" /></span>
+            </Link>
           )}
           <div className={`divide-y divide-gray-50 overflow-y-auto ${isStaff ? "max-h-80" : "max-h-64"}`}>
             {upcoming.length === 0 ? (

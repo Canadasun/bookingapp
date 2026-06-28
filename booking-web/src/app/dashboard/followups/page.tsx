@@ -185,7 +185,7 @@ export default function FollowupsPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <LoadingSpinner /> : items.length === 0 ? (
-        <EmptyState title="No follow-ups yet" description="Open a client and set 'Next visit due' (e.g. every 8 weeks) to start a routine." />
+        <EmptyState title="No follow-ups yet" icon={Repeat} description="Open a client and set 'Next visit due' (e.g. every 8 weeks) to start a routine." />
       ) : (
         <div className="space-y-6">
           {due.length > 0 && (

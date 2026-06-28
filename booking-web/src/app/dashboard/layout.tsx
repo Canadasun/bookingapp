@@ -9,7 +9,7 @@ import {
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
-  ShieldCheck, LifeBuoy,
+  ShieldCheck, LifeBuoy, Globe,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
@@ -34,30 +34,51 @@ interface NavChild {
 }
 
 const OWNER_NAV: NavItem[] = [
-  { href: "/dashboard",              label: "Home",         icon: LayoutDashboard },
+  { href: "/dashboard",              label: "Dashboard",    icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
-  { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
+  { href: "/dashboard/booking-page", label: "Booking Page", icon: Globe },
   {
-    href: "#", label: "Financials", icon: DollarSign,
+    // Everything client-facing & conversational in one place. Messages keeps its
+    // unread badge (NavLink renders it for the /dashboard/messages child too).
+    href: "/dashboard/communication", label: "Communication", icon: MessageSquare,
     children: [
-      { href: "/dashboard/transactions", label: "Transactions" },
-      { href: "/dashboard/invoices",     label: "Invoices" },
-      { href: "/dashboard/reports",      label: "Reports" },
+      { href: "/dashboard/messages",  label: "Messages" },
+      { href: "/dashboard/forms",     label: "Forms" },
+      { href: "/dashboard/reminders", label: "Reminders" },
+      { href: "/dashboard/reviews",   label: "Reviews" },
     ],
   },
   {
-    href: "#", label: "Operations", icon: Scissors,
+    // "Catalog" = the bookable building blocks (what you sell, who/where delivers it).
+    href: "#", label: "Catalog", icon: Scissors,
     children: [
-      { href: "/dashboard/staff",        label: "Staff" },
       { href: "/dashboard/services",     label: "Services" },
-      { href: "/dashboard/resources",    label: "Resources" },
+      { href: "/dashboard/staff",        label: "Staff" },
+      { href: "/dashboard/resources",    label: "Spaces & Equipment" },
       { href: "/dashboard/hours",        label: "Hours" },
+    ],
+  },
+  {
+    // "Workflow" = recurring daily work, split out of the old "Operations" junk drawer.
+    href: "#", label: "Workflow", icon: CheckSquare,
+    children: [
       { href: "/dashboard/tasks",        label: "Tasks" },
       { href: "/dashboard/followups",    label: "Follow-ups" },
       { href: "/dashboard/waitlist",     label: "Waitlist" },
     ],
   },
+  {
+    // Renamed from "Financials" → owner-friendly "Payments"; Checkout surfaced here.
+    href: "#", label: "Payments", icon: DollarSign,
+    children: [
+      { href: "/dashboard/checkout",     label: "Checkout" },
+      { href: "/dashboard/transactions", label: "Transactions" },
+      { href: "/dashboard/invoices",     label: "Invoices" },
+      { href: "/dashboard/settings?tab=payments", label: "Deposits & fees" },
+    ],
+  },
+  { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },
   {
     href: "#", label: "Marketing",  icon: Megaphone,
     children: [
@@ -67,7 +88,6 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
       { href: "/dashboard/packages",     label: "Packages" },
       { href: "/dashboard/memberships",  label: "Memberships" },
-      { href: "/dashboard/reviews",      label: "Reviews" },
     ],
   },
 ];
@@ -89,7 +109,15 @@ const FOOTER_PAGES = [
 
 function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
   const pathname = usePathname();
-  const childActive = item.children?.some((c) => c.href && pathname.startsWith(c.href.split("?")[0])) ?? false;
+  const childActive = item.children?.some((c) => {
+    if (!c.href) return false;
+    const base = c.href.split("?")[0];
+    // A child that deep-links into another section's own page (e.g. Reminders →
+    // /dashboard/settings?tab=notifications) must not claim this group as active
+    // for every page of that section — Settings owns its own highlight.
+    if (c.href.includes("?") && base === "/dashboard/settings") return false;
+    return pathname.startsWith(base);
+  }) ?? false;
   const [open, setOpen] = useState(childActive);
   const active = item.href === "/dashboard"
     ? pathname === item.href
@@ -97,18 +125,26 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
   const Icon = item.icon;
 
   if (item.children) {
+    // A group whose header has a real href (not "#") is also a destination: the
+    // label navigates to that hub page, while a separate chevron toggles children.
+    const hasHub = item.href !== "#";
     return (
       <div>
-        <button
-          onClick={() => setOpen((o) => !o)}
+        <div
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
             active ? "bg-violet-100 text-violet-800 font-semibold" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
           )}>
           <Icon className={cn("w-4 h-4 shrink-0", active ? "text-violet-700" : "text-gray-400 group-hover:text-gray-600")} />
-          <span className="flex-1 text-left">{item.label}</span>
-          <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
-        </button>
+          {hasHub ? (
+            <Link href={item.href} onClick={onClose} className="flex-1 text-left truncate">{item.label}</Link>
+          ) : (
+            <button type="button" onClick={() => setOpen((o) => !o)} className="flex-1 text-left">{item.label}</button>
+          )}
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-label={`Toggle ${item.label}`} className="-mr-1 p-0.5">
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
+          </button>
+        </div>
         {open && (
           <div className="ml-7 mt-0.5 space-y-0.5">
             {item.children.map((c, index) => {
@@ -116,15 +152,21 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
                 return <p key={`${c.group}-${index}`} className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 first:pt-1">{c.group}</p>;
               }
               if (!c.href || !c.label) return null;
+              const showBadge = c.href === "/dashboard/messages" && unreadMessages > 0;
               return (
                 <Link key={c.href} href={c.href} onClick={onClose}
                   className={cn(
-                    "block px-3 py-2 rounded-lg text-sm transition-colors",
+                    "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                     pathname === c.href.split("?")[0]
                       ? "text-violet-800 font-semibold bg-violet-100"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
                   )}>
-                  {c.label}
+                  <span>{c.label}</span>
+                  {showBadge && (
+                    <span className="min-w-5 h-5 rounded-full bg-red-600 px-1 text-[10px] leading-5 text-white text-center font-bold">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
                 </Link>
               );
             })}

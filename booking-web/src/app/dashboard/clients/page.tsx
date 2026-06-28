@@ -473,7 +473,7 @@ export default function ClientsPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <SkeletonList rows={8} /> : clients.length === 0 ? (
-        <EmptyState title="No clients found" description="Add your first client or adjust the search." />
+        <EmptyState title="No clients found" description="Add your first client, or share your booking link so they add themselves when they book." action={{ label: "Share booking link", href: "/dashboard/booking-page" }} />
       ) : (
         <div className="space-y-2">
           {clients.map((c) => (

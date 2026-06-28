@@ -62,7 +62,7 @@ export default function WaitlistPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <LoadingSpinner /> : entries.length === 0 ? (
-        <EmptyState title="No one on the waitlist yet" />
+        <EmptyState title="No one on the waitlist yet" icon={CalendarPlus} description="When you're fully booked, clients can join the waitlist and you'll be notified the moment a slot opens." />
       ) : (
         <div className="space-y-3">
           {entries.map((e) => (

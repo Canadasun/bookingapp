@@ -89,7 +89,7 @@ export default function ReviewsPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <LoadingSpinner /> : reviews.length === 0 ? (
-        <EmptyState title="No reviews yet" description="Mark completed appointments to send signed review requests automatically." />
+        <EmptyState title="No reviews yet" icon={Star} description="Mark completed appointments to send signed review requests automatically. The more clients you book, the more reviews roll in." action={{ label: "Share your booking link", href: "/dashboard/booking-page" }} />
       ) : (
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
           <div className="space-y-4">
