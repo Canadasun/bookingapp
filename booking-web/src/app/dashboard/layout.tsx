@@ -9,7 +9,7 @@ import {
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
-  ShieldCheck, LifeBuoy, Globe,
+  ShieldCheck, LifeBuoy, Globe, MapPin,
 } from "lucide-react";
 import { api, type Business } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
@@ -469,7 +469,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const staffNav: NavItem[] = [
     ...STAFF_NAV,
     ...(perms.includes("MANAGE_SERVICES") ? [{ href: "/dashboard/services", label: "Services", icon: Scissors }] : []),
-    ...(perms.includes("MANAGE_STAFF") ? [{ href: "/dashboard/staff", label: "Staff", icon: Users }] : []),
+    ...(perms.includes("MANAGE_STAFF") ? [
+      { href: "/dashboard/staff", label: "Staff", icon: Users },
+      { href: "/dashboard/locations", label: "Locations", icon: MapPin },
+    ] : []),
     ...(perms.includes("VIEW_MONEY")
       ? [
           { href: "/dashboard/transactions", label: "Transactions", icon: DollarSign },

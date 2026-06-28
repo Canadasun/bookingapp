@@ -6,7 +6,7 @@ import {
   FolderPlus, ChevronDown, ChevronRight, Tag, X, Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, Service, ServiceCategory, Resource } from "@/lib/api";
+import { api, Service, ServiceCategory, Resource, ServiceLocationMode } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,12 +43,21 @@ interface ServiceFormState {
   name: string; description: string; durationMinutes: string;
   priceCents: string; priceType: "FLAT" | "PER_HOUR" | "STARTING_AT"; bufferBeforeMin: string; bufferAfterMin: string;
   capacity: string; resourceId: string;
+  locationMode: ServiceLocationMode; virtualMeetingUrl: string;
   color: string; active: boolean; categoryId: string;
 }
 const EMPTY_SVC: ServiceFormState = {
   name: "", description: "", durationMinutes: "60", priceCents: "", priceType: "FLAT",
-  bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", resourceId: "", color: "#E9A23C", active: true, categoryId: "",
+  bufferBeforeMin: "0", bufferAfterMin: "0", capacity: "1", resourceId: "",
+  locationMode: "IN_PERSON", virtualMeetingUrl: "", color: "#E9A23C", active: true, categoryId: "",
 };
+
+const LOCATION_MODES: { value: ServiceLocationMode; label: string; hint: string }[] = [
+  { value: "IN_PERSON", label: "At my business", hint: "Client comes to your location." },
+  { value: "VIRTUAL", label: "Virtual", hint: "Video call — a meeting link is sent to the client." },
+  { value: "CUSTOMER", label: "At customer", hint: "You travel to the client; their address is collected at booking." },
+  { value: "PHONE", label: "Phone only", hint: "You call the client at their number." },
+];
 
 function preferredPriceType(): ServiceFormState["priceType"] {
   if (typeof window === "undefined") return "FLAT";
@@ -75,6 +84,8 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       bufferAfterMin: String(editing.bufferAfterMin),
       capacity: String(editing.capacity ?? 1),
       resourceId: editing.resourceId ?? "",
+      locationMode: editing.locationMode ?? "IN_PERSON",
+      virtualMeetingUrl: editing.virtualMeetingUrl ?? "",
       color: editing.color, active: editing.active,
       categoryId: editing.categoryId ?? "",
     } : { ...EMPTY_SVC, priceType: preferredPriceType() }
@@ -97,6 +108,10 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
         bufferAfterMin: Number(form.bufferAfterMin),
         capacity: Math.max(1, Number(form.capacity) || 1),
         resourceId: form.resourceId || null,
+        locationMode: form.locationMode,
+        // Only meaningful for VIRTUAL; clear it otherwise so a mode switch
+        // doesn't leave a stale link behind.
+        virtualMeetingUrl: form.locationMode === "VIRTUAL" ? (form.virtualMeetingUrl.trim() || null) : null,
         color: form.color, active: form.active,
         sortOrder: editing?.sortOrder ?? 0,
         categoryId: form.categoryId || null,
@@ -202,6 +217,30 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
               Use starting at when the final amount may change after seeing the client, pet, or job.
             </p>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Where is it delivered?</label>
+            <div className="grid grid-cols-2 gap-2">
+              {LOCATION_MODES.map((m) => (
+                <button key={m.value} type="button" onClick={() => f("locationMode", m.value)}
+                  aria-pressed={form.locationMode === m.value}
+                  className={cn("rounded-xl border px-3 py-2 text-xs font-semibold text-left transition-colors",
+                    form.locationMode === m.value ? "border-violet-300 bg-violet-50 text-violet-700" : "border-gray-200 text-gray-500 hover:bg-gray-50")}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-gray-600">{LOCATION_MODES.find((m) => m.value === form.locationMode)?.hint}</p>
+          </div>
+
+          {form.locationMode === "VIRTUAL" && (
+            <div>
+              <label htmlFor="svc-virtualMeetingUrl" className="block text-sm font-medium text-gray-700 mb-1">Meeting link</label>
+              <Input id="svc-virtualMeetingUrl" type="url" inputMode="url" placeholder="https://meet.google.com/abc-defg-hij"
+                value={form.virtualMeetingUrl} onChange={e => f("virtualMeetingUrl", e.target.value)} />
+              <p className="mt-1 text-xs text-gray-600">Sent to the client in their confirmation and reminders. Leave blank to add the link per appointment.</p>
+            </div>
+          )}
 
           {[
             { k: "bufferBeforeMin", label: "Buffer before (min)", type: "number", ph: "0" },

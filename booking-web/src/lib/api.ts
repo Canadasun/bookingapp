@@ -161,10 +161,15 @@ export interface SystemError {
   resolved: boolean; resolvedAt?: string | null; createdAt: string;
 }
 
+export type ServiceLocationMode = "IN_PERSON" | "VIRTUAL" | "CUSTOMER" | "PHONE";
+
 export interface Service {
   id: string; name: string; description?: string;
   durationMinutes: number; priceCents: number;
   priceType?: "FLAT" | "PER_HOUR" | "STARTING_AT";
+  // How the service is delivered. Drives the booking flow + reminders.
+  locationMode?: ServiceLocationMode;
+  virtualMeetingUrl?: string | null;
   capacity?: number; resourceId?: string | null;
   bufferBeforeMin: number; bufferAfterMin: number;
   color: string; sortOrder: number; active: boolean;
