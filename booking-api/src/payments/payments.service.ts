@@ -874,6 +874,39 @@ export class PaymentsService {
     return customer.id;
   }
 
+  // Public — resolve the configured Stripe Payment Link IDs (plink_...) to their
+  // hosted buy.stripe.com URLs for the marketing/pricing page. The dashboard
+  // upgrade flow uses Checkout Sessions instead; these self-serve links are for
+  // logged-out visitors. URLs are stable, so the resolved map is cached in-memory.
+  private planLinkCache: Record<string, { month?: string; year?: string }> | null = null;
+
+  async getPlanPaymentLinks(): Promise<Record<string, { month?: string; year?: string }>> {
+    if (this.planLinkCache) return this.planLinkCache;
+    const envKeys = {
+      BASIC: { month: 'BASIC_MONTHLY_PLAN', year: 'BASIC_ANNUAL_SUBSCRIPTION' },
+      PRO: { month: 'PRO_MONTHLY_PLAN', year: 'PRO_ANNUAL_SUBSCRIPTION' },
+      UNLIMITED: { month: 'UNLIMITED_MONTHLY_PLAN', year: 'UNLIMITED_ANNUAL_SUBSCRIPTION' },
+    } as const;
+    const result: Record<string, { month?: string; year?: string }> = {};
+    for (const [plan, intervals] of Object.entries(envKeys)) {
+      for (const [interval, envKey] of Object.entries(intervals)) {
+        const id = this.configService.get<string>(envKey)?.trim();
+        if (!id || !id.startsWith('plink_')) continue;
+        try {
+          const link = await this.getStripe().paymentLinks.retrieve(id);
+          if (link.active && link.url) {
+            (result[plan] ??= {})[interval as 'month' | 'year'] = link.url;
+          }
+        } catch (error) {
+          // A bad/deleted link ID must not break the whole pricing page; skip it.
+          this.logger.warn(`Could not resolve payment link ${envKey} (${id}): ${(error as Error).message}`);
+        }
+      }
+    }
+    this.planLinkCache = result;
+    return result;
+  }
+
   // Owner — start a Stripe Checkout session to subscribe to a paid plan.
   async createSubscriptionCheckout(
     businessId: string,

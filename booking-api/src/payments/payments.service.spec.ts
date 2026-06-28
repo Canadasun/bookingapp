@@ -361,3 +361,53 @@ describe('PaymentsService client memberships', () => {
     }));
   });
 });
+
+describe('PaymentsService.getPlanPaymentLinks', () => {
+  async function buildLinks(env: Record<string, string | undefined>) {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: {} },
+        { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
+        { provide: NotificationsService, useValue: {} },
+        { provide: ReferralsService, useValue: {} },
+        { provide: EventsGateway, useValue: {} },
+      ],
+    }).compile();
+    const svc = module.get<PaymentsService>(PaymentsService);
+    const retrieve = jest.fn().mockImplementation((id: string) =>
+      Promise.resolve({ id, active: true, url: `https://buy.stripe.com/${id}` }),
+    );
+    (svc as unknown as { stripe: unknown }).stripe = { paymentLinks: { retrieve } };
+    return { svc, retrieve };
+  }
+
+  it('resolves configured plink IDs to their hosted URLs per plan/interval', async () => {
+    const { svc, retrieve } = await buildLinks({
+      BASIC_MONTHLY_PLAN: 'plink_basic_m',
+      BASIC_ANNUAL_SUBSCRIPTION: 'plink_basic_y',
+      PRO_MONTHLY_PLAN: 'plink_pro_m',
+    });
+    const links = await svc.getPlanPaymentLinks();
+    expect(links).toEqual({
+      BASIC: { month: 'https://buy.stripe.com/plink_basic_m', year: 'https://buy.stripe.com/plink_basic_y' },
+      PRO: { month: 'https://buy.stripe.com/plink_pro_m' },
+    });
+    expect(retrieve).toHaveBeenCalledTimes(3);
+  });
+
+  it('skips unset, non-plink, and inactive links without throwing', async () => {
+    const { svc } = await buildLinks({ BASIC_MONTHLY_PLAN: 'price_not_a_link', PRO_MONTHLY_PLAN: 'plink_pro_m' });
+    (svc as unknown as { stripe: { paymentLinks: { retrieve: jest.Mock } } }).stripe.paymentLinks.retrieve =
+      jest.fn().mockResolvedValue({ id: 'plink_pro_m', active: false, url: 'https://buy.stripe.com/x' });
+    const links = await svc.getPlanPaymentLinks();
+    expect(links).toEqual({});
+  });
+
+  it('caches the resolved map so Stripe is not hit twice', async () => {
+    const { svc, retrieve } = await buildLinks({ PRO_MONTHLY_PLAN: 'plink_pro_m' });
+    await svc.getPlanPaymentLinks();
+    await svc.getPlanPaymentLinks();
+    expect(retrieve).toHaveBeenCalledTimes(1);
+  });
+});

@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import { PLAN_DEFS, PLAN_FEATURES } from "@/lib/plans";
 import type { FeatureValue } from "@/lib/plans";
+import { getPlanLinks } from "@/lib/paymentLinks";
 
 export const metadata: Metadata = {
   title: "Appointment Booking Software Pricing | Pulse Appointments",
@@ -43,7 +44,9 @@ const faqSchema = {
   ],
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  // Resolved Stripe Payment Link URLs per paid plan; falls back to /register.
+  const planLinks = await getPlanLinks();
   return (
     <main id="main-content" className="min-h-screen bg-[#F8F5EF]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
@@ -77,7 +80,12 @@ export default function PricingPage() {
 
         {/* Plan cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16">
-          {PLAN_DEFS.map((plan) => (
+          {PLAN_DEFS.map((plan) => {
+            const links = plan.id === "FREE" ? undefined : planLinks[plan.id];
+            // Prefer the Stripe Payment Link; fall back to register-first checkout.
+            const monthlyHref = plan.price > 0 ? (links?.month ?? `${plan.href}&billing=monthly`) : plan.href;
+            const annualHref = links?.year ?? `${plan.href}&billing=annual`;
+            return (
             <div
               key={plan.id}
               className={
@@ -109,8 +117,8 @@ export default function PricingPage() {
                   </p>
                 </div>
               )}
-              <Link
-                href={plan.price > 0 ? `${plan.href}&billing=monthly` : plan.href}
+              <a
+                href={monthlyHref}
                 className={
                   plan.highlight
                     ? "flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-violet-600 text-white font-semibold text-sm hover:bg-violet-700 transition-colors"
@@ -119,17 +127,18 @@ export default function PricingPage() {
               >
                 {plan.highlight && <Sparkles className="h-4 w-4" />}
                 {plan.cta}
-              </Link>
+              </a>
               {plan.price > 0 && (
-                <Link
-                  href={`${plan.href}&billing=annual`}
+                <a
+                  href={annualHref}
                   className="mt-2 flex items-center justify-center w-full py-3 rounded-xl bg-emerald-50 text-emerald-700 font-semibold text-sm hover:bg-emerald-100 transition-colors"
                 >
                   Choose annual
-                </Link>
+                </a>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Feature table */}

@@ -55,6 +55,14 @@ export class PaymentsController {
     return this.paymentService.createBookingIntent(parsed.data.appointmentId);
   }
 
+  // Public — resolved Stripe Payment Link URLs per paid plan/interval for the
+  // marketing pricing page. No auth: returns only public buy.stripe.com URLs.
+  @Get('plan-links')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  planLinks() {
+    return this.paymentService.getPlanPaymentLinks();
+  }
+
   // Owner-initiated deposit (dashboard). Scoped to the owner's business.
   @Post('deposit/:appointmentId')
   @ApiBearerAuth()

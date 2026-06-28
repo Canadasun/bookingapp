@@ -5,6 +5,7 @@ import Image from "next/image";
 import { verifyCookieValue } from "@/lib/cookie-sign";
 import { Clock, Bell, CreditCard, CheckCircle2, ArrowRight, Zap, ClipboardList, Globe, Users, Star, ShieldCheck, MousePointerClick } from "lucide-react";
 import { PLAN_DEFS } from "@/lib/plans";
+import { getPlanLinks } from "@/lib/paymentLinks";
 
 export const metadata: Metadata = {
   title: "Online Booking Software for Canadian Service Businesses | Pulse Appointments",
@@ -95,6 +96,8 @@ export default async function LandingPage() {
   if (role === "ADMIN") redirect("/admin");
   if (role === "CLIENT") redirect("/my/dashboard");
   if ((role && role !== "CLIENT") || (authed && !role)) redirect("/dashboard");
+  // Resolved Stripe Payment Link URLs per paid plan; falls back to /register.
+  const planLinks = await getPlanLinks();
 
   const jsonLdOrg = {
     "@context": "https://schema.org",
@@ -398,7 +401,10 @@ export default async function LandingPage() {
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {PLAN_DEFS.map((plan) => (
+            {PLAN_DEFS.map((plan) => {
+              const links = plan.id === "FREE" ? undefined : planLinks[plan.id];
+              const ctaHref = plan.price > 0 ? (links?.month ?? plan.href) : plan.href;
+              return (
               <div
                 key={plan.id}
                 className={
@@ -421,7 +427,7 @@ export default async function LandingPage() {
                 </div>
                 <p className="text-xs text-slate-500 mb-5 leading-relaxed flex-1">{plan.desc}</p>
                 <a
-                  href={plan.href}
+                  href={ctaHref}
                   className={
                     plan.highlight
                       ? "block text-center py-2.5 rounded-xl bg-violet-600 text-white font-semibold text-sm hover:bg-violet-700 transition-colors"
@@ -431,7 +437,8 @@ export default async function LandingPage() {
                   {plan.cta}
                 </a>
               </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-center text-sm text-slate-400">
             See the full feature breakdown on our{" "}
