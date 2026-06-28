@@ -985,6 +985,9 @@ ${aptDetails(apt)}
           client: apt.client,
           business: apt.business,
           notes: apt.notes,
+          locationMode: apt.locationMode,
+          meetingUrl: apt.meetingUrl,
+          customerAddress: apt.customerAddress,
         });
         const icsAttachment = {
           filename: 'appointment.ics',

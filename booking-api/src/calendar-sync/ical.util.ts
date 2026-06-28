@@ -21,6 +21,20 @@ export interface ICalAppointment {
   client: { name: string; email?: string | null };
   business: { name: string; timezone?: string | null; address?: string | null; email?: string | null };
   notes?: string | null;
+  locationMode?: string | null;
+  meetingUrl?: string | null;
+  customerAddress?: string | null;
+}
+
+// Resolve the calendar event's place, mode-aware: the join link for virtual, the
+// client's address for mobile, a phone note, else the business address.
+function icalLocation(apt: ICalAppointment): string {
+  switch (apt.locationMode) {
+    case 'VIRTUAL': return apt.meetingUrl ?? 'Online video call';
+    case 'CUSTOMER': return apt.customerAddress ?? '';
+    case 'PHONE': return 'Phone call';
+    default: return apt.business.address ?? '';
+  }
 }
 
 /** Single-event iCal for client/owner calendar invite (METHOD:REQUEST). */
@@ -28,9 +42,11 @@ export function generateICalEvent(apt: ICalAppointment): string {
   const desc = [
     `Service: ${esc(apt.service.name)} (${apt.service.durationMinutes} min)`,
     `Provider: ${esc(apt.staff.user.name)}`,
+    apt.locationMode === 'VIRTUAL' && apt.meetingUrl ? `Join: ${esc(apt.meetingUrl)}` : '',
     apt.notes ? `Notes: ${esc(apt.notes)}` : '',
   ].filter(Boolean).join('\\n');
 
+  const location = icalLocation(apt);
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -45,7 +61,7 @@ export function generateICalEvent(apt: ICalAppointment): string {
     `SUMMARY:${esc(`${apt.service.name} at ${apt.business.name}`)}`,
     `DESCRIPTION:${desc}`,
   ];
-  if (apt.business.address) lines.push(`LOCATION:${esc(apt.business.address)}`);
+  if (location) lines.push(`LOCATION:${esc(location)}`);
   if (apt.business.email) lines.push(`ORGANIZER;CN="${esc(apt.business.name)}":mailto:${apt.business.email}`);
   if (apt.client.email) lines.push(`ATTENDEE;CN="${esc(apt.client.name)}";ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${apt.client.email}`);
   lines.push('STATUS:CONFIRMED', 'SEQUENCE:0', 'END:VEVENT', 'END:VCALENDAR');

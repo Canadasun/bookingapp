@@ -242,11 +242,21 @@ export class GoogleCalendarService {
       const auth = await this.accessTokenFor(apt.businessId);
       if (!auth) return; // business hasn't connected Google
       const tz = apt.business.timezone ?? 'UTC';
+      // Mode-aware place: join link (virtual), client address (mobile), a phone
+      // note, or the business address. Drives the event's Location + a link in
+      // the description so the provider sees where to be.
+      const where =
+        apt.locationMode === 'VIRTUAL' ? (apt.meetingUrl ?? 'Online video call')
+        : apt.locationMode === 'CUSTOMER' ? (apt.customerAddress ?? '')
+        : apt.locationMode === 'PHONE' ? 'Phone call'
+        : (apt.business.address ?? '');
+      const joinLine = apt.locationMode === 'VIRTUAL' && apt.meetingUrl ? `\n\nJoin: ${apt.meetingUrl}` : '';
       const body = {
         summary: `${apt.service.name} — ${apt.client.name}`,
-        description: `Booked via Pulse${apt.notes ? `\n\nNotes: ${apt.notes}` : ''}`,
+        description: `Booked via Pulse${joinLine}${apt.notes ? `\n\nNotes: ${apt.notes}` : ''}`,
         start: { dateTime: apt.startsAt.toISOString(), timeZone: tz },
         end: { dateTime: apt.endsAt.toISOString(), timeZone: tz },
+        ...(where ? { location: where } : {}),
         ...(apt.client.email ? { attendees: [{ email: apt.client.email, responseStatus: 'accepted' }] } : {}),
       };
       const base = `${CAL_API}/calendars/${encodeURIComponent(auth.calendarId)}/events`;

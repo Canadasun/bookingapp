@@ -160,6 +160,27 @@ function ManageAppointmentInner() {
               </div>
             </div>
 
+            {appointment.locationMode === 'VIRTUAL' && (
+              <div className="mb-8 rounded-xl bg-indigo-50 border border-indigo-100 p-4">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">💻 Online appointment</p>
+                {appointment.meetingUrl
+                  ? <a href={appointment.meetingUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-indigo-700 underline break-all">Join the video call</a>
+                  : <p className="text-sm text-indigo-700">Your meeting link will be sent before your appointment.</p>}
+              </div>
+            )}
+            {appointment.locationMode === 'CUSTOMER' && (
+              <div className="mb-8 rounded-xl bg-indigo-50 border border-indigo-100 p-4">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">🚗 We come to you</p>
+                <p className="text-sm text-indigo-700">{appointment.customerAddress || "We'll confirm your address with you."}</p>
+              </div>
+            )}
+            {appointment.locationMode === 'PHONE' && (
+              <div className="mb-8 rounded-xl bg-indigo-50 border border-indigo-100 p-4">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">📞 Phone appointment</p>
+                <p className="text-sm text-indigo-700">We&apos;ll call you at your appointment time.</p>
+              </div>
+            )}
+
             {canManage && (
               <div className="border-t border-gray-100 pt-6 pb-2 flex justify-center">
                 <AddToCalendar
@@ -167,8 +188,15 @@ function ManageAppointmentInner() {
                   title={`${appointment.service.name} at ${appointment.business.name}`}
                   startsAt={appointment.startsAt}
                   endsAt={appointment.endsAt}
-                  description={`With ${appointment.staff.user.name}`}
-                  location={appointment.business.address}
+                  description={appointment.locationMode === 'VIRTUAL' && appointment.meetingUrl
+                    ? `With ${appointment.staff.user.name} — Join: ${appointment.meetingUrl}`
+                    : `With ${appointment.staff.user.name}`}
+                  location={
+                    appointment.locationMode === 'VIRTUAL' ? (appointment.meetingUrl || 'Online video call')
+                    : appointment.locationMode === 'CUSTOMER' ? (appointment.customerAddress || 'Your address')
+                    : appointment.locationMode === 'PHONE' ? 'Phone call'
+                    : appointment.business.address
+                  }
                 />
               </div>
             )}

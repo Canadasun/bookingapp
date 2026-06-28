@@ -108,6 +108,28 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
             </div>
           ))}
 
+          {/* Delivery mode — where this appointment happens. */}
+          {apt.locationMode === "VIRTUAL" && (
+            <div className="flex justify-between text-sm gap-3">
+              <span className="text-gray-500 shrink-0">Online</span>
+              {apt.meetingUrl
+                ? <a href={apt.meetingUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-violet-600 hover:underline truncate text-right">Join video call</a>
+                : <span className="font-medium text-gray-900 text-right">Video call (no link set)</span>}
+            </div>
+          )}
+          {apt.locationMode === "CUSTOMER" && (
+            <div className="flex justify-between text-sm gap-3">
+              <span className="text-gray-500 shrink-0">Mobile — go to</span>
+              <span className="font-medium text-gray-900 text-right">{apt.customerAddress || "address not provided"}</span>
+            </div>
+          )}
+          {apt.locationMode === "PHONE" && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Where</span>
+              <span className="font-medium text-gray-900">Phone call</span>
+            </div>
+          )}
+
           <hr className="border-gray-100" />
 
           {/* Client */}
