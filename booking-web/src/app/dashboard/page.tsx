@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck, Sparkles, X, Globe } from "lucide-react";
 import { api, Appointment, DashboardOverview } from "@/lib/api";
 import { useEvents } from "@/lib/hooks";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -225,6 +225,25 @@ export default function OverviewPage() {
         </Link>
       </div>
 
+      {/* Quick actions — the handful of things an owner does most, one tap away. */}
+      {!isStaff && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {[
+            { label: "New appointment",    href: "/dashboard/appointments?new=1", icon: CalendarDays },
+            { label: "Take payment",       href: "/dashboard/checkout",           icon: CreditCard },
+            { label: "Share booking link", href: "/dashboard/booking-page",       icon: Globe },
+            { label: "Add client",         href: "/dashboard/clients",            icon: Users },
+          ].map(({ label, href, icon: Icon }) => (
+            <Link key={label} href={href}
+              className="flex items-center gap-2.5 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm hover:border-violet-200 hover:bg-violet-50/40 transition-colors">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="text-sm font-semibold text-gray-800">{label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {actions.length > 0 && (
         <div className="bg-white rounded-2xl border border-amber-100 shadow-sm p-5">
