@@ -37,7 +37,17 @@ const OWNER_NAV: NavItem[] = [
   { href: "/dashboard",              label: "Dashboard",    icon: LayoutDashboard },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
-  { href: "/dashboard/messages",     label: "Messages",     icon: MessageSquare },
+  {
+    // Everything client-facing & conversational in one place. Messages keeps its
+    // unread badge (NavLink renders it for the /dashboard/messages child too).
+    href: "#", label: "Communication", icon: MessageSquare,
+    children: [
+      { href: "/dashboard/messages",                 label: "Messages" },
+      { href: "/dashboard/forms",                    label: "Forms" },
+      { href: "/dashboard/settings?tab=notifications", label: "Reminders" },
+      { href: "/dashboard/reviews",                  label: "Reviews" },
+    ],
+  },
   {
     // "Catalog" = the bookable building blocks (what you sell, who/where delivers it).
     href: "#", label: "Catalog", icon: Scissors,
@@ -76,7 +86,6 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
       { href: "/dashboard/packages",     label: "Packages" },
       { href: "/dashboard/memberships",  label: "Memberships" },
-      { href: "/dashboard/reviews",      label: "Reviews" },
     ],
   },
 ];
@@ -125,15 +134,21 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
                 return <p key={`${c.group}-${index}`} className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 first:pt-1">{c.group}</p>;
               }
               if (!c.href || !c.label) return null;
+              const showBadge = c.href === "/dashboard/messages" && unreadMessages > 0;
               return (
                 <Link key={c.href} href={c.href} onClick={onClose}
                   className={cn(
-                    "block px-3 py-2 rounded-lg text-sm transition-colors",
+                    "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                     pathname === c.href.split("?")[0]
                       ? "text-violet-800 font-semibold bg-violet-100"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
                   )}>
-                  {c.label}
+                  <span>{c.label}</span>
+                  {showBadge && (
+                    <span className="min-w-5 h-5 rounded-full bg-red-600 px-1 text-[10px] leading-5 text-white text-center font-bold">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
                 </Link>
               );
             })}
