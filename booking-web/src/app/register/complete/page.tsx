@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
 import { Gift, Copy, ArrowRight } from "lucide-react";
 
 function ReferralPrompt({ onContinue }: { onContinue: () => void }) {
@@ -117,6 +118,15 @@ export default function CompleteOwnerRegistrationPage() {
       }
       toast.success("Business created! Welcome to Pulse.");
       trackEvent("owner_registration_complete", { method: "sso_completion" });
+      // If they paid via a Payment Link before signing up with Google/Apple, the
+      // session id was stashed before the OAuth redirect — claim it now.
+      const pending = readPendingCheckout();
+      if (pending) {
+        const claim = await claimCheckout(pending);
+        clearPendingCheckout();
+        if (claim.ok && claim.plan && claim.plan !== "FREE") toast.success(`${claim.plan} plan activated.`);
+        else if (!claim.ok) toast.error("Payment received — your plan will activate shortly. Contact support if it doesn't.");
+      }
       setDone(true);
     } catch {
       toast.error("Something went wrong, please try again");

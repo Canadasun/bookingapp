@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { trackEvent } from "@/lib/analytics";
 import { formatPhoneInput } from "@/lib/utils";
+import { storePendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
 
 function RegisterForm() {
   const router = useRouter();
@@ -34,9 +35,11 @@ function RegisterForm() {
   }, [referralCode]);
 
   // After a paid Payment Link checkout, prefill the email and show which plan
-  // was purchased so the visitor just finishes creating their account.
+  // was purchased so the visitor just finishes creating their account. Stash the
+  // session id so the SSO path (which leaves this page) can still claim it.
   useEffect(() => {
     if (!sessionId) return;
+    storePendingCheckout(sessionId);
     fetch(`/proxy/payments/checkout-prefill?session_id=${encodeURIComponent(sessionId)}`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
     })
@@ -111,21 +114,10 @@ function RegisterForm() {
       // business just created. Best-effort: never trap the user on this screen —
       // the Stripe webhook also reconciles, so we proceed to the dashboard either way.
       if (sessionId) {
-        try {
-          const claimRes = await fetch("/api/payments/claim-checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId }),
-          });
-          if (claimRes.ok) {
-            const claim = await claimRes.json().catch(() => ({})) as { plan?: string };
-            if (claim?.plan && claim.plan !== "FREE") toast.success(`${claim.plan} plan activated.`);
-          } else {
-            toast.error("Payment received — your plan will activate shortly. Contact support if it doesn't.");
-          }
-        } catch {
-          toast.error("Payment received — your plan will activate shortly. Contact support if it doesn't.");
-        }
+        const claim = await claimCheckout(sessionId);
+        clearPendingCheckout();
+        if (claim.ok && claim.plan && claim.plan !== "FREE") toast.success(`${claim.plan} plan activated.`);
+        else if (!claim.ok) toast.error("Payment received — your plan will activate shortly. Contact support if it doesn't.");
       }
       router.push("/dashboard");
     } catch {
