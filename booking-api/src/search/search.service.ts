@@ -14,25 +14,30 @@ export class SearchService {
     const ci = { contains: q, mode: 'insensitive' as const };
     const take = 5;
     const asNumber = /^\d+$/.test(q) ? parseInt(q, 10) : null;
+    // Typo tolerance: pg_trgm `%` similarity (backed by the GIN indexes) plus an
+    // ILIKE substring scan so exact substrings always match too. Ranked by
+    // trigram similarity. $queryRaw parameterizes every ${} as a bind value.
+    const like = `%${q}%`;
 
     const [clients, staff, services, invoices, appointments, locations] = await Promise.all([
-      this.prisma.client.findMany({
-        where: { businessId, OR: [{ name: ci }, { email: ci }, { phone: { contains: q } }] },
-        select: { id: true, name: true, email: true },
-        take,
-        orderBy: { updatedAt: 'desc' },
-      }),
-      this.prisma.staff.findMany({
-        where: { businessId, user: { name: ci } },
-        select: { id: true, user: { select: { name: true } } },
-        take,
-      }),
-      this.prisma.service.findMany({
-        where: { businessId, name: ci },
-        select: { id: true, name: true, priceCents: true },
-        take,
-        orderBy: { sortOrder: 'asc' },
-      }),
+      this.prisma.$queryRaw<{ id: string; name: string; email: string | null }[]>`
+        SELECT "id", "name", "email" FROM "Client"
+        WHERE "businessId" = ${businessId}
+          AND ("name" % ${q} OR "name" ILIKE ${like} OR COALESCE("email", '') ILIKE ${like} OR COALESCE("phone", '') ILIKE ${like})
+        ORDER BY similarity("name", ${q}) DESC, "updatedAt" DESC
+        LIMIT ${take}`,
+      this.prisma.$queryRaw<{ id: string; name: string }[]>`
+        SELECT s."id", u."name" FROM "Staff" s JOIN "User" u ON u."id" = s."userId"
+        WHERE s."businessId" = ${businessId}
+          AND (u."name" % ${q} OR u."name" ILIKE ${like})
+        ORDER BY similarity(u."name", ${q}) DESC
+        LIMIT ${take}`,
+      this.prisma.$queryRaw<{ id: string; name: string; priceCents: number }[]>`
+        SELECT "id", "name", "priceCents" FROM "Service"
+        WHERE "businessId" = ${businessId}
+          AND ("name" % ${q} OR "name" ILIKE ${like})
+        ORDER BY similarity("name", ${q}) DESC, "sortOrder" ASC
+        LIMIT ${take}`,
       this.prisma.invoice.findMany({
         where: { businessId, OR: [...(asNumber !== null ? [{ number: asNumber }] : []), { client: { name: ci } }] },
         select: { id: true, number: true, status: true, client: { select: { name: true } } },
@@ -45,11 +50,12 @@ export class SearchService {
         take,
         orderBy: { startsAt: 'desc' },
       }),
-      this.prisma.location.findMany({
-        where: { businessId, OR: [{ name: ci }, { address: ci }] },
-        select: { id: true, name: true, address: true },
-        take,
-      }),
+      this.prisma.$queryRaw<{ id: string; name: string; address: string | null }[]>`
+        SELECT "id", "name", "address" FROM "Location"
+        WHERE "businessId" = ${businessId}
+          AND ("name" % ${q} OR "name" ILIKE ${like} OR COALESCE("address", '') ILIKE ${like})
+        ORDER BY similarity("name", ${q}) DESC
+        LIMIT ${take}`,
     ]);
 
     const groups: SearchGroup[] = [];
@@ -68,7 +74,7 @@ export class SearchService {
     push('staff', 'Staff', staff.map((s) => ({
       type: 'staff',
       id: s.id,
-      label: s.user?.name ?? 'Staff member',
+      label: s.name ?? 'Staff member',
       href: `/dashboard/staff/${s.id}`,
     })));
     push('service', 'Services', services.map((s) => ({
