@@ -26,6 +26,10 @@ const SubmitSchema = z.object({
   registrationDocUrl: internalUploadPath,
 });
 const RejectSchema = z.object({ note: z.string().trim().max(500).optional() });
+const ComplimentaryPlanSchema = z.object({
+  plan: z.enum(['PRO', 'UNLIMITED']),
+  months: z.number().int().min(1).max(12),
+});
 
 // ── Owner: submit + check their own business verification ───────────────────
 @ApiTags('verification')
@@ -225,6 +229,16 @@ export class AdminOverviewController {
       throw new BadRequestException(`Plan must be one of: ${validPlans.join(', ')}`);
     }
     return this.svc.setPlanAdmin(id, body.plan as import('@prisma/client').PlanTier, admin.id);
+  }
+
+  /** Grant a time-limited plan without creating or modifying Stripe billing. */
+  @Post('businesses/:id/complimentary-plan')
+  grantComplimentaryPlan(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(ComplimentaryPlanSchema)) body: z.infer<typeof ComplimentaryPlanSchema>,
+    @CurrentUser() admin: User,
+  ) {
+    return this.svc.grantComplimentaryPlan(id, body.plan, body.months, admin.id);
   }
 
   /** Audit log — full history of admin actions across all entities. */

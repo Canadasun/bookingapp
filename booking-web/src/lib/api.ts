@@ -453,6 +453,8 @@ export interface AdminBusiness {
   suspended: boolean;
   createdAt: string;
   phone: string | null;
+  complimentaryPlanExpiresAt?: string | null;
+  complimentaryPreviousPlan?: PlanTier | null;
   subscription?: { status: string; currentPeriodEnd?: string | null; cancelAtPeriodEnd: boolean } | null;
   _count: { appointments: number; staff: number; clients: number };
 }
@@ -652,6 +654,11 @@ export const api = {
     suspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/suspend`, { method: "POST" }),
     unsuspendBusiness: (id: string) => req<{ suspended: boolean }>(`/admin/businesses/${id}/unsuspend`, { method: "POST" }),
     setPlan: (id: string, plan: string) => req<{ id: string; plan: string }>(`/admin/businesses/${id}/plan`, { method: "PATCH", body: JSON.stringify({ plan }) }),
+    grantComplimentaryPlan: (id: string, plan: "PRO" | "UNLIMITED", months: number) =>
+      req<{ id: string; plan: PlanTier; complimentaryPlanExpiresAt: string; complimentaryPreviousPlan: PlanTier }>(
+        `/admin/businesses/${id}/complimentary-plan`,
+        { method: "POST", body: JSON.stringify({ plan, months }) },
+      ),
     listBusinesses: (params: { page?: number; limit?: number; search?: string; plan?: string; verificationStatus?: string; suspended?: boolean; sortBy?: string; sortDir?: string }) => {
       const q = new URLSearchParams();
       if (params.page) q.set("page", String(params.page));

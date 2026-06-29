@@ -146,7 +146,7 @@ function MetricCard({
 
 export default function AdminPage() {
   const router = useRouter();
-  const { user: me } = useCurrentUser();
+  const { user: me, loading: authLoading } = useCurrentUser();
   const [tab, setTab] = useState<Tab>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
@@ -181,6 +181,9 @@ export default function AdminPage() {
   const [bizSortDir, setBizSortDir] = useState<"asc" | "desc">("desc");
   const [bizLoading, setBizLoading] = useState(false);
   const [planBusy, setPlanBusy] = useState<string | null>(null);
+  const [complimentaryBiz, setComplimentaryBiz] = useState<AdminBusiness | null>(null);
+  const [complimentaryPlan, setComplimentaryPlan] = useState<"PRO" | "UNLIMITED">("PRO");
+  const [complimentaryMonths, setComplimentaryMonths] = useState(3);
 
   // Audit log state
   const [auditLogs, setAuditLogs] = useState<{ logs: AdminAuditEntry[]; total: number; page: number; pages: number } | null>(null);
@@ -220,7 +223,14 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (authLoading || !me) return;
+    if (me.role !== "ADMIN") {
+      router.replace("/dashboard");
+      return;
+    }
+    load();
+  }, [authLoading, load, me, router]);
 
   const loadErrors = useCallback(async () => {
     try {
@@ -389,6 +399,27 @@ export default function AdminPage() {
     finally { setPlanBusy(null); }
   }
 
+  async function grantComplimentaryAccess() {
+    if (!complimentaryBiz) return;
+    setPlanBusy(complimentaryBiz.id);
+    try {
+      const result = await api.admin.grantComplimentaryPlan(
+        complimentaryBiz.id,
+        complimentaryPlan,
+        complimentaryMonths,
+      );
+      toast.success(
+        `${complimentaryPlan} access granted to ${complimentaryBiz.name} until ${format(new Date(result.complimentaryPlanExpiresAt), "MMM d, yyyy")}`,
+      );
+      setComplimentaryBiz(null);
+      await loadBusinesses();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not grant complimentary access");
+    } finally {
+      setPlanBusy(null);
+    }
+  }
+
   function dismissDuplicate(id: string, name: string) {
     setDialog({
       open: true, title: `Clear duplicate flag for "${name}"?`,
@@ -443,6 +474,17 @@ export default function AdminPage() {
     { id: "settings",      label: "Settings",       icon: Settings },
   ];
 
+  if (authLoading || !me || me.role !== "ADMIN") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="flex items-center gap-3 text-sm font-medium text-gray-500">
+          <RefreshCw className="h-4 w-4 animate-spin text-violet-600" />
+          {authLoading ? "Checking admin access…" : "Redirecting…"}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <ConfirmDialog
@@ -456,6 +498,61 @@ export default function AdminPage() {
         onConfirm={dialog.onConfirm}
         onCancel={closeDialog}
       />
+      {complimentaryBiz && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={() => setComplimentaryBiz(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="complimentary-plan-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <h2 id="complimentary-plan-title" className="font-bold text-gray-950">Grant complimentary access</h2>
+                <p className="mt-1 text-sm text-gray-500">{complimentaryBiz.name}</p>
+              </div>
+              <button type="button" onClick={() => setComplimentaryBiz(null)} aria-label="Close" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {complimentaryBiz.subscription && ["ACTIVE", "TRIALING", "PAST_DUE"].includes(complimentaryBiz.subscription.status) ? (
+              <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                This business has active billing. Manage its subscription through Stripe instead.
+              </div>
+            ) : (
+              <div className="mb-5 space-y-4">
+                <div>
+                  <label htmlFor="complimentary-plan" className="mb-1.5 block text-sm font-semibold text-gray-700">Plan</label>
+                  <select id="complimentary-plan" value={complimentaryPlan} onChange={(event) => setComplimentaryPlan(event.target.value as "PRO" | "UNLIMITED")}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm">
+                    <option value="PRO">Pro</option>
+                    <option value="UNLIMITED">Unlimited</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="complimentary-months" className="mb-1.5 block text-sm font-semibold text-gray-700">Duration</label>
+                  <select id="complimentary-months" value={complimentaryMonths} onChange={(event) => setComplimentaryMonths(Number(event.target.value))}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm">
+                    {[1, 2, 3, 6, 12].map((months) => (
+                      <option key={months} value={months}>{months} month{months === 1 ? "" : "s"}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500">No Stripe subscription or charge will be created. The previous plan is restored automatically when access expires.</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setComplimentaryBiz(null)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={grantComplimentaryAccess}
+                disabled={planBusy === complimentaryBiz.id || !!(complimentaryBiz.subscription && ["ACTIVE", "TRIALING", "PAST_DUE"].includes(complimentaryBiz.subscription.status))}
+                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
+                {planBusy === complimentaryBiz.id ? "Granting…" : "Grant access"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
       <aside className={cn(
@@ -853,15 +950,36 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-gray-500">
-                          {b.suspended
-                            ? <span className="font-semibold text-red-600">Suspended</span>
-                            : b.subscription?.status ?? "No billing"}
-                          {b.subscription?.cancelAtPeriodEnd && <span className="ml-1 text-amber-600">(canceling)</span>}
+                          <div className="flex flex-col gap-0.5">
+                            <span>
+                              {b.suspended
+                                ? <span className="font-semibold text-red-600">Suspended</span>
+                                : b.subscription?.status ?? "No billing"}
+                              {b.subscription?.cancelAtPeriodEnd && <span className="ml-1 text-amber-600">(canceling)</span>}
+                            </span>
+                            {b.complimentaryPlanExpiresAt && (
+                              <span className="font-semibold text-violet-700">
+                                Gifted until {format(new Date(b.complimentaryPlanExpiresAt), "MMM d, yyyy")}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-gray-400 whitespace-nowrap">
                           {format(new Date(b.createdAt), "MMM d, yyyy")}
                         </td>
                         <td className="px-4 py-3.5">
+                          <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setComplimentaryPlan(b.plan === "UNLIMITED" ? "UNLIMITED" : "PRO");
+                              setComplimentaryMonths(3);
+                              setComplimentaryBiz(b);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-50"
+                          >
+                            <CalendarClock className="h-3.5 w-3.5" />Gift access
+                          </button>
                           <button
                             disabled={busy === b.id}
                             onClick={() => toggleSuspend(b)}
@@ -876,6 +994,7 @@ export default function AdminPage() {
                               ? <><CheckCircle2 className="h-3.5 w-3.5" />Unsuspend</>
                               : <><Ban className="h-3.5 w-3.5" />Suspend</>}
                           </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

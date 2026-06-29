@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { Prisma, PlanTier } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { deleteUploadByUrl } from '../uploads/upload-cleanup';
+import { addMonths } from 'date-fns';
 
 @Injectable()
 export class VerificationService {
@@ -157,6 +158,7 @@ export class VerificationService {
         take: 10,
         select: {
           id: true, name: true, email: true, slug: true, plan: true,
+          complimentaryPlanExpiresAt: true, complimentaryPreviousPlan: true,
           verificationStatus: true, suspended: true, createdAt: true,
           subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } },
         },
@@ -292,8 +294,8 @@ export class VerificationService {
     if (!biz) throw new NotFoundException('Business not found');
     const result = await this.prisma.business.update({
       where: { id: businessId },
-      data: { plan },
-      select: { id: true, plan: true },
+      data: { plan, complimentaryPlanExpiresAt: null, complimentaryPreviousPlan: null },
+      select: { id: true, plan: true, complimentaryPlanExpiresAt: true },
     });
     await this.prisma.auditLog.create({
       data: {
@@ -302,6 +304,57 @@ export class VerificationService {
         action: 'ADMIN_PLAN_OVERRIDE',
         userId: adminId,
         changes: { from: biz.plan, to: plan },
+      },
+    });
+    return result;
+  }
+
+  async grantComplimentaryPlan(
+    businessId: string,
+    plan: 'PRO' | 'UNLIMITED',
+    months: number,
+    adminId: string,
+  ) {
+    const biz = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: {
+        id: true,
+        plan: true,
+        complimentaryPlanExpiresAt: true,
+        complimentaryPreviousPlan: true,
+        subscription: { select: { status: true } },
+      },
+    });
+    if (!biz) throw new NotFoundException('Business not found');
+    if (biz.subscription && ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(biz.subscription.status)) {
+      throw new BadRequestException('This business has active billing. Use Stripe billing controls instead.');
+    }
+
+    const expiresAt = addMonths(new Date(), months);
+    const previousPlan = biz.complimentaryPlanExpiresAt && biz.complimentaryPlanExpiresAt > new Date()
+      ? (biz.complimentaryPreviousPlan ?? 'FREE')
+      : biz.plan;
+    const result = await this.prisma.business.update({
+      where: { id: businessId },
+      data: {
+        plan,
+        complimentaryPreviousPlan: previousPlan,
+        complimentaryPlanExpiresAt: expiresAt,
+      },
+      select: {
+        id: true,
+        plan: true,
+        complimentaryPlanExpiresAt: true,
+        complimentaryPreviousPlan: true,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        entityType: 'BUSINESS',
+        entityId: businessId,
+        action: 'ADMIN_COMPLIMENTARY_PLAN_GRANTED',
+        userId: adminId,
+        changes: { from: biz.plan, to: plan, months, expiresAt: expiresAt.toISOString() },
       },
     });
     return result;

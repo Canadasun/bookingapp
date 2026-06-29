@@ -503,6 +503,36 @@ export class NotificationProcessor extends WorkerHost {
   }
 
   async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number }>) {
+    // Access expiry is state maintenance, not a user notification, so it must
+    // still run when outbound notifications are disabled.
+    if (job.name === 'expire-complimentary-plans') {
+      const expired = await this.prisma.business.findMany({
+        where: { complimentaryPlanExpiresAt: { lte: new Date() } },
+        select: { id: true, complimentaryPreviousPlan: true },
+      });
+      for (const business of expired) {
+        const restoredPlan = business.complimentaryPreviousPlan ?? 'FREE';
+        await this.prisma.$transaction([
+          this.prisma.business.update({
+            where: { id: business.id },
+            data: {
+              plan: restoredPlan,
+              complimentaryPlanExpiresAt: null,
+              complimentaryPreviousPlan: null,
+            },
+          }),
+          this.prisma.auditLog.create({
+            data: {
+              entityType: 'BUSINESS',
+              entityId: business.id,
+              action: 'COMPLIMENTARY_PLAN_EXPIRED',
+              changes: { restoredPlan },
+            },
+          }),
+        ]);
+      }
+      return;
+    }
     if (process.env.NOTIFICATIONS_ENABLED === 'false') {
       this.logger.warn(`[Notification skipped] NOTIFICATIONS_ENABLED=false job=${job.name} id=${job.id}`);
       return;

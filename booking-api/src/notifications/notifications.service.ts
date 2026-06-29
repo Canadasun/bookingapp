@@ -61,6 +61,11 @@ export class NotificationsService implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: true,
       });
+      await this.queue.add('expire-complimentary-plans', {}, {
+        repeat: { pattern: '15 0 * * *' }, // 00:15 UTC daily
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     } catch (e) {
       this.logger.warn(`Could not schedule scans: ${e instanceof Error ? e.message : e}`);
     }

@@ -121,6 +121,10 @@ model Business {
   // Subscription
   plan          PlanTier  @default(FREE)
   planExpiresAt DateTime?
+  // Admin-granted access that does not create or modify a Stripe subscription.
+  // The previous tier is restored automatically when the grant expires.
+  complimentaryPlanExpiresAt DateTime?
+  complimentaryPreviousPlan PlanTier?
   suspended     Boolean   @default(false)
 
   // Cancellation policy text shown to clients before booking
@@ -202,6 +206,8 @@ model Business {
   migrationRequests   MigrationRequest[]
   migrationBatches    MigrationImportBatch[]
   migrationRows       MigrationImportRow[]
+
+  @@index([complimentaryPlanExpiresAt])
 }
 
 model Review {

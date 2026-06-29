@@ -768,13 +768,35 @@ export class PaymentsService {
       cancelAtPeriodEnd: sub.cancel_at_period_end,
     };
     // Notify the owner when their plan actually changes (upgrade/downgrade/cancel).
-    const prev = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
+    const prev = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: { plan: true, complimentaryPlanExpiresAt: true },
+    });
     await this.prisma.subscription.upsert({ where: { businessId }, create: { businessId, ...data }, update: data });
-    await this.prisma.business.update({ where: { id: businessId }, data: { plan: effectivePlan, planExpiresAt: periodEnd } });
-    if (prev && prev.plan !== effectivePlan) {
-      await this.notifications.sendPlanChanged(businessId, effectivePlan).catch(() => {});
+    const activeComplimentaryGrant = !!(
+      prev?.complimentaryPlanExpiresAt &&
+      prev.complimentaryPlanExpiresAt.getTime() > Date.now()
+    );
+    // A stale cancellation/failure event from an old Stripe subscription must
+    // not revoke a current admin grant. A newly active paid subscription does
+    // replace the grant and becomes the source of truth.
+    const preserveComplimentaryGrant = activeComplimentaryGrant && effectivePlan === 'FREE';
+    const resultingPlan = preserveComplimentaryGrant ? prev!.plan : effectivePlan;
+    await this.prisma.business.update({
+      where: { id: businessId },
+      data: preserveComplimentaryGrant
+        ? { planExpiresAt: periodEnd }
+        : {
+            plan: effectivePlan,
+            planExpiresAt: periodEnd,
+            complimentaryPlanExpiresAt: null,
+            complimentaryPreviousPlan: null,
+          },
+    });
+    if (prev && prev.plan !== resultingPlan) {
+      await this.notifications.sendPlanChanged(businessId, resultingPlan).catch(() => {});
     }
-    this.events.emitPlanUpdate(businessId, { plan: effectivePlan, planExpiresAt: periodEnd });
+    this.events.emitPlanUpdate(businessId, { plan: resultingPlan, planExpiresAt: periodEnd });
     // When a referred business becomes a paying customer, grant the referrer their
     // reward (once). Best-effort: a reward hiccup never breaks the subscription.
     if (effectivePlan !== 'FREE') {
