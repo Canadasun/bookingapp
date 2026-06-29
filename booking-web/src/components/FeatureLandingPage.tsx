@@ -2,10 +2,28 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ElementType } from "react";
 import { CheckCircle2 } from "lucide-react";
+import type { Locale } from "@/i18n/config";
+import { LanguageToggle } from "@/components/marketing/LanguageToggle";
 
 type ComparisonValue = boolean | string;
 
+// Chrome strings shared by every feature detail page (the same in EN across all
+// of them); supplied once from the dictionary so they translate in one place.
+export type FeatureUi = {
+  getStartedFree: string;
+  frequentlyAsked: string;
+  featureColumn: string;
+  brand: string;
+  breadcrumbHome: string;
+  breadcrumbFeatures: string;
+  toggleLabel: string;
+};
+
+export type FeatureFooter = { home: string; pricing: string; terms: string; privacy: string; support: string };
+
 export type FeatureLandingPageProps = {
+  ui: FeatureUi;
+  locale?: Locale;
   badge: string;
   badgeIcon: ElementType;
   title: string;
@@ -14,7 +32,9 @@ export type FeatureLandingPageProps = {
   slug: string;
   breadcrumbName: string;
   proofPoints: string[];
+  stepsTitle: string;
   steps: { num: string; title: string; desc: string }[];
+  featuresTitle: string;
   features: { icon: ElementType; title: string; body: string }[];
   comparisonTitle: string;
   competitors: string[];
@@ -22,6 +42,7 @@ export type FeatureLandingPageProps = {
   faqs: { q: string; a: string }[];
   ctaTitle: string;
   ctaText: string;
+  footer?: FeatureFooter;
 };
 
 function Cell({ value }: { value: ComparisonValue }) {
@@ -31,6 +52,8 @@ function Cell({ value }: { value: ComparisonValue }) {
 }
 
 export function FeatureLandingPage({
+  ui,
+  locale = "en",
   badge,
   badgeIcon: BadgeIcon,
   title,
@@ -39,7 +62,9 @@ export function FeatureLandingPage({
   slug,
   breadcrumbName,
   proofPoints,
+  stepsTitle,
   steps,
+  featuresTitle,
   features,
   comparisonTitle,
   competitors,
@@ -47,14 +72,18 @@ export function FeatureLandingPage({
   faqs,
   ctaTitle,
   ctaText,
+  footer,
 }: FeatureLandingPageProps) {
+  const SITE = "https://www.pulseappointments.com";
+  const enHref = `/features/${slug}`;
+  const frHref = `/fr/features/${slug}`;
   const breadcrumb = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "https://www.pulseappointments.com" },
-      { "@type": "ListItem", position: 2, name: "Features", item: "https://www.pulseappointments.com/features" },
-      { "@type": "ListItem", position: 3, name: breadcrumbName, item: `https://www.pulseappointments.com/features/${slug}` },
+      { "@type": "ListItem", position: 1, name: ui.breadcrumbHome, item: SITE },
+      { "@type": "ListItem", position: 2, name: ui.breadcrumbFeatures, item: `${SITE}/features` },
+      { "@type": "ListItem", position: 3, name: breadcrumbName, item: `${SITE}${enHref}` },
     ],
   };
   const faqSchema = {
@@ -73,14 +102,17 @@ export function FeatureLandingPage({
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
 
       <nav className="bg-white/80 backdrop-blur-xl border-b border-[#E9DDCB] sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+          <Link href={locale === "fr" ? "/fr" : "/"} className="flex items-center gap-2.5">
             <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
-            <span className="text-base font-bold text-slate-900 tracking-tight">Pulse Booking</span>
+            <span className="text-base font-bold text-slate-900 tracking-tight">{ui.brand}</span>
           </Link>
-          <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
-            Get started free
-          </Link>
+          <div className="flex items-center gap-3">
+            <LanguageToggle locale={locale} enHref={enHref} frHref={frHref} label={ui.toggleLabel} />
+            <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
+              {ui.getStartedFree}
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -97,7 +129,7 @@ export function FeatureLandingPage({
         </h1>
         <p className="text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">{description}</p>
         <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">
-          Get started free
+          {ui.getStartedFree}
         </Link>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2">
           {proofPoints.map((point) => (
@@ -111,7 +143,7 @@ export function FeatureLandingPage({
 
       <section className="py-16 bg-white/60 border-y border-[#E9DDCB]">
         <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-slate-900 text-center mb-12">How it works</h2>
+          <h2 className="text-2xl font-bold text-slate-900 text-center mb-12">{stepsTitle}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {steps.map(({ num, title: stepTitle, desc }) => (
               <div key={num} className="bg-white rounded-2xl border border-[#E9DDCB] p-7 shadow-sm">
@@ -126,7 +158,7 @@ export function FeatureLandingPage({
 
       <section className="py-16">
         <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-slate-900 text-center mb-12">Built for daily service-business work</h2>
+          <h2 className="text-2xl font-bold text-slate-900 text-center mb-12">{featuresTitle}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {features.map(({ icon: Icon, title: featureTitle, body }) => (
               <div key={featureTitle} className="bg-white rounded-2xl border border-[#E9DDCB] p-7 shadow-sm">
@@ -148,7 +180,7 @@ export function FeatureLandingPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#E9DDCB]">
-                  <th className="text-left px-6 py-4 font-semibold text-slate-900 w-[35%]">Feature</th>
+                  <th className="text-left px-6 py-4 font-semibold text-slate-900 w-[35%]">{ui.featureColumn}</th>
                   <th className="px-4 py-4 font-bold text-violet-700 text-center">Pulse</th>
                   {competitors.map((name) => (
                     <th key={name} className="px-4 py-4 font-semibold text-slate-600 text-center">{name}</th>
@@ -174,7 +206,7 @@ export function FeatureLandingPage({
 
       <section className="py-16">
         <div className="max-w-2xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-slate-900 text-center mb-10">Frequently asked questions</h2>
+          <h2 className="text-2xl font-bold text-slate-900 text-center mb-10">{ui.frequentlyAsked}</h2>
           <div className="space-y-4">
             {faqs.map(({ q, a }) => (
               <div key={q} className="bg-white rounded-2xl border border-[#E9DDCB] p-6 shadow-sm">
@@ -191,10 +223,25 @@ export function FeatureLandingPage({
           <h2 className="text-2xl font-bold text-white mb-3">{ctaTitle}</h2>
           <p className="text-white/60 mb-8">{ctaText}</p>
           <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
-            Get started free
+            {ui.getStartedFree}
           </Link>
         </div>
       </section>
+
+      {footer && (
+        <footer className="border-t border-[#E9DDCB] bg-white/80 py-8">
+          <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-sm text-slate-400">© {new Date().getFullYear()} Pulse Appointments</span>
+            <div className="flex gap-6 text-sm text-slate-500">
+              <Link href={locale === "fr" ? "/fr" : "/"} className="hover:text-violet-600 transition-colors">{footer.home}</Link>
+              <Link href={locale === "fr" ? "/fr/pricing" : "/pricing"} className="hover:text-violet-600 transition-colors">{footer.pricing}</Link>
+              <Link href="/terms" className="hover:text-violet-600 transition-colors">{footer.terms}</Link>
+              <Link href="/privacy" className="hover:text-violet-600 transition-colors">{footer.privacy}</Link>
+              <Link href="/support" className="hover:text-violet-600 transition-colors">{footer.support}</Link>
+            </div>
+          </div>
+        </footer>
+      )}
     </main>
   );
 }

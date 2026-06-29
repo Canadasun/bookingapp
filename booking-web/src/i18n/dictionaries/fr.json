@@ -227,5 +227,325 @@
       "body": "Les flux Pulse les plus efficaces combinent plusieurs fonctionnalités : un formulaire d'admission avant la réservation, un dépôt au paiement, des rappels par SMS avant le rendez-vous et une demande d'avis après la visite."
     },
     "toggleLabel": "Langue"
+  },
+  "featureUi": {
+    "getStartedFree": "Commencer gratuitement",
+    "frequentlyAsked": "Foire aux questions",
+    "featureColumn": "Fonctionnalité",
+    "brand": "Pulse Booking",
+    "breadcrumbHome": "Accueil",
+    "breadcrumbFeatures": "Fonctionnalités",
+    "toggleLabel": "Langue",
+    "footer": { "home": "Accueil", "pricing": "Tarification", "terms": "Conditions", "privacy": "Confidentialité", "support": "Assistance" }
+  },
+  "featurePages": {
+    "online-booking": {
+      "meta": { "title": "Logiciel de réservation en ligne pour les entreprises de services canadiennes | Pulse", "description": "Laissez vos clients prendre rendez-vous en ligne 24/7. Pulse vous offre une page de réservation publique gratuite — ajoutez-la à Instagram, Google ou votre site Web. Aucun téléchargement d'application requis. Prix en CAD." },
+      "og": { "title": "Logiciel de réservation en ligne | Pulse Appointments", "description": "Page de réservation en ligne gratuite pour les entreprises de services canadiennes. Fonctionne sur Instagram, Google et tout site Web." },
+      "badge": "Réservation en ligne",
+      "title": "Laissez vos clients prendre rendez-vous en ligne,",
+      "titleAccent": "24/7",
+      "description": "Fini les échanges de messages téléphoniques. Fini les messages privés qui demandent « êtes-vous libre jeudi? » Pulse vous offre une page de réservation publique gratuite que vos clients peuvent utiliser à tout moment — depuis Instagram, Google ou votre site Web.",
+      "breadcrumbName": "Réservation en ligne",
+      "proofPoints": ["Gratuit sur tous les forfaits", "Aucun téléchargement d'application pour les clients", "En ligne en moins de 5 minutes"],
+      "stepsTitle": "Opérationnel en quelques minutes",
+      "steps": [
+        { "num": "01", "title": "Ajoutez vos services", "desc": "Saisissez les noms de vos services, leurs prix, leur durée et vos disponibilités. Environ 5 minutes. Aucune compétence technique requise." },
+        { "num": "02", "title": "Partagez votre lien de réservation", "desc": "Ajoutez votre lien de réservation Pulse à votre bio Instagram, votre profil Google Business, votre site Web ou votre signature courriel. Les clients touchent le lien et réservent eux-mêmes." },
+        { "num": "03", "title": "Vous êtes avisé, ils sont confirmés", "desc": "Pulse vous envoie une notification et envoie au client un courriel de confirmation instantanément. Le rendez-vous apparaît dans votre calendrier. Terminé." }
+      ],
+      "featuresTitle": "Une seule page de réservation. Tous les canaux.",
+      "features": [
+        { "title": "Fonctionne partout où vos clients vous trouvent", "body": "Votre page de réservation fonctionne depuis votre bio Instagram, votre fiche Google Business, un lien dans vos courriels ou intégrée à votre site Web. Un seul lien, partout." },
+        { "title": "Pensée mobile d'abord pour les clients", "body": "Les clients réservent depuis leur téléphone en moins de 2 minutes, sans téléchargement d'application. Ils choisissent un service, une heure et paient un dépôt au besoin — le tout en un seul parcours." },
+        { "title": "Multi-personnel et multi-service", "body": "Les clients peuvent choisir leur prestataire et leur service préférés. Chaque membre du personnel a son propre calendrier et ses disponibilités. Aucune double réservation possible." }
+      ],
+      "comparisonTitle": "Comparaison de la réservation en ligne",
+      "competitors": ["Jane App", "Vagaro", "Acuity", "Calendly"],
+      "comparison": [
+        { "feature": "Page de réservation publique gratuite", "values": [true, true, true, true, true] },
+        { "feature": "Aucun compte client requis", "values": [true, false, false, true, true] },
+        { "feature": "Prête pour le lien dans la bio Instagram", "values": [true, false, true, true, true] },
+        { "feature": "Intégration Google Business", "values": [true, false, true, "Partiel", "Partiel"] },
+        { "feature": "Réservation multi-personnel", "values": [true, true, true, true, true] },
+        { "feature": "Prix en CAD", "values": [true, true, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "Les clients doivent-ils créer un compte pour réserver?", "a": "Non. Les clients réservent avec seulement leur nom, leur courriel et leur numéro de téléphone. Aucun mot de passe, aucun compte, aucun téléchargement d'application requis. Plus le parcours de réservation est simple, plus vous obtenez de réservations — c'est pourquoi nous l'avons conçu ainsi." },
+        { "q": "Puis-je intégrer la page de réservation à mon site Web existant?", "a": "Oui. Pulse fournit un widget de réservation intégrable que vous pouvez ajouter à n'importe quel site Web avec une seule ligne de code. Les clients réservent directement sur votre site sans être redirigés vers une page distincte. Fonctionne avec Squarespace, Wix, WordPress et tout site personnalisé." },
+        { "q": "Que se passe-t-il si un client tente de réserver en dehors de mes heures d'ouverture?", "a": "Pulse n'affiche que vos plages réellement disponibles. Si vous ne travaillez pas le dimanche, les plages du dimanche n'apparaissent pas. Si une plage est déjà réservée, elle est retirée du calendrier en temps réel. Les clients ne peuvent réserver que des heures qui vous conviennent vraiment." }
+      ],
+      "ctaTitle": "Commencez à accepter des réservations en ligne dès aujourd'hui",
+      "ctaText": "Votre page de réservation est en ligne en moins de 5 minutes. Gratuit pour commencer — aucune carte de crédit requise."
+    },
+    "deposits": {
+      "meta": { "title": "Logiciel de dépôt de réservation pour les entreprises de services canadiennes | Pulse", "description": "Exigez un dépôt lorsque les clients réservent en ligne. Pulse perçoit et conserve automatiquement les dépôts — et facture les frais de rendez-vous manqué sur la carte enregistrée. Prix en CAD, gratuit pour commencer." },
+      "og": { "title": "Logiciel de dépôt de réservation | Pulse Appointments", "description": "Percevez des dépôts à la réservation et facturez automatiquement les frais de rendez-vous manqué. Conçu pour les entreprises de services canadiennes." },
+      "badge": "Dépôts à la réservation",
+      "title": "Exigez un dépôt lorsque les clients réservent —",
+      "titleAccent": "automatiquement",
+      "description": "Cessez de perdre de l'argent à cause des rendez-vous manqués. Pulse perçoit un dépôt lorsque les clients réservent et facture la carte automatiquement s'ils ne se présentent pas. Configurez-le une fois. Il fonctionne seul.",
+      "breadcrumbName": "Dépôts à la réservation",
+      "proofPoints": ["Aucune carte de crédit requise pour commencer", "Prix en CAD", "Annulez à tout moment"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Définissez le montant du dépôt", "desc": "Choisissez un montant fixe en dollars ou un pourcentage du prix du service. Définissez-le par service — une coloration peut exiger plus qu'une simple coupe." },
+        { "num": "02", "title": "Le client paie à la réservation", "desc": "Lorsqu'un client réserve en ligne, Pulse perçoit le dépôt via Stripe. Le client voit le montant du dépôt et la politique avant de confirmer." },
+        { "num": "03", "title": "Rendez-vous manqué? Facturez automatiquement", "desc": "Si un client ne se présente pas ou annule dans votre fenêtre de politique, Pulse facture le solde restant (ou les frais complets de rendez-vous manqué) sur la carte automatiquement. Aucun appel gênant." }
+      ],
+      "featuresTitle": "Tout ce qu'il vous faut pour protéger vos revenus",
+      "features": [
+        { "title": "Règles de dépôt par service", "body": "Définissez des montants de dépôt différents pour différents services. Un rendez-vous de coloration de 3 heures peut exiger un dépôt de 50 $. Une coupe de 20 minutes peut n'en exiger aucun." },
+        { "title": "Carte enregistrée pour les frais de rendez-vous manqué", "body": "Une fois le dépôt perçu, la carte du client reste enregistrée. Annulation tardive ou rendez-vous manqué? Les frais supplémentaires sont facturés automatiquement — vous n'avez jamais à le demander." },
+        { "title": "Tableau de bord Revenus protégés", "body": "Voyez exactement combien d'argent Pulse vous a fait économiser sur les rendez-vous manqués et les annulations. Votre chiffre de Revenus protégés montre le véritable rendement des dépôts." }
+      ],
+      "comparisonTitle": "Comparaison des dépôts Pulse",
+      "competitors": ["Acuity", "Calendly", "Square"],
+      "comparison": [
+        { "feature": "Dépôts à la réservation", "values": [true, true, false, true] },
+        { "feature": "Facturation automatique au-delà du dépôt pour rendez-vous manqué", "values": [true, false, false, "Partiel"] },
+        { "feature": "Carte enregistrée pour les frais futurs", "values": [true, false, false, true] },
+        { "feature": "Prix en CAD", "values": [true, false, false, false] },
+        { "feature": "Indicateur Revenus protégés", "values": [true, false, false, false] },
+        { "feature": "Règles de dépôt par service", "values": [true, true, false, true] }
+      ],
+      "faqs": [
+        { "q": "Que se passe-t-il si un client conteste les frais de dépôt?", "a": "Le processus de litige intégré de Stripe gère les rétrofacturations. Pulse fournit un enregistrement de la politique de dépôt que le client a acceptée à la réservation — c'est la preuve la plus importante dans un litige. Les taux de rétrofacturation pour les dépôts assortis de politiques claires et transparentes sont très faibles." },
+        { "q": "Puis-je rembourser un dépôt si un client annule avec un préavis suffisant?", "a": "Oui. Vous pouvez rembourser les dépôts manuellement depuis votre tableau de bord Pulse à tout moment. Si un client annule dans votre fenêtre d'annulation gratuite, vous pouvez rembourser le dépôt en un clic. Pulse ne rembourse pas automatiquement — vous gardez le contrôle." },
+        { "q": "Les clients doivent-ils créer un compte pour payer un dépôt?", "a": "Non. Les clients paient le dépôt dans le cadre du parcours de réservation avec n'importe quelle carte de crédit ou de débit, Apple Pay ou Google Pay. Aucune création de compte requise. La carte est conservée en toute sécurité par Stripe pour les frais futurs." }
+      ],
+      "ctaTitle": "Commencez à protéger vos rendez-vous dès aujourd'hui",
+      "ctaText": "Configurez les dépôts en moins de 5 minutes. Gratuit pour commencer — aucune carte de crédit requise."
+    },
+    "no-show-protection": {
+      "meta": { "title": "Protection contre les rendez-vous manqués pour les entreprises de services canadiennes | Pulse", "description": "Facturez automatiquement les frais de rendez-vous manqué et d'annulation tardive sur la carte enregistrée. Pulse applique votre politique d'annulation pour que vous n'ayez plus jamais à avoir une conversation gênante." },
+      "og": { "title": "Logiciel de protection contre les rendez-vous manqués | Pulse Appointments", "description": "Appliquez les politiques d'annulation et facturez automatiquement les frais de rendez-vous manqué. Conçu pour les entreprises de services canadiennes." },
+      "badge": "Protection contre les rendez-vous manqués",
+      "title": "Facturez automatiquement les frais de rendez-vous manqué —",
+      "titleAccent": "sans conversations gênantes",
+      "description": "Pulse applique votre politique d'annulation à votre place. Lorsqu'un client ne se présente pas ou annule à la dernière minute, les frais sont facturés automatiquement sur sa carte enregistrée. Vous recevez une notification. Il reçoit un reçu. Aucune conversation nécessaire.",
+      "breadcrumbName": "Protection contre les rendez-vous manqués",
+      "proofPoints": ["Fonctionne pour les salons, spas, barbiers et plus", "Prix en CAD", "Gratuit pour commencer"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Définissez votre politique d'annulation", "desc": "Choisissez votre fenêtre d'annulation (p. ex. 24 heures) et le montant des frais (montant fixe ou pourcentage). Pulse affiche la politique à chaque client avant qu'il confirme une réservation." },
+        { "num": "02", "title": "Le client accepte à la réservation", "desc": "En complétant sa réservation, le client accepte votre politique d'annulation. Sa carte est conservée en toute sécurité par Stripe. Aucune surprise par la suite." },
+        { "num": "03", "title": "Frais facturés automatiquement", "desc": "Si un client ne se présente pas ou annule dans votre fenêtre de politique, Pulse facture les frais automatiquement et vous envoie à tous les deux un reçu. Vous n'avez rien à faire." }
+      ],
+      "featuresTitle": "Une protection qui travaille pendant que vous travaillez",
+      "features": [
+        { "title": "Application de la politique sans confrontation", "body": "Vous établissez les règles une seule fois. Pulse les applique automatiquement. Aucune relance des clients, aucun appel inconfortable, aucun laisser-aller parce que vous vous sentiez mal à l'aise de demander." },
+        { "title": "Fenêtre d'annulation personnalisable", "body": "Configurez votre politique pour qu'elle se déclenche à 24 heures, 48 heures ou toute fenêtre qui convient à votre entreprise. Les frais d'annulation tardive et de rendez-vous manqué peuvent être définis indépendamment." },
+        { "title": "Revenus protégés — voyez vos véritables économies", "body": "Votre tableau de bord Revenus protégés montre exactement combien Pulse a récupéré pour vous. La plupart des entreprises récupèrent le coût complet de leur abonnement mensuel dès la première semaine." }
+      ],
+      "comparisonTitle": "Comparaison de la protection contre les rendez-vous manqués",
+      "competitors": ["Jane App", "Vagaro", "Acuity", "Calendly"],
+      "comparison": [
+        { "feature": "Application de la politique d'annulation", "values": [true, "Partiel", true, true, false] },
+        { "feature": "Facturation automatique sur la carte enregistrée", "values": [true, "Partiel", true, false, false] },
+        { "feature": "Frais de rendez-vous manqué distincts du dépôt", "values": [true, false, true, false, false] },
+        { "feature": "Le client accepte la politique à la réservation", "values": [true, true, true, true, false] },
+        { "feature": "Prix en CAD", "values": [true, true, false, false, false] },
+        { "feature": "Tableau de bord Revenus protégés", "values": [true, false, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "Que faire si un client prétend ne pas avoir connu la politique d'annulation?", "a": "Chaque client voit et accepte votre politique d'annulation lorsqu'il réserve — elle est affichée sur la page de réservation et incluse dans son courriel de confirmation. Cet accord écrit est votre protection. Les clients qui prétendent l'ignorer sont contredits par le dossier de réservation." },
+        { "q": "Puis-je annuler des frais de rendez-vous manqué pour un client en particulier?", "a": "Oui. Vous pouvez annuler ou rembourser tous frais facturés automatiquement depuis votre tableau de bord. Le système facture automatiquement, mais vous avez toujours le dernier mot. Certaines entreprises pardonnent la première infraction et facturent à partir de la deuxième." },
+        { "q": "La protection contre les rendez-vous manqués fonctionne-t-elle pour les réservations en personne et en ligne?", "a": "Elle fonctionne pour toutes les réservations effectuées via Pulse — que les clients réservent via votre page de réservation publique, votre lien de bio Instagram ou un lien de réservation que vous leur envoyez directement. Les réservations sans rendez-vous saisies manuellement par vous peuvent aussi recevoir une carte enregistrée au moment du rendez-vous." }
+      ],
+      "ctaTitle": "Cessez d'absorber le coût des rendez-vous manqués",
+      "ctaText": "Configurez la protection contre les rendez-vous manqués en moins de 5 minutes. Gratuit pour commencer — aucune carte de crédit requise."
+    },
+    "sms-reminders": {
+      "meta": { "title": "Rappels de rendez-vous par SMS pour les entreprises de services canadiennes | Pulse", "description": "Rappels de rendez-vous automatisés par SMS et courriel qui réduisent les rendez-vous manqués jusqu'à 80 %. Pulse envoie des rappels 72 h, 24 h et 2 h avant chaque rendez-vous. Prix en CAD." },
+      "og": { "title": "Rappels de rendez-vous par SMS | Pulse Appointments", "description": "Rappels automatisés par SMS et courriel qui réduisent les rendez-vous manqués. Conformes à la LCAP, conçus pour les entreprises de services canadiennes." },
+      "badge": "Rappels par SMS",
+      "title": "Des rappels par SMS automatisés",
+      "titleAccent": "qui se font vraiment lire",
+      "description": "Les rappels par courriel sont ignorés. Les rappels par SMS sont ouverts. Pulse envoie des rappels texte automatisés avant chaque rendez-vous — réduisant les rendez-vous manqués jusqu'à 80 % sans aucun travail manuel de votre part.",
+      "breadcrumbName": "Rappels par SMS",
+      "proofPoints": ["SMS inclus sur les forfaits Essentiel et plus", "Prix en CAD", "Aucune carte de crédit pour commencer"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Activez les rappels par SMS", "desc": "Activez les rappels par SMS dans vos paramètres Pulse. Choisissez les intervalles à utiliser : 72 heures, 24 heures et 2 heures avant chaque rendez-vous. La configuration prend 60 secondes." },
+        { "num": "02", "title": "Les clients donnent leur consentement à la réservation", "desc": "Lorsqu'un client réserve, il fournit son numéro de téléphone et consent à recevoir des rappels de rendez-vous. Le consentement conforme à la LCAP est recueilli automatiquement." },
+        { "num": "03", "title": "Les rappels partent automatiquement", "desc": "Pulse envoie les messages SMS exactement aux intervalles que vous définissez. Aucun travail manuel. Chaque message comprend l'heure du rendez-vous, le service et un lien pour reprogrammer ou annuler." }
+      ],
+      "featuresTitle": "Des rappels qui travaillent pendant que vous travaillez",
+      "features": [
+        { "title": "SMS et courriel, les deux canaux", "body": "Certains clients préfèrent le texte. D'autres préfèrent le courriel. Pulse envoie les deux pour que chaque client soit rappelé de la façon qu'il consulte réellement. Le SMS de 24 h est celui qui arrête les rendez-vous manqués." },
+        { "title": "Moment des rappels personnalisable", "body": "Utilisez l'horaire par défaut de 72 h/24 h/2 h ou ajustez-le selon ce qui convient à votre entreprise. Un salon occupé pourrait vouloir un rappel à 48 h. Un toiletteur mobile pourrait ajouter un texte le matin même." },
+        { "title": "Recueil du consentement conforme à la LCAP", "body": "La loi anti-pourriel du Canada (LCAP) exige le consentement avant l'envoi de messages marketing ou transactionnels. Pulse le recueille automatiquement à la réservation — vous êtes couvert." }
+      ],
+      "comparisonTitle": "Comparaison des rappels par SMS",
+      "competitors": ["Vagaro", "Acuity", "Square", "Calendly"],
+      "comparison": [
+        { "feature": "Rappels par SMS inclus", "values": [true, "Option", true, true, "Option"] },
+        { "feature": "Rappels par courriel inclus", "values": [true, true, true, true, true] },
+        { "feature": "Recueil du consentement LCAP", "values": [true, false, false, false, false] },
+        { "feature": "Moment personnalisable", "values": [true, true, true, "Partiel", "Partiel"] },
+        { "feature": "Lien de reprogrammation dans le rappel", "values": [true, true, true, true, true] },
+        { "feature": "Prix en CAD", "values": [true, false, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "De quel forfait ai-je besoin pour les rappels par SMS?", "a": "Les rappels par SMS sont offerts à partir du forfait Essentiel (19 $ CAD/mois). Le forfait Gratuit comprend les confirmations et mises à jour par courriel, mais pas les rappels programmés par SMS ou courriel. Vous pouvez passer à un forfait supérieur à tout moment depuis les paramètres de votre compte." },
+        { "q": "Pulse gère-t-il la conformité à la LCAP pour les SMS automatiquement?", "a": "Oui. Lorsqu'un client fournit son numéro de téléphone à la réservation, Pulse recueille son consentement à recevoir des rappels de rendez-vous dans un format conforme à la LCAP. Vous n'avez pas à gérer le consentement séparément. Les messages marketing (campagnes, reconquêtes) ont un consentement distinct recueilli dans vos paramètres marketing." },
+        { "q": "Que dit réellement le SMS de rappel?", "a": "Pulse envoie un message en langage clair avec le nom du client, la date et l'heure du rendez-vous, le nom du service et le nom de votre entreprise. Il comprend un lien vers les détails de sa réservation où il peut reprogrammer ou annuler. Vous pouvez personnaliser le modèle de message depuis vos paramètres de notification." }
+      ],
+      "ctaTitle": "Réduisez les rendez-vous manqués jusqu'à 80 % — automatiquement",
+      "ctaText": "Activez les rappels par SMS en moins de 60 secondes. Gratuit pour commencer — aucune carte de crédit requise."
+    },
+    "client-management": {
+      "meta": { "title": "Logiciel de gestion des clients pour les entreprises de services canadiennes | Pulse", "description": "Regroupez les profils clients, l'historique des réservations, les notes, les messages et les dossiers de rendez-vous au même endroit. Gestion des clients conçue pour les entreprises de services canadiennes." },
+      "og": { "title": "Logiciel de gestion des clients | Pulse Appointments", "description": "Profils clients, notes, messages, historique et dossiers de réservation pour les entreprises de services canadiennes." },
+      "badge": "Gestion des clients",
+      "title": "Gardez chaque détail client",
+      "titleAccent": "au même endroit",
+      "description": "Cessez de fouiller dans les messages privés, les applications de notes et les vieux calendriers. Pulse regroupe les profils clients, l'historique des rendez-vous, les notes et les messages pour que chaque visite commence avec le contexte.",
+      "breadcrumbName": "Gestion des clients",
+      "proofPoints": ["Historique client", "Notes privées", "Aucune carte de crédit requise"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Le client réserve ou est ajouté", "desc": "Pulse crée un profil client lorsque quelqu'un réserve en ligne, ou vous pouvez en ajouter un manuellement depuis le tableau de bord." },
+        { "num": "02", "title": "L'historique se construit automatiquement", "desc": "Les rendez-vous, les services, les factures, les avis et les messages restent rattachés au dossier du client." },
+        { "num": "03", "title": "Votre équipe a le contexte", "desc": "Avant le prochain rendez-vous, le personnel peut consulter les notes et l'historique au lieu de poser à nouveau les mêmes questions." }
+      ],
+      "featuresTitle": "Conçu pour le travail quotidien des entreprises de services",
+      "features": [
+        { "title": "Historique des rendez-vous", "body": "Voyez les réservations passées et à venir, les détails des services et l'activité des clients sans changer d'outil." },
+        { "title": "Messages clients", "body": "Gardez les conversations liées aux rendez-vous rattachées à l'entreprise au lieu d'être éparpillées dans des boîtes de réception personnelles." },
+        { "title": "Recherche rapide", "body": "Trouvez rapidement les clients par nom ou coordonnées lorsqu'ils appellent, écrivent ou se présentent." }
+      ],
+      "comparisonTitle": "Comparaison de la gestion des clients",
+      "competitors": ["Calendly", "Acuity", "Square", "Jane App"],
+      "comparison": [
+        { "feature": "Profils clients", "values": [true, false, true, true, true] },
+        { "feature": "Historique des rendez-vous", "values": [true, false, true, true, true] },
+        { "feature": "Notes sur les clients", "values": [true, false, true, true, true] },
+        { "feature": "Conçu pour les services, pas les réunions", "values": [true, false, true, "Partiel", true] },
+        { "feature": "Tarification axée sur le CAD", "values": [true, false, false, false, true] }
+      ],
+      "faqs": [
+        { "q": "Quels renseignements client puis-je stocker dans Pulse?", "a": "Pulse stocke les coordonnées des clients, l'historique des rendez-vous, les notes, les réponses d'admission, les messages, les factures, les avis et les préférences de réservation lorsque disponibles." },
+        { "q": "Le personnel peut-il voir les notes sur les clients?", "a": "Les propriétaires et le personnel autorisé peuvent accéder aux détails des clients depuis le tableau de bord pour que l'équipe ait le contexte avant chaque rendez-vous." },
+        { "q": "La gestion des clients est-elle incluse dans le forfait gratuit?", "a": "Oui. Le forfait gratuit comprend les bases de la gestion des clients. Les forfaits payants ajoutent davantage d'outils opérationnels comme les rappels, les dépôts, la protection contre les rendez-vous manqués et des fonctionnalités d'équipe avancées." }
+      ],
+      "ctaTitle": "Apportez le contexte client à chaque rendez-vous",
+      "ctaText": "Commencez gratuitement et gardez vos dossiers de réservation, vos détails clients et votre historique connectés dès le premier jour."
+    },
+    "intake-forms": {
+      "meta": { "title": "Formulaires d'admission des clients pour les entreprises de services canadiennes | Pulse", "description": "Recueillez les allergies, les préférences, les consentements et des questions personnalisées avant l'arrivée des clients. Formulaires d'admission intégrés à la réservation en ligne." },
+      "og": { "title": "Formulaires d'admission des clients | Pulse Appointments", "description": "Recueillez les détails des clients et des questions personnalisées avant chaque rendez-vous." },
+      "badge": "Formulaires d'admission",
+      "title": "Recueillez les détails des clients avant",
+      "titleAccent": "leur arrivée",
+      "description": "Posez les bonnes questions à la réservation : allergies, préférences, objectifs, notes de service ou consentements. Pulse garde les réponses d'admission avec le rendez-vous pour que votre équipe soit prête.",
+      "breadcrumbName": "Formulaires d'admission",
+      "proofPoints": ["Questions personnalisées", "Rattachées aux réservations", "Pages de confidentialité canadiennes"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Créez vos questions", "desc": "Ajoutez des champs personnalisés pour les détails de service, les notes de santé ou les préférences dont vous avez besoin avant le rendez-vous." },
+        { "num": "02", "title": "Le client répond en réservant", "desc": "L'étape d'admission apparaît dans le parcours de réservation, de sorte que les détails sont recueillis avant la visite." },
+        { "num": "03", "title": "Le personnel consulte avant le service", "desc": "Les réponses restent connectées au rendez-vous et au dossier client pour un service plus rapide et mieux préparé." }
+      ],
+      "featuresTitle": "Conçu pour le travail quotidien des entreprises de services",
+      "features": [
+        { "title": "Questions d'admission personnalisées", "body": "Recueillez les détails exacts dont votre entreprise a besoin au lieu d'imposer un formulaire générique." },
+        { "title": "Contexte du rendez-vous", "body": "Les réponses restent rattachées à la réservation, ce qui simplifie la consultation avant le rendez-vous pour le personnel." },
+        { "title": "Documentation de confiance", "body": "Pulse prend en charge des pages publiques de confidentialité et de sécurité pour que les clients comprennent comment l'expérience de réservation est gérée." }
+      ],
+      "comparisonTitle": "Comparaison des formulaires d'admission",
+      "competitors": ["Calendly", "Acuity", "Vagaro", "Jane App"],
+      "comparison": [
+        { "feature": "Questions de réservation personnalisées", "values": [true, true, true, true, true] },
+        { "feature": "Parcours d'admission pour entreprises de services", "values": [true, false, true, true, true] },
+        { "feature": "Rattachées à l'historique client", "values": [true, false, true, true, true] },
+        { "feature": "Positionnement axé sur la confidentialité canadienne", "values": [true, false, false, false, true] },
+        { "feature": "Tarification axée sur le CAD", "values": [true, false, false, false, true] }
+      ],
+      "faqs": [
+        { "q": "Puis-je créer des questions d'admission personnalisées?", "a": "Oui. Pulse prend en charge des questions d'admission personnalisées pour que les entreprises puissent recueillir les détails qui comptent pour leurs services." },
+        { "q": "Quand les clients remplissent-ils les formulaires d'admission?", "a": "Les clients répondent aux questions d'admission pendant le parcours de réservation, avant la confirmation du rendez-vous." },
+        { "q": "Les réponses d'admission sont-elles connectées au rendez-vous?", "a": "Oui. Les réponses d'admission sont connectées au rendez-vous et au contexte client pour que le personnel puisse les consulter avant la visite." }
+      ],
+      "ctaTitle": "Recueillez de meilleurs détails avant chaque rendez-vous",
+      "ctaText": "Commencez gratuitement et ajoutez des questions d'admission à votre parcours de réservation sans outil de formulaire distinct."
+    },
+    "multi-location": {
+      "meta": { "title": "Logiciel de réservation multi-emplacement pour les entreprises de services canadiennes | Pulse", "description": "Gérez plusieurs emplacements, les calendriers du personnel, la disponibilité des services et les liens de réservation en ligne dans Pulse. Conçu pour les entreprises de services canadiennes." },
+      "og": { "title": "Logiciel de réservation multi-emplacement | Pulse Appointments", "description": "Gérez la réservation de services à travers plusieurs emplacements et calendriers du personnel." },
+      "badge": "Multi-emplacement",
+      "title": "Gérez la réservation à travers plusieurs",
+      "titleAccent": "emplacements",
+      "description": "Que vous ayez deux studios, des pop-ups itinérants ou plusieurs zones de service, Pulse aide à garder les emplacements, le personnel, les calendriers et les parcours de réservation des clients bien organisés.",
+      "breadcrumbName": "Multi-emplacement",
+      "proofPoints": ["Pro prend en charge 2 emplacements", "Illimité en prend en charge jusqu'à 5", "Calendriers du personnel"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Ajoutez vos emplacements", "desc": "Créez chaque studio, zone de service ou adresse d'exploitation dans les paramètres de votre entreprise." },
+        { "num": "02", "title": "Attribuez les services et le personnel", "desc": "Gardez les horaires du personnel et la disponibilité des services alignés sur l'endroit où le travail se fait réellement." },
+        { "num": "03", "title": "Les clients réservent au bon endroit", "desc": "Les clients voient le bon contexte d'emplacement pendant que votre équipe garde les calendriers organisés en coulisses." }
+      ],
+      "featuresTitle": "Conçu pour le travail quotidien des entreprises de services",
+      "features": [
+        { "title": "Gestion des emplacements", "body": "Gardez plusieurs studios, salles, pop-ups ou zones de service organisés sous un seul compte Pulse." },
+        { "title": "Clarté des calendriers", "body": "Réduisez les erreurs d'horaire en séparant l'endroit où les rendez-vous ont lieu de la personne qui les offre." },
+        { "title": "Prêt pour l'expansion locale", "body": "Conçu pour les entreprises canadiennes qui passent d'exploitant solo à une équipe et à des opérations multi-emplacement." }
+      ],
+      "comparisonTitle": "Comparaison multi-emplacement",
+      "competitors": ["Calendly", "Acuity", "Square", "Vagaro"],
+      "comparison": [
+        { "feature": "Plusieurs emplacements d'entreprise", "values": [true, false, true, true, true] },
+        { "feature": "Calendriers du personnel", "values": [true, true, true, true, true] },
+        { "feature": "Parcours de réservation pour entreprises de services", "values": [true, false, true, true, true] },
+        { "feature": "Tarification axée sur le CAD", "values": [true, false, false, false, false] },
+        { "feature": "Structure de forfaits simple", "values": [true, false, false, "Partiel", false] }
+      ],
+      "faqs": [
+        { "q": "Combien d'emplacements puis-je gérer dans Pulse?", "a": "Pulse prend en charge plusieurs emplacements sur les forfaits payants. Pro prend en charge 2 emplacements et Illimité en prend en charge jusqu'à 5." },
+        { "q": "Chaque emplacement peut-il avoir un personnel et des disponibilités différents?", "a": "Oui. Les emplacements peuvent être gérés avec leur propre contexte opérationnel, leurs horaires de personnel et leur configuration de réservation." },
+        { "q": "Le multi-emplacement est-il utile pour les prestataires de services mobiles?", "a": "Oui. La prise en charge des emplacements aide les entreprises à séparer les zones de service, les studios, les pop-ups ou différentes adresses d'exploitation." }
+      ],
+      "ctaTitle": "Gardez chaque emplacement organisé",
+      "ctaText": "Commencez gratuitement, puis passez à un forfait supérieur lorsque votre entreprise a besoin de contrôles de réservation multi-emplacement."
+    },
+    "reviews": {
+      "meta": { "title": "Logiciel de gestion des avis pour les entreprises de services canadiennes | Pulse", "description": "Recueillez et publiez de vrais avis de rendez-vous provenant de visites terminées. Gestion des avis pour les entreprises de services canadiennes qui utilisent Pulse." },
+      "og": { "title": "Logiciel de gestion des avis | Pulse Appointments", "description": "Recueillez, modérez et publiez des avis liés à de vrais rendez-vous." },
+      "badge": "Gestion des avis",
+      "title": "Recueillez de vrais avis après",
+      "titleAccent": "les visites terminées",
+      "description": "Pulse vous aide à gagner la confiance de la bonne façon : envoyez des demandes d'avis après de vrais rendez-vous, modérez les commentaires et publiez les avis là où les nouveaux clients décident s'ils vont réserver.",
+      "breadcrumbName": "Gestion des avis",
+      "proofPoints": ["Demandes liées à de vrais rendez-vous", "Modération par le propriétaire", "Aucun faux témoignage"],
+      "stepsTitle": "Comment ça fonctionne",
+      "steps": [
+        { "num": "01", "title": "Le rendez-vous est terminé", "desc": "Les demandes d'avis sont liées à l'activité réelle des rendez-vous, et non à du contenu marketing inventé." },
+        { "num": "02", "title": "Le client laisse un commentaire", "desc": "Les clients peuvent évaluer l'expérience et ajouter un commentaire écrit à partir d'un lien d'avis signé." },
+        { "num": "03", "title": "Vous publiez ce qui est utile", "desc": "Les propriétaires peuvent publier ou masquer les avis depuis le tableau de bord avant qu'ils n'apparaissent publiquement." }
+      ],
+      "featuresTitle": "Conçu pour le travail quotidien des entreprises de services",
+      "features": [
+        { "title": "Flux de demande d'avis", "body": "Transformez les rendez-vous terminés en demandes d'avis opportunes sans relance manuelle." },
+        { "title": "Contrôles de modération", "body": "Consultez les commentaires en privé et choisissez ce qui apparaît publiquement sur votre page de réservation." },
+        { "title": "Signal de confiance public", "body": "Les avis publiés aident les nouveaux clients à prendre une décision de réservation sans s'appuyer sur des témoignages fictifs." }
+      ],
+      "comparisonTitle": "Comparaison de la gestion des avis",
+      "competitors": ["Calendly", "Acuity", "Square", "Vagaro"],
+      "comparison": [
+        { "feature": "Demandes d'avis liées aux rendez-vous", "values": [true, false, false, "Partiel", true] },
+        { "feature": "Avis sur la page de réservation publique", "values": [true, false, false, true, true] },
+        { "feature": "Modération par le propriétaire", "values": [true, false, false, true, true] },
+        { "feature": "Conçu pour les services, pas les réunions", "values": [true, false, true, "Partiel", true] },
+        { "feature": "Tarification axée sur le CAD", "values": [true, false, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "Pulse crée-t-il des avis automatiquement?", "a": "Non. Pulse envoie des demandes d'avis après les rendez-vous terminés, mais les clients choisissent de laisser ou non un commentaire." },
+        { "q": "Puis-je choisir quels avis sont publics?", "a": "Oui. Les propriétaires peuvent publier ou masquer les avis depuis le tableau de bord avant qu'ils n'apparaissent publiquement." },
+        { "q": "Où apparaissent les avis publiés?", "a": "Les avis publiés peuvent apparaître sur la page de réservation publique pour que les clients potentiels puissent évaluer l'entreprise avant de réserver." }
+      ],
+      "ctaTitle": "Commencez à recueillir de vraies preuves d'avis",
+      "ctaText": "Utilisez les rendez-vous terminés pour bâtir la confiance du public sans publier de témoignages fabriqués."
+    }
   }
 }

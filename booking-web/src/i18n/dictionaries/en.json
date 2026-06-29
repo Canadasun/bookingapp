@@ -227,5 +227,325 @@
       "body": "The strongest Pulse workflows combine multiple features: an intake form before booking, a deposit at checkout, SMS reminders before the appointment, and a review request after completion."
     },
     "toggleLabel": "Language"
+  },
+  "featureUi": {
+    "getStartedFree": "Get started free",
+    "frequentlyAsked": "Frequently asked questions",
+    "featureColumn": "Feature",
+    "brand": "Pulse Booking",
+    "breadcrumbHome": "Home",
+    "breadcrumbFeatures": "Features",
+    "toggleLabel": "Language",
+    "footer": { "home": "Home", "pricing": "Pricing", "terms": "Terms", "privacy": "Privacy", "support": "Support" }
+  },
+  "featurePages": {
+    "online-booking": {
+      "meta": { "title": "Online Booking Software for Canadian Service Businesses | Pulse", "description": "Let clients book appointments online 24/7. Pulse gives you a free public booking page — add it to Instagram, Google, or your website. No app download required. CAD pricing." },
+      "og": { "title": "Online Booking Software | Pulse Appointments", "description": "Free online booking page for Canadian service businesses. Works on Instagram, Google, and any website." },
+      "badge": "Online Booking",
+      "title": "Let clients book appointments online,",
+      "titleAccent": "24/7",
+      "description": "No more phone tag. No more DMs asking \"are you free Thursday?\" Pulse gives you a free public booking page your clients can use any time — from Instagram, Google, or your website.",
+      "breadcrumbName": "Online Booking",
+      "proofPoints": ["Free on all plans", "No app download for clients", "Live in under 5 minutes"],
+      "stepsTitle": "Up and running in minutes",
+      "steps": [
+        { "num": "01", "title": "Add your services", "desc": "Enter your service names, prices, duration, and availability. Takes about 5 minutes. No technical skills required." },
+        { "num": "02", "title": "Share your booking link", "desc": "Put your Pulse booking link in your Instagram bio, Google Business profile, website, or email signature. Clients tap the link and book themselves." },
+        { "num": "03", "title": "You get notified, they get confirmed", "desc": "Pulse sends you a notification and the client a confirmation email instantly. The appointment appears in your calendar. Done." }
+      ],
+      "featuresTitle": "One booking page. Every channel.",
+      "features": [
+        { "title": "Works anywhere clients find you", "body": "Your booking page works from your Instagram bio, your Google Business listing, a link in your email, or embedded on your website. One link, everywhere." },
+        { "title": "Mobile-first for clients", "body": "Clients book from their phone in under 2 minutes, no app download required. They pick a service, choose a time, and pay a deposit if required — all in one flow." },
+        { "title": "Multi-staff and multi-service", "body": "Clients can choose their preferred provider and service. Each staff member gets their own calendar and availability. No double-bookings possible." }
+      ],
+      "comparisonTitle": "Online booking comparison",
+      "competitors": ["Jane App", "Vagaro", "Acuity", "Calendly"],
+      "comparison": [
+        { "feature": "Free public booking page", "values": [true, true, true, true, true] },
+        { "feature": "No client account required", "values": [true, false, false, true, true] },
+        { "feature": "Instagram bio link ready", "values": [true, false, true, true, true] },
+        { "feature": "Google Business integration", "values": [true, false, true, "Partial", "Partial"] },
+        { "feature": "Multi-staff booking", "values": [true, true, true, true, true] },
+        { "feature": "CAD pricing", "values": [true, true, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "Do clients need to create an account to book?", "a": "No. Clients book using just their name, email, and phone number. No password, no account, no app download required. The simpler the booking flow, the more bookings you get — that's why we designed it this way." },
+        { "q": "Can I embed the booking page on my existing website?", "a": "Yes. Pulse provides an embeddable booking widget you can add to any website with a single line of code. Clients book directly on your site without being redirected to a separate page. Works with Squarespace, Wix, WordPress, and any custom site." },
+        { "q": "What happens if a client tries to book outside my working hours?", "a": "Pulse only shows your actual available slots. If you're not working on Sundays, Sunday slots don't appear. If a slot is already booked, it's removed from the calendar in real time. Clients can only book times that genuinely work for you." }
+      ],
+      "ctaTitle": "Start taking online bookings today",
+      "ctaText": "Your booking page is live in under 5 minutes. Free to start — no credit card required."
+    },
+    "deposits": {
+      "meta": { "title": "Booking Deposit Software for Canadian Service Businesses | Pulse", "description": "Require a deposit when clients book online. Pulse automatically collects and holds deposits — and charges no-show fees to card-on-file. CAD pricing, free to start." },
+      "og": { "title": "Booking Deposit Software | Pulse Appointments", "description": "Collect deposits at booking and charge no-show fees automatically. Built for Canadian service businesses." },
+      "badge": "Booking Deposits",
+      "title": "Require a deposit when clients book —",
+      "titleAccent": "automatically",
+      "description": "Stop losing money to no-shows. Pulse collects a deposit when clients book and charges the card automatically if they don't show up. Set it up once. It runs itself.",
+      "breadcrumbName": "Booking Deposits",
+      "proofPoints": ["No credit card required to start", "CAD pricing", "Cancel anytime"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Set your deposit amount", "desc": "Choose a flat dollar amount or a percentage of the service price. Set it per-service — a colour treatment can require more than a quick trim." },
+        { "num": "02", "title": "Client pays at booking", "desc": "When a client books online, Pulse collects the deposit through Stripe. The client sees the deposit amount and policy before confirming." },
+        { "num": "03", "title": "No-show? Charge automatically", "desc": "If a client no-shows or cancels inside your policy window, Pulse charges the remaining balance (or the full no-show fee) to the card automatically. No awkward calls." }
+      ],
+      "featuresTitle": "Everything you need to protect your revenue",
+      "features": [
+        { "title": "Per-service deposit rules", "body": "Set different deposit amounts for different services. A 3-hour colour appointment can require a $50 deposit. A 20-minute trim can have none." },
+        { "title": "Card-on-file for no-show fees", "body": "After the deposit is collected, the client's card stays on file. Late cancel or no-show? The additional fee is charged automatically — you never have to ask." },
+        { "title": "Revenue Protected dashboard", "body": "See exactly how much money Pulse has saved you from no-shows and cancellations. Your Revenue Protected number shows the real ROI of deposits." }
+      ],
+      "comparisonTitle": "How Pulse deposits compare",
+      "competitors": ["Acuity", "Calendly", "Square"],
+      "comparison": [
+        { "feature": "Deposits at booking", "values": [true, true, false, true] },
+        { "feature": "No-show auto-charge beyond deposit", "values": [true, false, false, "Partial"] },
+        { "feature": "Card-on-file for future charges", "values": [true, false, false, true] },
+        { "feature": "CAD pricing", "values": [true, false, false, false] },
+        { "feature": "Revenue Protected metric", "values": [true, false, false, false] },
+        { "feature": "Per-service deposit rules", "values": [true, true, false, true] }
+      ],
+      "faqs": [
+        { "q": "What happens if a client disputes the deposit charge?", "a": "Stripe's built-in dispute process handles chargebacks. Pulse provides a record of the deposit policy the client agreed to at booking — this is the most important evidence in a dispute. Chargeback rates for deposits with clear upfront policies are very low." },
+        { "q": "Can I refund a deposit if a client cancels with enough notice?", "a": "Yes. You can refund deposits manually from your Pulse dashboard at any time. If a client cancels within your free-cancellation window, you can refund the deposit in one click. Pulse doesn't refund automatically — you stay in control." },
+        { "q": "Do clients need to create an account to pay a deposit?", "a": "No. Clients pay the deposit as part of the booking flow using any credit or debit card, Apple Pay, or Google Pay. No account creation required. The card is stored securely by Stripe for future charges." }
+      ],
+      "ctaTitle": "Start protecting your appointments today",
+      "ctaText": "Set up deposits in under 5 minutes. Free to start — no credit card required."
+    },
+    "no-show-protection": {
+      "meta": { "title": "No-Show Protection for Canadian Service Businesses | Pulse", "description": "Automatically charge no-show and late cancellation fees to card-on-file. Pulse enforces your cancellation policy so you never have to have an awkward conversation again." },
+      "og": { "title": "No-Show Protection Software | Pulse Appointments", "description": "Enforce cancellation policies and charge no-show fees automatically. Built for Canadian service businesses." },
+      "badge": "No-Show Protection",
+      "title": "Charge no-show fees automatically —",
+      "titleAccent": "no awkward conversations",
+      "description": "Pulse enforces your cancellation policy for you. When a client no-shows or cancels last minute, the fee is charged to their card on file automatically. You get a notification. They get a receipt. No conversation needed.",
+      "breadcrumbName": "No-Show Protection",
+      "proofPoints": ["Works for salons, spas, barbers, and more", "CAD pricing", "Free to start"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Set your cancellation policy", "desc": "Choose your cancellation window (e.g. 24 hours) and fee amount (flat fee or percentage). Pulse shows the policy to every client before they confirm a booking." },
+        { "num": "02", "title": "Client agrees at booking", "desc": "By completing their booking, the client agrees to your cancellation policy. Their card is stored securely by Stripe. No surprises later." },
+        { "num": "03", "title": "Fee charged automatically", "desc": "If a client no-shows or cancels inside your policy window, Pulse charges the fee automatically and sends both of you a receipt. You don't have to do anything." }
+      ],
+      "featuresTitle": "Protection that works while you work",
+      "features": [
+        { "title": "Policy enforcement without confrontation", "body": "You set the rules once. Pulse enforces them automatically. No chasing clients, no uncomfortable calls, no letting people off the hook because you felt awkward asking." },
+        { "title": "Customizable cancellation window", "body": "Set your policy to trigger at 24 hours, 48 hours, or any window that suits your business. Late-cancel fees and no-show fees can be set independently." },
+        { "title": "Revenue Protected — see your real savings", "body": "Your Revenue Protected dashboard shows exactly how much Pulse has recovered for you. Most businesses recover their entire monthly subscription cost in the first week." }
+      ],
+      "comparisonTitle": "No-show protection comparison",
+      "competitors": ["Jane App", "Vagaro", "Acuity", "Calendly"],
+      "comparison": [
+        { "feature": "Cancellation policy enforcement", "values": [true, "Partial", true, true, false] },
+        { "feature": "Automatic charge to card-on-file", "values": [true, "Partial", true, false, false] },
+        { "feature": "No-show fee separate from deposit", "values": [true, false, true, false, false] },
+        { "feature": "Client agrees to policy at booking", "values": [true, true, true, true, false] },
+        { "feature": "CAD pricing", "values": [true, true, false, false, false] },
+        { "feature": "Revenue Protected dashboard", "values": [true, false, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "What if a client claims they didn't know about the cancellation policy?", "a": "Every client sees and agrees to your cancellation policy when they book — it's displayed on the booking page and included in their confirmation email. This written agreement is your protection. Clients who claim ignorance are contradicted by the booking record." },
+        { "q": "Can I waive a no-show fee for a specific client?", "a": "Yes. You can cancel or refund any automatically charged fee from your dashboard. The system charges automatically, but you always have the final say. Some businesses waive the first offence and charge from the second." },
+        { "q": "Does no-show protection work for in-person and online bookings?", "a": "It works for all bookings made through Pulse — whether clients book through your public booking page, your Instagram bio link, or a booking link you send them directly. Walk-in bookings entered manually by you can also have card-on-file added at the time of the appointment." }
+      ],
+      "ctaTitle": "Stop absorbing the cost of no-shows",
+      "ctaText": "Set up no-show protection in under 5 minutes. Free to start — no credit card required."
+    },
+    "sms-reminders": {
+      "meta": { "title": "SMS Appointment Reminders for Canadian Service Businesses | Pulse", "description": "Automated SMS and email appointment reminders that reduce no-shows by up to 80%. Pulse sends reminders at 72h, 24h, and 2h before every appointment. CAD pricing." },
+      "og": { "title": "SMS Appointment Reminders | Pulse Appointments", "description": "Automated SMS and email reminders that cut no-shows. CASL-compliant, built for Canadian service businesses." },
+      "badge": "SMS Reminders",
+      "title": "Automated SMS reminders",
+      "titleAccent": "that actually get read",
+      "description": "Email reminders get ignored. SMS reminders get opened. Pulse sends automated text reminders before every appointment — reducing no-shows by up to 80% without any manual work from you.",
+      "breadcrumbName": "SMS Reminders",
+      "proofPoints": ["SMS included on Basic+ plans", "CAD pricing", "No credit card to start"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Turn on SMS reminders", "desc": "Enable SMS reminders in your Pulse settings. Choose which intervals to use: 72 hours, 24 hours, and 2 hours before each appointment. Takes 60 seconds to set up." },
+        { "num": "02", "title": "Clients opt in at booking", "desc": "When a client books, they provide their phone number and consent to receive appointment reminders. CASL-compliant consent is captured automatically." },
+        { "num": "03", "title": "Reminders go out automatically", "desc": "Pulse sends SMS messages at exactly the intervals you set. No manual work. Each message includes the appointment time, service, and a link to reschedule or cancel." }
+      ],
+      "featuresTitle": "Reminders that work while you work",
+      "features": [
+        { "title": "SMS + email, both channels", "body": "Some clients prefer text. Some prefer email. Pulse sends both so every client gets reminded in the way they actually check. The 24h SMS is the one that stops no-shows." },
+        { "title": "Customizable reminder timing", "body": "Use the default 72h/24h/2h schedule or adjust to what works for your business. A busy salon might want a 48h reminder. A mobile groomer might add a same-morning text." },
+        { "title": "CASL-compliant consent capture", "body": "Canada's anti-spam law (CASL) requires consent before sending marketing or transactional messages. Pulse captures this automatically at booking — you're covered." }
+      ],
+      "comparisonTitle": "SMS reminder comparison",
+      "competitors": ["Vagaro", "Acuity", "Square", "Calendly"],
+      "comparison": [
+        { "feature": "SMS reminders included", "values": [true, "Add-on", true, true, "Add-on"] },
+        { "feature": "Email reminders included", "values": [true, true, true, true, true] },
+        { "feature": "CASL consent capture", "values": [true, false, false, false, false] },
+        { "feature": "Customizable timing", "values": [true, true, true, "Partial", "Partial"] },
+        { "feature": "Reschedule link in reminder", "values": [true, true, true, true, true] },
+        { "feature": "CAD pricing", "values": [true, false, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "What plan do I need for SMS reminders?", "a": "SMS reminders are available on the Basic plan ($19 CAD/month) and above. The Free plan includes email confirmations and updates, but not scheduled SMS or email reminders. You can upgrade at any time from your account settings." },
+        { "q": "Does Pulse handle CASL compliance for SMS automatically?", "a": "Yes. When a client provides their phone number at booking, Pulse captures their consent to receive appointment reminders in a CASL-compliant format. You don't need to manage consent separately. Marketing messages (campaigns, win-backs) have separate consent captured under your marketing settings." },
+        { "q": "What does the reminder SMS actually say?", "a": "Pulse sends a plain-language message with the client's name, appointment date and time, service name, and your business name. It includes a link to their booking details where they can reschedule or cancel. You can customize the message template from your notification settings." }
+      ],
+      "ctaTitle": "Cut no-shows by up to 80% — automatically",
+      "ctaText": "Enable SMS reminders in under 60 seconds. Free to start — no credit card required."
+    },
+    "client-management": {
+      "meta": { "title": "Client Management Software for Canadian Service Businesses | Pulse", "description": "Keep client profiles, booking history, notes, messages, and appointment records in one place. Client management built for Canadian service businesses." },
+      "og": { "title": "Client Management Software | Pulse Appointments", "description": "Client profiles, notes, messages, history, and booking records for Canadian service businesses." },
+      "badge": "Client Management",
+      "title": "Keep every client detail",
+      "titleAccent": "in one place",
+      "description": "Stop digging through DMs, notes apps, and old calendars. Pulse keeps client profiles, appointment history, notes, and messages together so every visit starts with context.",
+      "breadcrumbName": "Client Management",
+      "proofPoints": ["Client history", "Private notes", "No credit card required"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Client books or gets added", "desc": "Pulse creates a client profile when someone books online, or you can add one manually from the dashboard." },
+        { "num": "02", "title": "History builds automatically", "desc": "Appointments, services, invoices, reviews, and messages stay attached to the client record." },
+        { "num": "03", "title": "Your team has context", "desc": "Before the next appointment, staff can review notes and history instead of asking the same questions again." }
+      ],
+      "featuresTitle": "Built for daily service-business work",
+      "features": [
+        { "title": "Appointment history", "body": "See past and upcoming bookings, service details, and client activity without switching tools." },
+        { "title": "Client messages", "body": "Keep appointment-related conversations connected to the business instead of scattered across personal inboxes." },
+        { "title": "Fast lookup", "body": "Find clients quickly by name or contact details when they call, message, or walk in." }
+      ],
+      "comparisonTitle": "Client management comparison",
+      "competitors": ["Calendly", "Acuity", "Square", "Jane App"],
+      "comparison": [
+        { "feature": "Client profiles", "values": [true, false, true, true, true] },
+        { "feature": "Appointment history", "values": [true, false, true, true, true] },
+        { "feature": "Client notes", "values": [true, false, true, true, true] },
+        { "feature": "Built for services, not meetings", "values": [true, false, true, "Partial", true] },
+        { "feature": "CAD-first pricing", "values": [true, false, false, false, true] }
+      ],
+      "faqs": [
+        { "q": "What client details can I store in Pulse?", "a": "Pulse stores client contact details, appointment history, notes, intake answers, messages, invoices, reviews, and booking preferences where available." },
+        { "q": "Can staff see client notes?", "a": "Owners and authorized staff can access client details from the dashboard so the team has context before each appointment." },
+        { "q": "Is client management included on the free plan?", "a": "Yes. The free plan includes client management basics. Paid plans add more operational tools such as reminders, deposits, no-show protection, and advanced team features." }
+      ],
+      "ctaTitle": "Bring client context into every appointment",
+      "ctaText": "Start free and keep your booking records, client details, and history connected from day one."
+    },
+    "intake-forms": {
+      "meta": { "title": "Client Intake Forms for Canadian Service Businesses | Pulse", "description": "Collect allergies, preferences, consent details, and custom questions before clients arrive. Intake forms built into online booking." },
+      "og": { "title": "Client Intake Forms | Pulse Appointments", "description": "Collect client details and custom questions before each appointment." },
+      "badge": "Intake Forms",
+      "title": "Collect client details before",
+      "titleAccent": "they arrive",
+      "description": "Ask the right questions at booking: allergies, preferences, goals, service notes, or consent details. Pulse keeps intake answers with the appointment so your team is prepared.",
+      "breadcrumbName": "Intake Forms",
+      "proofPoints": ["Custom questions", "Attached to bookings", "Canadian privacy pages"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Build your questions", "desc": "Add custom fields for the service details, health notes, or preferences you need before the appointment." },
+        { "num": "02", "title": "Client answers while booking", "desc": "The intake step appears inside the booking flow, so details are collected before the visit." },
+        { "num": "03", "title": "Staff review before service", "desc": "Answers stay connected to the appointment and client record for faster, more prepared service." }
+      ],
+      "featuresTitle": "Built for daily service-business work",
+      "features": [
+        { "title": "Custom intake questions", "body": "Collect the exact details your business needs instead of forcing a generic form." },
+        { "title": "Appointment context", "body": "Answers stay tied to the booking, making pre-appointment review simple for staff." },
+        { "title": "Trust documentation", "body": "Pulse supports public privacy and security pages so clients understand how the booking experience is handled." }
+      ],
+      "comparisonTitle": "Intake form comparison",
+      "competitors": ["Calendly", "Acuity", "Vagaro", "Jane App"],
+      "comparison": [
+        { "feature": "Custom booking questions", "values": [true, true, true, true, true] },
+        { "feature": "Service-business intake flow", "values": [true, false, true, true, true] },
+        { "feature": "Attached to client history", "values": [true, false, true, true, true] },
+        { "feature": "Canadian privacy positioning", "values": [true, false, false, false, true] },
+        { "feature": "CAD-first pricing", "values": [true, false, false, false, true] }
+      ],
+      "faqs": [
+        { "q": "Can I create custom intake questions?", "a": "Yes. Pulse supports custom intake questions so businesses can collect the details that matter for their services." },
+        { "q": "When do clients complete intake forms?", "a": "Clients complete intake questions during the booking flow, before the appointment is confirmed." },
+        { "q": "Are intake answers connected to the appointment?", "a": "Yes. Intake answers are connected to the appointment and client context so staff can review them before the visit." }
+      ],
+      "ctaTitle": "Collect better details before every appointment",
+      "ctaText": "Start free and add intake questions to your booking flow without a separate form tool."
+    },
+    "multi-location": {
+      "meta": { "title": "Multi-Location Booking Software for Canadian Service Businesses | Pulse", "description": "Manage multiple locations, staff calendars, service availability, and online booking links in Pulse. Built for Canadian service businesses." },
+      "og": { "title": "Multi-Location Booking Software | Pulse Appointments", "description": "Manage service booking across multiple business locations and staff calendars." },
+      "badge": "Multi-Location",
+      "title": "Run booking across multiple",
+      "titleAccent": "locations",
+      "description": "Whether you have two studios, rotating pop-ups, or multiple service areas, Pulse helps keep locations, staff, calendars, and client booking paths organized.",
+      "breadcrumbName": "Multi-Location",
+      "proofPoints": ["Pro supports 2 locations", "Unlimited supports up to 5", "Staff calendars"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Add your locations", "desc": "Create each studio, service area, or operating address in your business settings." },
+        { "num": "02", "title": "Assign services and staff", "desc": "Keep staff schedules and service availability aligned with where the work actually happens." },
+        { "num": "03", "title": "Clients book the right place", "desc": "Clients see the right location context while your team keeps calendars organized behind the scenes." }
+      ],
+      "featuresTitle": "Built for daily service-business work",
+      "features": [
+        { "title": "Location management", "body": "Keep multiple studios, rooms, pop-ups, or service areas organized under one Pulse account." },
+        { "title": "Calendar clarity", "body": "Reduce scheduling mistakes by separating where appointments happen from who provides them." },
+        { "title": "Local expansion ready", "body": "Built for Canadian businesses growing from solo operator to team and multi-location operations." }
+      ],
+      "comparisonTitle": "Multi-location comparison",
+      "competitors": ["Calendly", "Acuity", "Square", "Vagaro"],
+      "comparison": [
+        { "feature": "Multiple business locations", "values": [true, false, true, true, true] },
+        { "feature": "Staff calendars", "values": [true, true, true, true, true] },
+        { "feature": "Service-business booking flow", "values": [true, false, true, true, true] },
+        { "feature": "CAD-first pricing", "values": [true, false, false, false, false] },
+        { "feature": "Flat plan structure", "values": [true, false, false, "Partial", false] }
+      ],
+      "faqs": [
+        { "q": "How many locations can I manage in Pulse?", "a": "Pulse supports multiple locations on paid plans. Pro supports 2 locations and Unlimited supports up to 5." },
+        { "q": "Can each location have different staff and availability?", "a": "Yes. Locations can be managed with their own operational context, staff schedules, and booking setup." },
+        { "q": "Is multi-location useful for mobile service providers?", "a": "Yes. Location support helps businesses separate service areas, studios, pop-ups, or different operating addresses." }
+      ],
+      "ctaTitle": "Keep every location organized",
+      "ctaText": "Start free, then upgrade when your business needs multi-location booking controls."
+    },
+    "reviews": {
+      "meta": { "title": "Review Management Software for Canadian Service Businesses | Pulse", "description": "Collect and publish real appointment reviews from completed visits. Review management for Canadian service businesses using Pulse." },
+      "og": { "title": "Review Management Software | Pulse Appointments", "description": "Collect, moderate, and publish reviews tied to real appointments." },
+      "badge": "Review Management",
+      "title": "Collect real reviews after",
+      "titleAccent": "completed visits",
+      "description": "Pulse helps you earn trust the right way: send review requests after real appointments, moderate feedback, and publish reviews where new clients are deciding whether to book.",
+      "breadcrumbName": "Review Management",
+      "proofPoints": ["Real appointment requests", "Owner moderation", "No fake testimonials"],
+      "stepsTitle": "How it works",
+      "steps": [
+        { "num": "01", "title": "Appointment is completed", "desc": "Review requests are connected to actual appointment activity, not invented marketing copy." },
+        { "num": "02", "title": "Client leaves feedback", "desc": "Clients can rate the experience and add a written comment from a signed review link." },
+        { "num": "03", "title": "You publish what is useful", "desc": "Owners can publish or hide reviews from the dashboard before they appear publicly." }
+      ],
+      "featuresTitle": "Built for daily service-business work",
+      "features": [
+        { "title": "Review request workflow", "body": "Turn completed appointments into timely review requests without manual follow-up." },
+        { "title": "Moderation controls", "body": "Review feedback privately and choose what appears publicly on your booking page." },
+        { "title": "Public trust signal", "body": "Published reviews help new clients make a booking decision without relying on placeholder testimonials." }
+      ],
+      "comparisonTitle": "Review management comparison",
+      "competitors": ["Calendly", "Acuity", "Square", "Vagaro"],
+      "comparison": [
+        { "feature": "Appointment-based review requests", "values": [true, false, false, "Partial", true] },
+        { "feature": "Public booking-page reviews", "values": [true, false, false, true, true] },
+        { "feature": "Owner moderation", "values": [true, false, false, true, true] },
+        { "feature": "Built for services, not meetings", "values": [true, false, true, "Partial", true] },
+        { "feature": "CAD-first pricing", "values": [true, false, false, false, false] }
+      ],
+      "faqs": [
+        { "q": "Does Pulse create reviews automatically?", "a": "No. Pulse sends review requests after completed appointments, but clients choose whether to leave feedback." },
+        { "q": "Can I choose which reviews are public?", "a": "Yes. Owners can publish or hide reviews from the dashboard before they appear publicly." },
+        { "q": "Where do published reviews appear?", "a": "Published reviews can appear on the public booking page so prospective clients can evaluate the business before booking." }
+      ],
+      "ctaTitle": "Start collecting real review proof",
+      "ctaText": "Use completed appointments to build public trust without publishing fabricated testimonials."
+    }
   }
 }

@@ -6,7 +6,20 @@ const SITE = "https://www.pulseappointments.com";
 // Add a path here the moment its /fr/<path> page is created: both the English
 // and French pages will then start emitting the fr-CA hreflang automatically,
 // no per-page edits required.
-export const LOCALIZED_PATHS = new Set<string>(["/", "/security", "/pricing", "/features"]);
+export const LOCALIZED_PATHS = new Set<string>([
+  "/",
+  "/security",
+  "/pricing",
+  "/features",
+  "/features/online-booking",
+  "/features/deposits",
+  "/features/no-show-protection",
+  "/features/sms-reminders",
+  "/features/client-management",
+  "/features/intake-forms",
+  "/features/multi-location",
+  "/features/reviews",
+]);
 
 export type Locale = "en" | "fr";
 
