@@ -12,7 +12,11 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: { title: dict.security.meta.title, description: dict.security.meta.description },
     alternates: {
       canonical: `${SITE}/fr/security`,
-      languages: { "en-CA": `${SITE}/security`, "fr-CA": `${SITE}/fr/security` },
+      languages: {
+        "en-CA": `${SITE}/security`,
+        "fr-CA": `${SITE}/fr/security`,
+        "x-default": `${SITE}/security`,
+      },
     },
   };
 }
