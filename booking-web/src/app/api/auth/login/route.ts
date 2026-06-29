@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
   // A prior "remember this device" token lets a 2FA user skip the OTP here.
   const trustedDeviceToken = req.cookies.get("booking_td")?.value;
   const body = { ...input, email: input.email.trim().toLowerCase(), platform: 'web' as const, ...(trustedDeviceToken ? { trustedDeviceToken } : {}) };
+  // The API requires a browser Origin header for ADMIN login (anti-CLI hardening).
+  // This server-side hop would otherwise strip it, and Safari omits Origin on
+  // same-origin POST entirely. assertSameOrigin() above already proved this is a
+  // genuine same-origin browser request, so forward the authoritative web origin
+  // (NEXT_PUBLIC_WEB_URL is in the API's CORS_ALLOWED_ORIGINS allow-list).
+  const forwardedOrigin =
+    process.env.NEXT_PUBLIC_WEB_URL?.replace(/\/$/, "") ||
+    req.headers.get("origin") ||
+    req.nextUrl.origin;
   const upstream = await fetch(`${API}/auth/login`, {
     method: "POST",
     headers: {
@@ -40,6 +49,7 @@ export async function POST(req: NextRequest) {
       // Forward the real client device/IP so the API can detect new-device logins.
       "x-client-user-agent": req.headers.get("user-agent") ?? "",
       "x-forwarded-for": req.headers.get("x-forwarded-for") ?? "",
+      ...(forwardedOrigin ? { origin: forwardedOrigin } : {}),
     },
     body: JSON.stringify(body),
   });

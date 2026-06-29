@@ -252,6 +252,7 @@ export class VerificationService {
         select: {
           id: true, name: true, email: true, slug: true, plan: true,
           verificationStatus: true, suspended: true, createdAt: true, phone: true,
+          complimentaryPlanExpiresAt: true, complimentaryPreviousPlan: true,
           subscription: { select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true } },
           _count: { select: { appointments: true, staff: true, clients: true } },
         },
