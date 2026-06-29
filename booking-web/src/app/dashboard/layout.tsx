@@ -53,7 +53,7 @@ const OWNER_NAV: NavItem[] = [
   },
   {
     // "Catalog" = the bookable building blocks (what you sell, who/where delivers it).
-    href: "#", label: "Catalog", icon: Scissors,
+    href: "/dashboard/catalog", label: "Catalog", icon: Scissors,
     children: [
       { href: "/dashboard/services",     label: "Services" },
       { href: "/dashboard/staff",        label: "Staff" },
@@ -63,7 +63,7 @@ const OWNER_NAV: NavItem[] = [
   },
   {
     // "Workflow" = recurring daily work, split out of the old "Operations" junk drawer.
-    href: "#", label: "Workflow", icon: CheckSquare,
+    href: "/dashboard/workflow", label: "Workflow", icon: CheckSquare,
     children: [
       { href: "/dashboard/tasks",        label: "Tasks" },
       { href: "/dashboard/followups",    label: "Follow-ups" },
@@ -72,7 +72,7 @@ const OWNER_NAV: NavItem[] = [
   },
   {
     // Renamed from "Financials" → owner-friendly "Payments"; Checkout surfaced here.
-    href: "#", label: "Payments", icon: DollarSign,
+    href: "/dashboard/payments", label: "Payments", icon: DollarSign,
     children: [
       { href: "/dashboard/checkout",     label: "Checkout" },
       { href: "/dashboard/transactions", label: "Transactions" },
@@ -82,9 +82,9 @@ const OWNER_NAV: NavItem[] = [
   },
   { href: "/dashboard/reports",      label: "Reports",      icon: BarChart3 },
   {
-    href: "#", label: "Marketing",  icon: Megaphone,
+    href: "/dashboard/marketing", label: "Marketing",  icon: Megaphone,
     children: [
-      { href: "/dashboard/marketing",    label: "Campaigns" },
+      { href: "/dashboard/marketing/campaigns", label: "Campaigns" },
       { href: "/dashboard/offers",       label: "Offers" },
       { href: "/dashboard/promo-codes",  label: "Promo codes" },
       { href: "/dashboard/gift-cards",   label: "Gift cards" },
