@@ -37,11 +37,11 @@ export function verifyUnsubscribeToken(clientId: string, sig: string, secret: st
   }
 }
 
-function emailWrap(content: string, unsubscribeUrl?: string) {
+function emailWrap(content: string, unsubscribeUrl?: string, locale: 'en' | 'fr' = 'en') {
   const footerLink = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#E9A23C;text-decoration:none">Unsubscribe</a>`
-    : 'Manage preferences';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse</title></head>
+    ? `<a href="${unsubscribeUrl}" style="color:#E9A23C;text-decoration:none">${locale === 'fr' ? 'Se désabonner' : 'Unsubscribe'}</a>`
+    : locale === 'fr' ? 'Gérer les préférences' : 'Manage preferences';
+  return `<!DOCTYPE html><html lang="${locale}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse</title></head>
 <body style="margin:0;padding:0;background:#F8F9FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table width="100%" style="max-width:520px;background:#fff;border-radius:16px;border:1px solid #E5E7EB;overflow:hidden">
@@ -67,18 +67,19 @@ function verifiedPill(status?: string | null) {
 function whereText(apt: {
   locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null;
   location?: { name?: string; address?: string | null } | null;
-  business?: { address?: string | null } | null;
+  business?: { address?: string | null } | null; locale?: string | null;
 }): string {
+  const fr = apt.locale === 'fr';
   switch (apt.locationMode) {
     case 'VIRTUAL':
-      return apt.meetingUrl ? `Online video call: ${apt.meetingUrl}` : 'Online video call — link to follow';
+      return apt.meetingUrl ? `${fr ? 'Appel vidéo' : 'Online video call'}: ${apt.meetingUrl}` : fr ? 'Appel vidéo — lien à venir' : 'Online video call — link to follow';
     case 'CUSTOMER':
-      return apt.customerAddress ? `We come to you: ${apt.customerAddress}` : 'We come to you';
+      return apt.customerAddress ? `${fr ? 'Nous nous déplaçons chez vous' : 'We come to you'}: ${apt.customerAddress}` : fr ? 'Nous nous déplaçons chez vous' : 'We come to you';
     case 'PHONE':
-      return "Phone call — we'll call you";
+      return fr ? 'Appel téléphonique — nous vous appellerons' : "Phone call — we'll call you";
     default: {
       const addr = apt.location?.address ?? apt.business?.address ?? '';
-      return addr ? `Location: ${addr}` : '';
+      return addr ? `${fr ? 'Lieu' : 'Location'}: ${addr}` : '';
     }
   }
 }
@@ -90,28 +91,30 @@ function aptDetails(apt: {
   location?: { name?: string; address?: string | null } | null;
   locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null;
   startsAt: Date; endsAt: Date;
+  locale?: string | null;
 }) {
+  const fr = apt.locale === 'fr';
   const tz = apt.business.timezone ?? 'UTC';
   const bizRow = apt.business.name
-    ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Business</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.business.name)}${verifiedPill(apt.business.verificationStatus)}</td></tr>`
+    ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">${fr ? 'Entreprise' : 'Business'}</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.business.name)}${verifiedPill(apt.business.verificationStatus)}</td></tr>`
     : '';
   // Mode-aware "Where" row. Virtual links are rendered as a clickable anchor;
   // everything else is escaped plain text.
   let whereValue = '';
   if (apt.locationMode === 'VIRTUAL') {
     whereValue = apt.meetingUrl
-      ? `<a href="${esc(apt.meetingUrl)}" style="color:#4F46E5;font-weight:600">Join video call</a>`
-      : 'Online video call — link to follow';
+      ? `<a href="${esc(apt.meetingUrl)}" style="color:#4F46E5;font-weight:600">${fr ? 'Participer à l’appel vidéo' : 'Join video call'}</a>`
+      : fr ? 'Appel vidéo — lien à venir' : 'Online video call — link to follow';
   } else if (apt.locationMode === 'CUSTOMER') {
-    whereValue = apt.customerAddress ? `We come to you — ${esc(apt.customerAddress)}` : 'We come to you';
+    whereValue = apt.customerAddress ? `${fr ? 'Nous nous déplaçons chez vous' : 'We come to you'} — ${esc(apt.customerAddress)}` : fr ? 'Nous nous déplaçons chez vous' : 'We come to you';
   } else if (apt.locationMode === 'PHONE') {
-    whereValue = "Phone call — we'll call you";
+    whereValue = fr ? 'Appel téléphonique — nous vous appellerons' : "Phone call — we'll call you";
   } else {
     const addr = apt.location?.address ?? apt.business.address ?? '';
     whereValue = addr ? esc(addr) : '';
   }
   const whereRow = whereValue
-    ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Where</td><td style="color:#111827;font-size:13px;font-weight:600">${whereValue}</td></tr>`
+    ? `<tr><td style="padding:4px 0;color:#6B7280;font-size:13px">${fr ? 'Lieu' : 'Where'}</td><td style="color:#111827;font-size:13px;font-weight:600">${whereValue}</td></tr>`
     : '';
   return `
 <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;background:#F8F9FA;border-radius:12px">
@@ -119,9 +122,9 @@ function aptDetails(apt: {
     <table width="100%">
       ${bizRow}
       <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Service</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.service.name)} (${apt.service.durationMinutes} min)</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">With</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.staff.user.name)}</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'EEEE, MMMM d, yyyy')}</td></tr>
-      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Time</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, 'h:mm a')} - ${formatInTimeZone(apt.endsAt, tz, 'h:mm a')}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">${fr ? 'Avec' : 'With'}</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.staff.user.name)}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Date</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, fr ? 'yyyy-MM-dd' : 'EEEE, MMMM d, yyyy')}</td></tr>
+      <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">${fr ? 'Heure' : 'Time'}</td><td style="color:#111827;font-size:13px;font-weight:600">${formatInTimeZone(apt.startsAt, tz, fr ? 'HH:mm' : 'h:mm a')} - ${formatInTimeZone(apt.endsAt, tz, fr ? 'HH:mm' : 'h:mm a')}</td></tr>
       ${whereRow}
     </table>
   </td></tr>
@@ -1074,6 +1077,7 @@ ${aptDetails(apt)}
     if (!apt) return;
     this.currentBusinessId = apt.businessId;
     const clientFirstName = esc(firstName(apt.client.name));
+    const fr = (apt as typeof apt & { locale?: string }).locale === 'fr';
 
     const smsEnabled = isProPlan(apt.business.plan);
     const settings = apt.business.notificationSettings;
@@ -1082,7 +1086,7 @@ ${aptDetails(apt)}
     const webUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
     // HMAC manage token so the link proves the recipient got the email (the
     // public booking endpoints reject an id without a valid token).
-    const manageUrl = `${webUrl}/appointments/${apt.id}/manage#token=${encodeURIComponent(signAppointmentToken(apt.id))}`;
+    const manageUrl = `${webUrl}/appointments/${apt.id}/manage${fr ? '?lang=fr' : ''}#token=${encodeURIComponent(signAppointmentToken(apt.id))}`;
 
     switch (job.name) {
 
@@ -1103,19 +1107,20 @@ ${aptDetails(apt)}
       case 'send-pending': {
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Booking request received — ${apt.service.name}`,
+          subject: fr ? `Demande de réservation reçue — ${apt.service.name}` : `Booking request received — ${apt.service.name}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Booking request received ⏳</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your booking request has been received and is awaiting approval from <strong>${esc(apt.business.name)}</strong>. You'll get a confirmation email once it's approved.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Demande de réservation reçue' : 'Booking request received'} ⏳</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, votre demande attend l’approbation de` : `Hi ${clientFirstName}, your booking request has been received and is awaiting approval from`} <strong>${esc(apt.business.name)}</strong>. ${fr ? 'Vous recevrez un courriel dès sa confirmation.' : "You'll get a confirmation email once it's approved."}</p>
 ${aptDetails(apt)}
-<p style="margin:8px 0 0;color:#6B7280;font-size:13px">We'll notify you as soon as your appointment is confirmed.</p>
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View booking →</a>
-          `),
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Voir la réservation' : 'View booking'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
         });
         if (apt.client.phone && smsEnabled) {
           await this.sms.send({
             to: apt.client.phone,
-            body: `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
+            body: fr
+              ? `Demande de réservation reçue par ${apt.business.name}: ${apt.service.name}, le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')}. ${manageUrl}`
+              : `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
           });
         }
         await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}. Awaiting approval.`);
@@ -1154,22 +1159,24 @@ ${aptDetails(apt)}
         const hasCardOnFile = !!apt.stripePaymentMethodId;
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Appointment confirmed — ${apt.service.name}`,
+          subject: fr ? `Rendez-vous confirmé — ${apt.service.name}` : `Appointment confirmed — ${apt.service.name}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">You're booked! ✓</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment is confirmed.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Votre rendez-vous est réservé!' : "You're booked!"} ✓</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, votre rendez-vous est confirmé.` : `Hi ${clientFirstName}, your appointment is confirmed.`}</p>
 ${aptDetails(apt)}
-<p style="margin:0;color:#6B7280;font-size:13px">You'll receive a reminder 24 hours before your appointment. A calendar invite is attached to this email.</p>
+<p style="margin:0;color:#6B7280;font-size:13px">${fr ? 'Vous recevrez un rappel 24 heures avant votre rendez-vous. Une invitation de calendrier est jointe.' : "You'll receive a reminder 24 hours before your appointment. A calendar invite is attached to this email."}</p>
 ${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 A card is saved on file for this booking (for no-show/cancellation protection). You can remove it anytime from your <a href="${webUrl}/my/dashboard" style="color:#7C3AED">client portal</a>.</p>` : ''}
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
-          `),
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer le rendez-vous' : 'Manage appointment'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
           attachments: [icsAttachment],
         });
         if (apt.client.phone && smsEnabled && shouldSend('smsConfirmation')) {
           const where = whereText(apt);
           await this.sms.send({
             to: apt.client.phone,
-            body: `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
+            body: fr
+              ? `Confirmé avec ${apt.business.name}: ${apt.service.name}, le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')}.${where ? ` ${where}.` : ''} ${manageUrl}`
+              : `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
           });
         }
         await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
@@ -1192,13 +1199,13 @@ ${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 
         }
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Reminder: ${apt.service.name} in 3 days`,
+          subject: fr ? `Rappel : ${apt.service.name} dans 3 jours` : `Reminder: ${apt.service.name} in 3 days`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Coming up in 3 days</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, a heads-up about your upcoming appointment.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Rendez-vous dans 3 jours' : 'Coming up in 3 days'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, voici un rappel de votre prochain rendez-vous.` : `Hi ${clientFirstName}, a heads-up about your upcoming appointment.`}</p>
 ${aptDetails(apt)}
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
-          `),
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer le rendez-vous' : 'Manage appointment'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Reminder: You have an appointment for ${apt.service.name} in 3 days at ${aptDate(apt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_72H', 'SENT');
@@ -1213,13 +1220,13 @@ ${aptDetails(apt)}
         }
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Reminder: ${apt.service.name} tomorrow`,
+          subject: fr ? `Rappel : ${apt.service.name} demain` : `Reminder: ${apt.service.name} tomorrow`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">See you tomorrow!</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, just a friendly reminder about your upcoming appointment.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'À demain!' : 'See you tomorrow!'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, voici un rappel de votre prochain rendez-vous.` : `Hi ${clientFirstName}, just a friendly reminder about your upcoming appointment.`}</p>
 ${aptDetails(apt)}
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage appointment →</a>
-          `),
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer le rendez-vous' : 'Manage appointment'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${aptDate(apt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SENT');
@@ -1236,7 +1243,9 @@ ${aptDetails(apt)}
           const where = whereText(apt);
           await this.sms.send({
             to: apt.client.phone,
-            body: `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
+            body: fr
+              ? `Rappel : ${apt.service.name} avec ${apt.staff.user.name} dans 2 heures, à ${aptDate(apt, 'HH:mm')}.${where ? ` ${where}.` : ''} ${manageUrl}`
+              : `Reminder: ${apt.service.name} with ${apt.staff.user.name} in 2 hours at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
           });
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SENT');
         }
@@ -1273,14 +1282,14 @@ ${aptDetails(apt)}
         const cancelIcs = generateICalCancellation({ id: apt.id, startsAt: apt.startsAt, endsAt: apt.endsAt, service: apt.service, business: apt.business });
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Appointment cancelled — ${apt.service.name}`,
+          subject: fr ? `Rendez-vous annulé — ${apt.service.name}` : `Appointment cancelled — ${apt.service.name}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been cancelled.</p>
+<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">${fr ? 'Rendez-vous annulé' : 'Appointment cancelled'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, votre rendez-vous a été annulé.` : `Hi ${clientFirstName}, your appointment has been cancelled.`}</p>
 ${aptDetails(apt)}
-${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">Reason: <em>${esc(apt.cancelReason)}</em></p>` : ''}
-<a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a new appointment →</a>
-          `),
+${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">${fr ? 'Motif' : 'Reason'}: <em>${esc(apt.cancelReason)}</em></p>` : ''}
+<a href="${webUrl}/book${fr ? '?lang=fr' : ''}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Prendre un nouveau rendez-vous' : 'Book a new appointment'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
           attachments: [{ filename: 'cancellation.ics', content: Buffer.from(cancelIcs).toString('base64'), content_type: 'text/calendar; method=CANCEL' }],
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
@@ -1332,13 +1341,13 @@ ${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;bo
         });
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Appointment rescheduled — ${apt.service.name}`,
+          subject: fr ? `Rendez-vous reporté — ${apt.service.name}` : `Appointment rescheduled — ${apt.service.name}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#E9A23C;font-size:20px;font-weight:700">Appointment rescheduled</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, your appointment has been moved to a new time. An updated calendar invite is attached.</p>
+<h2 style="margin:0 0 4px;color:#E9A23C;font-size:20px;font-weight:700">${fr ? 'Rendez-vous reporté' : 'Appointment rescheduled'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, votre rendez-vous a été déplacé. Une invitation de calendrier mise à jour est jointe.` : `Hi ${clientFirstName}, your appointment has been moved to a new time. An updated calendar invite is attached.`}</p>
 ${aptDetails(apt)}
-<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View appointment →</a>
-          `),
+<a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Voir le rendez-vous' : 'View appointment'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
           attachments: [{ filename: 'appointment.ics', content: Buffer.from(reschedIcs).toString('base64'), content_type: 'text/calendar; method=REQUEST' }],
         });
         await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);

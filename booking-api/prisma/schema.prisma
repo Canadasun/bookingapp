@@ -956,6 +956,7 @@ model Appointment {
   squarePaymentId       String?
   squareCardId          String?
   notes                 String?
+  locale                String            @default("en") // en | fr; client communication language
   googleEventId         String? // Google Calendar event id (when the business has calendar sync on)
   recurringGroupId      String? // shared id linking occurrences of a recurring series
   intakeAnswers         Json? // client's answers to the business intake questions, [{ label, answer }]

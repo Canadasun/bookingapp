@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Scissors, Users, Boxes, Clock, ChevronRight, type LucideIcon } from "lucide-react";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const CARDS: { href: string; label: string; desc: string; icon: LucideIcon }[] = [
   { href: "/dashboard/services",  label: "Services",            desc: "The services clients can book, with prices and durations.", icon: Scissors },
@@ -11,18 +12,24 @@ const CARDS: { href: string; label: string; desc: string; icon: LucideIcon }[] =
 ];
 
 export default function CatalogHub() {
+  const { dictionary } = useDashboardLocale();
+  const copy = dictionary.hubs.catalog;
+  const cards = CARDS.map((card, index) => {
+    const translated = Object.values(copy.cards)[index];
+    return { ...card, label: translated[0], desc: translated[1] };
+  });
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <Scissors className="w-5 h-5 text-violet-600" />
-          <h1 className="text-xl font-bold text-gray-900">Catalog</h1>
+          <h1 className="text-xl font-bold text-gray-900">{copy.title}</h1>
         </div>
-        <p className="text-sm text-gray-500 mt-1">What you offer and who delivers it — services, team, spaces, and hours.</p>
+        <p className="text-sm text-gray-500 mt-1">{copy.intro}</p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        {CARDS.map(({ href, label, desc, icon: Icon }) => (
+        {cards.map(({ href, label, desc, icon: Icon }) => (
           <Link key={href} href={href}
             className="flex items-start justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:border-violet-200 hover:bg-violet-50/40 transition-colors">
             <div className="flex items-start gap-3">

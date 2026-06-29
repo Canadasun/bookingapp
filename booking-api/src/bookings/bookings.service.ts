@@ -425,6 +425,7 @@ export class BookingsService {
               endsAt,
               totalPriceCents: Math.max(0, subtotalCents - discountCents),
               notes: notesWithServices,
+              locale: dto.locale ?? 'en',
               // Owner/staff-initiated bookings always confirm immediately.
               // Public bookings confirm immediately when the business uses AUTO mode.
               ...((opts.confirmed || bizApprovalMode === 'AUTO') ? { status: 'CONFIRMED' as const } : {}),
@@ -449,7 +450,7 @@ export class BookingsService {
                 ? { customerAddress: dto.customerAddress.trim() } : {}),
               ...(dto.referralSource ? { referralSource: dto.referralSource } : {}),
               ...(dto.promoCodeId ? { promoCodeId: dto.promoCodeId, discountCents } : {}),
-            },
+            } as Prisma.AppointmentUncheckedCreateInput & { locale: 'en' | 'fr' },
             include: {
               client: true,
               service: true,

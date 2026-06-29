@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatPrice, cn, normalizePhoneE164, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 type Tab = "today" | "week" | "all";
 type ViewMode = "list" | "staff" | "calendar" | "week";
@@ -38,6 +39,8 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
   onClose: () => void;
   onAction: (action: string, id: string, extra?: Record<string, string>) => Promise<void>;
 }) {
+  const { dictionary, formatCurrency, formatDate } = useDashboardLocale();
+  const copy = dictionary.appointments.drawer;
   const [cancelReason, setCancelReason] = useState("");
   const [chargeFee, setChargeFee] = useState(false);
   const [showCancelForm, setShowCancelForm] = useState(false);
@@ -74,8 +77,8 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
         className="dashboard-safe-bottom fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 id="apt-drawer-title" className="text-lg font-bold text-gray-900">Appointment details</h2>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <h2 id="apt-drawer-title" className="text-lg font-bold text-gray-900">{copy.title}</h2>
+          <button onClick={onClose} aria-label={copy.close} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
 
         {/* Content */}
@@ -89,19 +92,19 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Datetime */}
           <div className="bg-violet-50 rounded-xl p-4">
             <p className="text-sm font-semibold text-violet-800">
-              {format(new Date(apt.startsAt), "EEEE, MMMM d, yyyy")}
+              {formatDate(apt.startsAt, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
             <p className="text-sm text-violet-600 mt-0.5">
-              {format(new Date(apt.startsAt), "h:mm a")} - {format(new Date(apt.endsAt), "h:mm a")}
+              {formatDate(apt.startsAt, { hour: "numeric", minute: "2-digit" })} - {formatDate(apt.endsAt, { hour: "numeric", minute: "2-digit" })}
             </p>
           </div>
 
           {/* Details */}
           {[
-            { label: "Service",  value: `${apt.service.name} (${apt.service.durationMinutes} min)` },
-            { label: "Price",    value: formatPrice(apt.totalPriceCents || apt.service.priceCents) },
-            { label: "Staff",    value: apt.staff.user.name },
-            ...(apt.location ? [{ label: "Location", value: apt.location.name }] : []),
+            { label: copy.fields[0], value: `${apt.service.name} (${apt.service.durationMinutes} min)` },
+            { label: copy.fields[1], value: formatCurrency(apt.totalPriceCents || apt.service.priceCents) },
+            { label: copy.fields[2], value: apt.staff.user.name },
+            ...(apt.location ? [{ label: copy.fields[3], value: apt.location.name }] : []),
           ].map(({ label, value }) => (
             <div key={label} className="flex justify-between text-sm">
               <span className="text-gray-500">{label}</span>
@@ -112,22 +115,22 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Delivery mode — where this appointment happens. */}
           {apt.locationMode === "VIRTUAL" && (
             <div className="flex justify-between text-sm gap-3">
-              <span className="text-gray-500 shrink-0">Online</span>
+              <span className="text-gray-500 shrink-0">{copy.online}</span>
               {apt.meetingUrl
-                ? <a href={apt.meetingUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-violet-600 hover:underline truncate text-right">Join video call</a>
-                : <span className="font-medium text-gray-900 text-right">Video call (no link set)</span>}
+                ? <a href={apt.meetingUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-violet-600 hover:underline truncate text-right">{copy.joinVideo}</a>
+                : <span className="font-medium text-gray-900 text-right">{copy.videoNoLink}</span>}
             </div>
           )}
           {apt.locationMode === "CUSTOMER" && (
             <div className="flex justify-between text-sm gap-3">
-              <span className="text-gray-500 shrink-0">Mobile — go to</span>
-              <span className="font-medium text-gray-900 text-right">{apt.customerAddress || "address not provided"}</span>
+              <span className="text-gray-500 shrink-0">{copy.mobile}</span>
+              <span className="font-medium text-gray-900 text-right">{apt.customerAddress || copy.addressMissing}</span>
             </div>
           )}
           {apt.locationMode === "PHONE" && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Where</span>
-              <span className="font-medium text-gray-900">Phone call</span>
+              <span className="text-gray-500">{copy.where}</span>
+              <span className="font-medium text-gray-900">{copy.phoneCall}</span>
             </div>
           )}
 
@@ -135,7 +138,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
 
           {/* Client */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Client</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{copy.client}</p>
             <p className="font-semibold text-gray-900">{apt.client.name}</p>
             <p className="text-sm text-gray-500">{apt.client.email}</p>
             {apt.client.phone && <p className="text-sm text-gray-500">{formatPhoneDisplay(apt.client.phone)}</p>}
@@ -144,7 +147,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Notes */}
           {apt.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{copy.notes}</p>
               <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{apt.notes}</p>
             </div>
           )}
@@ -152,7 +155,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Intake / consultation answers */}
           {apt.intakeAnswers && apt.intakeAnswers.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Intake form</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{copy.intake}</p>
               <div className="space-y-2">
                 {apt.intakeAnswers.map((a, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg px-3 py-2">
@@ -167,16 +170,16 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           {/* Deposit */}
           {apt.depositCents && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Deposit collected</span>
-              <span className="font-medium text-emerald-600">{formatPrice(apt.depositCents)}</span>
+              <span className="text-gray-500">{copy.deposit}</span>
+              <span className="font-medium text-emerald-600">{formatCurrency(apt.depositCents)}</span>
             </div>
           )}
 
           {/* Cancel form */}
           {showCancelForm && (
             <div className="space-y-2">
-              <Input placeholder="Reason for cancellation (optional)" value={cancelReason}
-                aria-label="Reason for cancellation (optional)"
+              <Input placeholder={copy.cancelReason} value={cancelReason}
+                aria-label={copy.cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)} />
               {feeEligible && (
                 <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -186,14 +189,14 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
                     onChange={(e) => setChargeFee(e.target.checked)}
                     className="h-4 w-4 accent-violet-600"
                   />
-                  Charge the {formatPrice(apt.business.cancellationFeeCents)} cancellation fee to the client&apos;s card
+                  {copy.chargeCancellation.replace("{amount}", formatCurrency(apt.business.cancellationFeeCents))}
                 </label>
               )}
               <div className="flex gap-2">
-                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowCancelForm(false)}>Back</Button>
+                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowCancelForm(false)}>{copy.back}</Button>
                 <Button size="sm" variant="destructive" className="flex-1" loading={acting === "cancel"}
                   onClick={() => act("cancel", { ...(cancelReason ? { cancelReason } : {}), ...(chargeFee ? { chargeFee: "true" } : {}) })}>
-                  Confirm cancel
+                  {copy.confirmCancel}
                 </Button>
               </div>
             </div>
@@ -201,12 +204,12 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
 
           {showEditForm && (
             <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Edit booking</p>
-              <Input value={edit.clientName} onChange={(e) => setEdit((p) => ({ ...p, clientName: e.target.value }))} placeholder="Client name" aria-label="Client name" />
-              <Input type="email" value={edit.clientEmail} onChange={(e) => setEdit((p) => ({ ...p, clientEmail: e.target.value }))} placeholder="Client email" aria-label="Client email" />
-              <Input value={edit.clientPhone} onChange={(e) => setEdit((p) => ({ ...p, clientPhone: e.target.value }))} placeholder="Client phone" aria-label="Client phone" />
-              <Input type="datetime-local" value={edit.startsAt} onChange={(e) => setEdit((p) => ({ ...p, startsAt: e.target.value }))} aria-label="Appointment date and time" />
-              <Input value={edit.notes} onChange={(e) => setEdit((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" aria-label="Notes" />
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{copy.edit}</p>
+              <Input value={edit.clientName} onChange={(e) => setEdit((p) => ({ ...p, clientName: e.target.value }))} placeholder={copy.clientName} aria-label={copy.clientName} />
+              <Input type="email" value={edit.clientEmail} onChange={(e) => setEdit((p) => ({ ...p, clientEmail: e.target.value }))} placeholder={copy.clientEmail} aria-label={copy.clientEmail} />
+              <Input value={edit.clientPhone} onChange={(e) => setEdit((p) => ({ ...p, clientPhone: e.target.value }))} placeholder={copy.clientPhone} aria-label={copy.clientPhone} />
+              <Input type="datetime-local" value={edit.startsAt} onChange={(e) => setEdit((p) => ({ ...p, startsAt: e.target.value }))} aria-label={copy.appointmentDateTime} />
+              <Input value={edit.notes} onChange={(e) => setEdit((p) => ({ ...p, notes: e.target.value }))} placeholder={copy.notes} aria-label={copy.notes} />
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -214,10 +217,10 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
                   onChange={(e) => setEdit((p) => ({ ...p, notifyClient: e.target.checked }))}
                   className="h-4 w-4 accent-violet-600"
                 />
-                Notify client by email
+                {copy.notify}
               </label>
               <div className="flex gap-2">
-                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowEditForm(false)}>Back</Button>
+                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowEditForm(false)}>{copy.back}</Button>
                 <Button size="sm" className="flex-1" loading={acting === "edit"} onClick={() => act("edit", {
                   clientName: edit.clientName,
                   clientEmail: edit.clientEmail,
@@ -226,7 +229,7 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
                   notes: edit.notes,
                   notifyClient: String(edit.notifyClient),
                 })}>
-                  Save changes
+                  {copy.save}
                 </Button>
               </div>
             </div>
@@ -238,38 +241,38 @@ function AppointmentDrawer({ apt, onClose, onAction }: {
           <div className="px-6 py-4 border-t border-gray-100 space-y-2">
             <a href={`/dashboard/receipt/${apt.id}`} target="_blank" rel="noopener noreferrer"
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              <FileText className="w-4 h-4" /> View receipt
+              <FileText className="w-4 h-4" /> {copy.actions[0]}
             </a>
             <Button className="w-full gap-2" variant="secondary" onClick={() => setShowEditForm(true)}>
-              Edit appointment
+              {copy.actions[1]}
             </Button>
             {apt.status === "PENDING" && (
               <Button className="w-full gap-2" loading={acting === "confirm"}
                 onClick={() => act("confirm")}>
-                <CheckCircle className="w-4 h-4" /> Confirm appointment
+                <CheckCircle className="w-4 h-4" /> {copy.actions[2]}
               </Button>
             )}
             {apt.status === "CONFIRMED" && (
               <Button className="w-full gap-2" variant="secondary" loading={acting === "complete"}
                 onClick={() => act("complete")}>
-                <CheckSquare className="w-4 h-4" /> Mark completed
+                <CheckSquare className="w-4 h-4" /> {copy.actions[3]}
               </Button>
             )}
             {["PENDING","CONFIRMED"].includes(apt.status) && (
               <Button className="w-full gap-2" variant="destructive" onClick={() => setShowCancelForm(true)}>
-                <XCircle className="w-4 h-4" /> Cancel appointment
+                <XCircle className="w-4 h-4" /> {copy.actions[4]}
               </Button>
             )}
             {apt.status === "CONFIRMED" && (
               <Button className="w-full gap-2" variant="ghost" loading={acting === "noshow"}
                 onClick={() => act("noshow")}>
-                <AlertCircle className="w-4 h-4" /> Mark no-show
+                <AlertCircle className="w-4 h-4" /> {copy.actions[5]}
               </Button>
             )}
             {apt.status === "NO_SHOW" && !apt.depositCents && (
               <Button className="w-full gap-2" variant="ghost" loading={acting === "noshow-fee"}
                 onClick={() => act("noshow-fee")}>
-                <DollarSign className="w-4 h-4" /> Charge no-show fee
+                <DollarSign className="w-4 h-4" /> {copy.actions[6]}
               </Button>
             )}
           </div>
@@ -363,6 +366,7 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const copy = useDashboardLocale().dictionary.appointments.newDialog;
   const [initialTime] = useState(() => {
     const now = new Date();
     return {
@@ -415,12 +419,12 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
 
   async function submit() {
     const trimName = clientName.trim();
-    if (trimName.length < 2) { toast.error("Client name must be at least 2 characters"); return; }
-    if (!phone.trim() && !email.trim()) { toast.error("Provide at least a phone number or email"); return; }
-    if (!serviceId) { toast.error("Select a service"); return; }
-    if (!staffId) { toast.error("Select a staff member"); return; }
+    if (trimName.length < 2) { toast.error(copy.errors[0]); return; }
+    if (!phone.trim() && !email.trim()) { toast.error(copy.errors[1]); return; }
+    if (!serviceId) { toast.error(copy.errors[2]); return; }
+    if (!staffId) { toast.error(copy.errors[3]); return; }
     const startsAt = new Date(`${date}T${time}`);
-    if (Number.isNaN(startsAt.getTime())) { toast.error("Enter a valid date and time"); return; }
+    if (Number.isNaN(startsAt.getTime())) { toast.error(copy.errors[4]); return; }
 
     setBusy(true);
     try {
@@ -440,11 +444,11 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
           : {}),
         ...(locationFilter ? { locationId: locationFilter } : {}),
       });
-      toast.success("Appointment created");
+      toast.success(copy.created);
       onSaved();
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create appointment");
+      toast.error(e instanceof Error ? e.message : copy.errors[5]);
     } finally {
       setBusy(false);
     }
@@ -461,33 +465,33 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
         tabIndex={-1}
         className="dashboard-safe-bottom relative z-10 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-md sm:mx-4 max-h-[92dvh] overflow-y-auto p-4 sm:p-6">
         <div className="flex items-center justify-between mb-5">
-          <p id="new-apt-modal-title" className="text-base font-semibold text-gray-900">New appointment</p>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+          <p id="new-apt-modal-title" className="text-base font-semibold text-gray-900">{copy.title}</p>
+          <button onClick={onClose} aria-label={copy.close} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="space-y-3">
           {/* Client */}
           <div>
-            <label htmlFor="new-apt-client-name" className="block text-sm font-medium text-gray-700 mb-1">Client name <span className="text-red-500">*</span></label>
+            <label htmlFor="new-apt-client-name" className="block text-sm font-medium text-gray-700 mb-1">{copy.clientName} <span className="text-red-500">*</span></label>
             <Input id="new-apt-client-name" placeholder="Jane Smith" value={clientName} onChange={(e) => setClientName(e.target.value)} aria-required="true" />
           </div>
           <div>
-            <label htmlFor="new-apt-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <label htmlFor="new-apt-phone" className="block text-sm font-medium text-gray-700 mb-1">{copy.phone}</label>
             <Input id="new-apt-phone" type="tel" placeholder="(555) 123-4567" value={phone}
               onChange={(e) => setPhone(formatPhoneInput(e.target.value))} />
           </div>
           <div>
-            <label htmlFor="new-apt-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label htmlFor="new-apt-email" className="block text-sm font-medium text-gray-700 mb-1">{copy.email}</label>
             <Input id="new-apt-email" type="email" placeholder="jane@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <p className="text-xs text-gray-500 -mt-1">At least one of phone or email is required.</p>
+          <p className="text-xs text-gray-500 -mt-1">{copy.contactRequired}</p>
 
           {/* Service */}
           <div>
-            <label htmlFor="new-apt-service" className="block text-sm font-medium text-gray-700 mb-1">Service <span className="text-red-500">*</span></label>
+            <label htmlFor="new-apt-service" className="block text-sm font-medium text-gray-700 mb-1">{copy.service} <span className="text-red-500">*</span></label>
             <select id="new-apt-service" value={serviceId} onChange={(e) => setServiceId(e.target.value)} aria-required="true"
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
-              {services.length === 0 && <option value="">Loading…</option>}
+              {services.length === 0 && <option value="">{copy.loading}</option>}
               {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
@@ -495,10 +499,10 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
           {/* Location filter (only shown when business has multiple locations) */}
           {locations.length > 1 && (
             <div>
-              <label htmlFor="new-apt-location" className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <label htmlFor="new-apt-location" className="block text-sm font-medium text-gray-700 mb-1">{copy.location}</label>
               <select id="new-apt-location" value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
-                <option value="">All locations</option>
+                <option value="">{copy.allLocations}</option>
                 {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
@@ -507,11 +511,11 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
           {/* Staff */}
           {staffList.length > 1 && (
             <div>
-              <label htmlFor="new-apt-staff" className="block text-sm font-medium text-gray-700 mb-1">Staff member <span className="text-red-500">*</span></label>
+              <label htmlFor="new-apt-staff" className="block text-sm font-medium text-gray-700 mb-1">{copy.staff} <span className="text-red-500">*</span></label>
               <select id="new-apt-staff" value={staffId} onChange={(e) => setStaffId(e.target.value)} aria-required="true"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300">
                 {filteredStaff.length === 0
-                  ? <option value="">No staff at this location</option>
+                  ? <option value="">{copy.noStaff}</option>
                   : filteredStaff.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)
                 }
               </select>
@@ -520,7 +524,7 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
 
           {selectedService?.locationMode === "VIRTUAL" && (
             <div>
-              <label htmlFor="new-apt-meeting-url" className="block text-sm font-medium text-gray-700 mb-1">Meeting link (optional)</label>
+              <label htmlFor="new-apt-meeting-url" className="block text-sm font-medium text-gray-700 mb-1">{copy.meetingLink}</label>
               <Input
                 id="new-apt-meeting-url"
                 type="url"
@@ -528,29 +532,29 @@ function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, on
                 value={meetingUrl}
                 onChange={(e) => setMeetingUrl(e.target.value)}
               />
-              <p className="mt-1 text-xs text-gray-500">Leave blank to use the service&apos;s default meeting link.</p>
+              <p className="mt-1 text-xs text-gray-500">{copy.meetingHint}</p>
             </div>
           )}
 
           {/* Date & time */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="new-apt-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <label htmlFor="new-apt-date" className="block text-sm font-medium text-gray-700 mb-1">{copy.date}</label>
               <Input id="new-apt-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-required="true" />
             </div>
             <div>
-              <label htmlFor="new-apt-time" className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+              <label htmlFor="new-apt-time" className="block text-sm font-medium text-gray-700 mb-1">{copy.time}</label>
               <Input id="new-apt-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-required="true" />
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label htmlFor="new-apt-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <Input id="new-apt-notes" placeholder="Any notes for this appointment…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <label htmlFor="new-apt-notes" className="block text-sm font-medium text-gray-700 mb-1">{copy.notes}</label>
+            <Input id="new-apt-notes" placeholder={copy.notesPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
-          <Button className="w-full mt-1" loading={busy} onClick={submit}>Book appointment</Button>
+          <Button className="w-full mt-1" loading={busy} onClick={submit}>{copy.submit}</Button>
         </div>
       </div>
     </div>
@@ -565,6 +569,8 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { dictionary, formatDate } = useDashboardLocale();
+  const copy = dictionary.appointments.blockDialog;
   const [staffId, setStaffId] = useState(staffList[0]?.id ?? "");
   const today = format(new Date(), "yyyy-MM-dd");
   const [date, setDate] = useState(today);
@@ -581,19 +587,19 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
   useEffect(() => { if (staffId) loadBlocks(staffId); }, [staffId, loadBlocks]);
 
   async function save() {
-    if (!staffId) { toast.error("Choose a provider"); return; }
+    if (!staffId) { toast.error(copy.errors[0]); return; }
     const startsAt = new Date(`${date}T${start}`);
     const endsAt = new Date(`${date}T${end}`);
-    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) { toast.error("Enter a valid date and time"); return; }
-    if (endsAt <= startsAt) { toast.error("End time must be after the start time"); return; }
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) { toast.error(copy.errors[1]); return; }
+    if (endsAt <= startsAt) { toast.error(copy.errors[2]); return; }
     setBusy(true);
     try {
       await api.staff.addTimeOff(bizId, staffId, { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), reason: reason.trim() || undefined });
-      toast.success("Time blocked — those hours are now unbookable");
+      toast.success(copy.success);
       setReason("");
       loadBlocks(staffId);
       onSaved();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to block time"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : copy.errors[3]); }
     finally { setBusy(false); }
   }
 
@@ -602,7 +608,7 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
       await api.staff.deleteTimeOff(bizId, staffId, id);
       setBlocks((p) => p.filter((b) => b.id !== id));
       onSaved();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to remove"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : copy.errors[4]); }
   }
 
   const upcoming = blocks
@@ -622,14 +628,14 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <CalendarOff className="w-4 h-4 text-violet-600" />
-            <p id="block-time-modal-title" className="text-sm font-semibold text-gray-900">Block time</p>
+            <p id="block-time-modal-title" className="text-sm font-semibold text-gray-900">{copy.title}</p>
           </div>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} aria-label={copy.close} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-3">
           {staffList.length > 1 && (
             <div>
-              <label htmlFor="block-provider" className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+              <label htmlFor="block-provider" className="block text-sm font-medium text-gray-700 mb-1">{copy.provider}</label>
               <select id="block-provider" value={staffId} onChange={(e) => setStaffId(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
                 {staffList.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
@@ -637,38 +643,38 @@ function BlockTimeModal({ bizId, staffList, onClose, onSaved }: {
             </div>
           )}
           <div>
-            <label htmlFor="block-date" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <label htmlFor="block-date" className="block text-sm font-medium text-gray-700 mb-1">{copy.date}</label>
             <Input id="block-date" type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} aria-required="true" />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="block-from" className="block text-sm font-medium text-gray-700 mb-1">From</label>
+              <label htmlFor="block-from" className="block text-sm font-medium text-gray-700 mb-1">{copy.from}</label>
               <Input id="block-from" type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-required="true" />
             </div>
             <div>
-              <label htmlFor="block-to" className="block text-sm font-medium text-gray-700 mb-1">To</label>
+              <label htmlFor="block-to" className="block text-sm font-medium text-gray-700 mb-1">{copy.to}</label>
               <Input id="block-to" type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-required="true" />
             </div>
           </div>
           <div>
-            <label htmlFor="block-reason" className="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
-            <Input id="block-reason" placeholder="Lunch, holiday, personal…" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <label htmlFor="block-reason" className="block text-sm font-medium text-gray-700 mb-1">{copy.reason}</label>
+            <Input id="block-reason" placeholder={copy.reasonPlaceholder} value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
-          <Button className="w-full" loading={busy} onClick={save}>Block this time</Button>
+          <Button className="w-full" loading={busy} onClick={save}>{copy.submit}</Button>
 
           {upcoming.length > 0 && (
             <div className="pt-2">
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Upcoming blocks</p>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{copy.upcoming}</p>
               <div className="space-y-1 max-h-40 overflow-y-auto">
                 {upcoming.map((b) => (
                   <div key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-700 truncate">
-                        {format(new Date(b.startsAt), "EEE, MMM d · h:mm a")}–{format(new Date(b.endsAt), "h:mm a")}
+                        {formatDate(b.startsAt, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}–{formatDate(b.endsAt, { hour: "numeric", minute: "2-digit" })}
                       </p>
                       {b.reason && <p className="text-[11px] text-gray-500 truncate">{b.reason}</p>}
                     </div>
-                    <button onClick={() => remove(b.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0" aria-label="Remove block">
+                    <button onClick={() => remove(b.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0" aria-label={copy.remove}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -903,6 +909,8 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
 }
 
 function AppointmentsPage() {
+  const { dictionary, formatCurrency, formatDate } = useDashboardLocale();
+  const copy = dictionary.appointments;
   const { user } = useCurrentUser();
   const isStaff = user?.role === "STAFF";
   const bizId = user?.businessId ?? "";
@@ -981,9 +989,9 @@ function AppointmentsPage() {
         : data;
       setAppointments(staffFiltered);
     }
-    catch (e) { setError(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setError(e instanceof Error ? e.message : copy.errors.load); }
     finally { setLoading(false); }
-  }, [isStaff, user, bizId, viewMode, calMonth, weekStart]);
+  }, [isStaff, user, bizId, viewMode, calMonth, weekStart, copy.errors.load]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1013,17 +1021,17 @@ function AppointmentsPage() {
       }
       else if (action === "noshow-fee") {
         const res = await api.payments.chargeNoShow(id);
-        if (res.charged) toast.success(`Charged no-show fee of ${formatPrice(res.feeCents)}`);
-        else toast.error(res.message ?? "Could not charge the no-show fee");
+        if (res.charged) toast.success(copy.chargedNoShow.replace("{amount}", formatCurrency(res.feeCents)));
+        else toast.error(res.message ?? copy.errors.noShowFee);
         setSelected(null);
         load();
         return;
       }
-      toast.success("Updated");
+      toast.success(copy.updated);
       setSelected(null);
       load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Action failed");
+      toast.error(e instanceof Error ? e.message : copy.errors.action);
     }
   }
 
@@ -1084,10 +1092,10 @@ function AppointmentsPage() {
     if (next.getTime() === orig.getTime()) return; // dropped on the same day
     try {
       await api.appointments.reschedule(bizId, appointmentId, next.toISOString());
-      toast.success(`Moved ${apt.client.name} to ${format(next, "EEE, MMM d")}`);
+      toast.success(copy.moved.replace("{client}", apt.client.name).replace("{date}", formatDate(next, { weekday: "short", month: "short", day: "numeric" })));
       load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not reschedule — that time may be unavailable");
+      toast.error(e instanceof Error ? e.message : copy.errors.reschedule);
     }
   }
 
@@ -1104,20 +1112,20 @@ function AppointmentsPage() {
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Appointments</h2>
-          <p className="text-sm text-gray-500">{appointments.length} total</p>
+          <h2 className="text-xl font-bold text-gray-900">{copy.title}</h2>
+          <p className="text-sm text-gray-500">{copy.total.replace("{count}", String(appointments.length))}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => setShowNewApt(true)} className="gap-1.5">
-            + New appointment
+            + {copy.newAppointment}
           </Button>
           {!isStaff && (
             <Button variant="outline" size="sm" onClick={() => setShowBlock(true)} className="gap-1.5">
-              <CalendarOff className="w-4 h-4" /> Block time
+              <CalendarOff className="w-4 h-4" /> {copy.blockTime}
             </Button>
           )}
           <Button variant="secondary" size="sm" onClick={load} loading={loading}>
-            <RefreshCw className="w-4 h-4" /> Refresh
+            <RefreshCw className="w-4 h-4" /> {copy.refresh}
           </Button>
         </div>
       </div>
@@ -1139,34 +1147,34 @@ function AppointmentsPage() {
       <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-5">
         <select value={tab} onChange={(e) => setTab(e.target.value as Tab)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700 font-medium">
-          <option value="all">All appointments</option>
-          <option value="week">This week</option>
-          <option value="today">Today</option>
+          <option value="all">{copy.all}</option>
+          <option value="week">{copy.thisWeek}</option>
+          <option value="today">{copy.today}</option>
         </select>
 
         <div className="flex items-center gap-1">
           <button onClick={() => { setShowSearch(s => !s); if (showSearch) setSearch(""); }}
-            aria-label="Filter"
+            aria-label={copy.filter}
             className={cn("p-2 rounded-xl border transition-colors", showSearch ? "bg-violet-50 border-violet-200 text-violet-600" : "border-gray-200 text-gray-400 hover:text-gray-600")}>
             <Search className="w-4 h-4" />
           </button>
           {showSearch && (
             <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input placeholder="Search client…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-full sm:w-48" autoFocus />
+              <Input placeholder={copy.searchClient} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-full sm:w-48" autoFocus />
             </div>
           )}
         </div>
 
         <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
-          <option value="">All staff</option>
+          <option value="">{copy.allStaff}</option>
           {staffNames.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
 
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
-          <option value="">All statuses</option>
+          <option value="">{copy.allStatuses}</option>
           {["PENDING","CONFIRMED","CANCELLED","COMPLETED","NO_SHOW"].map((s) =>
             <option key={s} value={s}>{s}</option>)}
         </select>
@@ -1176,7 +1184,7 @@ function AppointmentsPage() {
         ).length > 1 && (
           <select value={locationListFilter} onChange={(e) => setLocationListFilter(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
-            <option value="">Selected locations</option>
+            <option value="">{copy.selectedLocations}</option>
             {locationList
               .filter((location) => scopedLocationIds.length === 0 || scopedLocationIds.includes(location.id))
               .map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -1194,7 +1202,7 @@ function AppointmentsPage() {
             }}
               className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                 viewMode === v ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}>
-              {v === "list" ? "List" : v === "staff" ? "Staff board" : v === "week" ? "Week" : "Month"}
+              {v === "list" ? copy.views[0] : v === "staff" ? copy.views[1] : v === "week" ? copy.views[2] : copy.views[3]}
             </button>
           ))}
           </div>
@@ -1204,7 +1212,7 @@ function AppointmentsPage() {
       {error && (
         <div className="text-center py-8">
           <p className="text-red-500 mb-2">{error}</p>
-          <button onClick={load} className="text-violet-600 text-sm hover:underline">Retry</button>
+          <button onClick={load} className="text-violet-600 text-sm hover:underline">{copy.retry}</button>
         </div>
       )}
 
@@ -1230,14 +1238,14 @@ function AppointmentsPage() {
           onReschedule={rescheduleToDay}
         />
       ) : filtered.length === 0 ? (
-        <EmptyState title="No appointments" description="Try adjusting your filters." />
+        <EmptyState title={copy.emptyTitle} description={copy.emptyBody} />
       ) : viewMode === "staff" ? (
         <div className="grid gap-4 lg:grid-cols-3">
           {staffGroups.map(([name, rows]) => (
             <div key={name} className="rounded-2xl border border-gray-100 bg-white shadow-sm">
               <div className="border-b border-gray-50 px-4 py-3">
                 <p className="text-sm font-semibold text-gray-900">{name}</p>
-                <p className="text-xs text-gray-500">{rows.length} appointment{rows.length === 1 ? "" : "s"}</p>
+                <p className="text-xs text-gray-500">{rows.length} {rows.length === 1 ? copy.appointment : copy.appointments}</p>
               </div>
               <div className="max-h-[520px] divide-y divide-gray-50 overflow-y-auto">
                 {rows.map((apt) => (

@@ -1,3 +1,5 @@
+import { LOCALIZED_PATHS } from "@/lib/hreflang";
+
 const SITE_URL = "https://www.pulseappointments.com";
 const CONTENT_DATE = new Date().toISOString();
 
@@ -6,6 +8,7 @@ type SitemapRoute = {
   lastModified: string;
   changeFrequency: "daily" | "weekly" | "monthly" | "yearly";
   priority: number;
+  alternates?: { en: string; fr: string };
 };
 
 const RAW_API_URL = (
@@ -40,7 +43,6 @@ const staticRoutes: SitemapRoute[] = [
   ["/accessibility", "yearly", 0.3],
   ["/status", "monthly", 0.3],
   ["/security", "yearly", 0.5],
-  ["/fr/security", "yearly", 0.5],
   ["/canadian-privacy", "yearly", 0.5],
   ["/changelog", "weekly", 0.5],
   ["/compare", "monthly", 0.7],
@@ -72,6 +74,10 @@ const staticRoutes: SitemapRoute[] = [
   ["/for/ottawa", "monthly", 0.9],
   ["/for/edmonton", "monthly", 0.9],
   ["/for/winnipeg", "monthly", 0.9],
+  ["/for/montreal", "monthly", 0.9],
+  ["/for/quebec-city", "monthly", 0.9],
+  ["/for/laval", "monthly", 0.9],
+  ["/for/gatineau", "monthly", 0.9],
   ["/features/online-booking", "monthly", 0.8],
   ["/features/deposits", "monthly", 0.8],
   ["/features/no-show-protection", "monthly", 0.8],
@@ -85,12 +91,23 @@ const staticRoutes: SitemapRoute[] = [
   ["/blog/best-appointment-booking-software-canada-2026", "monthly", 0.7],
   ["/blog/how-to-take-appointment-deposits-canada", "monthly", 0.7],
   ["/blog/salon-cancellation-policy-canada", "monthly", 0.7],
-].map(([path, changeFrequency, priority]) => ({
-  url: `${SITE_URL}${path}`,
-  lastModified: CONTENT_DATE,
-  changeFrequency: changeFrequency as SitemapRoute["changeFrequency"],
-  priority: priority as number,
-}));
+].flatMap(([path, changeFrequency, priority]) => {
+  const logicalPath = path as string;
+  const suffix = logicalPath === "/" ? "" : logicalPath;
+  const en = `${SITE_URL}${suffix}`;
+  const fr = `${SITE_URL}/fr${suffix}`;
+  const base = {
+    lastModified: CONTENT_DATE,
+    changeFrequency: changeFrequency as SitemapRoute["changeFrequency"],
+    priority: priority as number,
+  };
+  if (!LOCALIZED_PATHS.has(logicalPath)) return [{ ...base, url: en }];
+  const alternates = { en, fr };
+  return [
+    { ...base, url: en, alternates },
+    { ...base, url: fr, alternates },
+  ];
+});
 
 async function fetchPublicSlugs(): Promise<{ slug: string; updatedAt: string }[]> {
   for (const apiUrl of API_CANDIDATES) {
@@ -119,6 +136,11 @@ function renderUrl(route: SitemapRoute) {
   return [
     "<url>",
     `<loc>${escapeXml(route.url)}</loc>`,
+    ...(route.alternates ? [
+      `<xhtml:link rel="alternate" hreflang="en-CA" href="${escapeXml(route.alternates.en)}"/>`,
+      `<xhtml:link rel="alternate" hreflang="fr-CA" href="${escapeXml(route.alternates.fr)}"/>`,
+      `<xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(route.alternates.en)}"/>`,
+    ] : []),
     `<lastmod>${route.lastModified}</lastmod>`,
     `<changefreq>${route.changeFrequency}</changefreq>`,
     `<priority>${route.priority}</priority>`,
@@ -137,7 +159,7 @@ export async function GET() {
 
   const body = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ...[...staticRoutes, ...businessRoutes].map(renderUrl),
     "</urlset>",
   ].join("\n");

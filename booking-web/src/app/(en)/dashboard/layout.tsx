@@ -20,6 +20,7 @@ import { useEvents } from "@/lib/hooks";
 import { toast } from "sonner";
 import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
 import { LOCATIONS_CHANGED_EVENT, LocationScopeContext } from "@/lib/location-scope";
+import { DashboardLocaleContext } from "@/lib/dashboard-locale";
 
 interface NavItem {
   href: string;
@@ -108,6 +109,32 @@ const FOOTER_PAGES = [
   { href: "/dashboard/settings",      label: "Settings" },
   { href: "/support",                 label: "Help & Support" },
 ];
+
+const FR_LABELS: Record<string, string> = {
+  Dashboard: "Tableau de bord", Locations: "Emplacements", Appointments: "Rendez-vous",
+  Clients: "Clients", "Booking Page": "Page de réservation", Communication: "Communication",
+  Messages: "Messages", Forms: "Formulaires", Reminders: "Rappels", Reviews: "Avis",
+  Catalog: "Catalogue", Services: "Services", Staff: "Personnel", "Spaces & Equipment": "Espaces et équipement",
+  Hours: "Heures", Workflow: "Flux de travail", Tasks: "Tâches", "Follow-ups": "Suivis",
+  Waitlist: "Liste d’attente", Payments: "Paiements", Checkout: "Encaissement",
+  Transactions: "Transactions", Invoices: "Factures", "Deposits & fees": "Dépôts et frais",
+  Reports: "Rapports", Marketing: "Marketing", Campaigns: "Campagnes", Offers: "Offres",
+  "Promo codes": "Codes promotionnels", "Gift cards": "Cartes-cadeaux", Packages: "Forfaits",
+  Memberships: "Abonnements", "My Appointments": "Mes rendez-vous", "My Tasks": "Mes tâches",
+  Notifications: "Notifications", Account: "Compte", Settings: "Paramètres",
+  "Help & Support": "Aide et soutien",
+};
+
+function translateNav(items: NavItem[], french: boolean): NavItem[] {
+  if (!french) return items;
+  return items.map((item) => ({
+    ...item,
+    label: FR_LABELS[item.label] ?? item.label,
+    children: item.children?.map((child) => child.label
+      ? { ...child, label: FR_LABELS[child.label] ?? child.label }
+      : child),
+  }));
+}
 
 function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
   const pathname = usePathname();
@@ -563,6 +590,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [locationsLoading, setLocationsLoading] = useState(true);
+  const [dashboardLocale, setDashboardLocale] = useState<"en" | "fr">("en");
+  const french = dashboardLocale === "fr";
+
+  useEffect(() => {
+    const saved = localStorage.getItem("pulse_dashboard_locale");
+    if (saved === "fr") setDashboardLocale("fr");
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = french ? "fr-CA" : "en-CA";
+    localStorage.setItem("pulse_dashboard_locale", dashboardLocale);
+  }, [dashboardLocale, french]);
 
   // useCurrentUser() is the authoritative auth check. It calls /api/auth/me on
   // first mount (result is module-level cached), redirects to /login on 401, and
@@ -679,7 +717,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ]
       : []),
   ];
-  const nav = user?.role === "STAFF" ? staffNav : user?.role === "OWNER" ? OWNER_NAV : [];
+  const nav = translateNav(user?.role === "STAFF" ? staffNav : user?.role === "OWNER" ? OWNER_NAV : [], french);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)");
@@ -736,6 +774,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
+    <DashboardLocaleContext.Provider value={dashboardLocale}>
     <LocationScopeContext.Provider value={locationScope}>
     <div className="dashboard-shell flex brand-shell">
       <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} canSearchData={user?.role === "OWNER"} />
@@ -785,15 +824,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
           <Link href="/dashboard/settings" onClick={() => setOpen(false)}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
-            <SettingsIcon className="w-4 h-4" /> Settings
+            <SettingsIcon className="w-4 h-4" /> {french ? "Paramètres" : "Settings"}
           </Link>
           <Link href="/support" onClick={() => setOpen(false)}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
-            <LifeBuoy className="w-4 h-4" /> Help & Support
+            <LifeBuoy className="w-4 h-4" /> {french ? "Aide et soutien" : "Help & Support"}
           </Link>
           <button onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
-            <LogOut className="w-4 h-4" /> Sign out
+            <LogOut className="w-4 h-4" /> {french ? "Se déconnecter" : "Sign out"}
           </button>
         </div>
       </aside>
@@ -824,10 +863,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setDashboardLocale(french ? "en" : "fr")}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              aria-label={french ? "Afficher le tableau de bord en anglais" : "Afficher le tableau de bord en français"}
+            >
+              {french ? "EN" : "FR"}
+            </button>
             <Link href="/dashboard/checkout"
               className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shrink-0">
               <CalendarPlus className="h-4 w-4" />
-              <span className="hidden sm:inline">New booking</span>
+              <span className="hidden sm:inline">{french ? "Nouvelle réservation" : "New booking"}</span>
             </Link>
             <button type="button" onClick={() => setCommandOpen(true)}
               className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 lg:inline-flex">
@@ -876,5 +923,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     </div>
     </LocationScopeContext.Provider>
+    </DashboardLocaleContext.Provider>
   );
 }

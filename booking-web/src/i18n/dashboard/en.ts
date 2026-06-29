@@ -1,0 +1,138 @@
+export const dashboardEn = {
+  common: {
+    add: "Add", apply: "Apply", back: "Back", cancel: "Cancel", close: "Close",
+    confirm: "Confirm", create: "Create", delete: "Delete", edit: "Edit",
+    loading: "Loading…", optional: "optional", retry: "Retry", save: "Save",
+    search: "Search", select: "Select", update: "Update",
+  },
+  overview: {
+    retry: "Retry",
+    demoAlreadyLoaded: "Demo data is already loaded — check each section to explore.",
+    demoAdded: "Demo data added! Browse each dashboard section to see examples.",
+    demoFailed: "Could not load demo data. Please try again.",
+    loadFailed: "Failed to load",
+    greetings: { morning: "Good morning", afternoon: "Good afternoon", evening: "Good evening" },
+    allAppointments: "All appointments",
+    demoTitle: "Explore with demo data",
+    demoBody: "Load sample records into every dashboard section so you can see how each feature works before adding real data.",
+    loadDemo: "Load demo data",
+    dismissDemo: "Dismiss demo banner",
+    quickActions: ["New appointment", "Take payment", "Share booking link", "Add client"],
+    setup: {
+      payoutsActive: "Payouts active", setupPayouts: "Set up payouts",
+      calendarSynced: "Calendar synced", connectCalendar: "Connect calendar",
+    },
+    actionNeeded: "Action needed",
+    actions: ["Pending bookings", "Unread messages", "Unread alerts", "Failed payments", "Waiting clients", "Failed deliveries"],
+    verification: {
+      title: "Get your business verified",
+      body: "Earn a verified badge by submitting your legal details and supporting documents.",
+      cta: "Get verified",
+      pending: "Verification requested — under review. We'll let you know once it's approved.",
+    },
+    metrics: ["Revenue this week", "Appointments today", "Completed this week", "New clients this month"],
+    todaySchedule: "Today's schedule",
+    appointment: "appointment",
+    appointments: "appointments",
+    nothingToday: "Nothing scheduled today",
+    viewManageAll: "View & manage all",
+    comingUp: "Coming up",
+    nextUpcoming: "Next {count} upcoming",
+    reportSummary: "No-shows, cancellations & top services",
+    viewReports: "View in Reports",
+    noUpcoming: "No upcoming appointments",
+  },
+  appointments: {
+    title: "Appointments", total: "{count} total", newAppointment: "New appointment",
+    blockTime: "Block time", refresh: "Refresh", all: "All appointments",
+    thisWeek: "This week", today: "Today", filter: "Filter", searchClient: "Search client…",
+    allStaff: "All staff", allStatuses: "All statuses", selectedLocations: "Selected locations",
+    views: ["List", "Staff board", "Week", "Month"], retry: "Retry",
+    emptyTitle: "No appointments", emptyBody: "Try adjusting your filters.",
+    appointment: "appointment", appointments: "appointments",
+    errors: {
+      load: "Failed to load", action: "Action failed",
+      noShowFee: "Could not charge the no-show fee",
+      reschedule: "Could not reschedule — that time may be unavailable",
+    },
+    updated: "Updated",
+    moved: "Moved {client} to {date}",
+    chargedNoShow: "Charged no-show fee of {amount}",
+    newDialog: {
+      title: "New appointment", close: "Close", clientName: "Client name", phone: "Phone",
+      email: "Email", contactRequired: "At least one of phone or email is required.",
+      service: "Service", loading: "Loading…", location: "Location", allLocations: "All locations",
+      staff: "Staff member", noStaff: "No staff at this location", meetingLink: "Meeting link (optional)",
+      meetingHint: "Leave blank to use the service's default meeting link.", date: "Date", time: "Time",
+      notes: "Notes (optional)", notesPlaceholder: "Any notes for this appointment…", submit: "Book appointment",
+      errors: ["Client name must be at least 2 characters", "Provide at least a phone number or email", "Select a service", "Select a staff member", "Enter a valid date and time", "Failed to create appointment"],
+      created: "Appointment created",
+    },
+    blockDialog: {
+      title: "Block time", close: "Close", provider: "Provider", date: "Date", from: "From", to: "To",
+      reason: "Reason (optional)", reasonPlaceholder: "Lunch, holiday, personal…", submit: "Block this time",
+      upcoming: "Upcoming blocks", remove: "Remove block",
+      errors: ["Choose a provider", "Enter a valid date and time", "End time must be after the start time", "Failed to block time", "Failed to remove"],
+      success: "Time blocked — those hours are now unbookable",
+    },
+    drawer: {
+      title: "Appointment details", close: "Close",
+      fields: ["Service", "Price", "Staff", "Location"],
+      online: "Online", joinVideo: "Join video call", videoNoLink: "Video call (no link set)",
+      mobile: "Mobile — go to", addressMissing: "address not provided", where: "Where", phoneCall: "Phone call",
+      client: "Client", notes: "Notes", intake: "Intake form", deposit: "Deposit collected",
+      cancelReason: "Reason for cancellation (optional)", chargeCancellation: "Charge the {amount} cancellation fee to the client's card",
+      back: "Back", confirmCancel: "Confirm cancel", edit: "Edit booking",
+      clientName: "Client name", clientEmail: "Client email", clientPhone: "Client phone",
+      appointmentDateTime: "Appointment date and time", notify: "Notify client by email", save: "Save changes",
+      actions: ["View receipt", "Edit appointment", "Confirm appointment", "Mark completed", "Cancel appointment", "Mark no-show", "Charge no-show fee"],
+    },
+  },
+  hubs: {
+    catalog: {
+      title: "Catalog",
+      intro: "What you offer and who delivers it — services, team, spaces, and hours.",
+      cards: {
+        services: ["Services", "The services clients can book, with prices and durations."],
+        staff: ["Staff", "Your team, their roles, and the services each one offers."],
+        resources: ["Spaces & Equipment", "Rooms, chairs, and equipment that bookings depend on."],
+        hours: ["Hours", "When you're open — the windows clients can book within."],
+      },
+    },
+    communication: {
+      title: "Communication",
+      intro: "Everything you send to and receive from clients, in one place.",
+      cards: {
+        messages: ["Messages", "Two-way chat with your clients — replies, questions, and SMS."],
+        forms: ["Forms", "Intake & consultation questions clients answer when they book."],
+        reminders: ["Reminders", "Automated email & SMS confirmations, reminders, and follow-ups."],
+        reviews: ["Reviews", "Collect and publish client reviews from completed appointments."],
+      },
+    },
+    workflow: {
+      title: "Workflow",
+      intro: "Keep day-to-day operations moving — tasks, follow-ups, and your waitlist.",
+      cards: {
+        tasks: ["Tasks", "Your team's to-dos and follow-up reminders."],
+        followups: ["Follow-ups", "Automated and manual check-ins to bring clients back."],
+        waitlist: ["Waitlist", "Clients waiting for an opening — fill cancellations fast."],
+      },
+    },
+    payments: {
+      title: "Payments",
+      intro: "Take payments and keep your books — checkout, transactions, invoices, and fee rules.",
+      cards: {
+        checkout: ["Checkout", "Take an in-person payment or charge a saved card."],
+        transactions: ["Transactions", "Every payment, refund, and payout in one ledger."],
+        invoices: ["Invoices", "Create, send, and track client invoices."],
+        fees: ["Deposits & fees", "Deposit rules, no-show and late-cancellation fees, tax."],
+      },
+    },
+  },
+} as const;
+
+export type DashboardDictionary = {
+  [K in keyof typeof dashboardEn]: {
+    [P in keyof (typeof dashboardEn)[K]]: (typeof dashboardEn)[K][P]
+  }
+};

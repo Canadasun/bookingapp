@@ -11,7 +11,9 @@ const GOOGLE_SITE_VERIFICATION =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ??
   "";
 
-export const sharedMetadata: Metadata = {
+function metadataForLocale(locale: "en_CA" | "fr_CA"): Metadata {
+  const french = locale === "fr_CA";
+  return {
   metadataBase: new URL(SITE_URL),
   title: {
     default: "Pulse — Scheduling made simple",
@@ -26,6 +28,8 @@ export const sharedMetadata: Metadata = {
     description: "Book appointments online, 24/7. Automated reminders, deposits, and a beautiful dashboard.",
     url: SITE_URL,
     images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630, alt: "Pulse — Scheduling made simple" }],
+    locale,
+    alternateLocale: [french ? "en_CA" : "fr_CA"],
   },
   twitter: {
     card: "summary_large_image",
@@ -40,6 +44,10 @@ export const sharedMetadata: Metadata = {
     'apple-itunes-app': 'app-id=6774881206, app-argument=https://www.pulseappointments.com',
   },
 };
+}
+
+export const sharedMetadata: Metadata = metadataForLocale("en_CA");
+export const sharedFrenchMetadata: Metadata = metadataForLocale("fr_CA");
 
 export const sharedViewport: Viewport = {
   width: "device-width",

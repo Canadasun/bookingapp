@@ -8,8 +8,6 @@ import { LanguageToggle } from "./LanguageToggle";
 const SITE = "https://www.pulseappointments.com";
 
 // Each feature's link + icon lives in code, paired by index with the dictionary
-// copy (title/desc). The sub-pages are English-only for now, so cards link to
-// the canonical English routes regardless of locale until those get translated.
 const FEATURE_LINKS: { href: string; Icon: LucideIcon }[] = [
   { href: "/features/online-booking", Icon: CreditCard },
   { href: "/features/deposits", Icon: ShieldCheck },
@@ -73,7 +71,7 @@ export function FeaturesContent({ dict, locale }: { dict: Dictionary["features"]
       <section className="border-y border-[#E9DDCB] bg-white">
         <div className="mx-auto grid max-w-6xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURE_LINKS.map(({ href, Icon }, i) => (
-            <Link key={href} href={href} className="group rounded-lg border border-slate-200 p-5 transition-colors hover:border-violet-300 hover:bg-violet-50/40">
+            <Link key={href} href={locale === "fr" ? `/fr${href}` : href} className="group rounded-lg border border-slate-200 p-5 transition-colors hover:border-violet-300 hover:bg-violet-50/40">
               <Icon className="h-5 w-5 text-violet-700" aria-hidden="true" />
               <h2 className="mt-4 text-base font-semibold text-slate-950 group-hover:text-violet-800">{dict.items[i].title}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">{dict.items[i].desc}</p>

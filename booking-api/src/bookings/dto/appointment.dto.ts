@@ -20,6 +20,9 @@ const AppointmentFieldsSchema = z.object({
   // Where to meet the client for an at-customer (mobile) service. Only stored
   // when the booked service's mode is CUSTOMER; ignored otherwise.
   customerAddress: z.string().max(500).optional(),
+  // Persist the language chosen on the public booking page so delayed
+  // confirmations and reminders use the same language.
+  locale: z.enum(['en', 'fr']).optional(),
 });
 
 export const CreateAppointmentSchema = AppointmentFieldsSchema.extend({

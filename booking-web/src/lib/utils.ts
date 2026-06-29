@@ -8,12 +8,12 @@ export function cn(...inputs: ClassValue[]) {
 // Prices default to CAD (the platform's primary market); pass "USD" for US
 // businesses. Using the en-US locale renders CAD as "CA$" and USD as "$", so the
 // two are visually distinct.
-export function formatPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+export function formatPrice(cents: number, currency: "CAD" | "USD" = "CAD", locale: "en-CA" | "fr-CA" = "en-CA") {
+  return new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "narrowSymbol" }).format(cents / 100);
 }
 
-export function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", {
+export function formatDateTime(iso: string, locale: "en-CA" | "fr-CA" = "en-CA") {
+  return new Date(iso).toLocaleString(locale, {
     weekday: "short", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", hour12: true,
   });

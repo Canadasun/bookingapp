@@ -155,7 +155,7 @@ type FooterT = {
 };
 
 // Footer links adapt to the session too.
-export function LandingFooterLinks({ t }: { t: FooterT }) {
+export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: "en" | "fr" }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
@@ -169,12 +169,12 @@ export function LandingFooterLinks({ t }: { t: FooterT }) {
     <>
       <Link href="/for" className="hover:text-indigo-600 transition-colors">{t.industries}</Link>
       <Link href="/compare" className="hover:text-indigo-600 transition-colors">{t.compare}</Link>
-      <Link href="/pricing" className="hover:text-indigo-600 transition-colors">{t.pricing}</Link>
+      <Link href={locale === "fr" ? "/fr/pricing" : "/pricing"} className="hover:text-indigo-600 transition-colors">{t.pricing}</Link>
       <Link href="/demo" className="hover:text-indigo-600 transition-colors">{t.demo}</Link>
       <Link href="/reviews" className="hover:text-indigo-600 transition-colors">{t.reviews}</Link>
       <Link href="/referrals" className="hover:text-indigo-600 transition-colors">{t.referrals}</Link>
       <Link href="/changelog" className="hover:text-indigo-600 transition-colors">{t.changelog}</Link>
-      <Link href="/security" className="hover:text-indigo-600 transition-colors">{t.security}</Link>
+      <Link href={locale === "fr" ? "/fr/security" : "/security"} className="hover:text-indigo-600 transition-colors">{t.security}</Link>
       <Link href="/canadian-privacy" className="hover:text-indigo-600 transition-colors">{t.canadianPrivacy}</Link>
       <Link href="/support" className="hover:text-indigo-600 transition-colors">{t.support}</Link>
       <Link href="/status" className="hover:text-indigo-600 transition-colors">{t.status}</Link>

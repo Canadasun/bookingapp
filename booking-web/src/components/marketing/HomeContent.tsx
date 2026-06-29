@@ -391,7 +391,7 @@ export function HomeContent({
             <Image src="/logo-icon.png" alt="Pulse" width={16} height={16} className="w-4 h-4 object-contain opacity-60" />
             <span className="text-sm">© {new Date().getFullYear()} Pulse Appointments</span>
           </div>
-          <LandingFooterLinks t={h.footer} />
+          <LandingFooterLinks t={h.footer} locale={locale} />
         </div>
       </footer>
     </div>

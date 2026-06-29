@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense, use } from "react";
 import { useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, addMinutes, parseISO, isBefore, isAfter } from "date-fns";
+import { frCA } from "date-fns/locale";
 import { Check, ChevronLeft, Clock, ChevronRight, X, Calendar, Sun, Sunset, Moon, AlertCircle, Star, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, Service, StaffMember, Slot, Business } from "@/lib/api";
@@ -30,8 +31,8 @@ function fmtDuration(mins: number) {
   if (h > 0) return `${h}h`;
   return `${m}m`;
 }
-function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD", locale: "en" | "fr" = "en") {
+  return new Intl.NumberFormat(locale === "fr" ? "fr-CA" : "en-CA", { style: "currency", currency }).format(cents / 100);
 }
 function normalizeHexColor(value: unknown, fallback = "#7C3AED") {
   if (typeof value !== "string") return fallback;
@@ -133,6 +134,15 @@ function CartBar({ services, onClear }: { services: Service[]; onClear: (id: str
 
 export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?: "slug" | "id" }) {
   const searchParams  = useSearchParams();
+  const locale: "en" | "fr" = searchParams.get("lang") === "fr" ? "fr" : "en";
+  const isFrench = locale === "fr";
+  const dateLocale = isFrench ? { locale: frCA } : undefined;
+  const languageHref = (() => {
+    const query = new URLSearchParams(searchParams.toString());
+    if (isFrench) query.delete("lang"); else query.set("lang", "fr");
+    const suffix = query.toString();
+    return suffix ? `?${suffix}` : "?";
+  })();
   const rescheduleId  = searchParams.get("reschedule");
   const [rescheduleToken, setRescheduleToken] = useState<string | undefined>();
   const [fragmentReady, setFragmentReady] = useState(false);
@@ -368,6 +378,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         locationId: selectedLocationId || undefined,
         customerAddress: (selectedServices[0]?.locationMode ?? "IN_PERSON") === "CUSTOMER"
           ? customerAddress.trim() : undefined,
+        locale,
       });
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before
@@ -458,10 +469,14 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const brandSoft = `${brandColor}18`;
   const hidePouredBy = !!bookingSettings.hidePouredBy;
   const bookingTagline = typeof bookingSettings.tagline === "string" ? bookingSettings.tagline.trim() : "";
-  const bookingHeadline = typeof bookingSettings.headline === "string" && bookingSettings.headline.trim()
+  const localizedHeadline = isFrench && typeof bookingSettings.headlineFr === "string"
+    ? bookingSettings.headlineFr.trim() : "";
+  const bookingHeadline = localizedHeadline || (typeof bookingSettings.headline === "string" && bookingSettings.headline.trim()
     ? bookingSettings.headline.trim()
-    : `Book with ${biz?.name ?? "us"}`;
-  const bookingIntro = typeof bookingSettings.intro === "string" ? bookingSettings.intro.trim() : "";
+    : isFrench ? `Réserver avec ${biz?.name ?? "nous"}` : `Book with ${biz?.name ?? "us"}`);
+  const bookingIntro = isFrench && typeof bookingSettings.introFr === "string"
+    ? bookingSettings.introFr.trim()
+    : typeof bookingSettings.intro === "string" ? bookingSettings.intro.trim() : "";
   const fontFamily = typeof bookingSettings.fontFamily === "string" ? bookingSettings.fontFamily : "default";
   const fontClass = {
     default: "font-sans",
@@ -563,11 +578,20 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const chosenStaffName = selectedStaff && selectedStaff !== "any"
     ? (selectedStaff as StaffMember).user.name
     : selectedSlot?.staffName;
-  const stepLabels  = multiProvider ? ["Services", "Provider", "Date & Time", "Details"] : ["Services", "Date & Time", "Details"];
+  const stepLabels = isFrench
+    ? (multiProvider ? ["Services", "Professionnel", "Date et heure", "Coordonnées"] : ["Services", "Date et heure", "Coordonnées"])
+    : (multiProvider ? ["Services", "Provider", "Date & Time", "Details"] : ["Services", "Date & Time", "Details"]);
   const visualStep  = multiProvider ? step : (step === 0 ? 0 : step - 1);
 
   return (
     <div className={cn(isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]", fontClass)}>
+      {isEmbed && (
+        <div className="flex justify-end px-5 pt-3">
+          <Link href={languageHref} hrefLang={isFrench ? "en-CA" : "fr-CA"} className="text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg bg-white">
+            {isFrench ? "English" : "Français"}
+          </Link>
+        </div>
+      )}
       {/* Brand colour injection — scoped to booking page only */}
       <style>{`
         .bk-cta { background-color: ${brandColor}; color: ${brandTextColor}; }
@@ -613,6 +637,14 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               </Link>
             </div>
           )}
+          <Link
+            href={languageHref}
+            hrefLang={isFrench ? "en-CA" : "fr-CA"}
+            className="text-xs font-semibold text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg bk-option"
+            aria-label={isFrench ? "Afficher cette page en anglais" : "View this page in French"}
+          >
+            {isFrench ? "English" : "Français"}
+          </Link>
         </div>
       </nav>
       )}
@@ -697,9 +729,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
               <Check className="w-8 h-8 text-emerald-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">Your Booking is Confirmed</h2>
-            <p className="text-sm bk-brand-text font-medium mb-2">You&apos;re all set!</p>
-            <p className="text-gray-500 mb-1">Confirmation sent to <span className="font-medium text-gray-800">{[form.email, form.phone].filter(Boolean).join(" and ")}</span></p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1">{isFrench ? "Votre réservation est confirmée" : "Your Booking is Confirmed"}</h2>
+            <p className="text-sm bk-brand-text font-medium mb-2">{isFrench ? "Tout est prêt!" : "You're all set!"}</p>
+            <p className="text-gray-500 mb-1">{isFrench ? "Confirmation envoyée à " : "Confirmation sent to "}<span className="font-medium text-gray-800">{[form.email, form.phone].filter(Boolean).join(isFrench ? " et " : " and ")}</span></p>
             <p className="text-xs text-gray-400 font-mono mb-3">#{booking.id.slice(-8).toUpperCase()}</p>
             {clientMatched && (
               <p className="mb-6 inline-flex items-center gap-1.5 rounded-full bk-brand-soft border bk-brand-border-soft px-3 py-1 text-xs font-medium bk-brand-text">
@@ -719,7 +751,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
               {(biz?.taxRatePercent ?? 0) > 0 && (
                 <>
                   <div className="flex justify-between text-gray-500 text-xs">
-                    <span>Subtotal</span><span>{fmtPrice(totalCents)}</span>
+                    <span>{isFrench ? "Sous-total" : "Subtotal"}</span><span>{fmtPrice(totalCents, biz?.currency as "CAD" | "USD", locale)}</span>
                   </div>
                   <div className="flex justify-between text-gray-500 text-xs">
                     <span>Tax ({biz!.taxRatePercent}%)</span><span>{fmtPrice(Math.round(totalCents * (biz!.taxRatePercent! / 100)))}</span>
@@ -731,10 +763,10 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 <span className="bk-brand-text">{fmtPrice(totalCents + Math.round(totalCents * ((biz?.taxRatePercent ?? 0) / 100)))}</span>
               </div>
               <div className="flex justify-between text-gray-500 text-xs pt-1">
-                <span>Duration</span><span>{fmtDuration(totalMins)}</span>
+                <span>{isFrench ? "Durée" : "Duration"}</span><span>{fmtDuration(totalMins)}</span>
               </div>
               <div className="flex justify-between text-gray-500 text-xs">
-                <span>When</span>
+                <span>{isFrench ? "Quand" : "When"}</span>
                 <span>{selectedDate && format(selectedDate, "EEE, MMM d")} · {selectedSlot && format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a")}</span>
               </div>
             </div>
@@ -787,7 +819,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             <div className="flex gap-3 mb-4">
               <Link href={`/appointments/${booking.id}/manage${booking.manageToken ? `#token=${encodeURIComponent(booking.manageToken)}` : ''}`}
                 className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 text-center transition-colors">
-                Manage booking
+                {isFrench ? "Gérer la réservation" : "Manage booking"}
               </Link>
               <button onClick={reset}
                 className="flex-1 py-3 rounded-xl text-sm font-semibold transition-colors bk-cta">
@@ -796,7 +828,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             </div>
 
             <p className="text-center text-xs text-gray-400 mt-2">
-              We&apos;ve emailed your confirmation with a link to manage this booking.
+              {isFrench ? "Nous vous avons envoyé une confirmation par courriel avec un lien pour gérer cette réservation." : "We've emailed your confirmation with a link to manage this booking."}
             </p>
             {cardSaved && (
               <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-3 text-left">
@@ -837,8 +869,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   </div>
                 )}
 
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Choose services</h2>
-                <p className="text-sm text-gray-400 mb-4">Select one or more services</p>
+                <h2 className="text-lg font-bold text-gray-900 mb-1">{isFrench ? "Choisir les services" : "Choose services"}</h2>
+                <p className="text-sm text-gray-400 mb-4">{isFrench ? "Sélectionnez un ou plusieurs services" : "Select one or more services"}</p>
 
                 {revStats && revStats.count > 0 && (
                   <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
@@ -935,8 +967,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 	                <button onClick={() => setStep(0)} className="flex items-center gap-1 text-sm text-gray-400 bk-link mb-4 transition-colors">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Choose a provider</h2>
-                <p className="text-sm text-gray-400 mb-4">Pick who you&apos;d like to see, or let us choose</p>
+                <h2 className="text-lg font-bold text-gray-900 mb-1">{isFrench ? "Choisir un professionnel" : "Choose a provider"}</h2>
+                <p className="text-sm text-gray-400 mb-4">{isFrench ? "Choisissez la personne souhaitée ou laissez-nous choisir" : "Pick who you'd like to see, or let us choose"}</p>
 
                 <div className="space-y-2">
                   {/* Any available */}
@@ -950,8 +982,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                     )}>
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-lg">✨</div>
                     <div className="flex-1">
-                      <p className="font-semibold text-sm text-gray-900">Any available</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Best availability across all providers</p>
+                      <p className="font-semibold text-sm text-gray-900">{isFrench ? "Toute personne disponible" : "Any available"}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{isFrench ? "Meilleures disponibilités parmi tous les professionnels" : "Best availability across all providers"}</p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-300" />
                   </button>
@@ -989,9 +1021,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {step === 2 && (
               <div className="px-6 pb-6">
 	                <button onClick={() => setStep(multiProvider ? 1 : 0)} className="flex items-center gap-1 text-sm text-gray-400 bk-link mb-4 transition-colors">
-                  <ChevronLeft className="w-4 h-4" /> Back
+                  <ChevronLeft className="w-4 h-4" /> {isFrench ? "Retour" : "Back"}
                 </button>
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Pick a date &amp; time</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">{isFrench ? "Choisir une date et une heure" : "Pick a date & time"}</h2>
 
                 <DayPicker
                   mode="single"
@@ -999,15 +1031,16 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   onSelect={pickDate}
                   disabled={(date) => isBefore(date, today) || isAfter(startOfDay(date), startOfDay(advanceLimit))}
                   className="mx-auto"
+                  locale={isFrench ? frCA : undefined}
                 />
 
                 {selectedDate && (
                   <div className="mt-4">
                     <p className="text-sm font-semibold text-gray-700 mb-3">
-                      {format(selectedDate, "EEEE, MMMM d")}
+                      {format(selectedDate, "EEEE, MMMM d", dateLocale)}
                     </p>
                     {loadingSlots ? (
-                      <p className="text-sm text-gray-400 text-center py-4">Loading available times…</p>
+                      <p className="text-sm text-gray-400 text-center py-4">{isFrench ? "Chargement des disponibilités…" : "Loading available times…"}</p>
                     ) : slots.length === 0 ? (
                       <div className="py-2">
                         {wlDone ? (
@@ -1081,9 +1114,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {step === 3 && (
               <div className="px-6 pb-6">
 	                <button onClick={() => setStep(2)} className="flex items-center gap-1 text-sm text-gray-400 bk-link mb-4 transition-colors">
-                  <ChevronLeft className="w-4 h-4" /> Back
+                  <ChevronLeft className="w-4 h-4" /> {isFrench ? "Retour" : "Back"}
                 </button>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">Your details</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-1">{isFrench ? "Vos coordonnées" : "Your details"}</h2>
 
                 {/* Booking summary */}
 	                <div className="bk-brand-soft rounded-xl p-4 mb-5 text-sm">
@@ -1093,8 +1126,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                         {selectedServices.map((s) => s.name).join(" + ")}
                       </p>
 	                      <p className="bk-brand-text mt-0.5 opacity-80">
-                        {selectedDate && format(selectedDate, "EEE, MMM d")}
-                        {selectedSlot && ` at ${format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a")}`}
+                        {selectedDate && format(selectedDate, "EEE, MMM d", dateLocale)}
+                        {selectedSlot && ` ${isFrench ? "à" : "at"} ${format(parseISO(selectedSlot.startsAtLocal.slice(0, 19)), "h:mm a", dateLocale)}`}
                         {` · ${providerText(chosenStaffName)}`}
                       </p>
                     </div>
@@ -1107,10 +1140,10 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
                 <div className="space-y-4">
                   {([
-                    { k: "name",  label: "Full name *",  type: "text",  ph: "Jane Smith" },
-                    { k: "email", label: "Email",         type: "email", ph: "jane@example.com" },
-                    { k: "phone", label: "Phone",         type: "tel",   ph: "+1 (416) 555-0123" },
-                    { k: "notes", label: "Notes (optional)", type: "text", ph: "Anything we should know?" },
+                    { k: "name",  label: isFrench ? "Nom complet *" : "Full name *", type: "text", ph: "Jane Smith" },
+                    { k: "email", label: isFrench ? "Courriel" : "Email", type: "email", ph: "jane@example.com" },
+                    { k: "phone", label: isFrench ? "Téléphone" : "Phone", type: "tel", ph: "+1 (416) 555-0123" },
+                    { k: "notes", label: isFrench ? "Notes (facultatif)" : "Notes (optional)", type: "text", ph: isFrench ? "Y a-t-il quelque chose à savoir?" : "Anything we should know?" },
                   ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
                       <label htmlFor={`field-${k}`} className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
@@ -1247,7 +1280,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   {/* Cancellation policy */}
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 mb-2">
-                      <AlertCircle className="w-3.5 h-3.5" /> Cancellation policy
+                      <AlertCircle className="w-3.5 h-3.5" /> {isFrench ? "Politique d’annulation" : "Cancellation policy"}
                     </p>
                     <p className="text-xs text-amber-800 leading-relaxed">{policy}</p>
                     <label className="flex items-start gap-2.5 mt-3 cursor-pointer">
@@ -1259,7 +1292,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 	                        className="mt-0.5 w-4 h-4 bk-check shrink-0"
                       />
                       <span className="text-xs text-amber-800 font-medium">
-                        I have read and agree to the cancellation policy
+                        {isFrench ? "J’ai lu et j’accepte la politique d’annulation" : "I have read and agree to the cancellation policy"}
                       </span>
                     </label>
                   </div>
@@ -1269,16 +1302,21 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       onClick={confirm}
                       disabled={submitting || !policyAccepted}
 	                      className="w-full py-4 rounded-xl font-semibold text-sm transition-colors bk-cta">
-                      {submitting ? "Booking…" : `Confirm booking · ${fmtPrice(totalCents)}`}
+                      {submitting ? (isFrench ? "Réservation…" : "Booking…") : `${isFrench ? "Confirmer la réservation" : "Confirm booking"} · ${fmtPrice(totalCents, biz?.currency as "CAD" | "USD", locale)}`}
                     </button>
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
-                      Payments are processed securely by Stripe. Stripe processing fees may apply under the business&apos;s Stripe agreement. Pulse does not store card numbers.
+                      {isFrench
+                        ? "Les paiements sont traités de façon sécuritaire par Stripe. Des frais de traitement peuvent s’appliquer selon l’entente Stripe de l’entreprise. Pulse ne conserve aucun numéro de carte."
+                        : "Payments are processed securely by Stripe. Stripe processing fees may apply under the business's Stripe agreement. Pulse does not store card numbers."}
                     </p>
                     <p className="text-[10px] text-gray-400 text-center px-4 leading-relaxed">
-                      By confirming, your name, contact details, and appointment information are collected and stored by this business and processed by{" "}
+                      {isFrench
+                        ? "En confirmant, vous acceptez que votre nom, vos coordonnées et les renseignements sur votre rendez-vous soient recueillis et conservés par cette entreprise et traités par "
+                        : "By confirming, your name, contact details, and appointment information are collected and stored by this business and processed by "}
 	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">Pulse</a>{" "}
-                      as its booking platform. View Pulse&apos;s{" "}
-	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">Privacy Policy</a>.
+                      {isFrench ? " à titre de plateforme de réservation. Consultez la " : "as its booking platform. View Pulse's "}
+	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">{isFrench ? "politique de confidentialité" : "Privacy Policy"}</a>
+                      {isFrench ? " de Pulse." : "."}
                     </p>
                   </div>
                 </div>
@@ -1289,7 +1327,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
         {!hidePouredBy && (
           <p className="text-center text-xs text-gray-400 mt-4">
-	            Powered by <span className="bk-brand-text font-medium">Pulse</span>
+	            {isFrench ? "Propulsé par" : "Powered by"} <span className="bk-brand-text font-medium">Pulse</span>
           </p>
         )}
       </main>

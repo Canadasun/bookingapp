@@ -1,0 +1,2 @@
+ALTER TABLE "Appointment"
+ADD COLUMN "locale" TEXT NOT NULL DEFAULT 'en';
