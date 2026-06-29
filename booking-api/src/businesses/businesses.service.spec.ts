@@ -8,6 +8,7 @@ function build() {
         id: 'biz1',
         timezone: 'America/Edmonton',
         verificationStatus: 'VERIFIED',
+        stripeConnectOnboarded: true,
       }),
     },
     staff: {
@@ -25,7 +26,8 @@ function build() {
       count: jest.fn()
         .mockResolvedValueOnce(7)
         .mockResolvedValueOnce(2)
-        .mockResolvedValueOnce(1),
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(10), // setup.hasBooking
     },
     notification: { count: jest.fn().mockResolvedValue(3) },
     message: { findMany: jest.fn().mockResolvedValue([
@@ -40,6 +42,7 @@ function build() {
     waitlistEntry: { count: jest.fn().mockResolvedValue(5) },
     notificationDelivery: { count: jest.fn().mockResolvedValue(6) },
     client: { count: jest.fn().mockResolvedValue(8) },
+    service: { count: jest.fn().mockResolvedValue(2) },
   };
   return {
     service: new BusinessesService(prisma as unknown as PrismaService),
@@ -66,6 +69,7 @@ describe('BusinessesService.dashboardOverview', () => {
     })).resolves.toMatchObject({
       today: [{ id: 'today' }],
       upcoming: [{ id: 'upcoming' }],
+      setup: { hasService: true, stripeConnected: true, hasBooking: true, isVerified: true },
       metrics: {
         pendingBookings: 7,
         cancelledThisWeek: 2,

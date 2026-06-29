@@ -197,7 +197,7 @@ export default function OverviewPage() {
   return (
     <div className="max-w-5xl mx-auto min-w-0 space-y-5 sm:space-y-6">
 
-      {!isStaff && <ErrorBoundary><OnboardingWizard /></ErrorBoundary>}
+      {!isStaff && <ErrorBoundary><OnboardingWizard setup={overview.setup} /></ErrorBoundary>}
 
       {showDemoBanner && (
         <div className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-sky-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">

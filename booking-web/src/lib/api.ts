@@ -380,6 +380,7 @@ export interface NotificationDelivery {
 export interface DashboardOverview {
   timezone: string;
   verificationStatus: VerificationStatus;
+  setup: { hasService: boolean; stripeConnected: boolean; hasBooking: boolean; isVerified: boolean } | null;
   today: Appointment[];
   upcoming: Appointment[];
   metrics: {

@@ -114,7 +114,7 @@ export class BusinessesService {
   async dashboardOverview(id: string, user: DashboardUser, locationId?: string) {
     const business = await this.prisma.business.findUnique({
       where: { id },
-      select: { id: true, timezone: true, verificationStatus: true },
+      select: { id: true, timezone: true, verificationStatus: true, stripeConnectOnboarded: true },
     });
     if (!business) throw new NotFoundException('Business not found');
     if (user.role !== 'ADMIN' && user.businessId !== id) {
@@ -217,8 +217,10 @@ export class BusinessesService {
     let waitlistCount = 0;
     let failedDeliveries = 0;
     let newClientsThisMonth = 0;
+    // Owner activation checklist (business-wide, unaffected by location scope).
+    let setup: { hasService: boolean; stripeConnected: boolean; hasBooking: boolean; isVerified: boolean } | null = null;
     if (!isStaff) {
-      const [payments, waitlist, deliveries, clients] = await Promise.all([
+      const [payments, waitlist, deliveries, clients, serviceCount, apptCount] = await Promise.all([
         this.prisma.payment.findMany({
           where: {
             businessId: id,
@@ -231,12 +233,20 @@ export class BusinessesService {
         this.prisma.waitlistEntry.count({ where: { businessId: id, status: 'WAITING' } }),
         this.prisma.notificationDelivery.count({ where: { businessId: id, status: 'FAILED' } }),
         this.prisma.client.count({ where: { businessId: id, createdAt: { gte: bounds.monthStart, lte: bounds.monthEnd } } }),
+        this.prisma.service.count({ where: { businessId: id } }),
+        this.prisma.appointment.count({ where: { businessId: id } }),
       ]);
       weekRevenue = payments.reduce((sum, payment) => sum + payment.amountCents - payment.refundedCents, 0);
       failedPayments = await this.prisma.payment.count({ where: { businessId: id, status: 'FAILED', ...revenueLocationFilter } });
       waitlistCount = waitlist;
       failedDeliveries = deliveries;
       newClientsThisMonth = clients;
+      setup = {
+        hasService: serviceCount > 0,
+        stripeConnected: business.stripeConnectOnboarded,
+        hasBooking: apptCount > 0,
+        isVerified: business.verificationStatus === 'VERIFIED',
+      };
     }
 
     const serviceCounts = weekCompletedAppointments.reduce<Record<string, number>>((acc, apt) => {
@@ -248,6 +258,7 @@ export class BusinessesService {
     return {
       timezone: business.timezone,
       verificationStatus: business.verificationStatus,
+      setup,
       today: todayAppointments,
       upcoming: upcomingAppointments,
       metrics: {

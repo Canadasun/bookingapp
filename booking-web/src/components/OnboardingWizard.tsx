@@ -15,13 +15,16 @@ interface Step {
   done: boolean;
 }
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ setup }: { setup?: { hasBooking: boolean } | null }) {
   const { user, loading: userLoading } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const router = useRouter();
   const [steps, setSteps] = useState<Step[]>([]);
   const [dismissed, setDismissed] = useState(true); // start hidden until check is done
   const [loading, setLoading] = useState(true);
+  // hasBooking comes from the dashboard overview the parent already loaded, so
+  // we don't fetch appointments here. Primitive dep keeps `check` stable.
+  const hasBooking = !!setup?.hasBooking;
 
   const check = useCallback(async () => {
     try {
@@ -39,10 +42,13 @@ export function OnboardingWizard() {
         { id: "services", title: "Add your first service", description: "Define what you offer — haircut, massage, cleaning, etc.", href: "/dashboard/services", done: hasServices },
         { id: "staff", title: "Set up your staff & hours", description: "Add yourself or team members and set working hours.", href: "/dashboard/staff", done: hasStaff },
         { id: "stripe", title: "Connect Stripe to get paid", description: "Accept deposits, card payments, and no-show fees.", href: "/dashboard/settings?tab=payouts", done: hasStripe },
+        { id: "booking", title: "Take your first booking", description: "Add an appointment yourself, or share your link so a client can.", href: "/dashboard/appointments?new=1", done: hasBooking },
         { id: "share", title: "Share your booking link", description: "Post it on Instagram, Google, or anywhere clients find you.", href: "/dashboard/settings?tab=online", done: false },
       ];
 
-      const coreDone = built.slice(0, 3).every(s => s.done);
+      // Auto-hide once the four owner-controllable steps are done (the "share"
+      // nudge can't be detected, so it never blocks).
+      const coreDone = built.slice(0, 4).every(s => s.done);
       if (coreDone) { setLoading(false); return; }
       setSteps(built);
       setDismissed(false);
@@ -51,7 +57,7 @@ export function OnboardingWizard() {
     } finally {
       setLoading(false);
     }
-  }, [bizId]);
+  }, [bizId, hasBooking]);
 
   useEffect(() => {
     if (userLoading) return;
