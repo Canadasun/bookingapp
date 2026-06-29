@@ -36,6 +36,7 @@ interface NavChild {
 
 const OWNER_NAV: NavItem[] = [
   { href: "/dashboard",              label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/dashboard/locations",    label: "Locations",    icon: MapPin },
   { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
   { href: "/dashboard/clients",      label: "Clients",      icon: Users },
   { href: "/dashboard/booking-page", label: "Booking Page", icon: Globe },
@@ -56,7 +57,6 @@ const OWNER_NAV: NavItem[] = [
     children: [
       { href: "/dashboard/services",     label: "Services" },
       { href: "/dashboard/staff",        label: "Staff" },
-      { href: "/dashboard/locations",    label: "Locations" },
       { href: "/dashboard/resources",    label: "Spaces & Equipment" },
       { href: "/dashboard/hours",        label: "Hours" },
     ],
@@ -435,7 +435,7 @@ function LocationPicker({
     };
   }, [open]);
 
-  if (locations.length < 2) return null;
+  if (locations.length === 0) return null;
 
   function toggle(id: string) {
     const next = selected.has(id)

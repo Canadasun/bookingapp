@@ -66,7 +66,10 @@ export function useCurrentUser() {
     fetchMe().then((u) => {
       setUser(u);
       setLoading(false);
-      if (!u) router.replace("/login");
+      if (!u) {
+        const next = window.location.pathname + window.location.search;
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+      }
     });
   }, [router]);
 
