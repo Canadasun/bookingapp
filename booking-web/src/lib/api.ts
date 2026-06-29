@@ -103,6 +103,7 @@ export interface Business {
   };
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
+  taxProvince?: string | null;
   locations?: { id: string; name: string; address?: string | null }[];
   suspectedDuplicateOfId?: string | null;
   stripeConnectOnboarded?: boolean;

@@ -100,6 +100,7 @@ model Business {
   // { id, label, required }. Answers are stored per appointment (intakeAnswers).
   intakeQuestions      Json    @default("[]")
   taxRatePercent       Float   @default(0) // sales tax applied to totals/receipts (e.g. 13 = 13%)
+  taxProvince          String? // Canadian province/territory code (e.g. ON) the rate preset came from
   invoiceSeq           Int     @default(0) // per-business invoice number counter
 
   // Booking policies

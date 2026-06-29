@@ -56,6 +56,7 @@ export const CreateBusinessSchema = z.object({
     required: z.boolean().optional(),
   })).max(20).optional(),
   taxRatePercent: z.number().min(0).max(100).optional(),
+  taxProvince: z.string().trim().max(2).nullable().optional(),
   minNoticeMinutes: z.number().int().nonnegative().max(43_200).default(120),     // max 30 days
   maxAdvanceDays: z.number().int().positive().max(730).default(60),               // max 2 years
   maxAdvanceMinutes: z.number().int().positive().max(1_051_200).default(86400),   // max 2 years

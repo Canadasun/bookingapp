@@ -30,6 +30,23 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
+// Canadian combined sales-tax rates by province/territory (GST/HST/PST/QST), 2026.
+const CA_TAX: { code: string; label: string; rate: number }[] = [
+  { code: "AB", label: "Alberta", rate: 5 },
+  { code: "BC", label: "British Columbia", rate: 12 },
+  { code: "MB", label: "Manitoba", rate: 12 },
+  { code: "NB", label: "New Brunswick", rate: 15 },
+  { code: "NL", label: "Newfoundland and Labrador", rate: 15 },
+  { code: "NS", label: "Nova Scotia", rate: 14 },
+  { code: "NT", label: "Northwest Territories", rate: 5 },
+  { code: "NU", label: "Nunavut", rate: 5 },
+  { code: "ON", label: "Ontario", rate: 13 },
+  { code: "PE", label: "Prince Edward Island", rate: 15 },
+  { code: "QC", label: "Quebec", rate: 14.975 },
+  { code: "SK", label: "Saskatchewan", rate: 11 },
+  { code: "YT", label: "Yukon", rate: 5 },
+];
+
 type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "branding" | "security" | "billing";
 type SubscriptionDetails = {
   plan: string;
@@ -545,6 +562,7 @@ function SettingsPage() {
         requireDeposit: !!form.requireDeposit,
         depositPercent: Math.max(1, Number(form.depositPercent ?? 25)),
         taxRatePercent: Math.max(0, Math.min(100, Number(form.taxRatePercent ?? 0))),
+        taxProvince: (form.taxProvince as string) || null,
         noShowFeeCents: Math.max(0, Number(form.noShowFeeCents ?? 0)),
         cancellationFeeCents: Math.max(0, Number(form.cancellationFeeCents ?? 0)),
         collectCardOnFile: !!form.collectCardOnFile,
@@ -961,16 +979,33 @@ function SettingsPage() {
                     <DollarSign className="w-4 h-4 text-violet-600" />
                     <p className="text-sm font-semibold text-gray-800">Sales tax</p>
                   </div>
-                  <p className="text-xs text-gray-400 mb-3">Shown on booking totals and receipts. Set to 0 to hide tax.</p>
-                  <div className="flex items-center gap-2 max-w-[180px]">
-                    <Input type="number" min={0} max={100} step={0.01}
-                      aria-label="Sales tax rate"
-                      value={(form.taxRatePercent as number) ?? 0}
-                      onChange={(e) => f("taxRatePercent", Number(e.target.value))}
-                      className="bg-white text-base font-semibold" />
-                    <span className="text-sm font-medium text-gray-500">% tax</span>
+                  <p className="text-xs text-gray-400 mb-3">Shown on booking totals and receipts. Pick your province to apply the standard GST/HST/PST rate, or set a custom rate. Set to 0 to hide tax.</p>
+                  <div className="grid gap-3 sm:grid-cols-2 max-w-md">
+                    <Field label="Province / territory" htmlFor="biz-tax-province">
+                      <select id="biz-tax-province" value={(form.taxProvince as string) ?? ""}
+                        onChange={(e) => {
+                          const code = e.target.value;
+                          const preset = CA_TAX.find((p) => p.code === code);
+                          setDirty(true);
+                          setForm((p) => ({ ...p, taxProvince: code || null, ...(preset ? { taxRatePercent: preset.rate } : {}) }));
+                        }}
+                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                        <option value="">Custom rate</option>
+                        {CA_TAX.map((p) => <option key={p.code} value={p.code}>{p.label} — {p.rate}%</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Tax rate" htmlFor="set-tax-rate">
+                      <div className="flex items-center gap-2">
+                        <Input id="set-tax-rate" type="number" min={0} max={100} step={0.01}
+                          aria-label="Sales tax rate"
+                          value={(form.taxRatePercent as number) ?? 0}
+                          onChange={(e) => f("taxRatePercent", Number(e.target.value))}
+                          className="bg-white text-base font-semibold" />
+                        <span className="text-sm font-medium text-gray-500">%</span>
+                      </div>
+                    </Field>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-2">Saved when you click Save changes below.</p>
+                  <p className="text-[11px] text-gray-400 mt-2">Selecting a province fills the standard combined rate; you can still adjust it. Saved when you click Save changes below.</p>
                 </div>
               </div>
             )}
