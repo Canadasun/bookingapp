@@ -397,6 +397,108 @@ export class NotificationProcessor extends WorkerHost {
     }).catch(() => {});
   }
 
+  // ── SaaS subscription lifecycle emails ────────────────────────────────────
+  private fmtMoney(cents: number) {
+    return `$${(Math.max(0, cents) / 100).toFixed(2)}`;
+  }
+  private fmtDateCa(iso: string | null) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('en-CA', { dateStyle: 'medium' });
+  }
+
+  // Dunning: a recurring subscription charge failed — prompt the owner to fix it.
+  private async sendSubscriptionPaymentFailedEmail(
+    businessId: string,
+    d: { amountDueCents: number; hostedInvoiceUrl: string | null; nextAttempt: string | null },
+  ) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'subscription-payment-failed';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    if (!owners.length) return;
+    const amount = this.fmtMoney(d.amountDueCents);
+    const retryDate = this.fmtDateCa(d.nextAttempt);
+    const retryLine = retryDate
+      ? `We will automatically retry on ${retryDate}. Update your card now to avoid any interruption.`
+      : `Please update your payment method now to keep your plan active.`;
+    const manageUrl = d.hostedInvoiceUrl ?? `${baseUrl}/dashboard/settings?tab=billing`;
+    const title = "Your Pulse payment did not go through";
+    const body = `We could not process your ${amount} subscription payment. ${retryLine}`;
+    for (const o of owners) {
+      await this.email.send({
+        to: o.email,
+        subject: "⚠️ Action needed: your Pulse payment failed",
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)} If the payment is not completed, your paid features will be paused.</p>
+<a href="${manageUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Update payment method →</a>
+`),
+      }).catch(() => {});
+    }
+    await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
+  }
+
+  // Receipt: a recurring subscription renewal succeeded.
+  private async sendSubscriptionRenewedEmail(
+    businessId: string,
+    d: { amountPaidCents: number; hostedInvoiceUrl: string | null; periodEnd: string | null },
+  ) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'subscription-renewed';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    if (!owners.length) return;
+    const amount = this.fmtMoney(d.amountPaidCents);
+    const renews = this.fmtDateCa(d.periodEnd);
+    const title = "Payment received — thank you";
+    const body = renews
+      ? `We have received your ${amount} Pulse subscription payment. Your plan is active and renews on ${renews}.`
+      : `We have received your ${amount} Pulse subscription payment. Your plan is active.`;
+    const receiptUrl = d.hostedInvoiceUrl ?? `${baseUrl}/dashboard/settings?tab=billing`;
+    for (const o of owners) {
+      await this.email.send({
+        to: o.email,
+        subject: "Your Pulse payment receipt",
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)}</p>
+<a href="${receiptUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View invoice →</a>
+`),
+      }).catch(() => {});
+    }
+    await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
+  }
+
+  // Heads-up: a free trial is about to convert to a paid charge.
+  private async sendTrialEndingEmail(businessId: string, d: { trialEndsAt: string | null }) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'trial-ending';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    if (!owners.length) return;
+    const ends = this.fmtDateCa(d.trialEndsAt);
+    const title = "Your Pulse trial is ending soon";
+    const body = ends
+      ? `Your free trial ends on ${ends}. To keep your paid features, make sure a valid card is on file — you will be billed automatically when the trial ends.`
+      : `Your free trial is ending soon. Add or confirm a payment method to keep your paid features without interruption.`;
+    for (const o of owners) {
+      await this.email.send({
+        to: o.email,
+        subject: "Your Pulse trial is ending soon",
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage billing →</a>
+`),
+      }).catch(() => {});
+    }
+    await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
+  }
+
   // In-app inbox notification to a business's owner(s). Best-effort.
   private async notifyOwners(
     businessId: string,
@@ -502,7 +604,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number; amountDueCents?: number; amountPaidCents?: number; hostedInvoiceUrl?: string | null; nextAttempt?: string | null; periodEnd?: string | null; trialEndsAt?: string | null }>) {
     // Access expiry is state maintenance, not a user notification, so it must
     // still run when outbound notifications are disabled.
     if (job.name === 'expire-complimentary-plans') {
@@ -936,6 +1038,31 @@ ${aptDetails(apt)}
     // Subscription plan changed → email + in-app confirmation to the owner.
     if (job.name === 'plan-changed') {
       await this.sendPlanChangedEmail(String(job.data.businessId ?? ''), String(job.data.plan ?? 'FREE'));
+      return;
+    }
+
+    if (job.name === 'subscription-payment-failed') {
+      await this.sendSubscriptionPaymentFailedEmail(String(job.data.businessId ?? ''), {
+        amountDueCents: Number(job.data.amountDueCents ?? 0),
+        hostedInvoiceUrl: job.data.hostedInvoiceUrl ?? null,
+        nextAttempt: job.data.nextAttempt ?? null,
+      });
+      return;
+    }
+
+    if (job.name === 'subscription-renewed') {
+      await this.sendSubscriptionRenewedEmail(String(job.data.businessId ?? ''), {
+        amountPaidCents: Number(job.data.amountPaidCents ?? 0),
+        hostedInvoiceUrl: job.data.hostedInvoiceUrl ?? null,
+        periodEnd: job.data.periodEnd ?? null,
+      });
+      return;
+    }
+
+    if (job.name === 'trial-ending') {
+      await this.sendTrialEndingEmail(String(job.data.businessId ?? ''), {
+        trialEndsAt: job.data.trialEndsAt ?? null,
+      });
       return;
     }
 

@@ -80,6 +80,47 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
+  // ── SaaS subscription lifecycle (Stripe billing) ──────────────────────────
+  // Jobs are keyed on the Stripe event id so a re-delivered webhook can't
+  // double-send. These never mutate plan/billing state — that stays owned by
+  // the customer.subscription.* webhook path.
+
+  // Dunning: a recurring subscription charge failed.
+  async sendSubscriptionPaymentFailed(
+    businessId: string,
+    data: { eventId: string; amountDueCents: number; hostedInvoiceUrl: string | null; nextAttempt: string | null },
+  ) {
+    await this.queue.add('subscription-payment-failed', { businessId, ...data }, {
+      jobId: `sub-failed-${data.eventId}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
+  // Receipt: a recurring subscription renewal succeeded.
+  async sendSubscriptionRenewed(
+    businessId: string,
+    data: { eventId: string; amountPaidCents: number; hostedInvoiceUrl: string | null; periodEnd: string | null },
+  ) {
+    await this.queue.add('subscription-renewed', { businessId, ...data }, {
+      jobId: `sub-renewed-${data.eventId}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
+  // Heads-up: a free trial is about to convert to a paid charge.
+  async sendTrialEnding(
+    businessId: string,
+    data: { eventId: string; trialEndsAt: string | null },
+  ) {
+    await this.queue.add('trial-ending', { businessId, ...data }, {
+      jobId: `trial-ending-${data.eventId}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
   // Alert client that their deposit failed and booking was cancelled.
   async sendDepositFailed(appointmentId: string) {
     await this.queue.add('deposit-failed', { appointmentId }, {

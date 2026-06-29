@@ -565,6 +565,26 @@ export class PaymentsService {
         }
         break;
       }
+      // ── SaaS billing lifecycle (notifications only — plan/billing state is
+      // owned by the customer.subscription.* cases above) ─────────────────────
+      case 'invoice.payment_failed': {
+        await this.notifySubscriptionInvoiceFailed(event.data.object as Stripe.Invoice, event.id);
+        break;
+      }
+      case 'invoice.payment_succeeded': {
+        await this.notifySubscriptionInvoicePaid(event.data.object as Stripe.Invoice, event.id);
+        break;
+      }
+      case 'customer.subscription.trial_will_end': {
+        const sub = event.data.object as Stripe.Subscription;
+        if (sub.metadata?.kind !== 'client_membership' && sub.metadata?.businessId) {
+          await this.notifications.sendTrialEnding(sub.metadata.businessId, {
+            eventId: event.id,
+            trialEndsAt: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+          }).catch(() => {});
+        }
+        break;
+      }
       case 'account.updated': {
         const account = event.data.object as Stripe.Account;
         // details_submitted = owner finished the onboarding form.
@@ -802,6 +822,48 @@ export class PaymentsService {
     if (effectivePlan !== 'FREE') {
       await this.grantReferralReward(businessId).catch(() => {});
     }
+  }
+
+  /**
+   * Resolve the SaaS business behind a subscription invoice. Returns null for
+   * one-off invoices and client-membership invoices (those live in a separate
+   * table), so we never send SaaS billing emails for the wrong thing.
+   */
+  private async businessIdForSubscriptionInvoice(invoice: Stripe.Invoice): Promise<string | null> {
+    if (!invoice.subscription) return null;
+    const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id;
+    const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id ?? null;
+    const row = await this.prisma.subscription.findFirst({
+      where: { OR: [{ stripeSubscriptionId: subId }, ...(customerId ? [{ stripeCustomerId: customerId }] : [])] },
+      select: { businessId: true },
+    });
+    return row?.businessId ?? null;
+  }
+
+  private async notifySubscriptionInvoiceFailed(invoice: Stripe.Invoice, eventId: string) {
+    const businessId = await this.businessIdForSubscriptionInvoice(invoice);
+    if (!businessId) return;
+    await this.notifications.sendSubscriptionPaymentFailed(businessId, {
+      eventId,
+      amountDueCents: invoice.amount_due ?? 0,
+      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+      nextAttempt: invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toISOString() : null,
+    }).catch(() => {});
+  }
+
+  private async notifySubscriptionInvoicePaid(invoice: Stripe.Invoice, eventId: string) {
+    // Receipt only for true renewals — the first invoice is already covered by
+    // the checkout/welcome flow, so we don't double up at signup.
+    if (invoice.billing_reason !== 'subscription_cycle') return;
+    const businessId = await this.businessIdForSubscriptionInvoice(invoice);
+    if (!businessId) return;
+    const periodEndUnix = invoice.lines?.data?.[0]?.period?.end ?? null;
+    await this.notifications.sendSubscriptionRenewed(businessId, {
+      eventId,
+      amountPaidCents: invoice.amount_paid ?? 0,
+      hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+      periodEnd: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
+    }).catch(() => {});
   }
 
   private membershipStatus(status: Stripe.Subscription.Status): 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' {
