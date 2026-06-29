@@ -97,11 +97,13 @@ describe('security regressions', () => {
       service: { id: 'svc-1', name: 'Service', description: null, durationMinutes: 60, priceCents: 1000, priceType: 'FLAT' },
       staff: { id: 'staff-1', bio: null, avatarUrl: null, user: { name: 'Owner', email: 'owner@example.com' } },
       business: { id: 'biz-1', name: 'Business', slug: 'business', timezone: 'UTC', currency: 'CAD', stripeConnectAccountId: 'acct_secret', verificationGovernmentIdUrl: '/uploads/secret' },
+      location: { id: 'loc-1', name: 'Downtown', address: '123 Main St' },
     }, signPublicClientToken('biz-1', 'client-1')) as any;
     expect(response).not.toHaveProperty('stripePaymentIntentId');
     expect(response.client).not.toHaveProperty('notes');
     expect(response.client).not.toHaveProperty('stripeCustomerId');
     expect(response.business).not.toHaveProperty('stripeConnectAccountId');
     expect(response.business).not.toHaveProperty('verificationGovernmentIdUrl');
+    expect(response.location).toEqual({ id: 'loc-1', name: 'Downtown', address: '123 Main St' });
   });
 });

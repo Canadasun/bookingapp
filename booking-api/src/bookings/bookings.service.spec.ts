@@ -113,6 +113,10 @@ function mockPrisma(options: { conflictExists?: boolean; bufferConflict?: boolea
     staff: {
       findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }),
     },
+    location: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'location-a' }),
+      count: jest.fn().mockResolvedValue(2),
+    },
     client: {
       findFirst: jest.fn().mockResolvedValue({ id: 'client1', businessId: 'biz1' }),
     },
@@ -220,6 +224,47 @@ describe('BookingsService', () => {
       });
       expect(result.status).toBe('PENDING');
       expect(prisma.staffService.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects a location that does not match the selected provider', async () => {
+      const { svc } = await buildService({
+        staff: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'staff1',
+            businessId: 'biz1',
+            active: true,
+            locationId: 'location-a',
+          }),
+        },
+      });
+
+      await expect(svc.create('biz1', {
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        clientId: 'client1',
+        startsAt: SLOT_START.toISOString(),
+        locationId: 'location-b',
+      })).rejects.toThrow('The selected provider is not available at this location');
+    });
+
+    it('assigns an unassigned provider to the only active location', async () => {
+      const { svc, prisma } = await buildService({
+        location: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'location-a' }),
+          count: jest.fn().mockResolvedValue(1),
+        },
+      });
+
+      await svc.create('biz1', {
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        clientId: 'client1',
+        startsAt: SLOT_START.toISOString(),
+        locationId: 'location-a',
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.location.count).toHaveBeenCalledWith({ where: { businessId: 'biz1', active: true } });
     });
 
     it('throws ConflictException when slot is taken', async () => {

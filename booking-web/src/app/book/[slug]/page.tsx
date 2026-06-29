@@ -184,7 +184,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [submitting, setSubmitting]         = useState(false);
   const [loadingSlots, setLoadingSlots]     = useState(false);
   const [loadingBiz, setLoadingBiz]         = useState(true);
-  const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string; locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null } | null>(null);
+  const [booking, setBooking]               = useState<{ id: string; startsAt: string; endsAt: string; manageToken?: string; locationMode?: string | null; meetingUrl?: string | null; customerAddress?: string | null; location?: { id: string; name: string; address?: string | null } | null } | null>(null);
   const [clientMatched, setClientMatched]   = useState(false);
   const [payInfo, setPayInfo]               = useState<PayInfo | null>(null);
   const [cardSaved, setCardSaved]           = useState(false); // setup intent completed — card on file
@@ -206,6 +206,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       .then((b) => {
         setBiz(b);
         setBizId(b.id);
+        if (b.locations?.length === 1) setSelectedLocationId(b.locations[0].id);
         setLoadingBiz(false);
       })
       .catch(() => {
@@ -246,6 +247,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     api.appointments.get(rescheduleId, rescheduleToken).then((apt) => {
       const svc = allServices.find((s) => s.id === apt.service.id);
       if (svc) setSelectedServices([svc]);
+      if (apt.location?.id) setSelectedLocationId(apt.location.id);
       setForm((p) => ({ ...p, name: apt.client.name, email: apt.client.email ?? "", phone: apt.client.phone ?? "" }));
       setWl({ name: apt.client.name, email: apt.client.email ?? "" });
       setStep(2);
@@ -363,6 +365,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         intakeAnswers: intakeAnswers.length ? intakeAnswers : undefined,
         referralSource: referralSource || undefined,
         promoCodeId: promoResult?.id || undefined,
+        locationId: selectedLocationId || undefined,
         customerAddress: (selectedServices[0]?.locationMode ?? "IN_PERSON") === "CUSTOMER"
           ? customerAddress.trim() : undefined,
       });
@@ -544,6 +547,14 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   // the business has an added non-owner provider. The owner-provider exists in
   // the API for booking logic, but should not make solo shops choose staff.
   const multiProvider = activeStaff.some((st) => st.user.role !== "OWNER");
+  const locationRequired = (biz?.locations?.length ?? 0) > 1;
+  const visibleServices = selectedLocationId
+    ? allServices.filter((service) => activeStaff.some((staff) =>
+        (staff.locationId === selectedLocationId || ((biz?.locations?.length ?? 0) === 1 && !staff.locationId)) &&
+        (staff.staffServices.length === 0 || staff.staffServices.some((assignment) => assignment.serviceId === service.id)),
+      ))
+    : allServices;
+  const selectedLocation = biz?.locations?.find((location) => location.id === selectedLocationId);
   const salonName     = biz?.name ?? "your provider";
   function providerText(staffName?: string): string {
     if (!multiProvider) return salonName;
@@ -750,6 +761,15 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 <p className="text-sm text-indigo-700">We&apos;ll call you at {form.phone || "your number"} at your appointment time.</p>
               </div>
             )}
+            {(booking.locationMode === "IN_PERSON" || !booking.locationMode) && (booking.location || selectedLocation) && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-left mb-6">
+                <p className="text-sm font-semibold text-indigo-900 mb-1">Appointment location</p>
+                <p className="text-sm font-medium text-indigo-800">{booking.location?.name || selectedLocation?.name}</p>
+                {(booking.location?.address || selectedLocation?.address) && (
+                  <p className="text-sm text-indigo-700">{booking.location?.address || selectedLocation?.address}</p>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-center mb-4">
               {booking && selectedSlot && (
@@ -759,7 +779,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   startsAt={booking.startsAt}
                   endsAt={booking.endsAt}
                   description={`With ${providerText(chosenStaffName)}`}
-                  location={biz?.address}
+                  location={booking.location?.address || booking.location?.name || biz?.address}
                 />
               )}
             </div>
@@ -794,13 +814,19 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 0: Services ──────────────────────────────────────── */}
             {step === 0 && (
               <div className="px-6 pb-6">
-                {/* Location picker — only when the business has more than one */}
+                {/* A branch choice is required when the business has multiple locations. */}
                 {(biz?.locations?.length ?? 0) > 1 && (
                   <div className="mb-5">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Choose a location</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Choose a location <span className="text-red-500">*</span></p>
                     <div className="flex flex-wrap gap-2">
                       {biz!.locations!.map((l) => (
-                        <button key={l.id} onClick={() => setSelectedLocationId((cur) => cur === l.id ? "" : l.id)}
+                        <button key={l.id} onClick={() => {
+                          setSelectedLocationId(l.id);
+                          setSelectedServices([]);
+                          setSelectedStaff(null);
+                          setSelectedDate(undefined);
+                          setSelectedSlot(null);
+                        }}
                           className={cn("rounded-xl border px-3 py-2 text-left transition-colors",
                             selectedLocationId === l.id ? "bk-selected" : "border-gray-200 bk-option")}>
                           <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "bk-selected-text" : "text-gray-800")}>{l.name}</span>
@@ -833,18 +859,20 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                   </div>
                 )}
 
-                {allServices.length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-8">No services available</p>
+                {visibleServices.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-8">
+                    {selectedLocationId ? "No services are available at this location." : "No services available"}
+                  </p>
                 )}
 
                 {/* Group by category */}
                 {(() => {
-                  const catIds = [...new Set(allServices.map(s => s.category?.id ?? null))];
+                  const catIds = [...new Set(visibleServices.map(s => s.category?.id ?? null))];
                   const catNames: Record<string, string> = {};
                   const catColors: Record<string, string> = {};
-                  allServices.forEach(s => { if (s.category) { catNames[s.category.id] = s.category.name; catColors[s.category.id] = s.category.color; } });
+                  visibleServices.forEach(s => { if (s.category) { catNames[s.category.id] = s.category.name; catColors[s.category.id] = s.category.color; } });
                   return catIds.map(catId => {
-                    const svcs = allServices.filter(s => (s.category?.id ?? null) === catId);
+                    const svcs = visibleServices.filter(s => (s.category?.id ?? null) === catId);
                     return (
                       <div key={catId ?? "__none__"} className="mb-5">
                         {catId && (
@@ -892,8 +920,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
 
                 <div className="mt-5">
                   <button
-                    onClick={() => { if (multiProvider) { setStep(1); } else { setSelectedStaff(activeStaff[0] ?? "any"); setStep(2); } }}
-                    disabled={selectedServices.length === 0}
+                    onClick={() => { if (multiProvider) { setStep(1); } else { setSelectedStaff(staffList[0] ?? "any"); setStep(2); } }}
+                    disabled={selectedServices.length === 0 || (locationRequired && !selectedLocationId) || staffList.length === 0}
 	                    className="w-full py-3.5 rounded-xl font-semibold text-sm transition-colors bk-cta">
                     Continue — {selectedServices.length > 0 ? `${selectedServices.length} service${selectedServices.length > 1 ? "s" : ""} · ${fmtPrice(totalCents)}` : "select services"}
                   </button>

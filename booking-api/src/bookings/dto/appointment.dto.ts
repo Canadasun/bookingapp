@@ -14,6 +14,9 @@ const AppointmentFieldsSchema = z.object({
   })).max(20).optional(),
   referralSource: z.string().max(100).optional(),
   promoCodeId: z.string().cuid().optional(),
+  // Explicit branch selected by the client/dashboard. The service validates
+  // that the chosen provider belongs to this location before creating a booking.
+  locationId: z.string().cuid().optional(),
   // Where to meet the client for an at-customer (mobile) service. Only stored
   // when the booked service's mode is CUSTOMER; ignored otherwise.
   customerAddress: z.string().max(500).optional(),

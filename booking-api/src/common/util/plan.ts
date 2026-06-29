@@ -31,7 +31,7 @@ export function getCapabilities(plan: string | null | undefined) {
     noShowFees:        true,
     cancellationFees:  true,
     marketing:         pro,
-    multipleLocations: unlimited,
+    multipleLocations: pro,
     removeBranding:    unlimited,
   };
 }

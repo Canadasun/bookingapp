@@ -67,7 +67,7 @@ export class BookingsService {
     const [data, total] = await Promise.all([
       this.prisma.appointment.findMany({
         where,
-        include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true } } },
         orderBy: { startsAt: 'desc' },
         skip,
         take: limit,
@@ -102,7 +102,7 @@ export class BookingsService {
 
     const data = await this.prisma.appointment.findMany({
       where,
-      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true } } },
       orderBy: { startsAt: 'asc' },
       take: 500,
     });
@@ -115,7 +115,7 @@ export class BookingsService {
         id,
         ...(businessId ? { businessId } : {})
       },
-      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true } } },
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true } } },
     });
     if (!apt) throw new NotFoundException('Appointment not found');
     return apt;
@@ -192,7 +192,11 @@ export class BookingsService {
         cancellationPolicy: appointment.business.cancellationPolicy,
         allowClientReschedule: appointment.business.allowClientReschedule,
       },
-      location: appointment.location ? { id: appointment.location.id, name: appointment.location.name } : null,
+      location: appointment.location ? {
+        id: appointment.location.id,
+        name: appointment.location.name,
+        address: appointment.location.address,
+      } : null,
     };
   }
 
@@ -281,6 +285,21 @@ export class BookingsService {
     // crafted request could attach another business's staff/client to a booking.
     const staff = await this.prisma.staff.findFirst({ where: { id: dto.staffId, businessId, active: true } });
     if (!staff) throw new NotFoundException('Staff not found');
+    if (dto.locationId) {
+      const location = await this.prisma.location.findFirst({
+        where: { id: dto.locationId, businessId, active: true },
+        select: { id: true },
+      });
+      if (!location) throw new NotFoundException('Location not found');
+      if (staff.locationId !== dto.locationId) {
+        const activeLocationCount = staff.locationId
+          ? 2
+          : await this.prisma.location.count({ where: { businessId, active: true } });
+        if (activeLocationCount > 1) {
+          throw new BadRequestException('The selected provider is not available at this location');
+        }
+      }
+    }
     const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId } });
     if (!client) throw new NotFoundException('Client not found');
     // Blocked clients cannot book online. Return a neutral error that does not
@@ -412,7 +431,7 @@ export class BookingsService {
               ...(opts.recurringGroupId ? { recurringGroupId: opts.recurringGroupId } : {}),
               ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
               // Multi-location: the appointment inherits its provider's location.
-              ...(staff.locationId ? { locationId: staff.locationId } : {}),
+              ...((dto.locationId ?? staff.locationId) ? { locationId: dto.locationId ?? staff.locationId } : {}),
               // Snapshot the service's delivery mode so reminders/confirmations
               // know whether this is in-person, virtual, mobile, or phone — and
               // carry the relevant link/address. Service edits won't rewrite it.
@@ -431,7 +450,13 @@ export class BookingsService {
               ...(dto.referralSource ? { referralSource: dto.referralSource } : {}),
               ...(dto.promoCodeId ? { promoCodeId: dto.promoCodeId, discountCents } : {}),
             },
-            include: { client: true, service: true, staff: { include: { user: true } }, business: true },
+            include: {
+              client: true,
+              service: true,
+              staff: { include: { user: true } },
+              business: true,
+              location: { select: { id: true, name: true, address: true } },
+            },
           });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },

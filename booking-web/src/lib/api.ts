@@ -222,7 +222,7 @@ export interface Appointment {
   service: Service;
   staff: StaffMember;
   business: Business;
-  location?: { id: string; name: string } | null;
+  location?: { id: string; name: string; address?: string | null } | null;
   // Delivery mode snapshot + virtual link / mobile address for this appointment.
   locationMode?: ServiceLocationMode | null;
   meetingUrl?: string | null;
@@ -1032,7 +1032,7 @@ export const api = {
       req<Appointment>(`/bookings/${id}`, token ? { headers: { "X-Manage-Token": token } } : undefined, null),
     // Owner-scoped single appointment (for receipts/detail).
     getOne: (businessId: string, id: string) => req<Appointment>(`/businesses/${businessId}/bookings/${id}`),
-    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientToken: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string; customerAddress?: string }) =>
+    create: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientToken: string; startsAt: string; notes?: string; intakeAnswers?: IntakeAnswer[]; referralSource?: string; promoCodeId?: string; customerAddress?: string; locationId?: string }) =>
       req<Appointment>(`/businesses/${businessId}/bookings`, { method: "POST", body: JSON.stringify(data) }),
     // Owner/staff-initiated (dashboard) — authenticated, goes straight to CONFIRMED
     // and sends the client their confirmation immediately (skips approval).

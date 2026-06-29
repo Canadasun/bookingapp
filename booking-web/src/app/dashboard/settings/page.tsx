@@ -594,7 +594,8 @@ function SettingsPage() {
   // deliberately enabled at build time.
   const isPaid     = biz?.capabilities?.deposits      ?? (plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED");
   const isPro      = biz?.capabilities?.sms           ?? (plan === "PRO"   || plan === "UNLIMITED");
-  const isUnlimited = biz?.capabilities?.multipleLocations ?? (plan === "UNLIMITED");
+  const isUnlimited = plan === "UNLIMITED";
+  const canManageLocations = biz?.capabilities?.multipleLocations ?? (plan === "PRO" || isUnlimited);
   function promptUpgrade(target: "BASIC" | "PRO" | "UNLIMITED", feature: string) {
     const label = target === "BASIC" ? "Basic or higher" : target === "PRO" ? "Pro or higher" : "Unlimited";
     toast.info(`${feature} requires ${label}.`);
@@ -1569,7 +1570,7 @@ function SettingsPage() {
                 <FeatureError message={featureErrors.locations} onRetry={loadLocations} />
                 <hr className="border-gray-100" />
 
-                {!isUnlimited ? (
+                {!canManageLocations ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <p className="text-sm font-semibold text-amber-900">Location limit reached</p>
                     <p className="text-xs text-amber-700 mt-1">Free and Basic allow 1 location. Pro allows 2. Upgrade to <strong>Unlimited</strong> to manage up to 5 branches, each with their own staff and calendar, under one account.</p>
