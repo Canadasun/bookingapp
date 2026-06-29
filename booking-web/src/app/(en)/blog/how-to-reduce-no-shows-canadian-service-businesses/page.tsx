@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/blog/how-to-reduce-no-shows-canadian-service-businesses"),
   title: "How to Reduce No-Shows for Canadian Service Businesses | Pulse",
   description:
     "No-shows cost Canadian service businesses thousands per year. Learn the proven deposit + reminder system that cuts no-shows by 80% — used by salons, spas, and barbers across Canada.",

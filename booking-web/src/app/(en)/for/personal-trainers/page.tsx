@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { CalendarCheck2, Dumbbell, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/personal-trainers"),
   title: "Personal Trainer Scheduling App Canada | Pulse Appointments",
   description: "Scheduling software for Canadian personal trainers. Online booking, recurring session management, deposits, SMS reminders, and CAD pricing.",
   openGraph: {

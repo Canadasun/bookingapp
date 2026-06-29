@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { ShieldCheck, FileText, RefreshCw } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/nail-techs"),
   title: "Booking Software for Nail Techs | Pulse Appointments",
   description: "Nail salon booking with deposits, no-show protection, gel and acrylic service protection, and client intake forms. Canada-first, CAD pricing.",
   openGraph: { title: "Nail Tech Booking Software | Pulse Appointments", description: "No-show protection and deposits for Canadian nail technicians." },

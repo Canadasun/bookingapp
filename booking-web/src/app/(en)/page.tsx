@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
@@ -8,6 +9,7 @@ import { PLAN_DEFS } from "@/lib/plans";
 import { getPlanLinks } from "@/lib/paymentLinks";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/"),
   title: "Online Booking Software for Canadian Service Businesses | Pulse Appointments",
   description: "Pulse is the simplest online booking software for Canadian salons, spas, and service businesses. Automated reminders, deposit collection, and no-show protection — free to start.",
   openGraph: {

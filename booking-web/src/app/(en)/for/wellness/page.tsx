@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { Users, Package, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/wellness"),
   title: "Booking Software for Wellness Providers | Pulse Appointments",
   description: "Wellness booking with memberships, packages, group classes, deposits, and no-show protection. Canada-first, CAD pricing.",
   openGraph: { title: "Wellness Booking Software | Pulse Appointments", description: "Memberships, packages, and no-show protection for Canadian wellness providers." },

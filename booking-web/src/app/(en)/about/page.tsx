@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { CheckCircle2, MapPin, ShieldCheck, Sparkles } from "lucide-react";
@@ -6,6 +7,7 @@ import { CheckCircle2, MapPin, ShieldCheck, Sparkles } from "lucide-react";
 const SITE_URL = "https://www.pulseappointments.com";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/about"),
   title: "About Pulse Appointments | Canadian Booking Software",
   description:
     "Learn about Pulse Appointments, a Canada-first online booking platform for salons, spas, barbers, wellness providers, and appointment-based service businesses.",

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { Users, Package, Bell } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/yoga-studios"),
   title: "Yoga Studio Scheduling Software | Pulse Appointments",
   description: "Yoga studio booking and class scheduling for Canadian yoga studios. Group classes, memberships, packages, waitlists, and automated reminders. CAD pricing.",
   openGraph: { title: "Yoga Studio Scheduling Software | Pulse Appointments", description: "Class scheduling, memberships, and no-show protection for Canadian yoga studios." },

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { PawPrint, Bell, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/pet-groomers"),
   title: "Booking Software for Pet Groomers | Pulse Appointments",
   description: "Pet grooming booking with breed notes, client intake forms, deposits, and SMS reminders. Canada-first, CAD pricing.",
   openGraph: { title: "Pet Grooming Booking Software | Pulse Appointments", description: "Online booking with pet-specific intake forms and no-show protection for groomers." },

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { Building2, CalendarDays, MapPin } from "lucide-react";
 import { FeatureLandingPage } from "@/components/FeatureLandingPage";
 
 export const metadata: Metadata = {
   title: "Multi-Location Booking Software for Canadian Service Businesses | Pulse",
   description: "Manage multiple locations, staff calendars, service availability, and online booking links in Pulse. Built for Canadian service businesses.",
-  alternates: { canonical: "/features/multi-location" },
+  alternates: buildAlternates("/features/multi-location"),
   openGraph: {
     title: "Multi-Location Booking Software | Pulse Appointments",
     description: "Manage service booking across multiple business locations and staff calendars.",

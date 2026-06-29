@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { Scissors, Star, Bell } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/barbers"),
   title: "Booking Software for Canadian Barbers | Pulse Appointments",
   description: "Barber shop booking with online deposits, no-show protection, SMS reminders, and Google review automation. Canada-first, CAD pricing.",
   openGraph: { title: "Barber Shop Booking Software | Pulse Appointments", description: "No-show protection and automated reminders for Canadian barbers." },

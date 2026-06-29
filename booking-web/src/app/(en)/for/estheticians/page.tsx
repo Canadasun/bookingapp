@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { FileText, Package, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/estheticians"),
   title: "Booking Software for Estheticians | Pulse Appointments",
   description: "Esthetician booking with intake forms, package deals, deposits, and PIPEDA-aware health data handling. Canada-first, CAD pricing.",
   openGraph: { title: "Esthetician Booking Software | Pulse Appointments", description: "Online booking with intake forms and no-show protection for estheticians." },

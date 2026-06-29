@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { Video, Calendar, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/consultants"),
   title: "Booking Software for Consultants | Pulse Appointments",
   description: "Consultant booking with virtual meeting links, Google Calendar sync, booking approval, and deposit protection. Canada-first, CAD pricing.",
   openGraph: { title: "Consultant Booking Software | Pulse Appointments", description: "Online booking with calendar sync and no-show protection for Canadian consultants." },

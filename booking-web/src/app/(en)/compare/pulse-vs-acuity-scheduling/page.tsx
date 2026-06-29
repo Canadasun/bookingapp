@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/compare/pulse-vs-acuity-scheduling"),
   title: "Pulse vs. Acuity Scheduling | CAD Pricing Alternative",
   description: "Compare Pulse and Acuity Scheduling for Canadian service businesses. CAD pricing, active development, no Squarespace account required, and automated no-show protection.",
 };

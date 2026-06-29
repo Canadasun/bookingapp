@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, Clock, BarChart3, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/features/no-show-protection"),
   title: "No-Show Protection for Canadian Service Businesses | Pulse",
   description:
     "Automatically charge no-show and late cancellation fees to card-on-file. Pulse enforces your cancellation policy so you never have to have an awkward conversation again.",

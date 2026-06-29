@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/compare/pulse-vs-square-appointments"),
   title: "Pulse vs. Square Appointments | CAD Pricing Alternative",
   description: "Compare Pulse and Square Appointments for Canadian service businesses. CAD pricing, no hardware required, PIPEDA compliance, and no-show protection without a POS terminal.",
 };

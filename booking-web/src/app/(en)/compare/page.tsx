@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Link from "next/link";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/compare"),
   title: "Compare Pulse Appointments | vs. Competitors",
   description: "How Pulse compares to Square Appointments, Calendly, Acuity, Jane App, Vagaro, and GlossGenius for Canadian service businesses.",
 };

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for"),
   title: "Pulse for Your Industry | Canadian Booking Software",
   description: "Pulse Appointments is built for salons, barbers, lash techs, estheticians, massage therapists, pet groomers, consultants, wellness providers, and mobile services.",
 };

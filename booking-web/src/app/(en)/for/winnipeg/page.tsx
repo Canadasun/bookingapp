@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { CityLandingPage, cityBreadcrumb } from "@/components/CityLandingPage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/winnipeg"),
   title: "Booking Software Winnipeg | Pulse Appointments",
   description: "Online booking software for Winnipeg salons, spas, pet groomers, wellness providers, and appointment-based service businesses. CAD pricing and no-show protection.",
 };

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import type { Metadata } from "next";
 
@@ -6,6 +7,7 @@ const SITE_URL = "https://www.pulseappointments.com";
 const slug = "salon-cancellation-policy-canada";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/blog/salon-cancellation-policy-canada"),
   title: "Salon Cancellation Policy Canada: Practical Template | Pulse",
   description:
     "A practical cancellation policy guide for Canadian salons and service businesses: notice windows, deposits, no-show fees, reminders, and client communication.",

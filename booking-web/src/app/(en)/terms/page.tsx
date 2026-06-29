@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import { AlertTriangle, CalendarCheck, CreditCard, FileText, Scale, ShieldCheck, Users } from "lucide-react";
 
-export const metadata = { title: "Terms of Service | Pulse Appointments" };
+export const metadata = {
+  alternates: buildAlternates("/terms"), title: "Terms of Service | Pulse Appointments" };
 
 export default function TermsPage() {
   return (

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { CreditCard, ShieldCheck, Bell, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/toronto"),
   title: "Appointment Booking Software for Toronto Service Businesses | Pulse",
   description: "Pulse is the simplest online booking software for salons, spas, barbers, and wellness businesses in Toronto. CAD pricing, no-show protection, free to start.",
   openGraph: {

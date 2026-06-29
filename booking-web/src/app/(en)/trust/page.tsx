@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { BadgeCheck, FileCheck2, LockKeyhole, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/trust"),
   title: "Trust Center | Pulse Appointments",
   description:
     "Pulse Appointments trust center: security, Canadian privacy, verified businesses, real review collection, and product transparency.",

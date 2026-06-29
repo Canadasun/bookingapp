@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Link from "next/link";
 import { MessageCircle, Building2, Mail, ExternalLink, Clock, HelpCircle, PenLine } from "lucide-react";
 import { SupportForm } from "./SupportForm";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/support"),
   title: "Support — Pulse",
   description: "Get help with Pulse Appointments. Contact us by email or browse answers to common questions about bookings, billing, and your account.",
   openGraph: {

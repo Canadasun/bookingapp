@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import type { Metadata } from "next";
 
@@ -6,6 +7,7 @@ const SITE_URL = "https://www.pulseappointments.com";
 const slug = "how-to-take-appointment-deposits-canada";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/blog/how-to-take-appointment-deposits-canada"),
   title: "How to Take Appointment Deposits in Canada | Pulse",
   description:
     "A practical guide for Canadian salons, spas, barbers, and service businesses that want to collect appointment deposits online and reduce no-shows.",

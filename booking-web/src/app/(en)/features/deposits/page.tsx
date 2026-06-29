@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, CreditCard, BarChart3, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/features/deposits"),
   title: "Booking Deposit Software for Canadian Service Businesses | Pulse",
   description:
     "Require a deposit when clients book online. Pulse automatically collects and holds deposits — and charges no-show fees to card-on-file. CAD pricing, free to start.",

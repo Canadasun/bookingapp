@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Link from "next/link";
 import { Accessibility, Keyboard, Eye, Volume2, RefreshCw, Mail, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/accessibility"),
   title: "Accessibility Statement — Pulse",
   description: "Pulse Appointments is committed to WCAG 2.2 AA accessibility. Learn about our standards, known limitations, and how to report an issue.",
   openGraph: {

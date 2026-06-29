@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Link from "next/link";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/changelog"),
   title: "Changelog | Pulse Appointments",
   description: "What's new in Pulse Appointments. Recent feature releases, improvements, and fixes.",
   openGraph: { title: "Changelog | Pulse Appointments", description: "New features and updates for Pulse Appointments." },

@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/blog/best-appointment-booking-software-canada-2026"),
   title: "Best Appointment Booking Software Canada 2026 | Pulse",
   description:
     "We compared the top booking platforms for Canadian service businesses: Pulse, Jane App, Vagaro, Acuity, Calendly, and Square. See which wins on CAD pricing, no-show protection, and ease of use.",

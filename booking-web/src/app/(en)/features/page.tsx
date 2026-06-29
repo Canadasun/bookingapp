@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Link from "next/link";
 import { Bell, ClipboardList, CreditCard, MapPin, MessageSquare, ShieldCheck, Star, Users } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Appointment Booking Features | Pulse Appointments",
   description: "Explore Pulse features for Canadian service businesses: online booking, deposits, no-show protection, SMS reminders, intake forms, client management, multi-location, and reviews.",
-  alternates: { canonical: "/features" },
+  alternates: buildAlternates("/features"),
   openGraph: {
     title: "Pulse Appointment Booking Features",
     description: "Online booking, reminders, deposits, reviews, intake forms, and client management for Canadian service businesses.",

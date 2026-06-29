@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { MapPin, ShieldCheck, Bell } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/mobile-services"),
   title: "Booking Software for Mobile Service Providers | Pulse Appointments",
   description: "Mobile service booking with location intake, travel buffer time, deposits, and GPS-aware scheduling. Canada-first, CAD pricing.",
   openGraph: { title: "Mobile Service Booking Software | Pulse Appointments", description: "Booking with location and travel buffer for Canadian mobile service providers." },

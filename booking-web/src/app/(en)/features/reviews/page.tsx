@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { Eye, Send, Star } from "lucide-react";
 import { FeatureLandingPage } from "@/components/FeatureLandingPage";
 
 export const metadata: Metadata = {
   title: "Review Management Software for Canadian Service Businesses | Pulse",
   description: "Collect and publish real appointment reviews from completed visits. Review management for Canadian service businesses using Pulse.",
-  alternates: { canonical: "/features/reviews" },
+  alternates: buildAlternates("/features/reviews"),
   openGraph: {
     title: "Review Management Software | Pulse Appointments",
     description: "Collect, moderate, and publish reviews tied to real appointments.",

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { CityLandingPage, cityBreadcrumb } from "@/components/CityLandingPage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/ottawa"),
   title: "Booking Software Ottawa | Pulse Appointments",
   description: "Online booking software for Ottawa salons, spas, wellness providers, consultants, and appointment-based service businesses. CAD pricing and no-show protection.",
 };

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Eye, ShieldCheck, Star } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Customer Review Collection for Service Businesses | Pulse Appointments",
   description: "Pulse helps Canadian service businesses collect, moderate, and publish real appointment reviews without fabricated testimonials.",
-  alternates: { canonical: "/reviews" },
+  alternates: buildAlternates("/reviews"),
   openGraph: {
     title: "Real Review Collection | Pulse Appointments",
     description: "Collect and publish reviews tied to completed appointments.",

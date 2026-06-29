@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { Globe, Smartphone, Users, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/features/online-booking"),
   title: "Online Booking Software for Canadian Service Businesses | Pulse",
   description:
     "Let clients book appointments online 24/7. Pulse gives you a free public booking page — add it to Instagram, Google, or your website. No app download required. CAD pricing.",

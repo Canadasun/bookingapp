@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { CityLandingPage, cityBreadcrumb } from "@/components/CityLandingPage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/edmonton"),
   title: "Booking Software Edmonton | Pulse Appointments",
   description: "Online appointment booking software for Edmonton salons, barbers, spas, wellness providers, and service businesses. CAD pricing, deposits, and reminders.",
 };

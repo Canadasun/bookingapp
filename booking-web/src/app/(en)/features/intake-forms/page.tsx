@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { ClipboardList, FileCheck2, ShieldCheck } from "lucide-react";
 import { FeatureLandingPage } from "@/components/FeatureLandingPage";
 
 export const metadata: Metadata = {
   title: "Client Intake Forms for Canadian Service Businesses | Pulse",
   description: "Collect allergies, preferences, consent details, and custom questions before clients arrive. Intake forms built into online booking.",
-  alternates: { canonical: "/features/intake-forms" },
+  alternates: buildAlternates("/features/intake-forms"),
   openGraph: {
     title: "Client Intake Forms | Pulse Appointments",
     description: "Collect client details and custom questions before each appointment.",

@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/blog"),
   title: "Blog | Pulse Appointments",
   description: "Tips, guides, and insights for Canadian service businesses — booking, no-shows, deposits, and growing your appointments.",
 };

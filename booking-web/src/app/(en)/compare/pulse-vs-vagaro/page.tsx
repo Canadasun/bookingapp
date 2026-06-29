@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/compare/pulse-vs-vagaro"),
   title: "Pulse vs. Vagaro | Canada-First Alternative — CAD Pricing",
   description: "Compare Pulse and Vagaro for Canadian service businesses. CAD pricing, no per-add-on fees, clients book without creating an account, and no marketplace listing fees.",
 };

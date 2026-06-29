@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { ShieldCheck, Bell, RefreshCw } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/lash-techs"),
   title: "Booking Software for Lash Techs | Pulse Appointments",
   description: "Lash extension booking with deposits, fill-in reminders, consent forms, and no-show protection. Canada-first, CAD pricing.",
   openGraph: { title: "Lash Tech Booking Software | Pulse Appointments", description: "No-show protection and fill reminders for Canadian lash artists." },

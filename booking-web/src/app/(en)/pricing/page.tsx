@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 import type { Metadata } from "next";
@@ -7,6 +8,7 @@ import type { FeatureValue } from "@/lib/plans";
 import { getPlanLinks } from "@/lib/paymentLinks";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/pricing"),
   title: "Appointment Booking Software Pricing | Pulse Appointments",
   description:
     "Simple, transparent pricing for Canadian service businesses. Start free — no credit card required. Upgrade when you're ready.",

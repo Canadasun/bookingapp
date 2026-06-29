@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import { ExternalLink, CheckCircle2, ArrowRight, AlertCircle } from "lucide-react";
 import { StatusRedirect } from "./StatusRedirect";
 
 export const metadata = {
+  alternates: buildAlternates("/status"),
   title: "System Status — Pulse Appointments",
   description: "Check real-time uptime and incident information for Pulse Appointments.",
   openGraph: {

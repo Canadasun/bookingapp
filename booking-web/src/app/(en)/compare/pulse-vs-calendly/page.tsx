@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/compare/pulse-vs-calendly"),
   title: "Pulse vs. Calendly | CAD Pricing for Service Businesses",
   description: "Calendly books meetings. Pulse books services. Compare deposits, no-show fees, client management, payments, and CAD pricing — everything Calendly doesn't have.",
 };

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { ComparePage } from "@/components/ComparePage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/compare/pulse-vs-jane-app"),
   title: "Pulse vs. Jane App | CAD Pricing for Service Businesses",
   description: "Jane App is forcing a mandatory payment processor change. If you're a non-clinical service business — salon, spa, groomer, trainer — Pulse is built for you at a fraction of the cost.",
 };

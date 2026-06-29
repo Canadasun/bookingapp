@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { Users, Gift, ShieldCheck } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/spas"),
   title: "Spa Management Software for Canadian Spas | Pulse Appointments",
   description: "Spa booking and management software for Canadian day spas. Online booking, deposits, multi-staff scheduling, packages, gift cards, and no-show protection. CAD pricing.",
   openGraph: { title: "Spa Management Software | Pulse Appointments", description: "Online booking, deposits, and no-show protection for Canadian spas." },

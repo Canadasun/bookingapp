@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { ShieldCheck, Bell, RefreshCw } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/hair-stylists"),
   title: "Booking Software for Hair Stylists | Pulse Appointments",
   description: "Online booking for independent hair stylists in Canada. Deposits, no-show protection, colour service protection, and automated reminders. CAD pricing.",
   openGraph: { title: "Hair Stylist Booking Software | Pulse Appointments", description: "No-show protection and colour service deposits for Canadian hair stylists." },

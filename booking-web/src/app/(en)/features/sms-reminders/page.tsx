@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { MessageSquare, Bell, CheckCircle2 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/features/sms-reminders"),
   title: "SMS Appointment Reminders for Canadian Service Businesses | Pulse",
   description:
     "Automated SMS and email appointment reminders that reduce no-shows by up to 80%. Pulse sends reminders at 72h, 24h, and 2h before every appointment. CAD pricing.",

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { History, MessageSquare, Search } from "lucide-react";
 import { FeatureLandingPage } from "@/components/FeatureLandingPage";
 
 export const metadata: Metadata = {
   title: "Client Management Software for Canadian Service Businesses | Pulse",
   description: "Keep client profiles, booking history, notes, messages, and appointment records in one place. Client management built for Canadian service businesses.",
-  alternates: { canonical: "/features/client-management" },
+  alternates: buildAlternates("/features/client-management"),
   openGraph: {
     title: "Client Management Software | Pulse Appointments",
     description: "Client profiles, notes, messages, history, and booking records for Canadian service businesses.",

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { ShieldCheck, Gift, FileText } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/massage-therapists"),
   title: "Booking Software for Massage Therapists | Pulse Appointments",
   description: "Massage therapy booking with intake forms, gift cards, deposits, and PIPEDA-aware health information handling. Canada-first, CAD pricing.",
   openGraph: { title: "Massage Therapy Booking Software | Pulse Appointments", description: "Online booking with health intake forms and no-show protection for massage therapists." },

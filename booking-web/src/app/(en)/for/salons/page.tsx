@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { IndustryPage } from "@/components/IndustryPage";
 import { Users, ShieldCheck, BarChart3 } from "lucide-react";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/salons"),
   title: "Booking Software for Canadian Salons | Pulse Appointments",
   description: "The #1 Canada-first booking platform for hair salons. Online deposits, no-show protection, multi-staff calendar, and automated reminders. CAD pricing.",
   openGraph: { title: "Booking Software for Canadian Salons | Pulse Appointments", description: "Salon booking with deposits, no-show protection, and SMS reminders. CAD pricing." },

@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { buildAlternates } from "@/lib/hreflang";
 import { Database, Eye, Lock, Mail, Scale, Share2, ShieldCheck, Trash2 } from "lucide-react";
 
-export const metadata = { title: "Privacy Policy | Pulse Appointments" };
+export const metadata = {
+  title: "Privacy Policy | Pulse Appointments",
+  alternates: buildAlternates("/privacy"),
+};
 
 const sections = [
   {

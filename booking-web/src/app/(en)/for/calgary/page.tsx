@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import { CityLandingPage, cityBreadcrumb } from "@/components/CityLandingPage";
 
 export const metadata: Metadata = {
+  alternates: buildAlternates("/for/calgary"),
   title: "Booking Software Calgary | Pulse Appointments",
   description: "Online booking software for Calgary salons, spas, barbers, wellness providers, and service businesses. CAD pricing, deposits, SMS reminders, and no-show protection.",
 };

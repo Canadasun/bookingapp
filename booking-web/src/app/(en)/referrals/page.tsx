@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildAlternates } from "@/lib/hreflang";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BadgeDollarSign, Gift, Link2, Sparkles } from "lucide-react";
@@ -6,7 +7,7 @@ import { ArrowRight, BadgeDollarSign, Gift, Link2, Sparkles } from "lucide-react
 export const metadata: Metadata = {
   title: "Referral Program for Canadian Service Businesses | Pulse Appointments",
   description: "Share Pulse with another Canadian service business. Referral codes are built into signup and billing so eligible rewards can be applied through Stripe.",
-  alternates: { canonical: "/referrals" },
+  alternates: buildAlternates("/referrals"),
   openGraph: {
     title: "Pulse Referral Program",
     description: "Invite another Canadian service business to Pulse with a referral code.",
