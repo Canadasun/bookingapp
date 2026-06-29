@@ -64,14 +64,22 @@ async function bootstrap() {
   // we must verify that the request was intentional (not a cross-site form 
   // submission) by requiring a custom header that cannot be set cross-origin 
   // without CORS preflight approval.
+  // CSRF only applies to state-changing methods. Safe methods (GET/HEAD/OPTIONS)
+  // must not mutate state, and the same-origin policy stops an attacker from
+  // reading their cross-origin responses — so enforcing the header there only
+  // breaks legitimate cookie-bearing GETs (images, iframes, the ws-ticket fetch)
+  // without adding protection. OPTIONS is the CORS preflight and is handled by
+  // enableCors below.
+  const CSRF_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
   app.use((req: any, res: any, next: any) => {
+    if (CSRF_SAFE_METHODS.has(String(req.method).toUpperCase())) return next();
     const hasCookie = !!(req.headers.cookie || req.headers.Cookie);
     const hasAuthHeader = !!(req.headers.authorization || req.headers.Authorization);
     // If authenticated via cookie but missing the custom header, reject it.
     if (hasCookie && !hasAuthHeader && !req.headers['x-requested-with']) {
-      return res.status(403).json({ 
-        statusCode: 403, 
-        message: 'CSRF Protection: X-Requested-With header required' 
+      return res.status(403).json({
+        statusCode: 403,
+        message: 'CSRF Protection: X-Requested-With header required'
       });
     }
     next();
