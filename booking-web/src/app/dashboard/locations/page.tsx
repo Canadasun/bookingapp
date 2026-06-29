@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, MapPin, Building2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil, Trash2, MapPin, Building2, CalendarDays, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, Location, StaffMember, Business } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
@@ -13,7 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { notifyLocationsChanged } from "@/lib/location-scope";
+import { notifyLocationsChanged, useLocationScope } from "@/lib/location-scope";
 
 // Canadian timezones offered for a location. Slot generation uses the
 // location's timezone (falling back to the business timezone) so a branch in
@@ -46,6 +47,14 @@ export default function LocationsPage() {
 
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
+  const router = useRouter();
+  const { setSelectedIds } = useLocationScope();
+
+  // Focus the whole dashboard on one branch and open its calendar.
+  function openBranchCalendar(id: string) {
+    setSelectedIds([id]);
+    router.push("/dashboard/appointments");
+  }
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -127,6 +136,12 @@ export default function LocationsPage() {
         <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4"/>Add location</Button>
       </div>
 
+      {!loading && !loadError && locations.length > 0 && (
+        <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50/60 p-3 text-xs leading-relaxed text-violet-800">
+          Open a branch below to jump straight to its calendar. Assign each provider to a branch on the <Link href="/dashboard/staff" className="font-semibold underline">Staff</Link> page — clients booking that location only see providers who work there.
+        </div>
+      )}
+
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
@@ -144,25 +159,43 @@ export default function LocationsPage() {
             const staffCount = staff.filter((s) => s.locationId === l.id).length;
             return (
               <Card key={l.id} className={l.active ? "" : "opacity-60"}>
-                <CardContent className="py-4 flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
-                    <MapPin className="w-5 h-5"/>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-gray-900">{l.name}</p>
-                      {!l.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">inactive</span>}
+                <CardContent className="py-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                      <MapPin className="w-5 h-5"/>
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                      {l.address && <p className="text-xs text-gray-500">{l.address}</p>}
-                      {l.phone && <p className="text-xs text-gray-500">{l.phone}</p>}
-                      {l.timezone && <p className="text-xs text-gray-400">{l.timezone}</p>}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-900">{l.name}</p>
+                        {!l.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">inactive</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        {l.address && <p className="text-xs text-gray-500">{l.address}</p>}
+                        {l.phone && <p className="text-xs text-gray-500">{l.phone}</p>}
+                        {l.timezone && <p className="text-xs text-gray-400">{l.timezone}</p>}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">{staffCount} {staffCount === 1 ? "provider" : "providers"} assigned</p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">{staffCount} {staffCount === 1 ? "provider" : "providers"} assigned</p>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => openEdit(l)} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" aria-label="Edit"><Pencil className="w-4 h-4"/></button>
+                      <button onClick={() => setToDelete(l)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label="Delete location"><Trash2 className="w-4 h-4"/></button>
+                    </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button onClick={() => openEdit(l)} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" aria-label="Edit"><Pencil className="w-4 h-4"/></button>
-                    <button onClick={() => setToDelete(l)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label="Delete location"><Trash2 className="w-4 h-4"/></button>
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => openBranchCalendar(l.id)}
+                      disabled={!l.active}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
+                    >
+                      <CalendarDays className="w-3.5 h-3.5"/>Open this branch&apos;s calendar
+                    </button>
+                    <Link
+                      href="/dashboard/staff"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      <Users className="w-3.5 h-3.5"/>Assign staff
+                    </Link>
                   </div>
                 </CardContent>
               </Card>
