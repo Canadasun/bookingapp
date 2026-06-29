@@ -290,8 +290,17 @@ export class VerificationService {
   }
 
   async setPlanAdmin(businessId: string, plan: PlanTier, adminId: string) {
-    const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true, plan: true } });
+    const biz = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true, plan: true, subscription: { select: { status: true } } },
+    });
     if (!biz) throw new NotFoundException('Business not found');
+    // A live Stripe subscription is the source of truth for the plan. Overriding
+    // it here would let Stripe keep billing the old tier while the app shows a
+    // different one (reconciliation desync). Force admins through Stripe instead.
+    if (biz.subscription && ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(biz.subscription.status)) {
+      throw new BadRequestException('This business has active Stripe billing. Change its plan through Stripe billing controls instead.');
+    }
     const result = await this.prisma.business.update({
       where: { id: businessId },
       data: { plan, complimentaryPlanExpiresAt: null, complimentaryPreviousPlan: null },

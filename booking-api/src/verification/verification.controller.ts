@@ -30,6 +30,7 @@ const ComplimentaryPlanSchema = z.object({
   plan: z.enum(['PRO', 'UNLIMITED']),
   months: z.number().int().min(1).max(12),
 });
+const SetPlanSchema = z.object({ plan: z.enum(['FREE', 'BASIC', 'PRO', 'UNLIMITED']) });
 
 // ── Owner: submit + check their own business verification ───────────────────
 @ApiTags('verification')
@@ -221,13 +222,9 @@ export class AdminOverviewController {
   @Patch('businesses/:id/plan')
   async setPlan(
     @Param('id') id: string,
-    @Body() body: { plan: string },
+    @Body(new ZodValidationPipe(SetPlanSchema)) body: z.infer<typeof SetPlanSchema>,
     @CurrentUser() admin: User,
   ) {
-    const validPlans = ['FREE', 'BASIC', 'PRO', 'UNLIMITED'];
-    if (!body.plan || !validPlans.includes(body.plan)) {
-      throw new BadRequestException(`Plan must be one of: ${validPlans.join(', ')}`);
-    }
     return this.svc.setPlanAdmin(id, body.plan as import('@prisma/client').PlanTier, admin.id);
   }
 

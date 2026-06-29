@@ -30,7 +30,7 @@ const TIMEZONES = [
   "Asia/Singapore","Asia/Tokyo","Australia/Sydney","Pacific/Auckland",
 ];
 
-type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "branding" | "notifications" | "security" | "billing";
+type Section = "profile" | "locations" | "booking" | "calendar" | "payments" | "payouts" | "online" | "branding" | "security" | "billing";
 type SubscriptionDetails = {
   plan: string;
   status: string | null;
@@ -442,7 +442,6 @@ function SettingsPage() {
       "booking": "booking",
       "payments": "payments",
       "payouts": "payouts",
-      "notifications": "notifications",
       "security": "security",
       "billing": "billing",
       "online": "online",
@@ -2038,7 +2037,7 @@ function SettingsPage() {
                       id: "PRO", name: "Pro", monthlyPrice: 39, annualPrice: 390,
                       desc: "Full power for busy businesses",
                       highlight: true,
-                      features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics & reports","Up to 10 staff members"],
+                      features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics & reports","Up to 10 staff members","Up to 2 locations"],
                       cta: "Upgrade to Pro", disabled: false,
                     },
                     {

@@ -82,6 +82,23 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
+// Render an audit-log `changes` object as a readable summary (e.g. "FREE → PRO ·
+// months: 3") rather than a raw, mid-truncated JSON string.
+function formatChanges(changes: Record<string, unknown>): string {
+  const v2s = (v: unknown) => (v == null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v));
+  const entries = Object.entries(changes);
+  if (!entries.length) return "—";
+  const parts: string[] = [];
+  if ("from" in changes || "to" in changes) {
+    parts.push(`${v2s(changes.from)} → ${v2s(changes.to)}`);
+  }
+  for (const [k, v] of entries) {
+    if (k === "from" || k === "to") continue;
+    parts.push(`${k}: ${v2s(v)}`);
+  }
+  return parts.join(" · ");
+}
+
 const statusClass: Record<VerificationStatus, string> = {
   VERIFIED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   PENDING: "bg-amber-50 text-amber-700 border-amber-200",
@@ -155,6 +172,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [sysErrors, setSysErrors] = useState<SystemError[]>([]);
+  // Unresolved CRITICAL count for the sidebar badge + overview quick-action.
+  // Kept separate from `sysErrors` so it's accurate on first load without
+  // opening the Errors tab, and isn't clobbered by the tab's filter.
+  const [unresolvedCritical, setUnresolvedCritical] = useState(0);
   const [errFilter, setErrFilter] = useState<"unresolved" | "resolved" | "all">("unresolved");
   const [errBusy, setErrBusy] = useState(false);
   const [errPatterns, setErrPatterns] = useState<{ category: string; total: number; critical: number; error: number; warn: number }[]>([]);
@@ -205,6 +226,17 @@ export default function AdminPage() {
   const [dialog, setDialog] = useState<DialogState>({ open: false, title: "", description: "", onConfirm: () => {} });
   const closeDialog = () => setDialog((d) => ({ ...d, open: false }));
 
+  // Cheap unresolved-critical tally (groupBy on the server) so the sidebar badge
+  // and overview alert are correct without loading the full Errors tab.
+  const refreshErrorBadge = useCallback(async () => {
+    try {
+      const patterns = await api.systemErrors.patterns();
+      setUnresolvedCritical(patterns.reduce((sum, p) => sum + p.critical, 0));
+    } catch {
+      // Non-fatal: leave the previous count rather than blocking the dashboard.
+    }
+  }, []);
+
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
@@ -221,7 +253,8 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+    void refreshErrorBadge();
+  }, [refreshErrorBadge]);
 
   useEffect(() => {
     if (authLoading || !me) return;
@@ -302,6 +335,19 @@ export default function AdminPage() {
 
   useEffect(() => { if (tab === "audit") loadAuditLog(); }, [tab, loadAuditLog]);
 
+  // Header "Refresh" reloads the overview data AND whatever tab is active, so it
+  // isn't a no-op on Businesses/Errors/Health/Funnel/Audit.
+  const refreshAll = useCallback(() => {
+    load();
+    switch (tab) {
+      case "errors": loadErrors(); break;
+      case "health": loadHealth(); break;
+      case "funnel": loadFunnel(); break;
+      case "businesses": loadBusinesses(); break;
+      case "audit": loadAuditLog(); break;
+    }
+  }, [load, tab, loadErrors, loadHealth, loadFunnel, loadBusinesses, loadAuditLog]);
+
   async function runAiExplain(category?: string) {
     setAiLoading(true);
     try {
@@ -313,7 +359,7 @@ export default function AdminPage() {
 
   async function resolveError(id: string) {
     setErrBusy(true);
-    try { await api.systemErrors.resolve(id); await loadErrors(); }
+    try { await api.systemErrors.resolve(id); await loadErrors(); void refreshErrorBadge(); }
     catch { toast.error("Failed"); }
     finally { setErrBusy(false); }
   }
@@ -325,7 +371,7 @@ export default function AdminPage() {
       confirmLabel: "Resolve all",
       onConfirm: async () => {
         closeDialog(); setErrBusy(true);
-        try { await api.systemErrors.resolveAll(); await loadErrors(); toast.success("All errors resolved"); }
+        try { await api.systemErrors.resolveAll(); await loadErrors(); void refreshErrorBadge(); toast.success("All errors resolved"); }
         catch { toast.error("Failed"); }
         finally { setErrBusy(false); }
       },
@@ -399,6 +445,27 @@ export default function AdminPage() {
     finally { setPlanBusy(null); }
   }
 
+  // Plan override writes straight to the DB (no Stripe). Confirm first so a
+  // stray dropdown selection can't silently re-tier a customer. The backend also
+  // rejects overrides on businesses with active Stripe billing.
+  function confirmOverridePlan(biz: AdminBusiness, newPlan: PlanTier) {
+    if (newPlan === biz.plan) return;
+    const hasActiveBilling = !!(biz.subscription && ["ACTIVE", "TRIALING", "PAST_DUE"].includes(biz.subscription.status));
+    setDialog({
+      open: true,
+      title: `Change ${biz.name} to ${newPlan}?`,
+      description: hasActiveBilling
+        ? "This business has active Stripe billing — change its plan through Stripe instead. This override will be rejected."
+        : `This sets the plan directly in the database without touching Stripe. Use it only for businesses without active Stripe billing.`,
+      confirmLabel: `Move to ${newPlan}`,
+      variant: newPlan === "FREE" || hasActiveBilling ? "destructive" : "default",
+      onConfirm: async () => {
+        closeDialog();
+        await overridePlan(biz, newPlan);
+      },
+    });
+  }
+
   async function grantComplimentaryAccess() {
     if (!complimentaryBiz) return;
     setPlanBusy(complimentaryBiz.id);
@@ -466,7 +533,7 @@ export default function AdminPage() {
     { id: "verifications", label: "Verifications",  icon: BadgeCheck,     badge: queue.length || undefined },
     { id: "businesses",    label: "Businesses",     icon: Building2 },
     { id: "duplicates",    label: "Duplicates",     icon: AlertTriangle,  badge: duplicates.length || undefined },
-    { id: "errors",        label: "Errors",         icon: Activity,       badge: sysErrors.filter((e) => !e.resolved && e.severity === "CRITICAL").length || undefined },
+    { id: "errors",        label: "Errors",         icon: Activity,       badge: unresolvedCritical || undefined },
     { id: "health",        label: "Health",         icon: HeartPulse },
     { id: "funnel",        label: "Funnel",         icon: Funnel },
     { id: "users",         label: "User Support",   icon: Users },
@@ -632,7 +699,7 @@ export default function AdminPage() {
             </div>
           </div>
           <button
-            onClick={() => load()}
+            onClick={refreshAll}
             disabled={loading}
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
@@ -729,7 +796,7 @@ export default function AdminPage() {
                     {[
                       { label: "Verification queue", count: queue.length, tab: "verifications" as Tab, icon: BadgeCheck, color: "text-violet-600" },
                       { label: "Flagged duplicate accounts", count: duplicates.length, tab: "duplicates" as Tab, icon: AlertTriangle, color: "text-amber-600" },
-                      { label: "Unresolved critical errors", count: sysErrors.filter((e) => !e.resolved && e.severity === "CRITICAL").length, tab: "errors" as Tab, icon: Activity, color: "text-red-500" },
+                      { label: "Unresolved critical errors", count: unresolvedCritical, tab: "errors" as Tab, icon: Activity, color: "text-red-500" },
                     ].map((item) => (
                       <button
                         key={item.tab}
@@ -827,7 +894,7 @@ export default function AdminPage() {
                                   Open full size <ExternalLink className="h-3 w-3" />
                                 </a>
                               </div>
-                              <iframe src={b.verificationDocUrl} title={`${b.name} verification`} sandbox="allow-same-origin allow-scripts" className="h-80 w-full bg-white" />
+                              <iframe src={b.verificationDocUrl} title={`${b.name} verification`} sandbox="allow-same-origin" className="h-80 w-full bg-white" />
                             </div>
                           )}
                         </div>
@@ -927,7 +994,7 @@ export default function AdminPage() {
                           <select
                             value={b.plan}
                             disabled={planBusy === b.id}
-                            onChange={(e) => overridePlan(b, e.target.value as PlanTier)}
+                            onChange={(e) => confirmOverridePlan(b, e.target.value as PlanTier)}
                             className={cn(
                               "rounded-lg border px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-200 cursor-pointer disabled:opacity-60",
                               planClass[b.plan],
@@ -1375,7 +1442,7 @@ export default function AdminPage() {
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-400 max-w-[200px]">
                           {log.changes ? (
-                            <span className="font-mono">{JSON.stringify(log.changes).slice(0, 80)}</span>
+                            <span className="font-mono block truncate" title={JSON.stringify(log.changes)}>{formatChanges(log.changes)}</span>
                           ) : "—"}
                         </td>
                       </tr>
