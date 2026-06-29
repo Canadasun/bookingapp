@@ -1,0 +1,27 @@
+{
+  "security": {
+    "meta": {
+      "title": "Sécurité | Pulse Appointments",
+      "description": "Comment Pulse Appointments protège les données de votre entreprise et les renseignements de vos clients. Chiffrement, contrôles d'accès, conformité à la LPRPDE et divulgation responsable."
+    },
+    "hero": {
+      "title": "Sécurité",
+      "intro": "La protection des données de votre entreprise et des renseignements de vos clients est au cœur de tout ce que fait Pulse. Voici comment nous protégeons vos données."
+    },
+    "sections": {
+      "encryption": { "title": "Chiffrement en transit et au repos", "body": "Toutes les données échangées avec Pulse sont chiffrées au moyen de TLS 1.3. Les données stockées dans notre base de données sont chiffrées au repos avec AES-256. Les sauvegardes sont également chiffrées." },
+      "passwords": { "title": "Sécurité des mots de passe", "body": "Les mots de passe sont hachés avec bcrypt (facteur de coût 12) avant d'être stockés. Pulse ne conserve jamais les mots de passe en clair. Les jetons de réinitialisation sont à usage unique et expirent au bout de 15 minutes." },
+      "twofa": { "title": "Authentification à deux facteurs", "body": "Tous les comptes peuvent activer l'authentification à deux facteurs (2FA) par courriel ou par SMS. Nous encourageons les propriétaires d'entreprise à l'activer dès la configuration initiale. Des codes de récupération sont fournis à l'inscription." },
+      "audit": { "title": "Journalisation d'audit", "body": "Les actions sensibles sur le plan de la sécurité — connexions, changements de mot de passe, modifications du personnel, mises à jour des autorisations et exportations de données — sont consignées dans un journal d'audit infalsifiable accessible aux propriétaires d'entreprise." },
+      "loginAlerts": { "title": "Alertes de connexion", "body": "Lorsqu'une connexion provient d'un nouvel appareil ou d'une nouvelle adresse IP, nous envoyons immédiatement un courriel d'alerte de sécurité. L'alerte comprend un lien de réinitialisation du mot de passe en un clic pour verrouiller votre compte si ce n'était pas vous." },
+      "infra": { "title": "Infrastructure", "body": "Pulse fonctionne sur Railway, une plateforme infonuagique certifiée SOC 2 Type II. Notre base de données est hébergée sur un service PostgreSQL géré offrant des sauvegardes automatisées, une récupération à un point précis dans le temps et une isolation réseau." },
+      "pci": { "title": "Conformité PCI grâce à Stripe", "body": "Pulse ne conserve aucun numéro de carte de crédit, code de sécurité (CVV) ni renseignement de paiement complet. Tout le traitement des cartes est assuré par Stripe, un processeur de paiement certifié PCI DSS niveau 1. Pulse ne reçoit que des références tokenisées." },
+      "pipeda": { "title": "Vie privée au Canada (LPRPDE)", "body": "Pulse est conçu pour les entreprises canadiennes et bâti autour des obligations de l'annexe 1 de la LPRPDE — notamment la limitation des fins, la minimisation des données, les mesures de protection et la notification des atteintes. Consultez notre page Vie privée au Canada pour les détails.", "linkLabel": "Consulter notre page Vie privée au Canada" },
+      "breach": { "title": "Notification des atteintes", "body": "En cas d'atteinte confirmée à la protection des données touchant votre entreprise, Pulse avisera les entreprises et les clients concernés conformément aux exigences obligatoires de déclaration des atteintes de la LPRPDE (dans les 72 heures suivant la constatation)." },
+      "disclosure": { "title": "Divulgation responsable", "body": "Les chercheurs en sécurité qui découvrent une vulnérabilité dans Pulse sont invités à la signaler de façon responsable. Nous nous engageons à accuser réception des signalements dans un délai de 2 jours ouvrables et à ne pas intenter de poursuites contre les divulgations de bonne foi.", "linkLabel": "security@pulseappointments.com" }
+    },
+    "contact": { "title": "Des questions sur nos pratiques de sécurité ?", "body": "Nous répondons avec plaisir aux questions des propriétaires d'entreprise, des acheteurs en entreprise et des responsables de la protection de la vie privée." },
+    "footer": { "lastReviewed": "Dernière révision : juin 2026", "privacy": "Politique de confidentialité", "canadianPrivacy": "Vie privée au Canada", "terms": "Conditions d'utilisation" },
+    "switchLabel": "English"
+  }
+}

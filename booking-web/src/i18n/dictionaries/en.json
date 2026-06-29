@@ -1,0 +1,27 @@
+{
+  "security": {
+    "meta": {
+      "title": "Security | Pulse Appointments",
+      "description": "How Pulse Appointments protects your business data and your clients' information. Encryption, access controls, PIPEDA compliance, and responsible disclosure."
+    },
+    "hero": {
+      "title": "Security",
+      "intro": "Protecting your business data and your clients' information is foundational to everything Pulse does. Here is how we keep your data safe."
+    },
+    "sections": {
+      "encryption": { "title": "Encryption in transit and at rest", "body": "All data transmitted to and from Pulse is encrypted using TLS 1.3. Data stored in our database is encrypted at rest using AES-256. Backups are also encrypted." },
+      "passwords": { "title": "Password security", "body": "Passwords are hashed with bcrypt (cost factor 12) before storage. Pulse never stores plaintext passwords. Password reset tokens are single-use and expire in 15 minutes." },
+      "twofa": { "title": "Two-factor authentication", "body": "All user accounts can enable two-factor authentication (2FA) via email or SMS. Business owners are encouraged to enable 2FA on initial setup. Recovery codes are provided at enrollment." },
+      "audit": { "title": "Audit logging", "body": "Security-relevant actions — logins, password changes, staff changes, permission updates, and data exports — are written to a tamper-evident audit log accessible to business owners." },
+      "loginAlerts": { "title": "Login alerts", "body": "When a sign-in occurs from a new device or IP address, we send an immediate security alert email. The alert includes a one-click password reset link so you can lock your account if it wasn't you." },
+      "infra": { "title": "Infrastructure", "body": "Pulse runs on Railway, a SOC 2 Type II certified cloud platform. Our database is hosted on a managed PostgreSQL service with automated backups, point-in-time recovery, and network isolation." },
+      "pci": { "title": "PCI compliance via Stripe", "body": "Pulse does not store credit card numbers, CVVs, or full payment details. All card processing is handled by Stripe, a PCI DSS Level 1 certified payment processor. Pulse receives only tokenized references." },
+      "pipeda": { "title": "Canadian privacy (PIPEDA)", "body": "Pulse is designed for Canadian businesses and built around PIPEDA Schedule 1 obligations — including purpose limitation, data minimization, safeguards, and breach notification. See our Canadian Privacy page for details.", "linkLabel": "Read our Canadian Privacy page" },
+      "breach": { "title": "Breach notification", "body": "In the event of a confirmed data breach affecting your business, Pulse will notify affected businesses and clients in accordance with PIPEDA's mandatory breach reporting requirements (within 72 hours of determination)." },
+      "disclosure": { "title": "Responsible disclosure", "body": "Security researchers who discover a vulnerability in Pulse are encouraged to report it responsibly. We commit to acknowledging reports within 2 business days and to not pursuing legal action against good-faith disclosures.", "linkLabel": "security@pulseappointments.com" }
+    },
+    "contact": { "title": "Questions about our security practices?", "body": "We are happy to answer questions from business owners, enterprise buyers, or privacy officers." },
+    "footer": { "lastReviewed": "Last reviewed: June 2026", "privacy": "Privacy Policy", "canadianPrivacy": "Canadian Privacy", "terms": "Terms of Service" },
+    "switchLabel": "Français"
+  }
+}

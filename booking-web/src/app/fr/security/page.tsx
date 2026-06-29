@@ -5,19 +5,19 @@ import { SecurityContent } from "@/components/marketing/SecurityContent";
 const SITE = "https://www.pulseappointments.com";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const dict = await getDictionary("en");
+  const dict = await getDictionary("fr");
   return {
     title: dict.security.meta.title,
     description: dict.security.meta.description,
     openGraph: { title: dict.security.meta.title, description: dict.security.meta.description },
     alternates: {
-      canonical: `${SITE}/security`,
+      canonical: `${SITE}/fr/security`,
       languages: { "en-CA": `${SITE}/security`, "fr-CA": `${SITE}/fr/security` },
     },
   };
 }
 
-export default async function SecurityPage() {
-  const dict = await getDictionary("en");
-  return <SecurityContent dict={dict.security} altHref="/fr/security" />;
+export default async function SecurityPageFr() {
+  const dict = await getDictionary("fr");
+  return <SecurityContent dict={dict.security} altHref="/security" />;
 }

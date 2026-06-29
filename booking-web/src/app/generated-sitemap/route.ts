@@ -40,6 +40,7 @@ const staticRoutes: SitemapRoute[] = [
   ["/accessibility", "yearly", 0.3],
   ["/status", "monthly", 0.3],
   ["/security", "yearly", 0.5],
+  ["/fr/security", "yearly", 0.5],
   ["/canadian-privacy", "yearly", 0.5],
   ["/changelog", "weekly", 0.5],
   ["/compare", "monthly", 0.7],
