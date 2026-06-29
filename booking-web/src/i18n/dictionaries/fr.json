@@ -86,5 +86,115 @@
     },
     "footer": { "home": "Accueil", "terms": "Conditions", "privacy": "Confidentialité", "support": "Assistance" },
     "toggleLabel": "Langue"
+  },
+  "home": {
+    "meta": {
+      "title": "Logiciel de réservation en ligne pour les entreprises de services canadiennes | Pulse Appointments",
+      "description": "Pulse est le logiciel de réservation en ligne le plus simple pour les salons, les spas et les entreprises de services canadiennes. Rappels automatisés, perception de dépôts et protection contre les rendez-vous manqués — gratuit pour commencer."
+    },
+    "og": {
+      "title": "Logiciel de réservation en ligne pour les entreprises de services canadiennes | Pulse Appointments",
+      "description": "Pulse est le logiciel de réservation en ligne le plus simple pour les salons, les spas et les entreprises de services canadiennes. Gratuit pour commencer."
+    },
+    "nav": { "brand": "Pulse Booking" },
+    "authCta": { "signIn": "Se connecter", "getStarted": "Commencer", "greeting": "Bonjour, {name}", "dashboard": "Accéder au tableau de bord" },
+    "hero": {
+      "badge": "Conçu pour les professionnels autonomes",
+      "headlinePre": "Le logiciel de réservation en ligne le plus simple pour les ",
+      "headlineHighlight": "entreprises de services canadiennes",
+      "subtitle": "Commencez gratuitement avec des réservations en ligne illimitées, la gestion des clients, les confirmations et une page de réservation publique. Passez à un forfait supérieur lorsque vous avez besoin de rappels, de dépôts ou de SMS."
+    },
+    "heroCta": { "getStarted": "Commencer gratuitement", "signIn": "Se connecter", "dashboard": "Accéder au tableau de bord", "book": "Prendre un rendez-vous" },
+    "workflow": {
+      "eyebrow": "Flux de réservation",
+      "title": "Étapes d'automatisation",
+      "steps": [
+        { "label": "Réservation en ligne", "detail": "Le client choisit une heure" },
+        { "label": "Dépôt perçu", "detail": "Paiement traité par Stripe" },
+        { "label": "Rappel mis en file", "detail": "Courriel et SMS sur les forfaits payants" }
+      ],
+      "pill": "Flux de réservation automatisé"
+    },
+    "trust": ["Aucune carte de crédit requise", "Forfait gratuit pour toujours", "Annulez à tout moment"],
+    "tour": {
+      "eyebrow": "Visite du produit",
+      "title": "Voyez le parcours de réservation avant de vous engager",
+      "body": "Pulse est conçu autour du travail qui influence réellement vos revenus : vos clients réservent en ligne, paient un dépôt au besoin, reçoivent des rappels automatiquement et laissent de vrais avis après leurs rendez-vous.",
+      "items": [
+        { "title": "Le client choisit un service", "desc": "Votre page de réservation publique affiche les services, le personnel, les emplacements et les heures disponibles." },
+        { "title": "Un dépôt ou une empreinte de carte protège la plage horaire", "desc": "Les forfaits payants permettent de percevoir des dépôts et d'enregistrer les cartes pour la protection contre les rendez-vous manqués." },
+        { "title": "Les visites terminées deviennent des demandes d'avis", "desc": "Pulse envoie des liens d'avis signés afin que les commentaires publiés proviennent de vrais rendez-vous." }
+      ],
+      "viewTour": "Voir la visite du produit",
+      "reviewCollection": "Collecte d'avis",
+      "mockup": {
+        "location": "Toronto, ON",
+        "services": [
+          { "name": "Rehaussement de cils", "price": "95 $", "note": "Dépôt requis" },
+          { "name": "Mise en forme des sourcils", "price": "45 $", "note": "Réservation en ligne activée" },
+          { "name": "Soin du visage", "price": "120 $", "note": "Réservation en ligne activée" }
+        ],
+        "availableTimes": "Heures disponibles",
+        "date": "Jeudi 25 juin",
+        "times": ["10 h 00", "11 h 30", "13 h 00", "15 h 15"],
+        "depositCollected": "Dépôt de 25 $ perçu",
+        "depositNote": "La confirmation, le rappel et la demande d'avis sont mis en file automatiquement."
+      }
+    },
+    "howItWorks": {
+      "title": "Opérationnel en quelques minutes",
+      "subtitle": "Aucune formation requise. Aucune configuration compliquée. Seulement vos services, votre lien et vos clients.",
+      "steps": [
+        { "num": "01", "title": "Ajoutez vos services", "desc": "Configurez vos services, vos prix et vos disponibilités en moins de 5 minutes." },
+        { "num": "02", "title": "Partagez votre lien", "desc": "Ajoutez votre lien de réservation à votre bio Instagram, votre profil Google ou votre site Web." },
+        { "num": "03", "title": "Recevez des réservations", "desc": "Vos clients réservent eux-mêmes à toute heure. Vous n'avez qu'à vous présenter et faire votre travail." }
+      ]
+    },
+    "features": {
+      "title": "Tout ce dont votre horaire a besoin",
+      "subtitle": "Conçu pour les petites entreprises, les professionnels autonomes et les équipes en croissance — des toiletteurs pour animaux à la beauté, au bien-être et à tous les services sur rendez-vous.",
+      "items": [
+        { "title": "Réservation en ligne 24/7", "desc": "Fini les échanges de messages téléphoniques. Vos clients réservent, reprogramment et annulent à leur convenance." },
+        { "title": "Rappels automatisés", "desc": "Les forfaits payants ajoutent des rappels programmés par courriel et SMS. Chaque forfait inclut les confirmations et les mises à jour de réservation." },
+        { "title": "Dépôts et protection contre les rendez-vous manqués", "desc": "Percevez des dépôts à la réservation à partir du forfait Essentiel. Les forfaits Pro et Illimité ajoutent des frais automatiques de rendez-vous manqués et d'annulations tardives prélevés sur les cartes enregistrées." },
+        { "title": "Formulaires d'admission et de consentement", "desc": "Recueillez des notes de santé, des allergies ou des questions personnalisées directement dans le parcours de réservation — sans application supplémentaire." },
+        { "title": "Acceptez Apple Pay et Google Pay", "desc": "Vos clients paient à la caisse d'un simple toucher. Propulsé par Stripe avec prise en charge du CAD, sans configuration supplémentaire." },
+        { "title": "Multi-prestataire et multi-emplacement", "desc": "Ajoutez toute votre équipe, chacun avec son propre calendrier et ses services. Pro prend en charge 2 emplacements; Illimité en prend en charge jusqu'à 5." }
+      ]
+    },
+    "socialProof": {
+      "label": "La confiance des entreprises de services partout au Canada",
+      "niches": ["Salons", "Spas", "Studios de cils", "Massothérapie", "Cliniques de bien-être", "Barbiers"]
+    },
+    "pricingPreview": {
+      "title": "Des forfaits pour chaque étape",
+      "subtitle": "Commencez gratuitement, sans carte de crédit. Passez à un forfait supérieur dès que vous en avez besoin.",
+      "popular": "Populaire",
+      "perMonth": "/mois",
+      "footerPre": "Consultez le détail complet des fonctionnalités sur notre ",
+      "footerLink": "page de tarification →"
+    },
+    "bottomCta": {
+      "title": "Prêt à simplifier votre prise de rendez-vous?",
+      "subtitle": "Rejoignez les entreprises sur rendez-vous qui utilisent déjà Pulse.",
+      "getStarted": "Commencer gratuitement",
+      "signIn": "Se connecter",
+      "welcomeBack": "Bon retour, {name}",
+      "welcomeBackPlain": "Bon retour",
+      "pickUp": "Reprenez exactement là où vous vous étiez arrêté.",
+      "dashboard": "Accéder au tableau de bord"
+    },
+    "footer": {
+      "getStarted": "Commencer", "signIn": "Se connecter", "dashboard": "Tableau de bord", "book": "Réserver",
+      "terms": "Conditions", "privacy": "Confidentialité", "industries": "Secteurs", "compare": "Comparer",
+      "pricing": "Tarification", "demo": "Démo", "reviews": "Avis", "referrals": "Parrainage",
+      "changelog": "Nouveautés", "security": "Sécurité", "canadianPrivacy": "Confidentialité (Canada)",
+      "support": "Assistance", "status": "État du service"
+    },
+    "jsonLd": {
+      "appDescription": "Logiciel de réservation en ligne pour les entreprises de services canadiennes. Rappels automatisés, dépôts et protection contre les rendez-vous manqués.",
+      "offerDescription": "Forfait gratuit offert. Forfaits payants à partir de 19 $ CAD/mois."
+    },
+    "toggleLabel": "Langue"
   }
 }

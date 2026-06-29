@@ -86,5 +86,115 @@
     },
     "footer": { "home": "Home", "terms": "Terms", "privacy": "Privacy", "support": "Support" },
     "toggleLabel": "Language"
+  },
+  "home": {
+    "meta": {
+      "title": "Online Booking Software for Canadian Service Businesses | Pulse Appointments",
+      "description": "Pulse is the simplest online booking software for Canadian salons, spas, and service businesses. Automated reminders, deposit collection, and no-show protection — free to start."
+    },
+    "og": {
+      "title": "Online Booking Software for Canadian Service Businesses | Pulse Appointments",
+      "description": "Pulse is the simplest online booking software for Canadian salons, spas, and service businesses. Free to start."
+    },
+    "nav": { "brand": "Pulse Booking" },
+    "authCta": { "signIn": "Sign in", "getStarted": "Get started", "greeting": "Hi, {name}", "dashboard": "Go to dashboard" },
+    "hero": {
+      "badge": "Built for independent professionals",
+      "headlinePre": "The simplest online booking software for ",
+      "headlineHighlight": "Canadian service businesses",
+      "subtitle": "Start free with unlimited online bookings, client management, confirmations, and a public booking page. Upgrade when you need reminders, deposits, or SMS."
+    },
+    "heroCta": { "getStarted": "Get started free", "signIn": "Sign in", "dashboard": "Go to dashboard", "book": "Book an appointment" },
+    "workflow": {
+      "eyebrow": "Booking workflow",
+      "title": "Automation steps",
+      "steps": [
+        { "label": "Online booking", "detail": "Client chooses a time" },
+        { "label": "Deposit collected", "detail": "Payment handled by Stripe" },
+        { "label": "Reminder queued", "detail": "Email and SMS on paid plans" }
+      ],
+      "pill": "Booking workflow automated"
+    },
+    "trust": ["No credit card required", "Free forever plan", "Cancel anytime"],
+    "tour": {
+      "eyebrow": "Product tour",
+      "title": "See the booking flow before you commit",
+      "body": "Pulse is built around the work that actually affects revenue: clients book online, pay deposits when needed, get reminders automatically, and leave real reviews after completed appointments.",
+      "items": [
+        { "title": "Client picks a service", "desc": "Your public booking page shows services, staff, locations, and available times." },
+        { "title": "Deposit or card hold protects the slot", "desc": "Paid plans can collect deposits and save cards for no-show protection." },
+        { "title": "Completed visits become review requests", "desc": "Pulse sends signed review links so published feedback comes from real appointments." }
+      ],
+      "viewTour": "View product tour",
+      "reviewCollection": "Review collection",
+      "mockup": {
+        "location": "Toronto, ON",
+        "services": [
+          { "name": "Lash lift", "price": "$95", "note": "Deposit required" },
+          { "name": "Brow shape", "price": "$45", "note": "Online booking enabled" },
+          { "name": "Facial", "price": "$120", "note": "Online booking enabled" }
+        ],
+        "availableTimes": "Available times",
+        "date": "Thursday, June 25",
+        "times": ["10:00 AM", "11:30 AM", "1:00 PM", "3:15 PM"],
+        "depositCollected": "$25 deposit collected",
+        "depositNote": "Confirmation, reminder, and review request are queued automatically."
+      }
+    },
+    "howItWorks": {
+      "title": "Up and running in minutes",
+      "subtitle": "No training required. No complicated setup. Just your services, your link, and your clients.",
+      "steps": [
+        { "num": "01", "title": "Add your services", "desc": "Set up your services, pricing, and availability in under 5 minutes." },
+        { "num": "02", "title": "Share your link", "desc": "Put your booking link in your Instagram bio, Google profile, or website." },
+        { "num": "03", "title": "Get booked", "desc": "Clients book themselves around the clock. You just show up and do the work." }
+      ]
+    },
+    "features": {
+      "title": "Everything your schedule needs",
+      "subtitle": "Built for small businesses, solo professionals, and growing teams — from pet groomers to beauty, wellness, and every appointment-based service in between.",
+      "items": [
+        { "title": "24/7 Online Booking", "desc": "No more phone tag. Clients book, reschedule, and cancel on their own time." },
+        { "title": "Automated Reminders", "desc": "Paid plans add scheduled email and SMS reminders. Every plan includes booking confirmations and updates." },
+        { "title": "Deposits & No-Show Protection", "desc": "Collect deposits at booking on Basic+. Pro and Unlimited add automatic no-show and late-cancel fees charged to saved cards." },
+        { "title": "Intake & Consent Forms", "desc": "Collect health notes, allergies, or custom client questions right in the booking flow — no extra app needed." },
+        { "title": "Accept Apple Pay & Google Pay", "desc": "Clients pay at checkout with the tap of a finger. Powered by Stripe with CAD support, no extra setup required." },
+        { "title": "Multi-Provider & Multi-Location", "desc": "Add your whole team, each with their own calendar and services. Pro supports 2 locations; Unlimited supports up to 5." }
+      ]
+    },
+    "socialProof": {
+      "label": "Trusted by service businesses across Canada",
+      "niches": ["Salons", "Spas", "Lash Studios", "Massage Therapy", "Wellness Clinics", "Barbers"]
+    },
+    "pricingPreview": {
+      "title": "Plans for every stage",
+      "subtitle": "Start free, no credit card. Upgrade the moment you need it.",
+      "popular": "Popular",
+      "perMonth": "/mo",
+      "footerPre": "See the full feature breakdown on our ",
+      "footerLink": "pricing page →"
+    },
+    "bottomCta": {
+      "title": "Ready to simplify your scheduling?",
+      "subtitle": "Join appointment-based businesses already using Pulse.",
+      "getStarted": "Get started free",
+      "signIn": "Sign in",
+      "welcomeBack": "Welcome back, {name}",
+      "welcomeBackPlain": "Welcome back",
+      "pickUp": "Pick up right where you left off.",
+      "dashboard": "Go to dashboard"
+    },
+    "footer": {
+      "getStarted": "Get started", "signIn": "Sign in", "dashboard": "Dashboard", "book": "Book",
+      "terms": "Terms", "privacy": "Privacy", "industries": "Industries", "compare": "Compare",
+      "pricing": "Pricing", "demo": "Demo", "reviews": "Reviews", "referrals": "Referrals",
+      "changelog": "Changelog", "security": "Security", "canadianPrivacy": "Canadian Privacy",
+      "support": "Support", "status": "Status"
+    },
+    "jsonLd": {
+      "appDescription": "Online booking software for Canadian service businesses. Automated reminders, deposits, and no-show protection.",
+      "offerDescription": "Free plan available. Paid plans from $19 CAD/month."
+    },
+    "toggleLabel": "Language"
   }
 }

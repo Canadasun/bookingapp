@@ -11,8 +11,10 @@ function homeFor(user: SessionUser | null): string | null {
   return user.role === "ADMIN" ? "/admin" : user.role === "CLIENT" ? "/my/dashboard" : "/dashboard";
 }
 
+type HeroCtaT = { getStarted: string; signIn: string; dashboard: string; book: string };
+
 // Hero CTA: logged-in users see a way into the app instead of sign-in / sign-up.
-export function LandingHeroCta() {
+export function LandingHeroCta({ t }: { t: HeroCtaT }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
@@ -20,10 +22,10 @@ export function LandingHeroCta() {
     return (
       <div className="flex flex-col sm:flex-row items-center gap-4">
         <Link href={home} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 text-white text-base font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-xl shadow-violet-200">
-          <LayoutDashboard className="w-5 h-5" /> Go to dashboard
+          <LayoutDashboard className="w-5 h-5" /> {t.dashboard}
         </Link>
         <Link href="/book" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/90 text-slate-800 text-base font-semibold px-8 py-4 rounded-xl border border-[#E9DDCB] hover:bg-violet-50 transition-colors">
-          <CalendarPlus className="w-4 h-4" /> Book an appointment
+          <CalendarPlus className="w-4 h-4" /> {t.book}
         </Link>
       </div>
     );
@@ -31,28 +33,34 @@ export function LandingHeroCta() {
   return (
     <div className="flex flex-col sm:flex-row items-center gap-4">
       <Link href="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 text-white text-base font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-xl shadow-violet-200">
-        <Sparkles className="w-5 h-5" /> Get started free
+        <Sparkles className="w-5 h-5" /> {t.getStarted}
       </Link>
       <Link href="/login" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/90 text-slate-800 text-base font-semibold px-8 py-4 rounded-xl border border-[#E9DDCB] hover:bg-violet-50 transition-colors">
-        Sign in <ArrowRight className="w-4 h-4" />
+        {t.signIn} <ArrowRight className="w-4 h-4" />
       </Link>
     </div>
   );
 }
 
+type BottomCtaT = {
+  title: string; subtitle: string; getStarted: string; signIn: string;
+  welcomeBack: string; welcomeBackPlain: string; pickUp: string; dashboard: string;
+};
+
 // Bottom band: prospects get the marketing CTA; logged-in users get a "jump back in".
-export function LandingBottomCta() {
+export function LandingBottomCta({ t }: { t: BottomCtaT }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
   if (user && home) {
+    const first = user.name?.split(" ")[0];
     return (
       <>
-        <h2 className="text-3xl font-bold text-white mb-4">Welcome back{user.name ? `, ${user.name.split(" ")[0]}` : ""}</h2>
-        <p className="text-white/60 mb-8">Pick up right where you left off.</p>
+        <h2 className="text-3xl font-bold text-white mb-4">{first ? t.welcomeBack.replace("{name}", first) : t.welcomeBackPlain}</h2>
+        <p className="text-white/60 mb-8">{t.pickUp}</p>
         <div className="flex justify-center">
           <Link href={home} className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
-            <LayoutDashboard className="w-5 h-5" /> Go to dashboard
+            <LayoutDashboard className="w-5 h-5" /> {t.dashboard}
           </Link>
         </div>
       </>
@@ -60,14 +68,14 @@ export function LandingBottomCta() {
   }
   return (
     <>
-      <h2 className="text-3xl font-bold text-white mb-4">Ready to simplify your scheduling?</h2>
-      <p className="text-white/60 mb-8">Join appointment-based businesses already using Pulse.</p>
+      <h2 className="text-3xl font-bold text-white mb-4">{t.title}</h2>
+      <p className="text-white/60 mb-8">{t.subtitle}</p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
         <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
-          <Sparkles className="w-5 h-5" /> Get started free
+          <Sparkles className="w-5 h-5" /> {t.getStarted}
         </Link>
         <Link href="/login" className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
-          Sign in <ArrowRight className="w-4 h-4" />
+          {t.signIn} <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </>
@@ -139,37 +147,44 @@ export function LandingSolutions() {
   );
 }
 
+type FooterT = {
+  getStarted: string; signIn: string; dashboard: string; book: string;
+  terms: string; privacy: string; industries: string; compare: string; pricing: string;
+  demo: string; reviews: string; referrals: string; changelog: string; security: string;
+  canadianPrivacy: string; support: string; status: string;
+};
+
 // Footer links adapt to the session too.
-export function LandingFooterLinks() {
+export function LandingFooterLinks({ t }: { t: FooterT }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
   const legalLinks = (
     <>
-      <Link href="/terms" className="hover:text-indigo-600 transition-colors">Terms</Link>
-      <Link href="/privacy" className="hover:text-indigo-600 transition-colors">Privacy</Link>
+      <Link href="/terms" className="hover:text-indigo-600 transition-colors">{t.terms}</Link>
+      <Link href="/privacy" className="hover:text-indigo-600 transition-colors">{t.privacy}</Link>
     </>
   );
   const publicLinks = (
     <>
-      <Link href="/for" className="hover:text-indigo-600 transition-colors">Industries</Link>
-      <Link href="/compare" className="hover:text-indigo-600 transition-colors">Compare</Link>
-      <Link href="/pricing" className="hover:text-indigo-600 transition-colors">Pricing</Link>
-      <Link href="/demo" className="hover:text-indigo-600 transition-colors">Demo</Link>
-      <Link href="/reviews" className="hover:text-indigo-600 transition-colors">Reviews</Link>
-      <Link href="/referrals" className="hover:text-indigo-600 transition-colors">Referrals</Link>
-      <Link href="/changelog" className="hover:text-indigo-600 transition-colors">Changelog</Link>
-      <Link href="/security" className="hover:text-indigo-600 transition-colors">Security</Link>
-      <Link href="/canadian-privacy" className="hover:text-indigo-600 transition-colors">Canadian Privacy</Link>
-      <Link href="/support" className="hover:text-indigo-600 transition-colors">Support</Link>
-      <Link href="/status" className="hover:text-indigo-600 transition-colors">Status</Link>
+      <Link href="/for" className="hover:text-indigo-600 transition-colors">{t.industries}</Link>
+      <Link href="/compare" className="hover:text-indigo-600 transition-colors">{t.compare}</Link>
+      <Link href="/pricing" className="hover:text-indigo-600 transition-colors">{t.pricing}</Link>
+      <Link href="/demo" className="hover:text-indigo-600 transition-colors">{t.demo}</Link>
+      <Link href="/reviews" className="hover:text-indigo-600 transition-colors">{t.reviews}</Link>
+      <Link href="/referrals" className="hover:text-indigo-600 transition-colors">{t.referrals}</Link>
+      <Link href="/changelog" className="hover:text-indigo-600 transition-colors">{t.changelog}</Link>
+      <Link href="/security" className="hover:text-indigo-600 transition-colors">{t.security}</Link>
+      <Link href="/canadian-privacy" className="hover:text-indigo-600 transition-colors">{t.canadianPrivacy}</Link>
+      <Link href="/support" className="hover:text-indigo-600 transition-colors">{t.support}</Link>
+      <Link href="/status" className="hover:text-indigo-600 transition-colors">{t.status}</Link>
     </>
   );
   if (user && home) {
     return (
       <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-        <Link href={home} className="hover:text-indigo-600 transition-colors">Dashboard</Link>
-        <Link href="/book" className="hover:text-indigo-600 transition-colors">Book</Link>
+        <Link href={home} className="hover:text-indigo-600 transition-colors">{t.dashboard}</Link>
+        <Link href="/book" className="hover:text-indigo-600 transition-colors">{t.book}</Link>
         {legalLinks}
         {publicLinks}
       </div>
@@ -177,17 +192,19 @@ export function LandingFooterLinks() {
   }
   return (
     <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-      <Link href="/register" className="hover:text-indigo-600 transition-colors">Get started</Link>
-      <Link href="/login" className="hover:text-indigo-600 transition-colors">Sign in</Link>
+      <Link href="/register" className="hover:text-indigo-600 transition-colors">{t.getStarted}</Link>
+      <Link href="/login" className="hover:text-indigo-600 transition-colors">{t.signIn}</Link>
       {legalLinks}
       {publicLinks}
     </div>
   );
 }
 
+type AuthCtaT = { signIn: string; getStarted: string; greeting: string; dashboard: string };
+
 // Nav CTA that adapts to the session: a logged-in owner/staff/client sees a quick
 // link into their dashboard instead of Sign in / Get started.
-export function LandingAuthCta() {
+export function LandingAuthCta({ t }: { t: AuthCtaT }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
 
@@ -195,18 +212,18 @@ export function LandingAuthCta() {
     const home = homeFor(user) ?? "/dashboard";
     return (
       <div className="flex items-center gap-3">
-        <span className="hidden sm:inline text-sm text-slate-600">Hi, {user.name.split(" ")[0]}</span>
+        <span className="hidden sm:inline text-sm text-slate-600">{t.greeting.replace("{name}", user.name.split(" ")[0])}</span>
         <Link href={home}
           className="inline-flex items-center gap-1.5 text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
-          <LayoutDashboard className="w-4 h-4" /> Go to dashboard
+          <LayoutDashboard className="w-4 h-4" /> {t.dashboard}
         </Link>
       </div>
     );
   }
   return (
     <div className="flex items-center gap-3">
-      <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-violet-700 transition-colors">Sign in</Link>
-      <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">Get started</Link>
+      <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-violet-700 transition-colors">{t.signIn}</Link>
+      <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">{t.getStarted}</Link>
     </div>
   );
 }

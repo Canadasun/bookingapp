@@ -6,7 +6,7 @@ const SITE = "https://www.pulseappointments.com";
 // Add a path here the moment its /fr/<path> page is created: both the English
 // and French pages will then start emitting the fr-CA hreflang automatically,
 // no per-page edits required.
-export const LOCALIZED_PATHS = new Set<string>(["/security", "/pricing"]);
+export const LOCALIZED_PATHS = new Set<string>(["/", "/security", "/pricing"]);
 
 export type Locale = "en" | "fr";
 
@@ -20,8 +20,11 @@ export type Locale = "en" | "fr";
  * point both locales reciprocate.
  */
 export function buildAlternates(path: string, locale: Locale = "en"): Metadata["alternates"] {
-  const enUrl = `${SITE}${path}`;
-  const frUrl = `${SITE}/fr${path}`;
+  // The home page is path "/"; its URLs are the bare root and "/fr" (no trailing
+  // slash), so drop the slash there. Every other path is "/something".
+  const suffix = path === "/" ? "" : path;
+  const enUrl = `${SITE}${suffix}`;
+  const frUrl = `${SITE}/fr${suffix}`;
   const hasFrench = LOCALIZED_PATHS.has(path);
 
   const languages: Record<string, string> = { "en-CA": enUrl };

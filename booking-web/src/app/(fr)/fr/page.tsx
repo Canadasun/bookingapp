@@ -7,18 +7,18 @@ import { landingRedirectTarget } from "@/lib/landingSession";
 import { HomeContent } from "@/components/marketing/HomeContent";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { home } = await getDictionary("en");
+  const { home } = await getDictionary("fr");
   return {
     title: home.meta.title,
     description: home.meta.description,
     openGraph: { title: home.og.title, description: home.og.description },
-    alternates: buildAlternates("/", "en"),
+    alternates: buildAlternates("/", "fr"),
   };
 }
 
-export default async function LandingPage() {
+export default async function LandingPageFr() {
   const dest = await landingRedirectTarget();
   if (dest) redirect(dest);
-  const [dict, planLinks] = await Promise.all([getDictionary("en"), getPlanLinks()]);
-  return <HomeContent dict={dict} locale="en" planLinks={planLinks} />;
+  const [dict, planLinks] = await Promise.all([getDictionary("fr"), getPlanLinks()]);
+  return <HomeContent dict={dict} locale="fr" planLinks={planLinks} />;
 }
