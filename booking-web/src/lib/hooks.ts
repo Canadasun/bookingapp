@@ -24,7 +24,7 @@ export function useEvents(
 
     const connect = () => {
       if (cancelled) return;
-      fetch("/proxy/events/ws-ticket")
+      fetch("/proxy/events/ws-ticket", { headers: { "X-Requested-With": "XMLHttpRequest" } })
         .then((r) => r.json() as Promise<{ ticket: string }>)
         .then(({ ticket }) => {
           if (cancelled) return;

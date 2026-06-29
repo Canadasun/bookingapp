@@ -21,7 +21,9 @@ export default function ForgotPasswordPage() {
       // Always 200 — the API never reveals whether the email is registered.
       await fetch("/proxy/auth/forgot-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // X-Requested-With satisfies the API's CSRF guard, which rejects
+        // cookie-bearing requests (a stale session cookie is enough) that lack it.
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ email }),
       });
       setSent(true);

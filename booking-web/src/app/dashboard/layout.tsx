@@ -309,7 +309,7 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
     if (!user) return;
     setSending(true);
     try {
-      await fetch("/proxy/auth/resend-verification", { method: "POST" });
+      await fetch("/proxy/auth/resend-verification", { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" } });
       setSent(true);
       trackEvent("email_verification_resend", { role: user.role });
     } finally {

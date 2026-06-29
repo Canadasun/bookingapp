@@ -37,7 +37,9 @@ function ResetForm() {
     try {
       const res = await fetch("/proxy/auth/reset-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // X-Requested-With satisfies the API's CSRF guard, which rejects
+        // cookie-bearing requests (a stale session cookie is enough) that lack it.
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ token, newPassword: password }),
       });
       if (!res.ok) {
