@@ -97,6 +97,11 @@ export default function ClientsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  // Deep-link support: /dashboard/clients?search=Name (used by global search).
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get("search");
+    if (s) setSearch(s);
+  }, []);
   const [selected, setSelected] = useState<(ClientWithStats & { appointments?: unknown[]; payments?: Payment[]; packages?: ClientPackage[]; messages?: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }> }) | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showAdd, setShowAdd] = useState(false);

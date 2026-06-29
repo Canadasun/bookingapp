@@ -11,7 +11,7 @@ import {
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
   ShieldCheck, LifeBuoy, Globe, MapPin, Check,
 } from "lucide-react";
-import { api, type Business, type Location } from "@/lib/api";
+import { api, type Business, type Location, type SearchGroup } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { trackEvent } from "@/lib/analytics";
@@ -209,14 +209,33 @@ function commandItems(nav: NavItem[]) {
   return [...navItems, ...FOOTER_PAGES];
 }
 
-function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[]; onClose: () => void }) {
+function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: boolean; nav: NavItem[]; onClose: () => void; canSearchData?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [groups, setGroups] = useState<SearchGroup[]>([]);
+  const [searching, setSearching] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) setQuery("");
+    if (open) { setQuery(""); setGroups([]); }
   }, [open]);
+
+  // Debounced data search across the owner's business (clients, appointments,
+  // invoices, services, staff, locations). Pages still match instantly below.
+  useEffect(() => {
+    if (!open || !canSearchData) { setGroups([]); return; }
+    const term = query.trim();
+    if (term.length < 2) { setGroups([]); setSearching(false); return; }
+    setSearching(true);
+    let cancelled = false;
+    const t = setTimeout(() => {
+      api.search.global(term)
+        .then((res) => { if (!cancelled) setGroups(res.groups); })
+        .catch(() => { if (!cancelled) setGroups([]); })
+        .finally(() => { if (!cancelled) setSearching(false); });
+    }, 200);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, open, canSearchData]);
 
   // Focus trap: prevent Tab from leaving the dialog.
   useEffect(() => {
@@ -271,21 +290,41 @@ function CommandPalette({ open, nav, onClose }: { open: boolean; nav: NavItem[];
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
-            placeholder="Jump to a page..."
+            placeholder={canSearchData ? "Search clients, appointments, invoices, pages…" : "Jump to a page…"}
             className="h-10 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-gray-400 lg:text-sm"
           />
           <kbd className="hidden rounded-md border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 sm:inline">Esc</kbd>
         </div>
-        <div className="max-h-80 overflow-y-auto p-2">
-          {items.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-gray-500">No matching pages</p>
-          ) : items.map((item) => (
-            <button key={item.href} onClick={() => go(item.href)}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700">
-              <span>{item.label}</span>
-              <span className="text-xs text-gray-600">{item.href.replace("/dashboard", "") || "/"}</span>
-            </button>
+        <div className="max-h-96 overflow-y-auto p-2">
+          {items.length > 0 && (
+            <>
+              <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">Pages</p>
+              {items.map((item) => (
+                <button key={item.href} onClick={() => go(item.href)}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700">
+                  <span>{item.label}</span>
+                  <span className="text-xs text-gray-600">{item.href.replace("/dashboard", "") || "/"}</span>
+                </button>
+              ))}
+            </>
+          )}
+          {groups.map((group) => (
+            <div key={group.type}>
+              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">{group.label}</p>
+              {group.hits.map((hit) => (
+                <button key={`${hit.type}-${hit.id}`} onClick={() => go(hit.href)}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700">
+                  <span className="truncate">{hit.label}</span>
+                  {hit.sublabel && <span className="shrink-0 text-xs text-gray-400 truncate max-w-[45%]">{hit.sublabel}</span>}
+                </button>
+              ))}
+            </div>
           ))}
+          {items.length === 0 && groups.length === 0 && (
+            <p className="px-3 py-8 text-center text-sm text-gray-500">
+              {searching ? "Searching…" : query.trim().length >= 2 ? "No matches" : "No matching pages"}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -699,7 +738,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <LocationScopeContext.Provider value={locationScope}>
     <div className="dashboard-shell flex brand-shell">
-      <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} />
+      <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} canSearchData={user?.role === "OWNER"} />
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside

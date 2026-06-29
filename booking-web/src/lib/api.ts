@@ -516,11 +516,19 @@ export interface ServiceDueItem {
 
 // ── API client ────────────────────────────────────────────────────────────────
 
+export interface SearchHit { type: string; id: string; label: string; sublabel?: string; href: string }
+export interface SearchGroup { type: string; label: string; hits: SearchHit[] }
+
 export const api = {
   get: <T>(path: string) => req<T>(path),
   events: {
     // Short-lived ticket for the realtime socket handshake (see useEvents).
     wsTicket: () => req<{ ticket: string }>("/events/ws-ticket"),
+  },
+  search: {
+    // Global dashboard search across the owner's business data.
+    global: (q: string) =>
+      req<{ query: string; groups: SearchGroup[] }>(`/search?q=${encodeURIComponent(q)}`),
   },
   auth: {
     login: (email: string, password: string) =>
