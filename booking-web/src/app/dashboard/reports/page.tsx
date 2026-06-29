@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { TrendingUp, Users, CalendarCheck, XCircle, RefreshCw, ShieldCheck, Lock } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
+import { useLocationScope } from "@/lib/location-scope";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ type ReportData = {
   gated: false;
   plan: string;
   currency: string;
+  locationScoped?: boolean;
   outcomes: { total: number; completed: number; cancelled: number; noShow: number; pending: number; confirmed: number };
   collectedCents: number;
   revenueProtectedCents: number;
@@ -35,17 +37,22 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
+  // When a single branch is focused, scope the appointment/revenue metrics to it.
+  const { selectedIds: scopedIds, locations: scopeLocs } = useLocationScope();
+  const scopedLocationId = scopeLocs.length > 1 && scopedIds.length === 1 ? scopedIds[0] : undefined;
+  const scopedLocationName = scopedLocationId ? (scopeLocs.find((l) => l.id === scopedLocationId)?.name ?? null) : null;
+
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
     setLoadError("");
     setLoading(true);
     try {
-      const res = await api.get<{ gated: boolean } | ReportData>(`/businesses/${bizId}/reports`);
+      const res = await api.get<{ gated: boolean } | ReportData>(`/businesses/${bizId}/reports${scopedLocationId ? `?locationId=${encodeURIComponent(scopedLocationId)}` : ""}`);
       if (res.gated) { setGated(true); }
       else { setData(res as ReportData); setGated(false); }
     } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load reports"); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, scopedLocationId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -96,6 +103,11 @@ export default function ReportsPage() {
         <div className="min-w-0">
           <h2 className="text-xl font-bold text-gray-900">Reports</h2>
           <p className="text-sm text-gray-500">All-time performance · last 12 months revenue</p>
+          {data?.locationScoped && scopedLocationName && (
+            <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+              Showing {scopedLocationName} · appointments &amp; revenue only
+            </span>
+          )}
         </div>
         <Button variant="secondary" size="sm" onClick={load} className="gap-1.5">
           <RefreshCw className="w-4 h-4" /> Refresh
@@ -107,7 +119,7 @@ export default function ReportsPage() {
         {[
           { label: "Collected revenue (12 mo)", value: money(r.collectedCents), icon: TrendingUp, tone: "emerald" },
           { label: "Completed appointments", value: `${r.outcomes.completed}`, sub: `${pct(r.outcomes.completed, r.outcomes.total)}% of ${r.outcomes.total}`, icon: CalendarCheck, tone: "violet" },
-          { label: "New clients (30d)", value: `${r.newClients30d}`, icon: Users, tone: "amber" },
+          { label: "New clients (30d)", value: `${r.newClients30d}`, sub: r.locationScoped ? "business-wide" : undefined, icon: Users, tone: "amber" },
           { label: "No-show rate", value: `${pct(r.outcomes.noShow, r.outcomes.total)}%`, sub: `${r.outcomes.noShow} no-shows`, icon: XCircle, tone: "red" },
         ].map((k) => {
           const Icon = k.icon;
@@ -231,7 +243,10 @@ export default function ReportsPage() {
 
         {/* Top clients + busiest staff */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <p className="text-sm font-semibold text-gray-900 mb-3">Top clients by spend</p>
+          <p className="text-sm font-semibold text-gray-900 mb-3">
+            Top clients by spend
+            {r.locationScoped && <span className="ml-1.5 text-xs font-normal text-gray-400">(business-wide)</span>}
+          </p>
           {r.topClients.length === 0 ? (
             <p className="text-xs text-gray-400">No revenue recorded yet.</p>
           ) : (

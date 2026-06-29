@@ -88,9 +88,10 @@ export class BusinessesController {
   reports(
     @Param('id') id: string,
     @CurrentUser() user: User,
+    @Query('locationId') locationId?: string,
   ) {
     this.assertTenantAccess(user, id);
-    return this.businessService.getReports(id);
+    return this.businessService.getReports(id, locationId?.trim() || undefined);
   }
 
   // Full business record (incl. email, plan) — owner dashboard only. The public

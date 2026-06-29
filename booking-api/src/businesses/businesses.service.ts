@@ -555,11 +555,18 @@ export class BusinessesService {
     return result;
   }
 
-  async getReports(businessId: string) {
+  async getReports(businessId: string, locationId?: string) {
     const biz = await this.prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { plan: true, currency: true } });
     if (!isPaidPlan(biz.plan)) {
       return { gated: true, plan: biz.plan };
     }
+
+    // Optional single-branch scope. Appointment-derived metrics and revenue
+    // (via the payment->appointment relation) filter to the branch; client
+    // metrics (top clients, new clients) stay business-wide — a client isn't
+    // tied to one location — and are labelled as such in the UI.
+    const apptLoc = locationId ? { locationId } : {};
+    const payLoc = locationId ? { appointment: { locationId } } : {};
 
     const now = new Date();
     // Month buckets: last 12 calendar months (current month + 11 prior).
@@ -573,7 +580,7 @@ export class BusinessesService {
       // All-time booking outcome counts
       this.prisma.appointment.groupBy({
         by: ['status'],
-        where: { businessId },
+        where: { businessId, ...apptLoc },
         _count: { _all: true },
       }),
 
@@ -583,6 +590,7 @@ export class BusinessesService {
           businessId,
           status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] },
           createdAt: { gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) },
+          ...payLoc,
         },
         select: { amountCents: true, refundedCents: true, createdAt: true, kind: true },
       }),
@@ -590,7 +598,7 @@ export class BusinessesService {
       // Top 5 services by completed bookings
       this.prisma.appointment.groupBy({
         by: ['serviceId'],
-        where: { businessId, status: 'COMPLETED' },
+        where: { businessId, status: 'COMPLETED', ...apptLoc },
         _count: { _all: true },
         orderBy: { _count: { serviceId: 'desc' } },
         take: 5,
@@ -599,7 +607,7 @@ export class BusinessesService {
       // Top 5 staff by total bookings
       this.prisma.appointment.groupBy({
         by: ['staffId'],
-        where: { businessId },
+        where: { businessId, ...apptLoc },
         _count: { _all: true },
         orderBy: { _count: { staffId: 'desc' } },
         take: 5,
@@ -626,6 +634,7 @@ export class BusinessesService {
           businessId,
           status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] },
           kind: { in: ['DEPOSIT', 'NO_SHOW_FEE', 'LATE_CANCEL_FEE'] },
+          ...payLoc,
         },
         select: { amountCents: true, refundedCents: true, kind: true },
       }),
@@ -689,6 +698,7 @@ export class BusinessesService {
       gated: false,
       plan: biz.plan,
       currency: biz.currency ?? 'CAD',
+      locationScoped: !!locationId,
       outcomes,
       collectedCents,
       revenueProtectedCents,
