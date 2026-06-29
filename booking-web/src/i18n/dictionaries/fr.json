@@ -23,5 +23,68 @@
     "contact": { "title": "Des questions sur nos pratiques de sécurité ?", "body": "Nous répondons avec plaisir aux questions des propriétaires d'entreprise, des acheteurs en entreprise et des responsables de la protection de la vie privée." },
     "footer": { "lastReviewed": "Dernière révision : juin 2026", "privacy": "Politique de confidentialité", "canadianPrivacy": "Vie privée au Canada", "terms": "Conditions d'utilisation" },
     "switchLabel": "English"
+  },
+  "pricing": {
+    "meta": {
+      "title": "Tarification du logiciel de prise de rendez-vous | Pulse Appointments",
+      "description": "Une tarification simple et transparente pour les entreprises de services canadiennes. Commencez gratuitement — aucune carte de crédit requise. Passez à un forfait supérieur quand vous êtes prêt."
+    },
+    "og": {
+      "title": "Tarification du logiciel de prise de rendez-vous | Pulse Appointments",
+      "description": "Commencez gratuitement, puis passez à un forfait supérieur lorsque vous avez besoin de rappels par SMS, de dépôts et de la protection contre les rendez-vous manqués."
+    },
+    "nav": { "brand": "Pulse Booking", "cta": "Commencer gratuitement" },
+    "hero": {
+      "title": "Une tarification simple et transparente",
+      "subtitle": "Commencez gratuitement. Passez à un forfait supérieur seulement lorsque vous avez besoin de dépôts, de rappels par SMS ou de la protection contre les rendez-vous manqués. Aucun contrat. Annulez à tout moment."
+    },
+    "mostPopular": "Le plus populaire",
+    "priceFree": "Gratuit",
+    "periods": { "forever": "pour toujours", "month": "/ mois" },
+    "annual": { "label": "Option annuelle", "perYear": "{price} $/an CAD", "monthsFree": "2 mois gratuits", "cta": "Choisir l'annuel" },
+    "plans": {
+      "FREE": { "name": "Gratuit", "desc": "Tout ce qu'il vous faut pour commencer à accepter des réservations en ligne.", "cta": "Commencer gratuitement" },
+      "BASIC": { "name": "Essentiel", "desc": "Acceptez les paiements, les dépôts et les messages texte de vos clients.", "cta": "Choisir Essentiel" },
+      "PRO": { "name": "Pro", "desc": "Rappels automatisés, protection contre les rendez-vous manqués et outils d'équipe.", "cta": "Choisir Pro" },
+      "UNLIMITED": { "name": "Illimité", "desc": "Toutes les fonctionnalités Pro pour un maximum de 5 emplacements.", "cta": "Choisir Illimité" }
+    },
+    "table": {
+      "feature": "Fonctionnalité",
+      "footnote": "* 1/mois — un frais automatique par mois civil pour les forfaits Gratuit et Essentiel. Passez à Pro pour des frais illimités sur les rendez-vous manqués et les annulations tardives."
+    },
+    "features": [
+      "Page de réservation en ligne",
+      "Rendez-vous illimités",
+      "Gestion des clients",
+      "Confirmations de réservation (courriel)",
+      "Messagerie client intégrée",
+      "Synchronisation avec Google Agenda",
+      "Formulaires d'admission et de consentement",
+      "Emplacements",
+      "Recevoir et répondre aux SMS des clients",
+      "Envoyer des SMS aux clients",
+      "Dépôts et carte enregistrée",
+      "Politiques d'annulation",
+      "Rapports et analyses",
+      "Rappels automatisés par SMS et courriel",
+      "Frais automatiques pour rendez-vous manqués et annulations tardives",
+      "Forfaits, cartes-cadeaux et abonnements",
+      "Avis et campagnes marketing"
+    ],
+    "perMonthFee": "1/mois",
+    "faq": [
+      { "q": "Y a-t-il un essai gratuit?", "a": "Le forfait Gratuit n'a aucune limite de temps. Utilisez-le aussi longtemps que vous le souhaitez, puis passez à un forfait supérieur quand vous êtes prêt." },
+      { "q": "Puis-je annuler à tout moment?", "a": "Oui. Rétrogradez ou annulez depuis les paramètres de votre compte à tout moment. Aucuns frais d'annulation." },
+      { "q": "Quels modes de paiement acceptez-vous?", "a": "Toutes les principales cartes de crédit et de débit, Apple Pay et Google Pay via Stripe. Les paiements sont en dollars canadiens (CAD)." }
+    ],
+    "ctaSection": {
+      "title": "Prêt à commencer?",
+      "subtitle": "Créez votre compte gratuit en moins de 2 minutes. Aucune carte de crédit requise.",
+      "button": "Commencer gratuitement",
+      "questions": "Des questions?",
+      "supportLink": "Consultez notre page d'assistance"
+    },
+    "footer": { "home": "Accueil", "terms": "Conditions", "privacy": "Confidentialité", "support": "Assistance" },
+    "toggleLabel": "Langue"
   }
 }

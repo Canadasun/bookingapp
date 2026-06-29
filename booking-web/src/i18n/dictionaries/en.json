@@ -23,5 +23,68 @@
     "contact": { "title": "Questions about our security practices?", "body": "We are happy to answer questions from business owners, enterprise buyers, or privacy officers." },
     "footer": { "lastReviewed": "Last reviewed: June 2026", "privacy": "Privacy Policy", "canadianPrivacy": "Canadian Privacy", "terms": "Terms of Service" },
     "switchLabel": "Français"
+  },
+  "pricing": {
+    "meta": {
+      "title": "Appointment Booking Software Pricing | Pulse Appointments",
+      "description": "Simple, transparent pricing for Canadian service businesses. Start free — no credit card required. Upgrade when you're ready."
+    },
+    "og": {
+      "title": "Appointment Booking Software Pricing | Pulse Appointments",
+      "description": "Start free, upgrade when you need SMS reminders, deposits, and no-show protection."
+    },
+    "nav": { "brand": "Pulse Booking", "cta": "Get started free" },
+    "hero": {
+      "title": "Simple, transparent pricing",
+      "subtitle": "Start free. Upgrade only when you need deposits, SMS reminders, or no-show protection. No contracts. Cancel anytime."
+    },
+    "mostPopular": "Most popular",
+    "priceFree": "Free",
+    "periods": { "forever": "forever", "month": "/ month" },
+    "annual": { "label": "Annual option", "perYear": "${price}/yr CAD", "monthsFree": "2 months free", "cta": "Choose annual" },
+    "plans": {
+      "FREE": { "name": "Free", "desc": "Everything you need to start taking bookings online.", "cta": "Get started free" },
+      "BASIC": { "name": "Basic", "desc": "Accept payments, deposits, and client texts.", "cta": "Start with Basic" },
+      "PRO": { "name": "Pro", "desc": "Automated reminders, no-show protection, and team tools.", "cta": "Start with Pro" },
+      "UNLIMITED": { "name": "Unlimited", "desc": "All Pro features across up to 5 locations.", "cta": "Start with Unlimited" }
+    },
+    "table": {
+      "feature": "Feature",
+      "footnote": "* 1/mo — one automatic fee per calendar month on Free and Basic plans. Upgrade to Pro for unlimited no-show and late-cancel fees."
+    },
+    "features": [
+      "Online booking page",
+      "Unlimited appointments",
+      "Client management",
+      "Booking confirmations (email)",
+      "In-app client messaging",
+      "Google Calendar sync",
+      "Intake & consent forms",
+      "Locations",
+      "Receive & reply to client SMS",
+      "Initiate SMS to clients",
+      "Deposits & card on file",
+      "Cancellation policies",
+      "Reports & analytics",
+      "Automated SMS & email reminders",
+      "Automatic no-show & late-cancel fees",
+      "Packages, gift cards & memberships",
+      "Reviews & marketing campaigns"
+    ],
+    "perMonthFee": "1/mo",
+    "faq": [
+      { "q": "Is there a free trial?", "a": "The Free plan has no time limit. Use it forever, then upgrade when you're ready." },
+      { "q": "Can I cancel anytime?", "a": "Yes. Downgrade or cancel from your account settings at any time. No cancellation fees." },
+      { "q": "What payment methods do you accept?", "a": "All major credit and debit cards, Apple Pay, and Google Pay via Stripe. Payments are in CAD." }
+    ],
+    "ctaSection": {
+      "title": "Ready to get started?",
+      "subtitle": "Create your free account in under 2 minutes. No credit card required.",
+      "button": "Get started free",
+      "questions": "Questions?",
+      "supportLink": "Visit our support page"
+    },
+    "footer": { "home": "Home", "terms": "Terms", "privacy": "Privacy", "support": "Support" },
+    "toggleLabel": "Language"
   }
 }

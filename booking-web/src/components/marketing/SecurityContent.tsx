@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Lock, ShieldCheck, Eye, Server, CreditCard, Key, Bell, FileText, Mail, Languages, type LucideIcon } from "lucide-react";
+import { Lock, ShieldCheck, Eye, Server, CreditCard, Key, Bell, FileText, Mail, type LucideIcon } from "lucide-react";
 import type { Dictionary } from "@/i18n/getDictionary";
+import { LanguageToggle } from "./LanguageToggle";
 
 // Section icons/links live in code; all copy comes from the dictionary so the
 // page stays identical across locales except for the words.
@@ -17,8 +18,10 @@ const SECTION_ORDER: { key: string; Icon: LucideIcon; href?: string }[] = [
   { key: "disclosure", Icon: Mail, href: "mailto:security@pulseappointments.com" },
 ];
 
-// `altHref` is the same page in the other language (for the switcher + hreflang).
+// `altHref` is the same page in the other language; it tells us which locale
+// this render is (the canonical EN page links to /fr/..., and vice versa).
 export function SecurityContent({ dict, altHref }: { dict: Dictionary["security"]; altHref: string }) {
+  const locale = altHref.startsWith("/fr") ? "en" : "fr";
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-6 py-16">
@@ -28,10 +31,7 @@ export function SecurityContent({ dict, altHref }: { dict: Dictionary["security"
             <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
             <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse Appointments</span>
           </Link>
-          <Link href={altHref} hrefLang={altHref.startsWith("/fr") ? "fr-CA" : "en-CA"}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            <Languages className="w-4 h-4" /> {dict.switchLabel}
-          </Link>
+          <LanguageToggle locale={locale} enHref="/security" frHref="/fr/security" />
         </div>
 
         <div className="mb-10">
