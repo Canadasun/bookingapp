@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useLocationScope } from "@/lib/location-scope";
 import Link from "next/link";
 import { AlertTriangle, Bell, MessageSquare, TrendingUp, Users, ChevronRight, ArrowRight, CalendarDays, CheckCircle2, CreditCard, MailWarning, TimerReset, ShieldCheck, Sparkles, X, Globe } from "lucide-react";
 import { api, Appointment, DashboardOverview } from "@/lib/api";
@@ -126,6 +127,11 @@ export default function OverviewPage() {
     setShowDemoBanner(false);
   }
 
+  // When the owner focuses a single branch in the location switcher, scope the
+  // home overview to it. "All" / multi-select stays business-wide.
+  const { selectedIds: scopedLocationIds, locations: scopedLocations } = useLocationScope();
+  const scopedLocationId = scopedLocations.length > 1 && scopedLocationIds.length === 1 ? scopedLocationIds[0] : undefined;
+
   const load = useCallback(async () => {
     if (userLoading) return;
     if (!bizId) {
@@ -134,13 +140,13 @@ export default function OverviewPage() {
     }
     setLoading(true); setError("");
     try {
-      setOverview(await api.business.dashboardOverview(bizId));
+      setOverview(await api.business.dashboardOverview(bizId, scopedLocationId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally { setLoading(false); }
   // React Compiler needs `user` here because `bizId` is derived from it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLoading, user, bizId]);
+  }, [userLoading, user, bizId, scopedLocationId]);
 
   useEvents(bizId || null, useCallback(() => {
     load();

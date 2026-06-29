@@ -819,7 +819,8 @@ export const api = {
 
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
-    dashboardOverview: (id: string) => req<DashboardOverview>(`/businesses/${id}/dashboard-overview`),
+    dashboardOverview: (id: string, locationId?: string) =>
+      req<DashboardOverview>(`/businesses/${id}/dashboard-overview${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),
     getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
     update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt" | "plan" | "planExpiresAt" | "suspended" | "verificationStatus" | "stripeConnectOnboarded" | "capabilities" | "suspectedDuplicateOfId">>) =>

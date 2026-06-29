@@ -111,7 +111,7 @@ export class BusinessesService {
     return where;
   }
 
-  async dashboardOverview(id: string, user: DashboardUser) {
+  async dashboardOverview(id: string, user: DashboardUser, locationId?: string) {
     const business = await this.prisma.business.findUnique({
       where: { id },
       select: { id: true, timezone: true, verificationStatus: true },
@@ -125,6 +125,11 @@ export class BusinessesService {
     const now = new Date();
     const bounds = this.zonedBounds(now, business.timezone ?? 'UTC');
     const scopedAppointments = await this.appointmentScope(id, user);
+    // Optional multi-location scope: when the owner focuses one branch, every
+    // appointment-derived metric below filters to it (revenue too, via the
+    // appointment relation). No locationId = unchanged business-wide behavior.
+    if (locationId) scopedAppointments.locationId = locationId;
+    const revenueLocationFilter = locationId ? { appointment: { locationId } } : {};
     const appointmentInclude = {
       client: true,
       service: true,
@@ -219,6 +224,7 @@ export class BusinessesService {
             businessId: id,
             createdAt: { gte: bounds.weekStart, lte: bounds.weekEnd },
             status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED'] },
+            ...revenueLocationFilter,
           },
           select: { amountCents: true, refundedCents: true },
         }),
@@ -227,7 +233,7 @@ export class BusinessesService {
         this.prisma.client.count({ where: { businessId: id, createdAt: { gte: bounds.monthStart, lte: bounds.monthEnd } } }),
       ]);
       weekRevenue = payments.reduce((sum, payment) => sum + payment.amountCents - payment.refundedCents, 0);
-      failedPayments = await this.prisma.payment.count({ where: { businessId: id, status: 'FAILED' } });
+      failedPayments = await this.prisma.payment.count({ where: { businessId: id, status: 'FAILED', ...revenueLocationFilter } });
       waitlistCount = waitlist;
       failedDeliveries = deliveries;
       newClientsThisMonth = clients;

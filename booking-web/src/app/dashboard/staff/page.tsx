@@ -7,6 +7,7 @@ import { Plus, Pencil, UserX, Check, ShieldCheck, CalendarClock, MessageCircle, 
 import { toast } from "sonner";
 import { api, Service, StaffMember, Location } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
+import { useLocationScope } from "@/lib/location-scope";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +29,11 @@ export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  // When a single branch is focused in the location switcher, show only its providers.
+  const { selectedIds: scopedIds, locations: scopeLocs } = useLocationScope();
+  const scopedLocationId = scopeLocs.length > 1 && scopedIds.length === 1 ? scopedIds[0] : undefined;
+  const visibleStaff = scopedLocationId ? staff.filter((s) => s.locationId === scopedLocationId) : staff;
+  const scopedLocationName = scopedLocationId ? (scopeLocs.find((l) => l.id === scopedLocationId)?.name ?? null) : null;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -175,7 +181,10 @@ export default function StaffPage() {
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Staff</h2>
-          <p className="text-sm text-gray-500">{staff.filter((s) => s.active).length} active · {staff.filter((s) => !s.active).length} inactive</p>
+          <p className="text-sm text-gray-500">
+            {visibleStaff.filter((s) => s.active).length} active · {visibleStaff.filter((s) => !s.active).length} inactive
+            {scopedLocationName && <span className="text-violet-600"> · {scopedLocationName} only</span>}
+          </p>
         </div>
         <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4"/>Add staff</Button>
       </div>
@@ -207,9 +216,11 @@ export default function StaffPage() {
           <p className="text-red-500 mb-3">{loadError}</p>
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
-      ) : loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" icon={ShieldCheck} description="Add your team so bookings can be assigned to them and they get their own login." /> : (
+      ) : loading ? <LoadingSpinner /> : staff.length === 0 ? <EmptyState title="No staff yet" icon={ShieldCheck} description="Add your team so bookings can be assigned to them and they get their own login." /> : visibleStaff.length === 0 ? (
+        <EmptyState title={`No providers at ${scopedLocationName ?? "this location"}`} icon={ShieldCheck} description="Assign a provider to this branch from their staff profile, or clear the location filter in the top bar to see everyone." />
+      ) : (
         <div className="space-y-3">
-          {staff.map((s) => (
+          {visibleStaff.map((s) => (
             <Card key={s.id} className={!s.active ? "opacity-60" : ""}>
               <CardContent className="py-4 flex items-center gap-4">
                 <div className="relative w-10 h-10 rounded-full bg-violet-100 overflow-hidden flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">

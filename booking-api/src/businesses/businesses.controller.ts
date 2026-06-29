@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException, HttpCode } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -77,9 +77,10 @@ export class BusinessesController {
   dashboardOverview(
     @Param('id') id: string,
     @CurrentUser() user: User,
+    @Query('locationId') locationId?: string,
   ) {
     this.assertTenantAccess(user, id);
-    return this.businessService.dashboardOverview(id, user);
+    return this.businessService.dashboardOverview(id, user, locationId?.trim() || undefined);
   }
 
   @Get(':id/reports')
