@@ -196,5 +196,36 @@
       "offerDescription": "Forfait gratuit offert. Forfaits payants à partir de 19 $ CAD/mois."
     },
     "toggleLabel": "Langue"
+  },
+  "features": {
+    "meta": {
+      "title": "Fonctionnalités de prise de rendez-vous | Pulse Appointments",
+      "description": "Découvrez les fonctionnalités de Pulse pour les entreprises de services canadiennes : réservation en ligne, dépôts, protection contre les rendez-vous manqués, rappels par SMS, formulaires d'admission, gestion des clients, multi-emplacement et avis."
+    },
+    "og": {
+      "title": "Fonctionnalités de prise de rendez-vous Pulse",
+      "description": "Réservation en ligne, rappels, dépôts, avis, formulaires d'admission et gestion des clients pour les entreprises de services canadiennes."
+    },
+    "breadcrumb": { "home": "Accueil", "self": "Fonctionnalités" },
+    "eyebrow": "Fonctionnalités",
+    "h1": "Fonctionnalités de prise de rendez-vous pour les entreprises de services canadiennes",
+    "intro": "Pulse réunit la réservation, les rappels, les dépôts, les dossiers clients, les formulaires d'admission, la planification multi-emplacement et la collecte d'avis dans une seule plateforme pour les entreprises de services.",
+    "startFree": "Commencer gratuitement",
+    "viewDemo": "Voir la démo",
+    "items": [
+      { "title": "Réservation en ligne", "desc": "Permettez à vos clients de réserver 24/7 depuis Instagram, Google ou votre site Web." },
+      { "title": "Dépôts à la réservation", "desc": "Percevez des dépôts pendant la réservation et protégez les rendez-vous à forte valeur." },
+      { "title": "Protection contre les rendez-vous manqués", "desc": "Utilisez des politiques et l'enregistrement des cartes pour réduire les pertes de revenus." },
+      { "title": "Rappels par SMS", "desc": "Envoyez des rappels de rendez-vous pour que vos clients n'oublient pas leurs visites à venir." },
+      { "title": "Gestion des clients", "desc": "Regroupez les dossiers, les notes, les rendez-vous et l'historique de vos clients." },
+      { "title": "Formulaires d'admission", "desc": "Recueillez les allergies, les préférences, les consentements et des réponses personnalisées." },
+      { "title": "Multi-emplacement", "desc": "Organisez les services, le personnel et les parcours de réservation pour plusieurs emplacements." },
+      { "title": "Avis", "desc": "Recueillez et publiez des preuves d'avis liées aux rendez-vous terminés." }
+    ],
+    "together": {
+      "title": "Conçues pour fonctionner ensemble",
+      "body": "Les flux Pulse les plus efficaces combinent plusieurs fonctionnalités : un formulaire d'admission avant la réservation, un dépôt au paiement, des rappels par SMS avant le rendez-vous et une demande d'avis après la visite."
+    },
+    "toggleLabel": "Langue"
   }
 }

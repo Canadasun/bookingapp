@@ -196,5 +196,36 @@
       "offerDescription": "Free plan available. Paid plans from $19 CAD/month."
     },
     "toggleLabel": "Language"
+  },
+  "features": {
+    "meta": {
+      "title": "Appointment Booking Features | Pulse Appointments",
+      "description": "Explore Pulse features for Canadian service businesses: online booking, deposits, no-show protection, SMS reminders, intake forms, client management, multi-location, and reviews."
+    },
+    "og": {
+      "title": "Pulse Appointment Booking Features",
+      "description": "Online booking, reminders, deposits, reviews, intake forms, and client management for Canadian service businesses."
+    },
+    "breadcrumb": { "home": "Home", "self": "Features" },
+    "eyebrow": "Features",
+    "h1": "Appointment booking features for Canadian service businesses",
+    "intro": "Pulse brings booking, reminders, deposits, client records, intake forms, multi-location scheduling, and review collection into one service-business platform.",
+    "startFree": "Start free",
+    "viewDemo": "View demo",
+    "items": [
+      { "title": "Online booking", "desc": "Let clients book 24/7 from Instagram, Google, or your website." },
+      { "title": "Booking deposits", "desc": "Collect deposits during booking and protect high-value appointments." },
+      { "title": "No-show protection", "desc": "Use policies and card-on-file workflows to reduce lost revenue." },
+      { "title": "SMS reminders", "desc": "Send appointment reminders so clients remember upcoming visits." },
+      { "title": "Client management", "desc": "Keep client records, notes, appointments, and history together." },
+      { "title": "Intake forms", "desc": "Collect allergies, preferences, consent details, and custom answers." },
+      { "title": "Multi-location", "desc": "Organize services, staff, and booking paths across multiple locations." },
+      { "title": "Reviews", "desc": "Collect and publish review proof tied to completed appointments." }
+    ],
+    "together": {
+      "title": "Built to work together",
+      "body": "The strongest Pulse workflows combine multiple features: an intake form before booking, a deposit at checkout, SMS reminders before the appointment, and a review request after completion."
+    },
+    "toggleLabel": "Language"
   }
 }
