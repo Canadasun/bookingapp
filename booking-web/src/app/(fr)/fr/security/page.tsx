@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { getDictionary } from "@/i18n/getDictionary";
-import { localeHtmlLang } from "@/i18n/config";
-import { HtmlLang } from "@/components/marketing/HtmlLang";
 import { SecurityContent } from "@/components/marketing/SecurityContent";
 
 const SITE = "https://www.pulseappointments.com";
@@ -21,10 +19,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SecurityPageFr() {
   const dict = await getDictionary("fr");
-  return (
-    <>
-      <HtmlLang lang={localeHtmlLang.fr} />
-      <SecurityContent dict={dict.security} altHref="/security" />
-    </>
-  );
+  return <SecurityContent dict={dict.security} altHref="/security" />;
 }

@@ -2,7 +2,7 @@
 
 import { Suspense, use } from "react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { BookPageInner } from "@/app/book/[slug]/page";
+import { BookPageInner } from "@/app/(en)/book/[slug]/page";
 
 export default function ShortBusinessBookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
