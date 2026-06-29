@@ -10,6 +10,7 @@ import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, D
 import { toast } from "sonner";
 import { api, Appointment, AvailabilityRule, Service } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
+import { useLocationScope } from "@/lib/location-scope";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -355,9 +356,10 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
 
 // Quick "New appointment" modal — lets staff/owners book for a client using
 // just name + phone/email, then picks service, provider, date and time.
-function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
+function NewAppointmentModal({ bizId, staffList, allowedLocationIds, onClose, onSaved }: {
   bizId: string;
   staffList: { id: string; user: { name: string }; locationId?: string | null }[];
+  allowedLocationIds?: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -380,7 +382,9 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
   const [meetingUrl, setMeetingUrl] = useState("");
   const [services, setServices] = useState<Service[]>([]);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
-  const [locationFilter, setLocationFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState(
+    allowedLocationIds?.length === 1 ? allowedLocationIds[0] : "",
+  );
   const [busy, setBusy] = useState(false);
 
   const filteredStaff = locationFilter
@@ -396,9 +400,11 @@ function NewAppointmentModal({ bizId, staffList, onClose, onSaved }: {
     ]).then(([svcList, locList]) => {
       setServices(svcList);
       if (svcList.length > 0) setServiceId(svcList[0].id);
-      setLocations(locList.filter((l) => l.active));
+      setLocations(locList.filter((l) =>
+        l.active && (!allowedLocationIds?.length || allowedLocationIds.includes(l.id))
+      ));
     }).catch(() => {});
-  }, [bizId]);
+  }, [bizId, allowedLocationIds]);
 
   // When location filter changes, reset staffId to first matching staff
   useEffect(() => {
@@ -900,6 +906,7 @@ function AppointmentsPage() {
   const { user } = useCurrentUser();
   const isStaff = user?.role === "STAFF";
   const bizId = user?.businessId ?? "";
+  const { locations: scopedLocations, selectedIds: scopedLocationIds } = useLocationScope();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -938,6 +945,14 @@ function AppointmentsPage() {
     }).catch(() => {});
     api.locations.list(bizId).then((locs) => setLocationList(locs.filter((l) => l.active))).catch(() => {});
   }, [bizId]);
+
+  useEffect(() => {
+    if (scopedLocations.length < 2) return;
+    setLocationList(scopedLocations);
+    setLocationListFilter(
+      scopedLocationIds.length === 1 ? scopedLocationIds[0] : ""
+    );
+  }, [scopedLocations, scopedLocationIds]);
 
   const load = useCallback(async () => {
     if (!bizId) {
@@ -1019,6 +1034,9 @@ function AppointmentsPage() {
     let list = appointments;
     if (tab === "today") list = list.filter((a) => isToday(new Date(a.startsAt)));
     else if (tab === "week") list = list.filter((a) => isThisWeek(new Date(a.startsAt)));
+    if (scopedLocations.length > 1 && scopedLocationIds.length < scopedLocations.length) {
+      list = list.filter((a) => !!a.location?.id && scopedLocationIds.includes(a.location.id));
+    }
     if (locationListFilter) list = list.filter((a) => a.location?.id === locationListFilter);
     if (staffFilter) list = list.filter((a) => a.staff.user.name === staffFilter);
     if (statusFilter) list = list.filter((a) => a.status === statusFilter);
@@ -1031,12 +1049,15 @@ function AppointmentsPage() {
       );
     }
     return [...list].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  }, [appointments, tab, locationListFilter, staffFilter, statusFilter, search]);
+  }, [appointments, tab, locationListFilter, staffFilter, statusFilter, search, scopedLocations, scopedLocationIds]);
 
   // The month grid spans whole weeks, so it ignores the today/week tab and only
   // honours the location / staff / status / search filters.
   const calendarAppts = useMemo(() => {
     let list = appointments;
+    if (scopedLocations.length > 1 && scopedLocationIds.length < scopedLocations.length) {
+      list = list.filter((a) => !!a.location?.id && scopedLocationIds.includes(a.location.id));
+    }
     if (locationListFilter) list = list.filter((a) => a.location?.id === locationListFilter);
     if (staffFilter) list = list.filter((a) => a.staff.user.name === staffFilter);
     if (statusFilter) list = list.filter((a) => a.status === statusFilter);
@@ -1049,7 +1070,7 @@ function AppointmentsPage() {
       );
     }
     return list;
-  }, [appointments, locationListFilter, staffFilter, statusFilter, search]);
+  }, [appointments, locationListFilter, staffFilter, statusFilter, search, scopedLocations, scopedLocationIds]);
 
   // Drag-and-drop reschedule: move an appointment to another day, keeping its time.
   async function rescheduleToDay(appointmentId: string, dayKey: string) {
@@ -1102,7 +1123,13 @@ function AppointmentsPage() {
       </div>
 
       {showNewApt && (
-        <NewAppointmentModal bizId={bizId} staffList={staffList} onClose={() => setShowNewApt(false)} onSaved={load} />
+        <NewAppointmentModal
+          bizId={bizId}
+          staffList={staffList}
+          allowedLocationIds={scopedLocationIds}
+          onClose={() => setShowNewApt(false)}
+          onSaved={load}
+        />
       )}
       {showBlock && (
         <BlockTimeModal bizId={bizId} staffList={staffList} onClose={() => setShowBlock(false)} onSaved={load} />
@@ -1144,11 +1171,15 @@ function AppointmentsPage() {
             <option key={s} value={s}>{s}</option>)}
         </select>
 
-        {locationList.length > 1 && (
+        {locationList.filter((location) =>
+          scopedLocationIds.length === 0 || scopedLocationIds.includes(location.id)
+        ).length > 1 && (
           <select value={locationListFilter} onChange={(e) => setLocationListFilter(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
-            <option value="">All locations</option>
-            {locationList.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            <option value="">Selected locations</option>
+            {locationList
+              .filter((location) => scopedLocationIds.length === 0 || scopedLocationIds.includes(location.id))
+              .map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         )}
 

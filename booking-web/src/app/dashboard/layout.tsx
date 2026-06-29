@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -9,9 +9,9 @@ import {
   LogOut, X, ChevronRight, ChevronDown,
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
-  ShieldCheck, LifeBuoy, Globe, MapPin,
+  ShieldCheck, LifeBuoy, Globe, MapPin, Check,
 } from "lucide-react";
-import { api, type Business } from "@/lib/api";
+import { api, type Business, type Location } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { trackEvent } from "@/lib/analytics";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
 import { toast } from "sonner";
 import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
+import { LOCATIONS_CHANGED_EVENT, LocationScopeContext } from "@/lib/location-scope";
 
 interface NavItem {
   href: string;
@@ -395,6 +396,120 @@ function PendingCheckoutClaim({ enabled }: { enabled: boolean }) {
   return null;
 }
 
+function LocationPicker({
+  locations,
+  selectedIds,
+  onChange,
+}: {
+  locations: Location[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const allSelected = locations.length > 0 && selectedIds.length === locations.length;
+  const selected = new Set(selectedIds);
+  const visible = locations.filter((location) =>
+    location.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
+  const label = allSelected
+    ? `All locations (${locations.length})`
+    : selectedIds.length === 1
+      ? locations.find((location) => location.id === selectedIds[0])?.name ?? "Location"
+      : `${selectedIds.length} locations`;
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+
+  if (locations.length < 2) return null;
+
+  function toggle(id: string) {
+    const next = selected.has(id)
+      ? selectedIds.filter((selectedId) => selectedId !== id)
+      : [...selectedIds, id];
+    // Keep at least one branch in scope so dashboard pages never become
+    // accidentally empty with no visible explanation.
+    if (next.length > 0) onChange(next);
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-10 max-w-48 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:border-violet-300 hover:bg-violet-50 sm:max-w-60"
+      >
+        <MapPin className="h-4 w-4 shrink-0 text-violet-600" />
+        <span className="truncate">{label}</span>
+        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div role="dialog" aria-label="Choose locations" className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl sm:w-80">
+          <div className="border-b border-gray-100 p-3">
+            <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-3">
+              <Search className="h-4 w-4 text-gray-400" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search locations"
+                aria-label="Search locations"
+                className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+            </div>
+          </div>
+          <div className="max-h-72 overflow-y-auto p-2">
+            <button
+              type="button"
+              onClick={() => onChange(locations.map((location) => location.id))}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50"
+            >
+              <span>Select all</span>
+              <span className={cn("flex h-5 w-5 items-center justify-center rounded border", allSelected ? "border-violet-600 bg-violet-600 text-white" : "border-gray-300")}>
+                {allSelected && <Check className="h-3.5 w-3.5" />}
+              </span>
+            </button>
+            {visible.length === 0 ? (
+              <p className="px-3 py-6 text-center text-sm text-gray-500">No matching locations</p>
+            ) : visible.map((location) => (
+              <button
+                type="button"
+                key={location.id}
+                onClick={() => toggle(location.id)}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-violet-50"
+              >
+                <span className="truncate">{location.name}</span>
+                <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded border", selected.has(location.id) ? "border-violet-600 bg-violet-600 text-white" : "border-gray-300")}>
+                  {selected.has(location.id) && <Check className="h-3.5 w-3.5" />}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
+            Dashboard data updates to the selected {selectedIds.length === 1 ? "location" : "locations"}.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -406,6 +521,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [commandOpen, setCommandOpen] = useState(false);
   const [biz, setBiz] = useState<Business | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
 
   // useCurrentUser() is the authoritative auth check. It calls /api/auth/me on
   // first mount (result is module-level cached), redirects to /login on 401, and
@@ -426,6 +544,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (user.role !== "OWNER" && user.role !== "ADMIN") return;
     api.verification.status(user.businessId).then((v) => setVerified(v.verificationStatus === "VERIFIED")).catch(() => {});
   }, [user]);
+  const loadLocations = useCallback(() => {
+    if (!user?.businessId) return;
+    setLocationsLoading(true);
+    return api.locations.list(user.businessId)
+      .then((items) => {
+        const active = items.filter((item) => item.active);
+        setLocations(active);
+        let saved: string[] = [];
+        try {
+          saved = JSON.parse(localStorage.getItem(`pulse_location_scope:${user.businessId}`) ?? "[]");
+        } catch {}
+        const valid = saved.filter((id) => active.some((location) => location.id === id));
+        setSelectedLocationIds(valid.length > 0 ? valid : active.map((location) => location.id));
+      })
+      .catch(() => {
+        setLocations([]);
+        setSelectedLocationIds([]);
+      })
+      .finally(() => setLocationsLoading(false));
+  }, [user]);
+  useEffect(() => {
+    loadLocations();
+    const reload = () => { void loadLocations(); };
+    window.addEventListener(LOCATIONS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(LOCATIONS_CHANGED_EVENT, reload);
+  }, [loadLocations]);
+
+  const updateLocationScope = useCallback((ids: string[]) => {
+    setSelectedLocationIds(ids);
+    if (user?.businessId) {
+      try {
+        localStorage.setItem(`pulse_location_scope:${user.businessId}`, JSON.stringify(ids));
+      } catch {}
+    }
+  }, [user]);
+  const locationScope = useMemo(() => ({
+    locations,
+    selectedIds: selectedLocationIds,
+    setSelectedIds: updateLocationScope,
+    loading: locationsLoading,
+  }), [locations, selectedLocationIds, updateLocationScope, locationsLoading]);
   useEffect(() => {
     api.notifications.unreadCount()
       .then((r) => setUnread(r.count))
@@ -538,6 +697,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
+    <LocationScopeContext.Provider value={locationScope}>
     <div className="dashboard-shell flex brand-shell">
       <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} />
 
@@ -621,6 +781,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <h1 className="truncate text-sm font-semibold text-ink">{currentLabel}</h1>
             {verified && <VerifiedBadge />}
+            <LocationPicker locations={locations} selectedIds={selectedLocationIds} onChange={updateLocationScope} />
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -675,5 +836,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main id="main-content" className="flex-1 min-w-0 overflow-x-hidden p-3 sm:p-5 xl:p-6">{children}</main>
       </div>
     </div>
+    </LocationScopeContext.Provider>
   );
 }

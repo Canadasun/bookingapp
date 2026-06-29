@@ -10,6 +10,7 @@ import { Copy, Check, Globe, Clock, DollarSign, Building2, ChevronRight, CreditC
 import QRCode from "react-qr-code";
 import { toast } from "sonner";
 import { api, Business, VerificationStatus, Location } from "@/lib/api";
+import { notifyLocationsChanged } from "@/lib/location-scope";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1589,7 +1590,7 @@ function SettingsPage() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <button type="button"
-                              onClick={async () => { try { await api.locations.update(bizId, loc.id, { active: !loc.active }); loadLocations(); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } }}
+                              onClick={async () => { try { await api.locations.update(bizId, loc.id, { active: !loc.active }); notifyLocationsChanged(); loadLocations(); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } }}
                               className="text-xs text-gray-500 border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50">
                               {loc.active ? "Deactivate" : "Activate"}
                             </button>
@@ -1623,6 +1624,7 @@ function SettingsPage() {
                           try {
                             await api.locations.create(bizId, { name: locationForm.name, address: locationForm.address || undefined, phone: locationForm.phone || undefined, timezone: locationForm.timezone || undefined });
                             setLocationForm({ name: "", address: "", phone: "", timezone: "" });
+                            notifyLocationsChanged();
                             loadLocations();
                             toast.success("Location added");
                           } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add location"); }
@@ -2179,6 +2181,7 @@ function SettingsPage() {
         if (!locationToRemove) return;
         try {
           await api.locations.remove(bizId, locationToRemove.id);
+          notifyLocationsChanged();
           loadLocations();
           toast.success("Location removed");
         } catch (e) {

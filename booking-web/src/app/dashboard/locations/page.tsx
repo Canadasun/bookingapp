@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { notifyLocationsChanged } from "@/lib/location-scope";
 
 // Canadian timezones offered for a location. Slot generation uses the
 // location's timezone (falling back to the business timezone) so a branch in
@@ -94,6 +95,7 @@ export default function LocationsPage() {
         toast.success("Location added");
       }
       setModalOpen(false);
+      notifyLocationsChanged();
       load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
     finally { setSaving(false); }
@@ -101,7 +103,7 @@ export default function LocationsPage() {
 
   async function doRemove() {
     if (!bizId || !toDelete) return;
-    try { await api.locations.remove(bizId, toDelete.id); toast.success("Location deleted"); setToDelete(null); load(); }
+    try { await api.locations.remove(bizId, toDelete.id); toast.success("Location deleted"); setToDelete(null); notifyLocationsChanged(); load(); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Failed to delete"); setToDelete(null); }
   }
 

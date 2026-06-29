@@ -114,10 +114,10 @@ export class StaffService {
     const staff = await this.findOne(id, businessId);
     if (dto.locationId && businessId) {
       const location = await this.prisma.location.findFirst({
-        where: { id: dto.locationId, businessId },
+        where: { id: dto.locationId, businessId, active: true },
         select: { id: true },
       });
-      if (!location) throw new NotFoundException('Location not found');
+      if (!location) throw new NotFoundException('Active location not found');
     }
     const updated = await this.prisma.staff.update({
       where: { id: staff.id, businessId: staff.businessId },

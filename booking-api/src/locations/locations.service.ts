@@ -2,10 +2,34 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../prisma/prisma.service';
 import { featuresUnlocked } from '../common/util/plan';
 import { isProPlan, isUnlimitedPlan } from '../common/util/plan-features';
+import { PlanTier } from '@prisma/client';
 
 @Injectable()
 export class LocationsService {
   constructor(private prisma: PrismaService) {}
+
+  private locationLimit(plan: PlanTier) {
+    return isUnlimitedPlan(plan) ? 5 : isProPlan(plan) ? 2 : 1;
+  }
+
+  private async assertCanActivate(businessId: string) {
+    if (featuresUnlocked()) return;
+    const [business, activeCount] = await Promise.all([
+      this.prisma.business.findUniqueOrThrow({
+        where: { id: businessId },
+        select: { plan: true },
+      }),
+      this.prisma.location.count({ where: { businessId, active: true } }),
+    ]);
+    const limit = this.locationLimit(business.plan);
+    if (activeCount < limit) return;
+    const upgrade = isUnlimitedPlan(business.plan) ? null : isProPlan(business.plan) ? 'Unlimited' : 'Pro or Unlimited';
+    throw new ForbiddenException(
+      upgrade
+        ? `Your plan allows ${limit} location${limit === 1 ? '' : 's'}. Upgrade to ${upgrade} to add more.`
+        : `Unlimited plan supports up to 5 locations. Contact support if you need more.`,
+    );
+  }
 
   findAll(businessId: string, includeInactive = false) {
     return this.prisma.location.findMany({
@@ -15,25 +39,10 @@ export class LocationsService {
   }
 
   async create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string }) {
-    const business = await this.prisma.business.findUniqueOrThrow({
-      where: { id: businessId },
-      select: { plan: true },
-    });
-
-    const existing = await this.prisma.location.count({ where: { businessId, active: true } });
-
-    if (!featuresUnlocked()) {
-      // Location limits by plan: Free/Basic=1, Pro=2, Unlimited=5
-      const limit = isUnlimitedPlan(business.plan) ? 5 : isProPlan(business.plan) ? 2 : 1;
-      if (existing >= limit) {
-        // Check isUnlimitedPlan first — isProPlan returns true for UNLIMITED too
-        const upgrade = isUnlimitedPlan(business.plan) ? null : isProPlan(business.plan) ? 'Unlimited' : 'Pro or Unlimited';
-        const msg = upgrade
-          ? `Your plan allows ${limit} location${limit === 1 ? '' : 's'}. Upgrade to ${upgrade} to add more.`
-          : `Unlimited plan supports up to 5 locations. Contact support if you need more.`;
-        throw new ForbiddenException(msg);
-      }
-    }
+    // New locations are active by default, so the same guard must be used for
+    // creation and reactivation. Otherwise deactivate → create → reactivate
+    // bypasses the subscription limit.
+    await this.assertCanActivate(businessId);
 
     return this.prisma.location.create({
       data: {
@@ -49,6 +58,9 @@ export class LocationsService {
   async update(id: string, businessId: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean }) {
     const location = await this.prisma.location.findFirst({ where: { id, businessId } });
     if (!location) throw new NotFoundException('Location not found');
+    if (data.active === true && !location.active) {
+      await this.assertCanActivate(businessId);
+    }
     return this.prisma.location.update({
       where: { id: location.id, businessId: location.businessId },
       data: {
