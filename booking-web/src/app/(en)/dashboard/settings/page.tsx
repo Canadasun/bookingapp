@@ -20,6 +20,7 @@ import { cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { trackEvent } from "@/lib/analytics";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const TIMEZONES = [
   "America/New_York","America/Chicago","America/Denver","America/Los_Angeles",
@@ -56,17 +57,20 @@ type SubscriptionDetails = {
   hasBilling: boolean;
 };
 
-const SECTIONS: { id: Section; label: string; icon: React.ElementType; desc: string; group: string }[] = [
-  { id: "profile",       label: "Business profile",   icon: Building2,    desc: "Name, contact info, timezone",          group: "Business" },
-  { id: "locations",     label: "Locations",          icon: MapPin,       desc: "Manage multiple business locations",    group: "Business" },
-  { id: "booking",       label: "Booking policies",   icon: Clock,        desc: "Notice, cancellations, advance limits", group: "Booking setup" },
-  { id: "calendar",      label: "Calendar sync",      icon: CalendarDays, desc: "Sync bookings to Google Calendar",      group: "Booking setup" },
-  { id: "online",        label: "Online booking",     icon: Globe,        desc: "Booking link, QR code, embed",          group: "Booking page" },
-  { id: "branding",      label: "Branding",           icon: Palette,      desc: "Colors, fonts, booking page style",     group: "Booking page" },
-  { id: "payments",      label: "Payments & fees",    icon: DollarSign,   desc: "Deposits, no-show fees",                group: "Payments" },
-  { id: "payouts",       label: "Payouts",            icon: Banknote,     desc: "Connect bank account & withdraw",       group: "Payments" },
-  { id: "billing",       label: "Billing & plan",     icon: CreditCard,   desc: "Subscription plan, upgrade",            group: "Payments" },
-  { id: "security",      label: "Security",           icon: ShieldCheck,  desc: "Two-factor sign-in, password",          group: "Account" },
+// Labels and group names come from the dictionary (settings.nav / settings.groups);
+// `navKey` selects the nav entry, `group` is a dictionary group key.
+type GroupKey = "business" | "bookingSetup" | "bookingPage" | "payments" | "account";
+const SECTIONS: { id: Section; navKey: Section; icon: React.ElementType; group: GroupKey }[] = [
+  { id: "profile",   navKey: "profile",   icon: Building2,    group: "business" },
+  { id: "locations", navKey: "locations", icon: MapPin,       group: "business" },
+  { id: "booking",   navKey: "booking",   icon: Clock,        group: "bookingSetup" },
+  { id: "calendar",  navKey: "calendar",  icon: CalendarDays, group: "bookingSetup" },
+  { id: "online",    navKey: "online",    icon: Globe,        group: "bookingPage" },
+  { id: "branding",  navKey: "branding",  icon: Palette,      group: "bookingPage" },
+  { id: "payments",  navKey: "payments",  icon: DollarSign,   group: "payments" },
+  { id: "payouts",   navKey: "payouts",   icon: Banknote,     group: "payments" },
+  { id: "billing",   navKey: "billing",   icon: CreditCard,   group: "payments" },
+  { id: "security",  navKey: "security",  icon: ShieldCheck,  group: "account" },
 ];
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
@@ -78,18 +82,19 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
   );
 }
 
-function formatPolicyDuration(totalMinutes: number) {
+type PolicyLabels = { day: string; days: string; hr: string; hrs: string; min: string };
+function formatPolicyDuration(totalMinutes: number, l: PolicyLabels) {
   const safe = Math.max(0, Math.floor(Number.isFinite(totalMinutes) ? totalMinutes : 0));
   const days = Math.floor(safe / 1440);
   const hours = Math.floor((safe % 1440) / 60);
   const minutes = safe % 60;
-  if (days > 0) return `${days} day${days === 1 ? "" : "s"}${hours ? ` ${hours} hr` : ""}${minutes ? ` ${minutes} min` : ""}`;
-  if (hours > 0) return `${hours} hr${hours === 1 ? "" : "s"}${minutes ? ` ${minutes} min` : ""}`;
-  return `${minutes} min`;
+  if (days > 0) return `${days} ${days === 1 ? l.day : l.days}${hours ? ` ${hours} ${l.hr}` : ""}${minutes ? ` ${minutes} ${l.min}` : ""}`;
+  if (hours > 0) return `${hours} ${hours === 1 ? l.hr : l.hrs}${minutes ? ` ${minutes} ${l.min}` : ""}`;
+  return `${minutes} ${l.min}`;
 }
 
-function PolicyNumberInput({ value, min = 0, unit, label, onChange }: {
-  value: number; min?: number; unit: "hours" | "days"; label: string; onChange: (minutes: number) => void;
+function PolicyNumberInput({ value, min = 0, unit, unitLabel, label, onChange }: {
+  value: number; min?: number; unit: "hours" | "days"; unitLabel: string; label: string; onChange: (minutes: number) => void;
 }) {
   const multiplier = unit === "days" ? 1440 : 60;
   const safe = Math.max(min, Math.floor(Number.isFinite(value) ? value : min));
@@ -106,20 +111,22 @@ function PolicyNumberInput({ value, min = 0, unit, label, onChange }: {
         aria-label={label}
         className="h-8 w-20 border-0 bg-transparent p-0 text-base font-semibold tabular-nums shadow-none focus-visible:ring-0"
       />
-      <span className="ml-2 text-sm font-medium text-gray-500">{unit}</span>
+      <span className="ml-2 text-sm font-medium text-gray-500">{unitLabel}</span>
     </div>
   );
 }
 
 function FeatureError({ message, onRetry }: { message?: string; onRetry?: () => void }) {
+  const { dictionary } = useDashboardLocale();
+  const t = dictionary.settings;
   if (!message) return null;
   return (
     <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-      <p className="font-semibold text-red-800">Could not load this section completely.</p>
+      <p className="font-semibold text-red-800">{t.featureErrorTitle}</p>
       <p className="mt-0.5 text-xs">{message}</p>
       {onRetry && (
         <button type="button" onClick={onRetry} className="mt-2 text-xs font-semibold underline underline-offset-2">
-          Retry
+          {t.retry}
         </button>
       )}
     </div>
@@ -153,6 +160,8 @@ function contrastLabel(ratio: number): { pass: boolean; level: string; color: st
 
 function SettingsPage() {
   const { user, loading: userLoading } = useCurrentUser();
+  const { dictionary } = useDashboardLocale();
+  const t = dictionary.settings;
   const [biz, setBiz]       = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -208,7 +217,7 @@ function SettingsPage() {
 
   async function saveTwoFactor(enabled: boolean, method: "EMAIL" | "SMS") {
     if (!twoFAPassword) {
-      toast.error("Enter your current password to change two-factor settings");
+      toast.error(t.toasts.twoFAPasswordRequired);
       return;
     }
     setTwoFASaving(true);
@@ -223,10 +232,10 @@ function SettingsPage() {
       if (res.recoveryCodes?.length) setRecoveryCodes(res.recoveryCodes);
       if (!enabled) setRecoveryCodes(null);
       setTwoFAPassword("");
-      toast.success(enabled ? "Two-factor sign-in enabled" : "Two-factor sign-in turned off");
+      toast.success(enabled ? t.toasts.twoFAEnabled : t.toasts.twoFADisabled);
     } catch (err) {
       setTwoFA(prev.enabled); setTwoFAMethod(prev.method); // roll back
-      toast.error(err instanceof Error ? err.message : "Could not update two-factor");
+      toast.error(err instanceof Error ? err.message : t.toasts.twoFAFailed);
     } finally {
       setTwoFASaving(false);
     }
@@ -240,23 +249,23 @@ function SettingsPage() {
       return;
     }
     if (!bizId) {
-      setLoadError("No business account is linked to your profile. Please contact support.");
+      setLoadError(t.featureErrors.noBusiness);
       setLoading(false);
       return;
     }
     api.business.get(bizId)
       .then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); setDirty(false); })
-      .catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); setLoading(false); })
+      .catch((e) => { setLoadError(e instanceof Error ? e.message : t.featureErrors.loadSettings); setLoading(false); })
       .finally(() => setLoading(false));
-  }, [bizId, isOwner, userLoading]);
+  }, [bizId, isOwner, userLoading, t.featureErrors.noBusiness, t.featureErrors.loadSettings]);
 
   useEvents(
     bizId || null,
     useCallback(() => {}, []),
     useCallback((data: { plan: string; planExpiresAt: string | null }) => {
       setBiz((prev) => prev ? { ...prev, plan: data.plan as Business["plan"] } : prev);
-      toast.success(`Plan updated to ${data.plan.charAt(0) + data.plan.slice(1).toLowerCase()}`);
-    }, []),
+      toast.success(t.toasts.planUpdated.replace("{plan}", data.plan.charAt(0) + data.plan.slice(1).toLowerCase()));
+    }, [t.toasts.planUpdated]),
   );
 
   const f = (k: keyof Business, v: unknown) => {
@@ -294,10 +303,10 @@ function SettingsPage() {
       clearFeatureError("subscription");
       return details;
     } catch (e) {
-      recordFeatureError("subscription", e, "Could not load billing details");
+      recordFeatureError("subscription", e, t.featureErrors.subscription);
       throw e;
     }
-  }, [clearFeatureError, recordFeatureError]);
+  }, [clearFeatureError, recordFeatureError, t.featureErrors.subscription]);
 
   useEffect(() => {
     if (bizId && isOwner) loadSubscription().catch(() => {});
@@ -311,8 +320,8 @@ function SettingsPage() {
     if (!bizId || !isOwner) return;
     api.locations.list(bizId)
       .then((items) => { setLocations(items); clearFeatureError("locations"); })
-      .catch((e) => recordFeatureError("locations", e, "Could not load locations"));
-  }, [bizId, isOwner, clearFeatureError, recordFeatureError]);
+      .catch((e) => recordFeatureError("locations", e, t.featureErrors.locations));
+  }, [bizId, isOwner, clearFeatureError, recordFeatureError, t.featureErrors.locations]);
   useEffect(() => { loadLocations(); }, [loadLocations]);
 
   // Stripe Connect / Payouts
@@ -325,8 +334,8 @@ function SettingsPage() {
     if (!isOwner) return;
     api.connect.status()
       .then((status) => { setConnectStatus(status); clearFeatureError("connect"); })
-      .catch((e) => recordFeatureError("connect", e, "Could not load payout status"));
-  }, [isOwner, clearFeatureError, recordFeatureError]);
+      .catch((e) => recordFeatureError("connect", e, t.featureErrors.connect));
+  }, [isOwner, clearFeatureError, recordFeatureError, t.featureErrors.connect]);
   useEffect(() => { loadConnect(); }, [loadConnect]);
 
   // Load this business's own referral code + count.
@@ -338,8 +347,8 @@ function SettingsPage() {
     }
     api.referrals.get()
       .then((r) => { setMyReferral({ code: r.code, referredCount: r.referredCount }); clearFeatureError("referrals"); })
-      .catch((e) => recordFeatureError("referrals", e, "Could not load referral details"));
-  }, [isOwner, searchParams, clearFeatureError, recordFeatureError]);
+      .catch((e) => recordFeatureError("referrals", e, t.featureErrors.referrals));
+  }, [isOwner, searchParams, clearFeatureError, recordFeatureError, t.featureErrors.referrals]);
 
   // Business verification status.
   const [verif, setVerif] = useState<{ status: VerificationStatus; note: string | null } | null>(null);
@@ -359,20 +368,20 @@ function SettingsPage() {
         registrationDocUrl: v.verificationDocUrl ?? "",
       });
       clearFeatureError("verification");
-    }).catch((e) => recordFeatureError("verification", e, "Could not load verification status"));
-  }, [bizId, isOwner, clearFeatureError, recordFeatureError]);
+    }).catch((e) => recordFeatureError("verification", e, t.featureErrors.verification));
+  }, [bizId, isOwner, clearFeatureError, recordFeatureError, t.featureErrors.verification]);
   async function submitVerification() {
     if (!bizId) return;
     if (!verificationForm.legalName.trim() || !verificationForm.address.trim() || !verificationForm.phone.trim() || !verificationForm.governmentIdUrl || !verificationForm.registrationDocUrl) {
-      toast.error("Complete every verification field and upload both documents");
+      toast.error(t.toasts.verificationComplete);
       return;
     }
     setVerifBusy(true);
     try {
       const r = await api.verification.submit(bizId, verificationForm);
       setVerif({ status: r.verificationStatus, note: null });
-      toast.success("Verification details submitted for review");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not submit"); }
+      toast.success(t.toasts.verificationSubmitted);
+    } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.verificationFailed); }
     finally { setVerifBusy(false); }
   }
 
@@ -382,27 +391,27 @@ function SettingsPage() {
     if (!isOwner) return;
     api.calendarSync.status()
       .then((status) => { setCal(status); clearFeatureError("calendar"); })
-      .catch((e) => recordFeatureError("calendar", e, "Could not load calendar sync status"));
-  }, [isOwner, clearFeatureError, recordFeatureError]);
+      .catch((e) => recordFeatureError("calendar", e, t.featureErrors.calendar));
+  }, [isOwner, clearFeatureError, recordFeatureError, t.featureErrors.calendar]);
   useEffect(() => { loadCal(); }, [loadCal]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const p = params.get("calendar");
-    if (p === "connected") { toast.success("Google Calendar connected — bookings will sync automatically."); loadCal(); goSection("calendar"); }
+    if (p === "connected") { toast.success(t.toasts.calendarConnected); loadCal(); goSection("calendar"); }
     else if (p === "error") {
       const reason = params.get("reason") ?? "";
-      const msg = reason.startsWith("google_denied") ? "Google Calendar access was denied. You can try again." : reason === "missing_code" ? "The connection was interrupted. Please try again." : `Could not connect Google Calendar${reason ? `: ${reason}` : ""}.`;
+      const msg = reason.startsWith("google_denied") ? t.toasts.calendarDenied : reason === "missing_code" ? t.toasts.calendarInterrupted : t.toasts.calendarConnectFailed.replace("{reason}", reason ? `: ${reason}` : "");
       toast.error(msg);
       goSection("calendar");
     }
-  }, [goSection, loadCal]);
+  }, [goSection, loadCal, t.toasts.calendarConnected, t.toasts.calendarDenied, t.toasts.calendarInterrupted, t.toasts.calendarConnectFailed]);
   async function connectCal() {
     try { const { url } = await api.calendarSync.connect(); window.location.assign(url); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Google connect"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.calendarStartFailed); }
   }
   async function disconnectCal() {
-    try { await api.calendarSync.disconnect(); toast.success("Google Calendar disconnected"); loadCal(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not disconnect"); }
+    try { await api.calendarSync.disconnect(); toast.success(t.toasts.calendarDisconnected); loadCal(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.calendarDisconnectFailed); }
   }
 
   // Verify and reconcile a returning Stripe Checkout before claiming activation.
@@ -415,11 +424,11 @@ function SettingsPage() {
     window.history.replaceState({}, "", "/dashboard/settings?tab=billing");
     goSection("billing");
     if (result === "cancel") {
-      toast.info("Checkout canceled");
+      toast.info(t.toasts.checkoutCanceled);
       return;
     }
     if (result !== "success" || !sessionId || !bizId) {
-      toast.error("Checkout returned without a valid subscription confirmation. No plan change was applied.");
+      toast.error(t.toasts.checkoutInvalid);
       return;
     }
 
@@ -435,7 +444,7 @@ function SettingsPage() {
           if (cancelled) return;
           setBiz(business);
           setForm({ ...business, phone: formatPhoneDisplay(business.phone) });
-          toast.success(`Subscription active on ${confirmed.plan ?? business.plan}`);
+          toast.success(t.toasts.subscriptionActive.replace("{plan}", String(confirmed.plan ?? business.plan)));
           return;
         } catch (error) {
           lastError = error;
@@ -443,12 +452,12 @@ function SettingsPage() {
         }
       }
       if (!cancelled) {
-        toast.error(lastError instanceof Error ? lastError.message : "Subscription activation is still processing. Refresh Billing shortly.", { duration: 8000 });
+        toast.error(lastError instanceof Error ? lastError.message : t.toasts.subscriptionProcessing, { duration: 8000 });
       }
     };
     confirm().finally(() => { if (!cancelled) setBillingBusy(null); });
     return () => { cancelled = true; };
-  }, [bizId, goSection, loadSubscription]);
+  }, [bizId, goSection, loadSubscription, t.toasts.subscriptionActive, t.toasts.checkoutCanceled, t.toasts.checkoutInvalid, t.toasts.subscriptionProcessing]);
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -477,11 +486,11 @@ function SettingsPage() {
     const connect = searchParams.get("connect");
     if (connect === "success") {
       loadConnect();
-      toast.success("Stripe account connected successfully — you can now accept payouts.");
+      toast.success(t.toasts.connectConnected);
       goSection("payouts");
     } else if (connect === "refresh") {
       // Auto-restart onboarding
-      api.connect.onboard().then(({ url }) => window.location.assign(url)).catch((e) => toast.error(e instanceof Error ? e.message : "Could not resume Stripe onboarding"));
+      api.connect.onboard().then(({ url }) => window.location.assign(url)).catch((e) => toast.error(e instanceof Error ? e.message : t.toasts.connectResumeFailed));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -503,13 +512,13 @@ function SettingsPage() {
         window.location.assign(result.url);
       }
       else {
-        toast.success(`Switched to ${plan}. Stripe applied the prorated difference.`);
+        toast.success(t.toasts.planSwitched.replace("{plan}", plan));
         trackEvent("subscription_plan_changed", { plan, billing_interval: billingInterval });
         if (bizId) Promise.all([api.business.get(bizId), loadSubscription()]).then(([b]) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); }).catch(() => {});
         setBillingBusy(null);
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not start Stripe Checkout");
+      toast.error(e instanceof Error ? e.message : t.toasts.checkoutStartFailed);
       setBillingBusy(null);
     }
   }
@@ -519,20 +528,20 @@ function SettingsPage() {
     try {
       const { url } = await api.subscriptions.portal();
       window.location.assign(url);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not open Stripe billing"); setBillingBusy(null); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.billingOpenFailed); setBillingBusy(null); }
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!bizId || !isOwner) return;
     if (form.requireDeposit && !isPaid) {
-      promptUpgrade("BASIC", "Mandatory deposits");
+      promptUpgrade("BASIC", t.payments.depositsFeature);
       return;
     }
     if (form.requireDeposit) {
       const pct = Number(form.depositPercent);
       if (!Number.isInteger(pct) || pct < 1 || pct > 100) {
-        toast.error("Deposit percentage must be between 1 and 100.");
+        toast.error(t.toasts.depositRange);
         return;
       }
     }
@@ -581,26 +590,26 @@ function SettingsPage() {
         (payload.requireDeposit && !updated.requireDeposit) ||
         (payload.collectCardOnFile && !updated.collectCardOnFile);
       if (planStripped) {
-        toast.error("Deposits and card-on-file require a Basic or Pro plan. Upgrade your plan to enable these features.", { duration: 6000 });
+        toast.error(t.toasts.planStripped, { duration: 6000 });
       } else {
-        toast.success("Settings saved");
+        toast.success(t.toasts.settingsSaved);
       }
     }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.saveFailed); }
     finally { setSaving(false); }
   }
 
   function copyUrl() {
     navigator.clipboard.writeText(bookingUrl)
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })
-      .catch(() => toast.error("Could not copy link"));
+      .catch(() => toast.error(t.toasts.copyLinkFailed));
   }
 
   if (userLoading || loading) return <LoadingSpinner />;
   if (loadError) return (
     <div className="text-center py-20">
       <p className="text-red-500 mb-3">{loadError}</p>
-      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); setDirty(false); }).catch((e) => { setLoadError(e instanceof Error ? e.message : "Failed to load settings"); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+      <button onClick={() => { setLoadError(""); setLoading(true); api.business.get(bizId).then((b) => { setBiz(b); setForm({ ...b, phone: formatPhoneDisplay(b.phone) }); setDirty(false); }).catch((e) => { setLoadError(e instanceof Error ? e.message : t.featureErrors.loadSettings); }).finally(() => setLoading(false)); }} className="text-violet-600 hover:underline text-sm">{t.retry}</button>
     </div>
   );
 
@@ -615,27 +624,27 @@ function SettingsPage() {
   const isUnlimited = plan === "UNLIMITED";
   const canManageLocations = biz?.capabilities?.multipleLocations ?? (plan === "PRO" || isUnlimited);
   function promptUpgrade(target: "BASIC" | "PRO" | "UNLIMITED", feature: string) {
-    const label = target === "BASIC" ? "Basic or higher" : target === "PRO" ? "Pro or higher" : "Unlimited";
-    toast.info(`${feature} requires ${label}.`);
+    const label = target === "BASIC" ? t.upgradeLabels.basic : target === "PRO" ? t.upgradeLabels.pro : t.upgradeLabels.unlimited;
+    toast.info(t.toasts.featureRequires.replace("{feature}", feature).replace("{label}", label));
     goSection("billing");
   }
   function copyEmbed() {
     navigator.clipboard.writeText(embedSnippet)
       .then(() => { setEmbedCopied(true); setTimeout(() => setEmbedCopied(false), 2000); })
-      .catch(() => toast.error("Could not copy snippet"));
+      .catch(() => toast.error(t.toasts.copySnippetFailed));
   }
 
   return (
     <>
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Settings</h2>
+        <h2 className="text-xl font-bold text-gray-900">{t.title}</h2>
         <p className="text-sm text-gray-600 mt-0.5">
-          {isOwner ? "Manage your business profile and booking preferences" : "Manage your account security"}
+          {isOwner ? t.subtitleOwner : t.subtitleStaff}
         </p>
         {dirty && (
           <p className="mt-2 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
-            Unsaved changes
+            {t.unsavedChanges}
           </p>
         )}
       </div>
@@ -645,9 +654,9 @@ function SettingsPage() {
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 flex gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-amber-900">Possible duplicate account detected</p>
+            <p className="text-sm font-semibold text-amber-900">{t.duplicateTitle}</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              A business with a similar name and phone number already exists on Pulse. If this is intentional (e.g. a second location), please contact Pulse Admin to review. Opening multiple accounts with the same details may result in rejection.
+              {t.duplicateBody}
             </p>
           </div>
         </div>
@@ -659,7 +668,7 @@ function SettingsPage() {
         <div className="xl:hidden mb-4 relative -mx-3 sm:-mx-5">
           <div className="px-3 sm:px-5">
             <label htmlFor="settings-section" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Settings section
+              {t.sectionLabel}
             </label>
             <select
               id="settings-section"
@@ -668,9 +677,9 @@ function SettingsPage() {
               className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
             >
               {[...new Set(visibleSections.map((s) => s.group))].map((group) => (
-                <optgroup key={group} label={group}>
+                <optgroup key={group} label={t.groups[group]}>
                   {visibleSections.filter((s) => s.group === group).map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
+                    <option key={s.id} value={s.id}>{t.nav[s.navKey][0]}</option>
                   ))}
                 </optgroup>
               ))}
@@ -681,13 +690,15 @@ function SettingsPage() {
         {/* Left nav */}
         <aside className="hidden xl:block w-56 shrink-0">
           <nav className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {visibleSections.map(({ id, label, icon: Icon, desc, group }, i) => {
+            {visibleSections.map(({ id, navKey, icon: Icon, group }, i) => {
+              const label = t.nav[navKey][0];
+              const desc = t.nav[navKey][1];
               const isGroupStart = i === 0 || visibleSections[i - 1].group !== group;
               return (
                 <div key={id} className={cn(!isGroupStart && i !== 0 && "border-t border-gray-50")}>
                   {isGroupStart && i !== 0 && (
                     <div className="px-4 pt-3 pb-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{group}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{t.groups[group]}</p>
                     </div>
                   )}
                   <button onClick={() => goSection(id)}
@@ -718,8 +729,8 @@ function SettingsPage() {
             {section === "profile" && (
               <div className="p-4 space-y-4 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Business profile</h3>
-                  <p className="text-xs text-gray-600 mt-0.5">This information appears on your booking page.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.profile.title}</h3>
+                  <p className="text-xs text-gray-600 mt-0.5">{t.profile.subtitle}</p>
                 </div>
                 <FeatureError
                   message={featureErrors.verification}
@@ -733,7 +744,7 @@ function SettingsPage() {
                       registrationDocUrl: v.verificationDocUrl ?? "",
                     });
                     clearFeatureError("verification");
-                  }).catch((e) => recordFeatureError("verification", e, "Could not load verification status"))}
+                  }).catch((e) => recordFeatureError("verification", e, t.featureErrors.verification))}
                 />
                 <hr className="border-gray-100" />
 
@@ -741,39 +752,39 @@ function SettingsPage() {
                 {verif && verif.status === "VERIFIED" ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 flex items-center gap-2">
                     <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <p className="text-sm font-medium text-emerald-800">Business verified</p>
+                    <p className="text-sm font-medium text-emerald-800">{t.profile.verified}</p>
                   </div>
                 ) : verif ? (
                   <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
                     <div className="flex items-start gap-2">
                       <ShieldCheck className="w-5 h-5 text-violet-600 mt-0.5 shrink-0" />
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-violet-900">Verify your business</p>
+                        <p className="text-sm font-semibold text-violet-900">{t.profile.verifyTitle}</p>
                         {verif.status === "PENDING" ? (
-                          <p className="text-xs text-violet-700 mt-1">Your document is under review — we&apos;ll let you know once it&apos;s approved.</p>
+                          <p className="text-xs text-violet-700 mt-1">{t.profile.pending}</p>
                         ) : (
                           <>
                             <p className="text-xs text-violet-700 mt-1">
-                              Provide your business details and documents the review team needs before requesting verification.
-                              {verif.status === "REJECTED" && verif.note ? ` Previous submission declined: ${verif.note}` : ""}
+                              {t.profile.verifyBody}
+                              {verif.status === "REJECTED" && verif.note ? t.profile.rejected.replace("{note}", verif.note) : ""}
                             </p>
                             <div className={cn("mt-3 space-y-3", verifBusy && "opacity-60 pointer-events-none")}>
-                              <Input aria-label="Full business legal name" placeholder="Full business name" value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
-                              <Input aria-label="Business address" placeholder="Business address" value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
-                              <Input aria-label="Business phone number for verification" placeholder="Phone number" type="tel" value={verificationForm.phone} onChange={(e) => setVerificationForm((p) => ({ ...p, phone:e.target.value }))} />
+                              <Input aria-label={t.profile.legalNameAria} placeholder={t.profile.legalNamePlaceholder} value={verificationForm.legalName} onChange={(e) => setVerificationForm((p) => ({ ...p, legalName:e.target.value }))} />
+                              <Input aria-label={t.profile.addressAria} placeholder={t.profile.addressPlaceholder} value={verificationForm.address} onChange={(e) => setVerificationForm((p) => ({ ...p, address:e.target.value }))} />
+                              <Input aria-label={t.profile.phoneAria} placeholder={t.profile.phonePlaceholder} type="tel" value={verificationForm.phone} onChange={(e) => setVerificationForm((p) => ({ ...p, phone:e.target.value }))} />
                               <div>
-                                <p className="text-xs font-medium text-violet-700 mb-1.5">Government-issued ID</p>
+                                <p className="text-xs font-medium text-violet-700 mb-1.5">{t.profile.governmentId}</p>
                                 <ImageUpload value={verificationForm.governmentIdUrl || null} documents onChange={(url) => setVerificationForm((p) => ({ ...p, governmentIdUrl:url ?? "" }))} />
                               </div>
                               <div>
-                                <p className="text-xs font-medium text-violet-700 mb-1.5">Business registration</p>
+                                <p className="text-xs font-medium text-violet-700 mb-1.5">{t.profile.registration}</p>
                                 <ImageUpload value={verificationForm.registrationDocUrl || null} documents onChange={(url) => setVerificationForm((p) => ({ ...p, registrationDocUrl:url ?? "" }))} />
                               </div>
                               <button
                                 type="button"
                                 onClick={() => submitVerification()}
                                 className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
-                                <ShieldCheck className="w-4 h-4" /> Submit for verification
+                                <ShieldCheck className="w-4 h-4" /> {t.profile.submitVerification}
                               </button>
                             </div>
                           </>
@@ -783,27 +794,27 @@ function SettingsPage() {
                   </div>
                 ) : null}
 
-                <Field label="Logo">
+                <Field label={t.profile.logo}>
                   <ImageUpload value={(form.logoUrl as string) ?? null} kind="LOGO" onChange={async (url) => {
                     setForm((p) => ({ ...p, logoUrl: url ?? "" }));
                     // Persist the logo on its own so it can't be lost to an unrelated
                     // invalid field elsewhere in the settings form.
                     if (!bizId) return;
-                    try { await api.business.update(bizId, { logoUrl: url ?? "" }); toast.success(url ? "Logo saved" : "Logo removed"); }
-                    catch (e) { toast.error(e instanceof Error ? e.message : "Could not save logo"); }
+                    try { await api.business.update(bizId, { logoUrl: url ?? "" }); toast.success(url ? t.toasts.logoSaved : t.toasts.logoRemoved); }
+                    catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.logoFailed); }
                   }} />
                 </Field>
-                <Field label="Business name" htmlFor="set-name">
-                  <Input id="set-name" value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder="e.g. Paws & Claws Grooming" />
+                <Field label={t.profile.name} htmlFor="set-name">
+                  <Input id="set-name" value={(form.name as string) ?? ""} onChange={(e) => f("name", e.target.value)} placeholder={t.profile.namePlaceholder} />
                 </Field>
-                <Field label="Contact email" htmlFor="set-email">
+                <Field label={t.profile.email} htmlFor="set-email">
                   <Input id="set-email" type="email" value={(form.email as string) ?? ""} onChange={(e) => f("email", e.target.value)} />
                 </Field>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Phone" htmlFor="set-phone">
-                    <Input id="set-phone" type="tel" placeholder="+1 (416) 555-0123" value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
+                  <Field label={t.profile.phone} htmlFor="set-phone">
+                    <Input id="set-phone" type="tel" placeholder={t.profile.contactPhonePlaceholder} value={(form.phone as string) ?? ""} onChange={(e) => f("phone", formatPhoneInput(e.target.value))} />
                   </Field>
-                  <Field label="Timezone" htmlFor="biz-timezone">
+                  <Field label={t.profile.timezone} htmlFor="biz-timezone">
                     <select id="biz-timezone" value={(form.timezone as string) ?? "America/New_York"} onChange={(e) => f("timezone", e.target.value)}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                       {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}
@@ -811,31 +822,31 @@ function SettingsPage() {
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Address" htmlFor="set-address">
-                    <Input id="set-address" value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder="123 Main St, City, State" />
+                  <Field label={t.profile.address} htmlFor="set-address">
+                    <Input id="set-address" value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder={t.profile.addressFieldPlaceholder} />
                   </Field>
-                  <Field label="Currency" htmlFor="biz-currency">
+                  <Field label={t.profile.currency} htmlFor="biz-currency">
                     <select id="biz-currency" value={(form.currency as string) ?? "CAD"} onChange={(e) => f("currency", e.target.value)}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                      <option value="CAD">CAD — Canadian dollar (CA$)</option>
-                      <option value="USD">USD — US dollar ($)</option>
+                      <option value="CAD">{t.profile.currencyCad}</option>
+                      <option value="USD">{t.profile.currencyUsd}</option>
                     </select>
                   </Field>
                 </div>
                 <div className="rounded-xl border border-gray-100 p-4 space-y-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Post-visit and social links</p>
-                    <p className="text-xs text-gray-400">Shown after an appointment closes. Only secure https:// links are accepted.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.profile.socialTitle}</p>
+                    <p className="text-xs text-gray-400">{t.profile.socialSubtitle}</p>
                   </div>
-                  <Field label="Thank-you message" htmlFor="set-post-visit">
-                    <Input id="set-post-visit" value={(form.postVisitMessage as string) ?? ""} onChange={(e) => f("postVisitMessage", e.target.value)} placeholder="Thanks for visiting. We hope to see you again soon." />
+                  <Field label={t.profile.thankYou} htmlFor="set-post-visit">
+                    <Input id="set-post-visit" value={(form.postVisitMessage as string) ?? ""} onChange={(e) => f("postVisitMessage", e.target.value)} placeholder={t.profile.thankYouPlaceholder} />
                   </Field>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {(["websiteUrl", "instagramUrl", "facebookUrl", "tiktokUrl"] as const).map((key) => {
-                      const LABELS: Record<string, string> = { websiteUrl: "Website", instagramUrl: "Instagram", facebookUrl: "Facebook", tiktokUrl: "TikTok" };
+                      const LABELS: Record<string, string> = { websiteUrl: t.profile.website, instagramUrl: t.profile.instagram, facebookUrl: t.profile.facebook, tiktokUrl: t.profile.tiktok };
                       return (
                         <Field key={key} htmlFor={`set-${key}`} label={LABELS[key]}>
-                          <Input id={`set-${key}`} type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder="https://" />
+                          <Input id={`set-${key}`} type="url" value={(form[key] as string) ?? ""} onChange={(e) => f(key, e.target.value)} placeholder={t.profile.urlPlaceholder} />
                         </Field>
                       );
                     })}
@@ -847,8 +858,8 @@ function SettingsPage() {
             {section === "booking" && (
               <div className="p-4 space-y-5 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Booking policies</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Set the client booking rules that protect your calendar.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.booking.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.booking.subtitle}</p>
                 </div>
                 <Link
                   href="/dashboard/hours"
@@ -856,8 +867,8 @@ function SettingsPage() {
                 >
                   <Clock className="w-5 h-5 text-amber-600 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-amber-900">Business hours</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Set the days and times you&apos;re open. Clients can only book within these hours.</p>
+                    <p className="text-sm font-semibold text-amber-900">{t.booking.hoursTitle}</p>
+                    <p className="text-xs text-amber-700 mt-0.5">{t.booking.hoursBody}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-amber-500 shrink-0" />
                 </Link>
@@ -866,24 +877,24 @@ function SettingsPage() {
                 <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
                   {[
                     {
-                      label: "Minimum booking notice",
-                      desc: "Clients must book at least this far before the appointment starts.",
+                      label: t.booking.minNoticeLabel,
+                      desc: t.booking.minNoticeDesc,
                       value: (form.minNoticeMinutes as number) ?? 120,
                       min: 60,
                       unit: "hours" as const,
                       key: "minNoticeMinutes" as const,
                     },
                     {
-                      label: "Booking opens up to",
-                      desc: "The farthest date clients can choose on your booking page.",
+                      label: t.booking.maxAdvanceLabel,
+                      desc: t.booking.maxAdvanceDesc,
                       value: (form.maxAdvanceMinutes as number) ?? (((form.maxAdvanceDays as number) ?? 60) * 1440),
                       min: 7 * 1440,
                       unit: "days" as const,
                       key: "maxAdvanceMinutes" as const,
                     },
                     {
-                      label: "Cancel / reschedule cutoff",
-                      desc: "How many hours before the appointment clients can still change it themselves.",
+                      label: t.booking.cancelCutoffLabel,
+                      desc: t.booking.cancelCutoffDesc,
                       value: (form.cancellationWindowMinutes as number) ?? (((form.cancellationWindowHours as number) ?? 24) * 60),
                       min: 0,
                       unit: "hours" as const,
@@ -896,39 +907,39 @@ function SettingsPage() {
                         <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.desc}</p>
                       </div>
                       <div className="sm:text-right">
-                        <PolicyNumberInput value={item.value} min={item.min} unit={item.unit} label={item.label} onChange={(minutes) => f(item.key, minutes)} />
-                        <p className="mt-1 text-xs text-gray-400">Currently {formatPolicyDuration(item.value)}</p>
+                        <PolicyNumberInput value={item.value} min={item.min} unit={item.unit} unitLabel={t.units[item.unit]} label={item.label} onChange={(minutes) => f(item.key, minutes)} />
+                        <p className="mt-1 text-xs text-gray-400">{t.policy.currently.replace("{duration}", formatPolicyDuration(item.value, t.policy))}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                  <p className="text-sm font-semibold text-blue-900">Cancellation rule</p>
+                  <p className="text-sm font-semibold text-blue-900">{t.booking.cancellationRuleTitle}</p>
                   <p className="mt-1 text-xs leading-relaxed text-blue-700">
-                    Clients can cancel for free until the cancel window begins. Inside that window, Basic+ businesses can collect deposits and charge manually; Pro can add automatic late-cancellation fees when a saved card is available.
+                    {t.booking.cancellationRuleBody}
                   </p>
                 </div>
 
-                <Field label="Policy clients accept before booking" htmlFor="set-cancel-policy">
+                <Field label={t.booking.policyLabel} htmlFor="set-cancel-policy">
                   <textarea
                     id="set-cancel-policy"
                     className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm min-h-[120px] focus:outline-none focus:ring-2 focus:ring-violet-200"
                     value={(form.cancellationPolicy as string) ?? ""}
                     onChange={(e) => f("cancellationPolicy", e.target.value)}
-                    placeholder="Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee…" />
-                  <p className="text-xs text-gray-400 mt-1">Shown during checkout on every business-specific booking link.</p>
+                    placeholder={t.booking.policyPlaceholder} />
+                  <p className="text-xs text-gray-400 mt-1">{t.booking.policyHint}</p>
                 </Field>
 
                 <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Client self-reschedule</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Clients can move appointments from their secure manage link when outside your policy window.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.booking.selfRescheduleTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.booking.selfRescheduleDesc}</p>
                   </div>
                   <button type="button" onClick={() => f("allowClientReschedule", !form.allowClientReschedule)}
                     role="switch"
                     aria-checked={form.allowClientReschedule !== false}
-                    aria-label="Toggle client self-reschedule"
+                    aria-label={t.booking.selfRescheduleAria}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.allowClientReschedule ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.allowClientReschedule ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -936,13 +947,13 @@ function SettingsPage() {
 
                 <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Client self-cancel</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Clients can cancel appointments from their secure manage link. Cancellations inside your window still trigger the late-cancel fee if configured.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.booking.selfCancelTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.booking.selfCancelDesc}</p>
                   </div>
                   <button type="button" onClick={() => f("allowClientCancel", form.allowClientCancel === false ? true : false)}
                     role="switch"
                     aria-checked={form.allowClientCancel !== false}
-                    aria-label="Toggle client self-cancel"
+                    aria-label={t.booking.selfCancelAria}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.allowClientCancel !== false ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.allowClientCancel !== false ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -950,16 +961,16 @@ function SettingsPage() {
 
                 <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Booking approval mode</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Auto-confirm sends an instant confirmation when a client books. Manual approval puts bookings in a pending queue for you to review first.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.booking.approvalTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.booking.approvalDesc}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-gray-500">{form.bookingApprovalMode === "AUTO" ? "Auto-confirm" : "Manual approval"}</span>
+                    <span className="text-xs text-gray-500">{form.bookingApprovalMode === "AUTO" ? t.booking.autoConfirm : t.booking.manualApproval}</span>
                     <button type="button"
                       onClick={() => f("bookingApprovalMode", form.bookingApprovalMode === "AUTO" ? "MANUAL" : "AUTO")}
                       role="switch"
                       aria-checked={form.bookingApprovalMode === "AUTO"}
-                      aria-label="Toggle booking approval mode"
+                      aria-label={t.booking.approvalAria}
                       className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.bookingApprovalMode === "AUTO" ? "bg-violet-600" : "bg-gray-200")}>
                       <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.bookingApprovalMode === "AUTO" ? "translate-x-6" : "translate-x-1")} />
                     </button>
@@ -968,8 +979,8 @@ function SettingsPage() {
 
                 <Link href="/dashboard/forms" className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 hover:bg-gray-50 transition-colors">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Intake / consultation form</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Moved to Communication › Forms. Click to manage your booking questions.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.booking.intakeTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.booking.intakeDesc}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
                 </Link>
@@ -977,11 +988,11 @@ function SettingsPage() {
                 <div className="rounded-xl border border-gray-100 bg-white p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <DollarSign className="w-4 h-4 text-violet-600" />
-                    <p className="text-sm font-semibold text-gray-800">Sales tax</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.booking.taxTitle}</p>
                   </div>
-                  <p className="text-xs text-gray-400 mb-3">Shown on booking totals and receipts. Pick your province to apply the standard GST/HST/PST rate, or set a custom rate. Set to 0 to hide tax.</p>
+                  <p className="text-xs text-gray-400 mb-3">{t.booking.taxDesc}</p>
                   <div className="grid gap-3 sm:grid-cols-2 max-w-md">
-                    <Field label="Province / territory" htmlFor="biz-tax-province">
+                    <Field label={t.booking.province} htmlFor="biz-tax-province">
                       <select id="biz-tax-province" value={(form.taxProvince as string) ?? ""}
                         onChange={(e) => {
                           const code = e.target.value;
@@ -990,14 +1001,14 @@ function SettingsPage() {
                           setForm((p) => ({ ...p, taxProvince: code || null, ...(preset ? { taxRatePercent: preset.rate } : {}) }));
                         }}
                         className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                        <option value="">Custom rate</option>
+                        <option value="">{t.booking.customRate}</option>
                         {CA_TAX.map((p) => <option key={p.code} value={p.code}>{p.label} — {p.rate}%</option>)}
                       </select>
                     </Field>
-                    <Field label="Tax rate" htmlFor="set-tax-rate">
+                    <Field label={t.booking.taxRate} htmlFor="set-tax-rate">
                       <div className="flex items-center gap-2">
                         <Input id="set-tax-rate" type="number" min={0} max={100} step={0.01}
-                          aria-label="Sales tax rate"
+                          aria-label={t.booking.taxRateAria}
                           value={(form.taxRatePercent as number) ?? 0}
                           onChange={(e) => f("taxRatePercent", Number(e.target.value))}
                           className="bg-white text-base font-semibold" />
@@ -1005,7 +1016,7 @@ function SettingsPage() {
                       </div>
                     </Field>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-2">Selecting a province fills the standard combined rate; you can still adjust it. Saved when you click Save changes below.</p>
+                  <p className="text-[11px] text-gray-400 mt-2">{t.booking.taxFootnote}</p>
                 </div>
               </div>
             )}
@@ -1013,8 +1024,8 @@ function SettingsPage() {
             {section === "calendar" && (
               <div className="p-4 space-y-5 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Calendar sync</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">See your Pulse appointments in any calendar app on your phone or computer.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.calendar.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.calendar.subtitle}</p>
                 </div>
                 <FeatureError message={featureErrors.calendar} onRetry={loadCal} />
 
@@ -1025,9 +1036,9 @@ function SettingsPage() {
                       <Download className="w-4 h-4 text-amber-700" />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-amber-900">iCal feed — works with every calendar app</p>
+                      <p className="text-sm font-bold text-amber-900">{t.calendar.icalTitle}</p>
                       <p className="text-xs text-amber-800 mt-1 leading-relaxed">
-                        Download or subscribe to your appointments in <strong>Google Calendar, Apple Calendar, Outlook</strong>, or any app on your phone or computer. No scary screens, no special setup — just one click.
+                        {t.calendar.icalBodyA}<strong>{t.calendar.icalBodyApps}</strong>{t.calendar.icalBodyB}
                       </p>
                     </div>
                   </div>
@@ -1038,38 +1049,38 @@ function SettingsPage() {
                       download="pulse-appointments.ics"
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-700 transition-colors"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download .ics file
+                      <Download className="w-3.5 h-3.5" /> {t.calendar.downloadIcs}
                     </a>
                     <button
                       type="button"
                       onClick={() => {
                         const url = `${window.location.origin}${api.calendarSync.icalFeedUrl()}`;
-                        navigator.clipboard.writeText(url).then(() => toast.success("Feed link copied — paste it into Google Calendar → Other calendars → From URL")).catch(() => toast.error("Could not copy"));
+                        navigator.clipboard.writeText(url).then(() => toast.success(t.toasts.feedCopied)).catch(() => toast.error(t.toasts.copyFailed));
                       }}
                       className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-400 text-amber-800 text-xs font-semibold rounded-lg hover:bg-amber-100 transition-colors"
                     >
-                      Copy link
+                      {t.calendar.copyLink}
                     </button>
                   </div>
 
                   {/* Step-by-step for beginners */}
                   <div className="rounded-lg bg-white/70 border border-amber-100 p-4 space-y-3 text-xs text-amber-900">
-                    <p className="font-semibold text-amber-800">How to add to your calendar:</p>
+                    <p className="font-semibold text-amber-800">{t.calendar.howToTitle}</p>
                     <div className="space-y-2">
                       <div>
-                        <p className="font-semibold">📱 iPhone / Apple Calendar</p>
-                        <p className="text-amber-700 mt-0.5">Download the .ics file → tap &quot;Add to Calendar&quot; when prompted.</p>
+                        <p className="font-semibold">{t.calendar.iphoneTitle}</p>
+                        <p className="text-amber-700 mt-0.5">{t.calendar.iphoneStep}</p>
                       </div>
                       <div>
-                        <p className="font-semibold">🗓 Google Calendar</p>
-                        <p className="text-amber-700 mt-0.5">Copy the link above → open Google Calendar → click <strong>&quot;+&quot;</strong> next to &quot;Other calendars&quot; → <strong>&quot;From URL&quot;</strong> → paste the link → click &quot;Add calendar&quot;.</p>
+                        <p className="font-semibold">{t.calendar.googleTitle}</p>
+                        <p className="text-amber-700 mt-0.5">{t.calendar.googleStepA}<strong>{t.calendar.googleStepPlus}</strong>{t.calendar.googleStepB}<strong>{t.calendar.googleStepFromUrl}</strong>{t.calendar.googleStepC}</p>
                       </div>
                       <div>
-                        <p className="font-semibold">💻 Outlook</p>
-                        <p className="text-amber-700 mt-0.5">Download the .ics file → open Outlook → File → Open &amp; Export → Import/Export → Import an iCalendar file.</p>
+                        <p className="font-semibold">{t.calendar.outlookTitle}</p>
+                        <p className="text-amber-700 mt-0.5">{t.calendar.outlookStep}</p>
                       </div>
                     </div>
-                    <p className="text-amber-600 italic">Tip: confirmation emails sent to your clients also include a calendar invite they can add in one tap.</p>
+                    <p className="text-amber-600 italic">{t.calendar.tip}</p>
                   </div>
                 </div>
 
@@ -1078,24 +1089,24 @@ function SettingsPage() {
                   <div className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <CalendarDays className="w-4 h-4 text-violet-500" />
-                      <p className="text-sm font-semibold text-gray-900">Google Calendar — two-way sync</p>
-                      <span className="ml-auto text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">Advanced</span>
+                      <p className="text-sm font-semibold text-gray-900">{t.calendar.twoWayTitle}</p>
+                      <span className="ml-auto text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{t.calendar.advanced}</span>
                     </div>
                     {cal.connected ? (
                       <>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          Connected as <strong>{cal.email}</strong>. Confirmed bookings sync automatically to your Google Calendar, and your personal Google Calendar events block those time slots from new bookings.
+                          {t.calendar.connectedA}<strong>{cal.email}</strong>{t.calendar.connectedB}
                         </p>
                         <button type="button" onClick={disconnectCal}
-                          className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">Disconnect</button>
+                          className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">{t.calendar.disconnect}</button>
                       </>
                     ) : (
                       <>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          Connect your Google account for automatic two-way sync. Google will show a &quot;This app isn&apos;t verified&quot; warning — this is normal for apps awaiting Google review. Click <strong>Advanced → Go to pulseappointments.com</strong> to continue.
+                          {t.calendar.notConnectedA}<strong>{t.calendar.notConnectedBold}</strong>{t.calendar.notConnectedB}
                         </p>
                         <button type="button" onClick={connectCal}
-                          className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors">Connect Google Calendar</button>
+                          className="text-xs font-semibold text-white bg-violet-600 rounded-lg px-3 py-2 hover:bg-violet-700 transition-colors">{t.calendar.connect}</button>
                       </>
                     )}
                   </div>
@@ -1106,47 +1117,47 @@ function SettingsPage() {
             {section === "payments" && (
               <div className="p-4 space-y-4 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Payments &amp; fees</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Deposits and manual charges are Basic+. Automatic saved-card fees are Pro.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.payments.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.payments.subtitle}</p>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-sm font-medium text-gray-900">Stripe payments</p>
-                  <p className="text-xs text-gray-500 mt-1 max-w-md">Deposits, saved cards, fees, refunds, receipts, and subscription billing are processed securely by Stripe. Card details never pass through Pulse servers.</p>
+                  <p className="text-sm font-medium text-gray-900">{t.payments.stripeTitle}</p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-md">{t.payments.stripeBody}</p>
                 </div>
 
                 <hr className="border-gray-100" />
                 {isPaid && (
-                  <p className="text-xs text-gray-400 -mt-1">Enable the toggles below, then click <span className="font-semibold text-gray-600">Save changes</span> at the bottom of this page.</p>
+                  <p className="text-xs text-gray-400 -mt-1">{t.payments.enableHintA}<span className="font-semibold text-gray-600">{t.payments.enableHintBold}</span>{t.payments.enableHintB}</p>
                 )}
                 {!isPaid && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                    <p className="font-semibold">Payments require Basic+</p>
-                    <p className="mt-1 text-xs leading-relaxed text-amber-700">Free can book appointments and send confirmations. Basic adds deposits and manual charges. Pro adds automatic saved-card fee protection.</p>
-                    <button type="button" className="mt-2 text-xs font-semibold underline" onClick={() => promptUpgrade("BASIC", "Payments")}>View plans</button>
+                    <p className="font-semibold">{t.payments.requireBasicTitle}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-amber-700">{t.payments.requireBasicBody}</p>
+                    <button type="button" className="mt-2 text-xs font-semibold underline" onClick={() => promptUpgrade("BASIC", t.payments.paymentsFeature)}>{t.payments.viewPlans}</button>
                   </div>
                 )}
                 {isPaid && !isPro && (
                   <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-                    <p className="font-semibold">Basic payment tools are active</p>
-                    <p className="mt-1 text-xs leading-relaxed text-blue-700">You can collect deposits at booking and take manual charges. Upgrade to Pro for automatic no-show and late-cancellation charges.</p>
+                    <p className="font-semibold">{t.payments.basicActiveTitle}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-blue-700">{t.payments.basicActiveBody}</p>
                   </div>
                 )}
                 <div className={cn("flex flex-col gap-3 p-4 rounded-xl border sm:flex-row sm:items-center sm:justify-between", isPaid ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50")}>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Require deposit at booking</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Collect a partial payment when clients book online. Basic+</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.payments.requireDepositTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.payments.requireDepositDesc}</p>
                   </div>
-                  <button type="button" onClick={() => isPaid ? f("requireDeposit", !form.requireDeposit) : promptUpgrade("BASIC", "Deposits")}
+                  <button type="button" onClick={() => isPaid ? f("requireDeposit", !form.requireDeposit) : promptUpgrade("BASIC", t.payments.depositsFeature)}
                     role="switch"
                     aria-checked={!!form.requireDeposit}
-                    aria-label="Toggle require deposit at booking"
+                    aria-label={t.payments.requireDepositAria}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.requireDeposit ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.requireDeposit ? "translate-x-6" : "translate-x-1")} />
                   </button>
                 </div>
                 {isPaid && form.requireDeposit && (
-                  <Field label="Deposit percentage" htmlFor="set-deposit-pct">
+                  <Field label={t.payments.depositPercent} htmlFor="set-deposit-pct">
                     <div className="flex items-center gap-2">
                       <Input id="set-deposit-pct" type="number" min={1} max={100} value={(form.depositPercent as number) ?? 25}
                         onChange={(e) => f("depositPercent", Number(e.target.value))} />
@@ -1157,13 +1168,13 @@ function SettingsPage() {
 
                 <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
                   <div className="pr-3">
-                    <p className="text-sm font-semibold text-gray-800">Collect a card on file</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Ask every client to save a card with Stripe at booking (no upfront charge) so you can collect deposits/no-show/late-cancel fees later. Basic+</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.payments.cardOnFileTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.payments.cardOnFileDesc}</p>
                   </div>
-                  <button type="button" onClick={() => isPaid ? f("collectCardOnFile", !form.collectCardOnFile) : promptUpgrade("BASIC", "Card on file")}
+                  <button type="button" onClick={() => isPaid ? f("collectCardOnFile", !form.collectCardOnFile) : promptUpgrade("BASIC", t.payments.cardOnFileFeature)}
                     role="switch"
                     aria-checked={!!form.collectCardOnFile}
-                    aria-label="Toggle collect a card on file"
+                    aria-label={t.payments.cardOnFileAria}
                     className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.collectCardOnFile ? "bg-violet-600" : "bg-gray-200")}>
                     <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform", form.collectCardOnFile ? "translate-x-6" : "translate-x-1")} />
                   </button>
@@ -1171,37 +1182,37 @@ function SettingsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>
-                    <Field label="No-show fee" htmlFor="set-noshowfee">
+                    <Field label={t.payments.noShowFee} htmlFor="set-noshowfee">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 shrink-0">$</span>
-                        <Input id="set-noshowfee" type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic no-show fees")}
+                        <Input id="set-noshowfee" type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", t.payments.noShowFeature)}
                           value={(((form.noShowFeeCents as number) ?? 0) / 100).toString()}
                           onChange={(e) => f("noShowFeeCents", Math.round(Number(e.target.value) * 100))} />
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Pro automatic charge. Basic+ can still charge manually from checkout.</p>
-                      {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", "Automatic no-show fees")} className="mt-2 text-xs font-semibold text-violet-600 hover:underline">Upgrade to unlock</button>}
+                      <p className="text-xs text-gray-400 mt-1">{t.payments.noShowFeeDesc}</p>
+                      {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", t.payments.noShowFeature)} className="mt-2 text-xs font-semibold text-violet-600 hover:underline">{t.payments.upgradeUnlock}</button>}
                     </Field>
                   </div>
                   <div className={cn("rounded-xl border border-gray-100 bg-gray-50 p-4", !isPro && "opacity-85")}>
-                    <Field label="Late-cancellation fee" htmlFor="set-latefee">
+                    <Field label={t.payments.lateFee} htmlFor="set-latefee">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 shrink-0">$</span>
-                        <Input id="set-latefee" type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", "Automatic late-cancellation fees")}
+                        <Input id="set-latefee" type="number" min={0} step="0.01" disabled={!isPro} onFocus={() => !isPro && promptUpgrade("PRO", t.payments.lateFeeFeature)}
                           value={(((form.cancellationFeeCents as number) ?? 0) / 100).toString()}
                           onChange={(e) => f("cancellationFeeCents", Math.round(Number(e.target.value) * 100))} />
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">Pro automatic charge when a client cancels inside your window.</p>
-                      {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", "Automatic late-cancellation fees")} className="mt-2 text-xs font-semibold text-violet-600 hover:underline">Upgrade to unlock</button>}
+                      <p className="text-xs text-gray-400 mt-1">{t.payments.lateFeeDesc}</p>
+                      {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", t.payments.lateFeeFeature)} className="mt-2 text-xs font-semibold text-violet-600 hover:underline">{t.payments.upgradeUnlock}</button>}
                     </Field>
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Manual charges</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Basic+ businesses can charge a client manually from checkout for fees, balances, or add-ons.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.payments.manualTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.payments.manualDesc}</p>
                   </div>
                   <span className={cn("shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full", isPaid ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500")}>
-                    {isPaid ? "Available" : "Basic+"}
+                    {isPaid ? t.payments.available : t.payments.basicPlus}
                   </span>
                 </div>
               </div>
@@ -1210,74 +1221,74 @@ function SettingsPage() {
             {section === "online" && (
               <div className="p-4 space-y-5 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Online booking</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Share your booking link with clients.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.online.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.online.subtitle}</p>
                 </div>
                 <hr className="border-gray-100" />
                 <div className="bg-violet-50 border border-violet-100 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <Globe className="w-4 h-4 text-violet-600" />
-                    <span className="text-sm font-semibold text-violet-700">Your secure booking page</span>
+                    <span className="text-sm font-semibold text-violet-700">{t.online.securePage}</span>
                   </div>
                   <div className="flex items-center gap-2 bg-white border border-violet-200 rounded-xl px-4 py-3">
                     <code className="text-sm text-violet-600 flex-1 truncate">{bookingUrl}</code>
-                    <button type="button" onClick={copyUrl} aria-label="Copy booking URL" className="text-gray-400 hover:text-violet-600 transition-colors shrink-0">
+                    <button type="button" onClick={copyUrl} aria-label={t.online.copyUrlAria} className="text-gray-400 hover:text-violet-600 transition-colors shrink-0">
                       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-violet-500 mt-2">Share this link anywhere clients can find you.</p>
+                  <p className="text-xs text-violet-500 mt-2">{t.online.shareHint}</p>
 
                   {/* Social share row */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     <a
-                      href={`https://wa.me/?text=${encodeURIComponent(`Book an appointment with me: ${bookingUrl}`)}`}
+                      href={`https://wa.me/?text=${encodeURIComponent(t.online.whatsappText.replace("{url}", bookingUrl))}`}
                       target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
                     >
-                      WhatsApp
+                      {t.online.whatsapp}
                     </a>
                     <a
                       href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(bookingUrl)}`}
                       target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1877F2] text-white text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity"
                     >
-                      Facebook
+                      {t.online.facebook}
                     </a>
                     <a
-                      href={`mailto:?subject=Book an appointment&body=You can book an appointment with me here: ${bookingUrl}`}
+                      href={`mailto:?subject=${encodeURIComponent(t.online.emailSubject)}&body=${encodeURIComponent(t.online.emailBody.replace("{url}", bookingUrl))}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      Email
+                      {t.online.email}
                     </a>
                   </div>
 
                   {/* Bio page link */}
                   {biz?.slug && (
                     <div className="mt-3 rounded-lg bg-violet-50 border border-violet-100 px-3 py-2 text-xs text-violet-800">
-                      <span className="font-semibold">Mobile bio page:</span> Share{" "}
+                      <span className="font-semibold">{t.online.bioLabel}</span> {t.online.bioShare}{" "}
                       <code className="font-mono">{typeof window !== "undefined" ? window.location.origin : ""}/bio/{biz.slug}</code>{" "}
-                      — a clean mobile link page with your services, social links, and a Book Now button. Perfect for Instagram and TikTok bios.
+                      {t.online.bioBody}
                     </div>
                   )}
 
                   {/* Instagram tip */}
                   <div className="mt-2 rounded-lg bg-purple-50 border border-purple-100 px-3 py-2 text-xs text-purple-800">
-                    <span className="font-semibold">Instagram:</span> Go to your profile → <strong>Edit profile</strong> → paste your booking link (or bio page link) in the <strong>Website</strong> field. Clients can tap it directly from your bio.
+                    <span className="font-semibold">{t.online.instagramLabel}</span> {t.online.instagramBodyA}<strong>{t.online.instagramEdit}</strong>{t.online.instagramBodyB}<strong>{t.online.instagramWebsite}</strong>{t.online.instagramBodyC}
                   </div>
                   <div className="mt-2 rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">
-                    <span className="font-semibold">Google Business:</span> Go to your Google Business Profile → <strong>Edit profile</strong> → <strong>Website</strong> → paste your link so clients who find you on Google can book instantly.
+                    <span className="font-semibold">{t.online.googleLabel}</span> {t.online.googleBodyA}<strong>{t.online.googleEdit}</strong>{t.online.googleBodyB}<strong>{t.online.googleWebsite}</strong>{t.online.googleBodyC}
                   </div>
                   <div className="mt-2 rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-xs text-green-800">
-                    <span className="font-semibold">Facebook Page:</span> Go to your Page → <strong>Edit</strong> → <strong>Add a Button</strong> → choose <strong>Book Now</strong> → paste your booking link.
+                    <span className="font-semibold">{t.online.fbLabel}</span> {t.online.fbBodyA}<strong>{t.online.fbEdit}</strong>{t.online.fbBodyB}<strong>{t.online.fbAddButton}</strong>{t.online.fbBodyC}<strong>{t.online.fbBookNow}</strong>{t.online.fbBodyD}
                   </div>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <QrCode className="w-4 h-4 text-gray-700" />
-                    <span className="text-sm font-semibold text-gray-900">QR code</span>
+                    <span className="text-sm font-semibold text-gray-900">{t.online.qrTitle}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-4">Print and display in your shop, on flyers, or business cards so walk-in clients can scan to book instantly.</p>
+                  <p className="text-xs text-gray-400 mb-4">{t.online.qrDesc}</p>
                   <div className="flex flex-col items-center gap-4">
                     <div className="bg-white p-4 rounded-2xl border border-gray-200 inline-block" id="booking-qr">
                       <QRCode value={bookingUrl} size={160} />
@@ -1295,7 +1306,7 @@ function SettingsPage() {
                       }}
                       className="flex items-center gap-1.5 text-sm text-violet-600 hover:underline"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download SVG
+                      <Download className="w-3.5 h-3.5" /> {t.online.downloadSvg}
                     </button>
                   </div>
                 </div>
@@ -1303,25 +1314,25 @@ function SettingsPage() {
                 <div className="bg-white border border-gray-200 rounded-2xl p-5">
                   <div className="flex items-center gap-2 mb-1">
                     <Braces className="w-4 h-4 text-gray-700" />
-                    <span className="text-sm font-semibold text-gray-900">Embed on your website</span>
+                    <span className="text-sm font-semibold text-gray-900">{t.online.embedTitle}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-3">Paste this snippet into your site&apos;s HTML to embed the booking widget. It uses your public business ID instead of an email-derived slug.</p>
+                  <p className="text-xs text-gray-400 mb-3">{t.online.embedDesc}</p>
                   <div className="flex items-start gap-2 bg-gray-900 rounded-xl px-4 py-3">
                     <code className="text-xs text-gray-100 flex-1 break-all font-mono">{embedSnippet}</code>
-                    <button type="button" onClick={copyEmbed} aria-label="Copy embed snippet" className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
+                    <button type="button" onClick={copyEmbed} aria-label={t.online.embedCopyAria} className="text-gray-400 hover:text-white transition-colors shrink-0 mt-0.5">
                       {embedCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Quick stats</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t.online.quickStats}</p>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Public booking ID</span>
+                    <span className="text-gray-600">{t.online.publicId}</span>
                     <code className="text-gray-800 font-medium">{biz?.id}</code>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Timezone</span>
+                    <span className="text-gray-600">{t.online.timezone}</span>
                     <span className="text-gray-800 font-medium">{biz?.timezone}</span>
                   </div>
                 </div>
@@ -1329,35 +1340,35 @@ function SettingsPage() {
                 <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-900">Booking page builder</h4>
-                      <p className="text-xs text-gray-400">Tune public page copy and SEO from the web dashboard.</p>
+                      <h4 className="text-sm font-semibold text-gray-900">{t.online.builderTitle}</h4>
+                      <p className="text-xs text-gray-400">{t.online.builderSubtitle}</p>
                     </div>
-                    <Field label="Hero headline" htmlFor="set-headline">
-                      <Input id="set-headline" value={(bookingSettings.headline as string) ?? ""} onChange={(e) => bf("headline", e.target.value)} placeholder={`Book with ${biz?.name ?? "us"}`} />
+                    <Field label={t.online.headline} htmlFor="set-headline">
+                      <Input id="set-headline" value={(bookingSettings.headline as string) ?? ""} onChange={(e) => bf("headline", e.target.value)} placeholder={t.online.headlinePlaceholder.replace("{name}", biz?.name ?? t.online.usFallback)} />
                     </Field>
-                    <Field label="Short introduction" htmlFor="set-intro">
+                    <Field label={t.online.intro} htmlFor="set-intro">
                       <textarea
                         id="set-intro"
                         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-violet-200"
                         value={(bookingSettings.intro as string) ?? ""}
                         onChange={(e) => bf("intro", e.target.value)}
-                        placeholder="Tell clients what to expect before they book." />
+                        placeholder={t.online.introPlaceholder} />
                     </Field>
-                    <Field label="SEO title" htmlFor="set-seo-title">
-                      <Input id="set-seo-title" value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={`${biz?.name ?? "Business"} booking`} />
+                    <Field label={t.online.seoTitle} htmlFor="set-seo-title">
+                      <Input id="set-seo-title" value={(bookingSettings.seoTitle as string) ?? ""} onChange={(e) => bf("seoTitle", e.target.value)} placeholder={t.online.seoTitlePlaceholder.replace("{name}", biz?.name ?? t.online.businessFallback)} />
                     </Field>
-                    <p className="text-xs text-gray-400">To change your brand colour and font, go to <button type="button" onClick={() => goSection("branding")} className="text-violet-600 hover:underline font-medium">Branding</button>.</p>
-                    <Field label="SEO description" htmlFor="set-seo-desc">
-                      <Input id="set-seo-desc" value={(bookingSettings.seoDescription as string) ?? ""} onChange={(e) => bf("seoDescription", e.target.value)} placeholder="Book appointments online." />
+                    <p className="text-xs text-gray-400">{t.online.brandingHintA}<button type="button" onClick={() => goSection("branding")} className="text-violet-600 hover:underline font-medium">{t.online.brandingHintLink}</button>.</p>
+                    <Field label={t.online.seoDesc} htmlFor="set-seo-desc">
+                      <Input id="set-seo-desc" value={(bookingSettings.seoDescription as string) ?? ""} onChange={(e) => bf("seoDescription", e.target.value)} placeholder={t.online.seoDescPlaceholder} />
                     </Field>
                   </div>
                   <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Live preview</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t.online.livePreview}</p>
                     <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
                       <div className="h-10 w-10 rounded-lg" style={{ backgroundColor: String(bookingSettings.brandColor ?? "#7C3AED") }} />
-                      <h4 className="mt-4 text-base font-bold text-gray-900">{String(bookingSettings.headline || `Book with ${biz?.name ?? "us"}`)}</h4>
-                      <p className="mt-2 text-xs leading-relaxed text-gray-500">{String(bookingSettings.intro || biz?.cancellationPolicy || "Choose a service, pick a time, and confirm your appointment.")}</p>
-                      <div className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700">Services and availability appear below</div>
+                      <h4 className="mt-4 text-base font-bold text-gray-900">{String(bookingSettings.headline || t.online.previewHeadlineFallback.replace("{name}", biz?.name ?? t.online.usFallback))}</h4>
+                      <p className="mt-2 text-xs leading-relaxed text-gray-500">{String(bookingSettings.intro || biz?.cancellationPolicy || t.online.previewIntroFallback)}</p>
+                      <div className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700">{t.online.previewServices}</div>
                     </div>
                   </div>
                 </div>
@@ -1376,10 +1387,10 @@ function SettingsPage() {
               const bLabel    = contrastLabel(onBlack);
               const btnLabel  = contrastLabel(Math.max(whiteText, blackText));
               const FONTS = [
-                { id: "default",  label: "Default",  style: "font-sans",   preview: "Aa" },
-                { id: "modern",   label: "Modern",   style: "font-sans tracking-tight", preview: "Aa" },
-                { id: "elegant",  label: "Elegant",  style: "font-serif",  preview: "Aa" },
-                { id: "bold",     label: "Bold",     style: "font-sans font-black", preview: "Aa" },
+                { id: "default", style: "font-sans",   preview: "Aa" },
+                { id: "modern",  style: "font-sans tracking-tight", preview: "Aa" },
+                { id: "elegant", style: "font-serif",  preview: "Aa" },
+                { id: "bold",    style: "font-sans font-black", preview: "Aa" },
               ] as const;
               const fontVal = (bookingSettings.fontFamily as string) || "default";
               const COLOR_FAMILIES = [
@@ -1397,16 +1408,16 @@ function SettingsPage() {
               return (
                 <div className="p-4 space-y-6 sm:p-6">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Branding</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Customise how your booking page looks to clients. Changes apply after you save.</p>
+                    <h3 className="text-sm font-semibold text-gray-900">{t.branding.title}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.branding.subtitle}</p>
                   </div>
                   <hr className="border-gray-100" />
 
                   {/* Brand color + WCAG checker */}
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Palette className="w-4 h-4 text-violet-500" /> Brand colour</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Used for buttons, highlights, and accents on your booking page. Accessible to all plans.</p>
+                      <p className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Palette className="w-4 h-4 text-violet-500" /> {t.branding.brandColor}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{t.branding.brandColorDesc}</p>
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
@@ -1415,7 +1426,7 @@ function SettingsPage() {
                         <div className="w-12 h-12 rounded-xl border-2 border-gray-200 shadow-sm overflow-hidden group-hover:border-violet-400 transition-colors"
                           style={{ backgroundColor: brandHex }} />
                         <input type="color" value={brandHex} onChange={(e) => bf("brandColor", e.target.value)}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" aria-label="Pick brand colour" />
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" aria-label={t.branding.pickColorAria} />
                       </label>
 
                       {/* Hex text input */}
@@ -1424,7 +1435,7 @@ function SettingsPage() {
                         <input
                           type="text"
                           maxLength={6}
-                          aria-label="Hex colour code"
+                          aria-label={t.branding.hexAria}
                           value={hexInputValue}
                           onChange={(e) => {
                             const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
@@ -1437,29 +1448,29 @@ function SettingsPage() {
                       {/* Live button preview */}
                       <button type="button" className="px-4 py-2 rounded-xl text-sm font-semibold shadow-sm"
                         style={{ backgroundColor: brandHex, color: bestText }}>
-                        Book now
+                        {t.branding.bookNow}
                       </button>
                     </div>
 
                     {/* WCAG Accessibility panel */}
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
                       <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5" /> Accessibility — WCAG contrast ratios
+                        <ShieldCheck className="w-3.5 h-3.5" /> {t.branding.wcagTitle}
                       </p>
                       <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                         <div className="rounded-lg bg-white border border-gray-100 p-2.5 text-center">
-                          <p className="text-gray-400 mb-1">Colour on white</p>
+                          <p className="text-gray-400 mb-1">{t.branding.colorOnWhite}</p>
                           <p className="font-bold text-gray-900 tabular-nums">{onWhite.toFixed(1)}:1</p>
                           <span className={cn("text-[10px] font-semibold", wLabel.color)}>{wLabel.level}</span>
                         </div>
                         <div className="rounded-lg bg-white border border-gray-100 p-2.5 text-center">
-                          <p className="text-gray-400 mb-1">Colour on dark</p>
+                          <p className="text-gray-400 mb-1">{t.branding.colorOnDark}</p>
                           <p className="font-bold text-gray-900 tabular-nums">{onBlack.toFixed(1)}:1</p>
                           <span className={cn("text-[10px] font-semibold", bLabel.color)}>{bLabel.level}</span>
                         </div>
                         <div className="rounded-lg border border-gray-100 p-2.5 text-center"
                           style={{ backgroundColor: brandHex, color: bestText }}>
-                          <p className="opacity-70 mb-1 text-[10px]">Text on button</p>
+                          <p className="opacity-70 mb-1 text-[10px]">{t.branding.textOnButton}</p>
                           <p className="font-bold tabular-nums text-xs">{Math.max(whiteText, blackText).toFixed(1)}:1</p>
                           <span className="text-[10px] font-semibold opacity-90">{btnLabel.level}</span>
                         </div>
@@ -1467,33 +1478,33 @@ function SettingsPage() {
                       {!btnLabel.pass && (
                         <p className="text-[11px] text-amber-700 flex items-start gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                          This colour may be hard for some clients to read. WCAG AA requires 4.5:1 for normal text. Try a darker or lighter shade.
+                          {t.branding.wcagWarn}
                         </p>
                       )}
                       {btnLabel.pass && (
                         <p className="text-[11px] text-emerald-700 flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                          Good contrast — this colour meets WCAG {btnLabel.level} accessibility standards.
+                          {t.branding.wcagGood.replace("{level}", btnLabel.level)}
                         </p>
                       )}
                     </div>
 
                     {/* Colour palette shades */}
                     <div>
-                      <p className="text-xs font-medium text-gray-600">Colour shades</p>
-                      <p className="mb-3 mt-0.5 text-[11px] text-gray-400">Choose a prepared shade or use the picker above for any colour.</p>
+                      <p className="text-xs font-medium text-gray-600">{t.branding.shades}</p>
+                      <p className="mb-3 mt-0.5 text-[11px] text-gray-400">{t.branding.shadesDesc}</p>
                       <div className="space-y-2.5">
                         {COLOR_FAMILIES.map((family) => (
                           <div key={family.name} className="grid grid-cols-[64px_1fr] items-center gap-2">
-                            <span className="text-[11px] font-medium text-gray-500">{family.name}</span>
+                            <span className="text-[11px] font-medium text-gray-500">{t.branding.colorNames[family.name]}</span>
                             <div className="grid grid-cols-5 gap-1.5">
                               {family.shades.map((hex, shadeIndex) => (
-                                <button key={hex} type="button" title={`${family.name} shade ${shadeIndex + 1} — ${hex}`}
+                                <button key={hex} type="button" title={t.branding.shadeTitle.replace("{name}", t.branding.colorNames[family.name]).replace("{n}", String(shadeIndex + 1)).replace("{hex}", hex)}
                                   onClick={() => bf("brandColor", hex)}
                                   className={cn("h-8 rounded-lg border-2 shadow-sm transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-violet-300",
                                     brandHex.toLowerCase() === hex.toLowerCase() ? "border-gray-950 scale-105" : "border-white")}
                                   style={{ backgroundColor: hex }}
-                                  aria-label={`${family.name} shade ${shadeIndex + 1}, ${hex}`} />
+                                  aria-label={t.branding.shadeAria.replace("{name}", t.branding.colorNames[family.name]).replace("{n}", String(shadeIndex + 1)).replace("{hex}", hex)} />
                               ))}
                             </div>
                           </div>
@@ -1506,15 +1517,15 @@ function SettingsPage() {
 
                   {/* Tagline */}
                   <div className="space-y-2">
-                    <p className="text-sm font-semibold text-gray-800">Tagline</p>
-                    <p className="text-xs text-gray-400">A short phrase shown below your business name on the booking page. All plans.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.branding.tagline}</p>
+                    <p className="text-xs text-gray-400">{t.branding.taglineDesc}</p>
                     <input
                       type="text"
                       maxLength={80}
-                      aria-label="Tagline"
+                      aria-label={t.branding.taglineAria}
                       value={(bookingSettings.tagline as string) ?? ""}
                       onChange={(e) => bf("tagline", e.target.value)}
-                      placeholder="e.g. Premium care, every visit."
+                      placeholder={t.branding.taglinePlaceholder}
                       className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-200" />
                     <p className="text-[11px] text-gray-400 text-right">{((bookingSettings.tagline as string) ?? "").length}/80</p>
                   </div>
@@ -1525,24 +1536,24 @@ function SettingsPage() {
                   <div className={cn("space-y-3", !isPro && "opacity-70")}>
                     <div className="flex items-center gap-2">
                       <Type className="w-4 h-4 text-violet-500" />
-                      <p className="text-sm font-semibold text-gray-800">Font style</p>
-                      {!isPro && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">Pro+</span>}
+                      <p className="text-sm font-semibold text-gray-800">{t.branding.fontTitle}</p>
+                      {!isPro && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">{t.branding.proPlus}</span>}
                     </div>
-                    <p className="text-xs text-gray-400">Controls the typeface on your public booking page.</p>
+                    <p className="text-xs text-gray-400">{t.branding.fontDesc}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {FONTS.map((f) => (
-                        <button key={f.id} type="button"
+                      {FONTS.map((font) => (
+                        <button key={font.id} type="button"
                           disabled={!isPro}
-                          onClick={() => bf("fontFamily", f.id)}
+                          onClick={() => bf("fontFamily", font.id)}
                           className={cn("rounded-xl border-2 p-3 text-center transition-all",
-                            fontVal === f.id ? "border-violet-500 bg-violet-50" : "border-gray-100 hover:border-gray-300 bg-white",
+                            fontVal === font.id ? "border-violet-500 bg-violet-50" : "border-gray-100 hover:border-gray-300 bg-white",
                             !isPro && "cursor-not-allowed")}>
-                          <span className={cn("block text-2xl font-bold leading-tight text-gray-800 mb-1", f.style)}>{f.preview}</span>
-                          <span className="text-[10px] font-medium text-gray-500">{f.label}</span>
+                          <span className={cn("block text-2xl font-bold leading-tight text-gray-800 mb-1", font.style)}>{font.preview}</span>
+                          <span className="text-[10px] font-medium text-gray-500">{t.branding.fonts[font.id]}</span>
                         </button>
                       ))}
                     </div>
-                    {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", "Custom fonts")} className="text-xs font-semibold text-violet-600 hover:underline">Upgrade to Pro to unlock fonts</button>}
+                    {!isPro && <button type="button" onClick={() => promptUpgrade("PRO", t.branding.fontFeature)} className="text-xs font-semibold text-violet-600 hover:underline">{t.branding.fontUpgrade}</button>}
                   </div>
 
                   <hr className="border-gray-100" />
@@ -1551,16 +1562,16 @@ function SettingsPage() {
                   <div className={cn("flex flex-col gap-3 p-4 rounded-xl border sm:flex-row sm:items-center sm:justify-between", isUnlimited ? "border-gray-100 bg-gray-50" : "border-gray-100 bg-gray-50 opacity-75")}>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-gray-800">Remove &quot;Powered by Pulse&quot; watermark</p>
-                        {!isUnlimited && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">Unlimited</span>}
+                        <p className="text-sm font-semibold text-gray-800">{t.branding.removeWatermark}</p>
+                        {!isUnlimited && <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">{t.branding.unlimited}</span>}
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">Hides the Pulse credit line at the bottom of your booking page so clients only see your brand.</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{t.branding.removeWatermarkDesc}</p>
                     </div>
                     <button type="button"
-                      onClick={() => isUnlimited ? bf("hidePouredBy", !bookingSettings.hidePouredBy) : promptUpgrade("UNLIMITED", "Remove Pulse branding")}
+                      onClick={() => isUnlimited ? bf("hidePouredBy", !bookingSettings.hidePouredBy) : promptUpgrade("UNLIMITED", t.branding.removeBrandingFeature)}
                       role="switch"
                       aria-checked={!!(bookingSettings.hidePouredBy && isUnlimited)}
-                      aria-label="Toggle remove Powered by Pulse"
+                      aria-label={t.branding.removeWatermarkAria}
                       className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0 ml-4",
                         bookingSettings.hidePouredBy && isUnlimited ? "bg-violet-600" : "bg-gray-200")}>
                       <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform",
@@ -1570,7 +1581,7 @@ function SettingsPage() {
 
                   {/* Live preview */}
                   <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Booking page preview</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">{t.branding.pagePreview}</p>
                     <div className="rounded-xl overflow-hidden border border-gray-100">
                       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100" style={{ backgroundColor: brandHex + "18" }}>
                         {biz?.logoUrl
@@ -1579,17 +1590,17 @@ function SettingsPage() {
                               <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                             </div>
                         }
-                        <span className="text-sm font-bold text-gray-900">{biz?.name ?? "Your business"}</span>
+                        <span className="text-sm font-bold text-gray-900">{biz?.name ?? t.branding.businessFallback}</span>
                       </div>
                       <div className="p-4 bg-gray-50">
                         {!!bookingSettings.tagline && <p className="text-xs text-gray-500 italic mb-3">{String(bookingSettings.tagline)}</p>}
-                        <p className="text-base font-bold text-gray-900 mb-3">{String(bookingSettings.headline || `Book with ${biz?.name ?? "us"}`)}</p>
+                        <p className="text-base font-bold text-gray-900 mb-3">{String(bookingSettings.headline || t.online.previewHeadlineFallback.replace("{name}", biz?.name ?? t.online.usFallback))}</p>
                         <button type="button" className="px-4 py-2 rounded-lg text-sm font-semibold shadow-sm"
-                          style={{ backgroundColor: brandHex, color: bestText }}>Continue</button>
+                          style={{ backgroundColor: brandHex, color: bestText }}>{t.branding.continue}</button>
                       </div>
                     </div>
                     {!bookingSettings.hidePouredBy && (
-                      <p className="text-center text-[10px] text-gray-400 mt-2">Powered by <span className="text-violet-500 font-medium">Pulse</span></p>
+                      <p className="text-center text-[10px] text-gray-400 mt-2">{t.branding.poweredByA}<span className="text-violet-500 font-medium">{t.branding.poweredByBrand}</span></p>
                     )}
                   </div>
                 </div>
@@ -1599,39 +1610,39 @@ function SettingsPage() {
             {section === "locations" && (
               <div className="p-4 space-y-5 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Locations</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Manage multiple branches under one account. Staff and appointments are assigned per location.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.locations.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.locations.subtitle}</p>
                 </div>
                 <FeatureError message={featureErrors.locations} onRetry={loadLocations} />
                 <hr className="border-gray-100" />
 
                 {!canManageLocations ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-900">Location limit reached</p>
-                    <p className="text-xs text-amber-700 mt-1">Free and Basic allow 1 location. Pro allows 2. Upgrade to <strong>Unlimited</strong> to manage up to 5 branches, each with their own staff and calendar, under one account.</p>
-                    <button type="button" onClick={() => { goSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">View plans →</button>
+                    <p className="text-sm font-semibold text-amber-900">{t.locations.limitTitle}</p>
+                    <p className="text-xs text-amber-700 mt-1">{t.locations.limitBodyA}<strong>{t.locations.limitBodyBold}</strong>{t.locations.limitBodyB}</p>
+                    <button type="button" onClick={() => { goSection("billing"); }} className="mt-2 text-xs font-semibold text-amber-800 underline">{t.locations.viewPlans}</button>
                   </div>
                 ) : (
                   <>
                     <div className="space-y-2">
-                      {locations.length === 0 && <p className="text-xs text-gray-400">No extra locations yet.</p>}
+                      {locations.length === 0 && <p className="text-xs text-gray-400">{t.locations.noExtra}</p>}
                       {locations.map((loc) => (
                         <div key={loc.id} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-800 truncate">{loc.name}</p>
                             {loc.address && <p className="text-xs text-gray-400 truncate">{loc.address}</p>}
-                            {!loc.active && <span className="text-xs text-amber-600 font-medium">Inactive</span>}
+                            {!loc.active && <span className="text-xs text-amber-600 font-medium">{t.locations.inactive}</span>}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <button type="button"
-                              onClick={async () => { try { await api.locations.update(bizId, loc.id, { active: !loc.active }); notifyLocationsChanged(); loadLocations(); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } }}
+                              onClick={async () => { try { await api.locations.update(bizId, loc.id, { active: !loc.active }); notifyLocationsChanged(); loadLocations(); } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.failed); } }}
                               className="text-xs text-gray-500 border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50">
-                              {loc.active ? "Deactivate" : "Activate"}
+                              {loc.active ? t.locations.deactivate : t.locations.activate}
                             </button>
                             <button type="button"
                               onClick={() => setLocationToRemove(loc)}
                               className="text-xs text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50">
-                              Remove
+                              {t.locations.remove}
                             </button>
                           </div>
                         </div>
@@ -1639,32 +1650,32 @@ function SettingsPage() {
                     </div>
 
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-                      <p className="text-sm font-medium text-gray-700">Add location</p>
-                      <Input placeholder="Location name (e.g. Downtown)" aria-label="Location name" value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
-                      <Input placeholder="Address (optional)" aria-label="Location address" value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
+                      <p className="text-sm font-medium text-gray-700">{t.locations.addTitle}</p>
+                      <Input placeholder={t.locations.namePlaceholder} aria-label={t.locations.nameAria} value={locationForm.name} onChange={(e) => setLocationForm((p) => ({ ...p, name: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
+                      <Input placeholder={t.locations.addressPlaceholder} aria-label={t.locations.addressAria} value={locationForm.address} onChange={(e) => setLocationForm((p) => ({ ...p, address: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <Input placeholder="+1 (416) 555-0123" type="tel" aria-label="Location phone number" value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
-                        <label htmlFor="loc-timezone" className="sr-only">Location timezone</label>
+                        <Input placeholder={t.locations.phonePlaceholder} type="tel" aria-label={t.locations.phoneAria} value={locationForm.phone} onChange={(e) => setLocationForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} />
+                        <label htmlFor="loc-timezone" className="sr-only">{t.locations.timezoneSr}</label>
                         <select id="loc-timezone" value={locationForm.timezone} onChange={(e) => setLocationForm((p) => ({ ...p, timezone: e.target.value }))}
                           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-violet-500">
-                          <option value="">Same timezone as business</option>
+                          <option value="">{t.locations.sameTimezone}</option>
                           {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}
                         </select>
                       </div>
                       <Button type="button" size="sm" loading={locationBusy}
                         onClick={async () => {
-                          if (!locationForm.name.trim()) { toast.error("Location name is required"); return; }
+                          if (!locationForm.name.trim()) { toast.error(t.toasts.locationNameRequired); return; }
                           setLocationBusy(true);
                           try {
                             await api.locations.create(bizId, { name: locationForm.name, address: locationForm.address || undefined, phone: locationForm.phone || undefined, timezone: locationForm.timezone || undefined });
                             setLocationForm({ name: "", address: "", phone: "", timezone: "" });
                             notifyLocationsChanged();
                             loadLocations();
-                            toast.success("Location added");
-                          } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add location"); }
+                            toast.success(t.toasts.locationAdded);
+                          } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.locationAddFailed); }
                           finally { setLocationBusy(false); }
                         }}
-                      >Add location</Button>
+                      >{t.locations.addButton}</Button>
                     </div>
                   </>
                 )}
@@ -1674,8 +1685,8 @@ function SettingsPage() {
             {section === "payouts" && (
               <div className="p-4 space-y-5 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Payouts</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Connect your bank account and withdraw your earnings. Powered by Stripe Connect.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.payouts.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.payouts.subtitle}</p>
                 </div>
                 <FeatureError message={featureErrors.connect} onRetry={loadConnect} />
                 <hr className="border-gray-100" />
@@ -1683,29 +1694,29 @@ function SettingsPage() {
                 {/* Pricing table */}
                 <div className="rounded-2xl border border-gray-100 overflow-hidden">
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-100">
-                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Transaction fee schedule</p>
+                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{t.payouts.feeScheduleTitle}</p>
                   </div>
                   <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-gray-100">
-                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Plan</th>
-                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Monthly</th>
-                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Card-present</th>
-                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Card-not-present</th>
-                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">Online</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">{t.payouts.colPlan}</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">{t.payouts.colMonthly}</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">{t.payouts.colCardPresent}</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">{t.payouts.colCardNotPresent}</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-gray-500">{t.payouts.colOnline}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {[
-                        { id: "FREE",      name: "Free",      mo: "$0",   cp: "2.6% + $0.15", cnp: "3.5% + $0.15", online: "3.3% + $0.30" },
-                        { id: "BASIC",     name: "Basic",     mo: "$19",  cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
-                        { id: "PRO",       name: "Pro",       mo: "$39",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
-                        { id: "UNLIMITED", name: "Unlimited", mo: "$79",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
+                        { id: "FREE",      name: t.payouts.planFree,      mo: "$0",   cp: "2.6% + $0.15", cnp: "3.5% + $0.15", online: "3.3% + $0.30" },
+                        { id: "BASIC",     name: t.payouts.planBasic,     mo: "$19",  cp: "2.5% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.30" },
+                        { id: "PRO",       name: t.payouts.planPro,       mo: "$39",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
+                        { id: "UNLIMITED", name: t.payouts.planUnlimited, mo: "$79",  cp: "2.4% + $0.15", cnp: "3.5% + $0.15", online: "2.9% + $0.00" },
                       ].map((row) => (
                         <tr key={row.id} className={cn("border-b border-gray-50 last:border-0", plan === row.id && "bg-violet-50")}>
-                          <td className="px-4 py-2.5 font-semibold text-gray-800">{row.name}{plan === row.id && <span className="ml-1.5 text-violet-600">(current)</span>}</td>
-                          <td className="px-4 py-2.5 text-gray-600">{row.mo}/mo</td>
+                          <td className="px-4 py-2.5 font-semibold text-gray-800">{row.name}{plan === row.id && <span className="ml-1.5 text-violet-600">{t.payouts.current}</span>}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{row.mo}{t.payouts.perMonth}</td>
                           <td className="px-4 py-2.5 text-gray-600">{row.cp}</td>
                           <td className="px-4 py-2.5 text-gray-600">{row.cnp}</td>
                           <td className="px-4 py-2.5 text-gray-600">{row.online}</td>
@@ -1718,30 +1729,30 @@ function SettingsPage() {
 
                 {/* Connect status + onboarding */}
                 {!connectStatus && !featureErrors.connect ? (
-                  <p className="text-sm text-gray-400">Loading…</p>
+                  <p className="text-sm text-gray-400">{t.payouts.loading}</p>
                 ) : !connectStatus ? (
                   <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <p className="text-sm font-semibold text-gray-800">Payout status unavailable</p>
-                    <p className="mt-1 text-xs text-gray-500">Retry above, or open Billing if you need to confirm your plan while Stripe status is unavailable.</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.payouts.unavailableTitle}</p>
+                    <p className="mt-1 text-xs text-gray-500">{t.payouts.unavailableBody}</p>
                   </div>
                 ) : !connectStatus.onboarded ? (
                   <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 space-y-3">
-                    <p className="text-sm font-semibold text-violet-900">Connect your bank account</p>
-                    <p className="text-xs text-violet-700">Complete a quick Stripe onboarding to link your bank account. Once connected, you can transfer your earnings anytime — instantly or on a schedule.</p>
+                    <p className="text-sm font-semibold text-violet-900">{t.payouts.connectTitle}</p>
+                    <p className="text-xs text-violet-700">{t.payouts.connectBody}</p>
                     <ul className="text-xs text-violet-700 space-y-1 ml-3 list-disc">
-                      <li><strong>Holding Funds:</strong> Client payments are securely routed to your Stripe balance.</li>
-                      <li><strong>Flexible Payouts:</strong> Withdraw to your bank whenever you choose via the Stripe Express dashboard.</li>
-                      <li><strong>Instant Payouts:</strong> Transfer to a debit card for immediate access (instant payout fee applies).</li>
+                      <li><strong>{t.payouts.bulletHoldingLabel}</strong>{t.payouts.bulletHolding}</li>
+                      <li><strong>{t.payouts.bulletFlexibleLabel}</strong>{t.payouts.bulletFlexible}</li>
+                      <li><strong>{t.payouts.bulletInstantLabel}</strong>{t.payouts.bulletInstant}</li>
                     </ul>
                     <button type="button" disabled={connectBusy !== null}
                       onClick={async () => {
                         setConnectBusy("onboard");
                         try { const { url } = await api.connect.onboard(); window.location.assign(url); }
-                        catch (e) { toast.error(e instanceof Error ? e.message : "Could not start Stripe onboarding"); setConnectBusy(null); }
+                        catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.onboardStartFailed); setConnectBusy(null); }
                       }}
                       className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 transition-colors">
                       <ExternalLink className="w-4 h-4" />
-                      {connectBusy === "onboard" ? "Redirecting…" : "Set up payouts with Stripe"}
+                      {connectBusy === "onboard" ? t.payouts.redirecting : t.payouts.setupPayouts}
                     </button>
                   </div>
                 ) : !connectStatus.chargesEnabled ? (
@@ -1749,21 +1760,21 @@ function SettingsPage() {
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-semibold text-amber-900">Verification in progress</p>
-                        <p className="text-xs text-amber-700 mt-1">You&apos;ve submitted your information — Stripe is reviewing your account. This typically takes a few minutes to 1 business day. You&apos;ll receive an email when it&apos;s approved.</p>
-                        <p className="text-xs text-amber-600 mt-2">Payments made before approval are held safely in your Stripe balance and will be available once verified.</p>
+                        <p className="text-sm font-semibold text-amber-900">{t.payouts.verifyingTitle}</p>
+                        <p className="text-xs text-amber-700 mt-1">{t.payouts.verifyingBody}</p>
+                        <p className="text-xs text-amber-600 mt-2">{t.payouts.verifyingHeld}</p>
                       </div>
                     </div>
                     <button type="button" disabled={connectBusy !== null}
                       onClick={async () => {
                         setConnectBusy("dashboard");
                         try { const { url } = await api.connect.dashboard(); window.open(url, "_blank", "noopener,noreferrer"); }
-                        catch (e) { toast.error(e instanceof Error ? e.message : "Could not open dashboard"); }
+                        catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.dashboardOpenFailed); }
                         finally { setConnectBusy(null); }
                       }}
                       className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-3 py-2 hover:bg-amber-100 disabled:opacity-60 transition-colors">
                       <ExternalLink className="w-3.5 h-3.5" />
-                      {connectBusy === "dashboard" ? "Opening…" : "Check status in Stripe dashboard"}
+                      {connectBusy === "dashboard" ? t.payouts.opening : t.payouts.checkStatus}
                     </button>
                   </div>
                 ) : (
@@ -1771,8 +1782,8 @@ function SettingsPage() {
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
                       <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                       <div>
-                        <p className="text-sm font-semibold text-emerald-800">Bank account connected</p>
-                        <p className="text-xs text-emerald-700 mt-0.5">Your Stripe Express account is active and ready to receive payouts.</p>
+                        <p className="text-sm font-semibold text-emerald-800">{t.payouts.connectedTitle}</p>
+                        <p className="text-xs text-emerald-700 mt-0.5">{t.payouts.connectedBody}</p>
                       </div>
                     </div>
 
@@ -1780,13 +1791,13 @@ function SettingsPage() {
                     {connectStatus.available.length > 0 && (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="rounded-xl border border-gray-100 bg-white p-4">
-                          <p className="text-xs text-gray-400 mb-1">Available balance</p>
+                          <p className="text-xs text-gray-400 mb-1">{t.payouts.availableBalance}</p>
                           {connectStatus.available.map((b) => (
                             <p key={b.currency} className="text-xl font-bold text-gray-900">${(b.amount / 100).toFixed(2)} <span className="text-sm font-normal text-gray-400">{b.currency.toUpperCase()}</span></p>
                           ))}
                         </div>
                         <div className="rounded-xl border border-gray-100 bg-white p-4">
-                          <p className="text-xs text-gray-400 mb-1">Pending</p>
+                          <p className="text-xs text-gray-400 mb-1">{t.payouts.pending}</p>
                           {connectStatus.pending.map((b) => (
                             <p key={b.currency} className="text-xl font-bold text-gray-500">${(b.amount / 100).toFixed(2)} <span className="text-sm font-normal text-gray-400">{b.currency.toUpperCase()}</span></p>
                           ))}
@@ -1796,11 +1807,11 @@ function SettingsPage() {
 
                     {/* Manual payout */}
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-                      <p className="text-sm font-medium text-gray-700">Withdraw funds</p>
+                      <p className="text-sm font-medium text-gray-700">{t.payouts.withdrawTitle}</p>
                       <div className="flex gap-2">
                         <Input
-                          type="number" min="1" step="0.01" placeholder="Amount (e.g. 100.00)"
-                          aria-label="Payout amount"
+                          type="number" min="1" step="0.01" placeholder={t.payouts.amountPlaceholder}
+                          aria-label={t.payouts.amountAria}
                           value={payoutAmount} onChange={(e) => {
                             setPayoutAmount(e.target.value);
                             payoutIdempotencyKey.current = null;
@@ -1810,32 +1821,32 @@ function SettingsPage() {
                         <Button type="button" loading={connectBusy === "payout"}
                           onClick={async () => {
                             const cents = Math.round(parseFloat(payoutAmount) * 100);
-                            if (!cents || cents < 100) { toast.error("Minimum payout is $1.00"); return; }
+                            if (!cents || cents < 100) { toast.error(t.toasts.payoutMinimum); return; }
                             payoutIdempotencyKey.current ??= crypto.randomUUID();
                             setConnectBusy("payout");
                             try {
                               await api.connect.payout(cents, false, biz?.currency?.toLowerCase(), payoutIdempotencyKey.current);
-                              toast.success("Payout initiated — funds will arrive in 1–2 business days");
+                              toast.success(t.toasts.payoutInitiated);
                               payoutIdempotencyKey.current = null;
                               setPayoutAmount(""); loadConnect();
-                            } catch (e) { toast.error(e instanceof Error ? e.message : "Payout failed"); }
+                            } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.payoutFailed); }
                             finally { setConnectBusy(null); }
                           }}
-                        >Withdraw</Button>
+                        >{t.payouts.withdraw}</Button>
                       </div>
-                      <p className="text-xs text-gray-400">Standard payout: 1–2 business days. Instant payout available via the Stripe Express dashboard.</p>
+                      <p className="text-xs text-gray-400">{t.payouts.withdrawHint}</p>
                     </div>
 
                     <button type="button" disabled={connectBusy !== null}
                       onClick={async () => {
                         setConnectBusy("dashboard");
                         try { const { url } = await api.connect.dashboard(); window.open(url, "_blank", "noopener,noreferrer"); }
-                        catch (e) { toast.error(e instanceof Error ? e.message : "Could not open dashboard"); }
+                        catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.dashboardOpenFailed); }
                         finally { setConnectBusy(null); }
                       }}
                       className="inline-flex items-center gap-2 text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-2 hover:bg-violet-50 disabled:opacity-60 transition-colors">
                       <ExternalLink className="w-3.5 h-3.5" />
-                      {connectBusy === "dashboard" ? "Opening…" : "Open Stripe Express dashboard"}
+                      {connectBusy === "dashboard" ? t.payouts.opening : t.payouts.openExpress}
                     </button>
                   </div>
                 )}
@@ -1845,28 +1856,28 @@ function SettingsPage() {
             {section === "security" && (
               <div className="p-4 space-y-4 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Security</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Protect your account with a second step at sign-in.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.security.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.security.subtitle}</p>
                 </div>
                 <hr className="border-gray-100" />
 
                 <div>
-                  <label htmlFor="set-2fa-password" className="block text-xs font-medium text-gray-700 mb-1.5">Current password</label>
+                  <label htmlFor="set-2fa-password" className="block text-xs font-medium text-gray-700 mb-1.5">{t.security.currentPassword}</label>
                   <Input
                     id="set-2fa-password"
                     type="password"
                     autoComplete="current-password"
                     value={twoFAPassword}
                     onChange={(e) => setTwoFAPassword(e.target.value)}
-                    placeholder="Required to change two-factor settings"
+                    placeholder={t.security.currentPasswordPlaceholder}
                   />
                 </div>
 
                 <div className="flex flex-col gap-3 py-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Two-factor sign-in</p>
+                    <p className="text-sm font-medium text-gray-700">{t.security.twoFATitle}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      After your password, we&apos;ll ask for a one-time code. You can remember a browser for 30 days; clearing its cookies or changing browser profiles requires another code.
+                      {t.security.twoFADesc}
                     </p>
                   </div>
                   <button
@@ -1889,7 +1900,7 @@ function SettingsPage() {
 
                 {twoFA && (
                   <div className="pt-1">
-                    <p className="text-xs font-medium text-gray-700 mb-2">Send the code by</p>
+                    <p className="text-xs font-medium text-gray-700 mb-2">{t.security.sendCodeBy}</p>
                     <div className="grid grid-cols-2 gap-2">
                       {(["EMAIL", "SMS"] as const).map((m) => (
                         <button
@@ -1904,13 +1915,13 @@ function SettingsPage() {
                               : "border-gray-200 text-gray-600 hover:border-gray-300",
                           )}
                         >
-                          {m === "EMAIL" ? "Email" : "Text message"}
+                          {m === "EMAIL" ? t.security.methodEmail : t.security.methodSms}
                         </button>
                       ))}
                     </div>
                     {twoFAMethod === "SMS" && (
                       <p className="text-xs text-amber-600 mt-2">
-                        Make sure your account has a mobile number on file — codes fall back to email otherwise.
+                        {t.security.smsWarning}
                       </p>
                     )}
                   </div>
@@ -1918,22 +1929,22 @@ function SettingsPage() {
 
                 {recoveryCodes && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-900">Save your recovery codes</p>
+                    <p className="text-sm font-semibold text-amber-900">{t.security.recoveryTitle}</p>
                     <p className="text-xs text-amber-700 mt-0.5 mb-3">
-                      Each code works once. If you ever can&apos;t receive your verification code, enter one of these to sign in. They won&apos;t be shown again.
+                      {t.security.recoveryBody}
                     </p>
                     <div className="grid grid-cols-1 gap-1.5 font-mono text-sm text-gray-800 bg-white rounded-lg border border-amber-100 p-3 min-[400px]:grid-cols-2">
                       {recoveryCodes.map((c) => <span key={c}>{c}</span>)}
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button type="button"
-                        onClick={() => { navigator.clipboard?.writeText(recoveryCodes.join("\n")).then(() => toast.success("Recovery codes copied")).catch(() => toast.error("Could not copy codes")); }}
+                        onClick={() => { navigator.clipboard?.writeText(recoveryCodes.join("\n")).then(() => toast.success(t.toasts.recoveryCopied)).catch(() => toast.error(t.toasts.recoveryCopyFailed)); }}
                         className="text-xs font-semibold text-amber-800 border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-100">
-                        Copy codes
+                        {t.security.copyCodes}
                       </button>
                       <button type="button" onClick={() => setRecoveryCodes(null)}
                         className="text-xs font-semibold text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50">
-                        I&apos;ve saved them
+                        {t.security.savedThem}
                       </button>
                     </div>
                   </div>
@@ -1942,12 +1953,12 @@ function SettingsPage() {
                 <hr className="border-gray-100" />
                 <div className="flex flex-col gap-3 py-1 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Password</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Change the password you use to sign in.</p>
+                    <p className="text-sm font-medium text-gray-700">{t.security.passwordTitle}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.security.passwordDesc}</p>
                   </div>
                   <a href="/change-password"
                     className="text-xs font-semibold text-violet-600 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 transition-colors shrink-0">
-                    Change
+                    {t.security.changePassword}
                   </a>
                 </div>
               </div>
@@ -1956,14 +1967,14 @@ function SettingsPage() {
             {section === "billing" && (
               <div className="p-4 space-y-5 sm:p-6">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Billing &amp; plan</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Choose the plan that fits your business.</p>
+                  <h3 className="text-sm font-semibold text-gray-900">{t.billing.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.billing.subtitle}</p>
                 </div>
                 <FeatureError message={featureErrors.subscription || featureErrors.referrals} onRetry={() => {
                   loadSubscription().catch(() => {});
                   api.referrals.get()
                     .then((r) => { setMyReferral({ code: r.code, referredCount: r.referredCount }); clearFeatureError("referrals"); })
-                    .catch((e) => recordFeatureError("referrals", e, "Could not load referral details"));
+                    .catch((e) => recordFeatureError("referrals", e, t.featureErrors.referrals));
                 }} />
                 <hr className="border-gray-100" />
 
@@ -1971,22 +1982,22 @@ function SettingsPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">
-                        Current plan: {(subscription?.plan ?? biz?.plan ?? "FREE").toLowerCase().replace(/^./, (c) => c.toUpperCase())}
+                        {t.billing.currentPlan.replace("{plan}", (subscription?.plan ?? biz?.plan ?? "FREE").toLowerCase().replace(/^./, (c) => c.toUpperCase()))}
                       </p>
                       {billingBusy === "confirming" ? (
-                        <p className="mt-1 text-xs font-medium text-violet-700">Confirming your Stripe subscription...</p>
+                        <p className="mt-1 text-xs font-medium text-violet-700">{t.billing.confirming}</p>
                       ) : subscription?.status === "PAST_DUE" ? (
-                        <p className="mt-1 text-xs font-medium text-amber-700">Payment is past due. Update your payment method to avoid losing paid features.</p>
+                        <p className="mt-1 text-xs font-medium text-amber-700">{t.billing.pastDue}</p>
                       ) : subscription?.cancelAtPeriodEnd ? (
                         <p className="mt-1 text-xs font-medium text-amber-700">
-                          Cancellation scheduled. Paid access continues until {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : "the end of this billing period"}.
+                          {t.billing.cancelScheduledA.replace("{date}", subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : t.billing.endOfPeriod)}
                         </p>
                       ) : (subscription?.plan ?? biz?.plan ?? "FREE") !== "FREE" ? (
                         <p className="mt-1 text-xs text-gray-600">
-                          Renews automatically{subscription?.currentPeriodEnd ? ` on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}` : " each billing period"} until canceled.
+                          {subscription?.currentPeriodEnd ? t.billing.renewsOn.replace("{date}", new Date(subscription.currentPeriodEnd).toLocaleDateString()) : t.billing.renewsEach}
                         </p>
                       ) : (
-                        <p className="mt-1 text-xs text-gray-600">No recurring subscription charge.</p>
+                        <p className="mt-1 text-xs text-gray-600">{t.billing.noRecurring}</p>
                       )}
                     </div>
                     {subscription?.status && (
@@ -2000,41 +2011,41 @@ function SettingsPage() {
                 {/* Referral: apply a code for a discount + share your own */}
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-4">
                   <div>
-                    <p className="text-sm font-semibold text-amber-900">Have a referral code?</p>
-                    <p className="text-xs text-amber-700 mt-0.5">Enter it before upgrading. If the code is valid and the referral coupon is configured, Stripe applies the discount at checkout.</p>
+                    <p className="text-sm font-semibold text-amber-900">{t.billing.haveReferral}</p>
+                    <p className="text-xs text-amber-700 mt-0.5">{t.billing.haveReferralDesc}</p>
                     <input
-                      aria-label="Referral code"
+                      aria-label={t.billing.referralAria}
                       value={referralInput}
                       onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                      placeholder="PULSE-XXXXXX"
+                      placeholder={t.billing.referralPlaceholder}
                       className="mt-2 w-full sm:w-64 text-sm border border-amber-300 rounded-lg px-3 py-2 bg-white uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-amber-400"
                     />
                   </div>
                   {myReferral && (
                     <div className="border-t border-amber-200 pt-3">
-                      <p className="text-sm font-semibold text-amber-900">Share Pulse</p>
+                      <p className="text-sm font-semibold text-amber-900">{t.billing.sharePulse}</p>
                       <p className="text-xs text-amber-700 mt-0.5">
-                        Send your link to another Canadian business. When they subscribe with your code, Pulse records the referral and credits your account after their subscription starts{myReferral.referredCount > 0 ? ` (${myReferral.referredCount} referred so far)` : ""}.
+                        {t.billing.sharePulseBody.replace("{count}", myReferral.referredCount > 0 ? t.billing.sharePulseCount.replace("{count}", String(myReferral.referredCount)) : "")}
                       </p>
                       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                         <code className="text-xs font-bold text-amber-900 bg-white border border-amber-300 rounded-lg px-3 py-2 break-all">
                           https://www.pulseappointments.com/register?ref={myReferral.code}
                         </code>
                         <button type="button"
-                          onClick={() => { navigator.clipboard.writeText(`https://www.pulseappointments.com/register?ref=${myReferral.code}`).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }).catch(() => toast.error("Could not copy link")); }}
+                          onClick={() => { navigator.clipboard.writeText(`https://www.pulseappointments.com/register?ref=${myReferral.code}`).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }).catch(() => toast.error(t.toasts.copyLinkFailed)); }}
                           className="w-fit text-xs font-semibold text-amber-700 border border-amber-300 rounded-lg px-2.5 py-2 hover:bg-amber-100 transition-colors">
-                          {refCopied ? "Copied!" : "Copy link"}
+                          {refCopied ? t.billing.copied : t.billing.copyLink}
                         </button>
                       </div>
-                      <p className="mt-2 text-[11px] text-amber-700">Code: <span className="font-semibold tracking-wide">{myReferral.code}</span></p>
+                      <p className="mt-2 text-[11px] text-amber-700">{t.billing.codeLabel} <span className="font-semibold tracking-wide">{myReferral.code}</span></p>
                     </div>
                   )}
                 </div>
 
                 <div className="mb-4 inline-flex rounded-xl border border-gray-200 bg-white p-1">
                   {[
-                    { id: "month" as const, label: "Monthly" },
-                    { id: "year" as const, label: "Annual", suffix: "2 months free" },
+                    { id: "month" as const, label: t.billing.monthly },
+                    { id: "year" as const, label: t.billing.annual, suffix: t.billing.twoMonthsFree },
                   ].map((option) => (
                     <button
                       key={option.id}
@@ -2055,33 +2066,21 @@ function SettingsPage() {
 
                 <div className="grid gap-4">
                   {[
-                    {
-                      id: "FREE", name: "Free", monthlyPrice: 0, annualPrice: 0,
-                      desc: "Get started with the essentials",
-                      features: ["Unlimited bookings","Client management","Public booking page","Email confirmations, cancellations & reschedules","Recurring appointment series","Dashboard & notification center","Up to 5 staff members","1 location"],
-                      cta: "Current plan", disabled: true,
-                    },
-                    {
-                      id: "BASIC", name: "Basic", monthlyPrice: 19, annualPrice: 190,
-                      desc: "Great for growing businesses",
-                      recommended: true,
-                      features: ["Everything in Free","Receive SMS from clients + reply","Email reminders (24h)","Deposit collection","Manual charges","Cancellation policies","Up to 10 staff members"],
-                      cta: "Upgrade to Basic", disabled: false,
-                    },
-                    {
-                      id: "PRO", name: "Pro", monthlyPrice: 39, annualPrice: 390,
-                      desc: "Full power for busy businesses",
-                      highlight: true,
-                      features: ["Everything in Basic","Initiate SMS to clients first","SMS confirmations & 2h reminders","Automatic no-show fees","Late-cancellation fees","72h email reminder","Priority support","Analytics & reports","Up to 10 staff members","Up to 2 locations"],
-                      cta: "Upgrade to Pro", disabled: false,
-                    },
-                    {
-                      id: "UNLIMITED", name: "Unlimited", monthlyPrice: 79, annualPrice: 790,
-                      desc: "Multi-location — for enterprise businesses",
-                      features: ["Everything in Pro","Up to 5 locations","Full SMS across all locations","Remove Pulse branding","Unlimited staff accounts","Dedicated support","Early access to new features"],
-                      cta: "Upgrade to Unlimited", disabled: false,
-                    },
-                  ].map((plan) => (
+                    { id: "FREE", planKey: "free" as const, monthlyPrice: 0, annualPrice: 0, disabled: true },
+                    { id: "BASIC", planKey: "basic" as const, monthlyPrice: 19, annualPrice: 190, recommended: true, disabled: false },
+                    { id: "PRO", planKey: "pro" as const, monthlyPrice: 39, annualPrice: 390, highlight: true, disabled: false },
+                    { id: "UNLIMITED", planKey: "unlimited" as const, monthlyPrice: 79, annualPrice: 790, disabled: false },
+                  ].map((planRow) => {
+                    const plan = {
+                      ...planRow,
+                      name: t.billing.plans[planRow.planKey].name,
+                      desc: t.billing.plans[planRow.planKey].desc,
+                      features: t.billing.plans[planRow.planKey].features,
+                      cta: t.billing.plans[planRow.planKey].cta,
+                      recommended: "recommended" in planRow ? planRow.recommended : false,
+                      highlight: "highlight" in planRow ? planRow.highlight : false,
+                    };
+                    return (
                     <div key={plan.id} className={cn(
                       "rounded-2xl border-2 p-5 relative",
                       plan.recommended ? "border-emerald-500 bg-emerald-50/50"
@@ -2090,12 +2089,12 @@ function SettingsPage() {
                     )}>
                       {plan.recommended && (
                         <span className="absolute -top-2.5 left-5 text-xs font-bold text-white bg-emerald-600 px-3 py-0.5 rounded-full">
-                          ★ Recommended
+                          {t.billing.recommended}
                         </span>
                       )}
                       {plan.highlight && !plan.recommended && (
                         <span className="absolute -top-2.5 left-5 text-xs font-bold text-white bg-violet-600 px-3 py-0.5 rounded-full">
-                          Most popular
+                          {t.billing.mostPopular}
                         </span>
                       )}
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -2104,12 +2103,12 @@ function SettingsPage() {
                             <span className="text-2xl font-bold text-gray-900">
                               {plan.monthlyPrice === 0 ? "$0" : billingInterval === "year" ? `$${plan.annualPrice}` : `$${plan.monthlyPrice}`}
                             </span>
-                            <span className="text-sm text-gray-400">{plan.monthlyPrice === 0 ? "/mo" : billingInterval === "year" ? "/yr" : "/mo"}</span>
+                            <span className="text-sm text-gray-400">{plan.monthlyPrice === 0 ? t.billing.perMonth : billingInterval === "year" ? t.billing.perYear : t.billing.perMonth}</span>
                           </div>
                           <p className="font-semibold text-gray-800 mt-0.5">{plan.name}</p>
                           <p className="text-xs text-gray-400 mt-0.5">
                             {plan.desc}
-                            {billingInterval === "year" && plan.monthlyPrice > 0 ? " Annual billing gives you 2 months free." : ""}
+                            {billingInterval === "year" && plan.monthlyPrice > 0 ? t.billing.annualNote : ""}
                           </p>
                         </div>
                         {(() => {
@@ -2118,9 +2117,9 @@ function SettingsPage() {
                           const isCurrent = currentPlan === plan.id;
                           const isDowngrade = (RANK[plan.id] ?? 0) < (RANK[currentPlan] ?? 0);
                           const canBuy = (plan.id === "BASIC" || plan.id === "PRO" || plan.id === "UNLIMITED") && !isCurrent && !isDowngrade;
-                          const label = isCurrent ? "Current plan"
-                            : billingBusy === plan.id ? "Redirecting…"
-                            : isDowngrade ? `Manage ${plan.name} downgrade`
+                          const label = isCurrent ? t.billing.currentPlanBtn
+                            : billingBusy === plan.id ? t.billing.redirecting
+                            : isDowngrade ? t.billing.manageDowngrade.replace("{name}", plan.name)
                             : plan.cta;
                           return (
                             <button
@@ -2129,7 +2128,7 @@ function SettingsPage() {
                               onClick={() => {
                                 if (canBuy) upgrade(plan.id as "BASIC" | "PRO" | "UNLIMITED");
                                 else if (isDowngrade && subscription?.hasBilling) manageBilling();
-                                else if (!isCurrent) toast.info("To downgrade, manage your subscription from the billing portal below.");
+                                else if (!isCurrent) toast.info(t.toasts.downgradeInfo);
                               }}
                               className={cn(
                                 "text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0",
@@ -2148,26 +2147,27 @@ function SettingsPage() {
                         })()}
                       </div>
                       <ul className="mt-4 space-y-1.5">
-                        {plan.features.map((f) => (
-                          <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-xs text-gray-600">
                             <CheckCircle2 className={cn("w-3.5 h-3.5 shrink-0", plan.highlight && !plan.recommended ? "text-violet-500" : "text-emerald-500")} />
-                            {f}
+                            {feature}
                           </li>
                         ))}
                       </ul>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {(biz?.plan ?? "FREE") !== "FREE" && (
                   <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Stripe billing portal</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Update your card, view invoices, or cancel automatic renewal. Cancellation normally takes effect at the end of the paid period.</p>
+                      <p className="text-sm font-medium text-gray-700">{t.billing.portalTitle}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{t.billing.portalDesc}</p>
                     </div>
                     <button type="button" onClick={manageBilling} disabled={billingBusy !== null}
                       className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-60 transition-colors shrink-0">
-                      {billingBusy === "portal" ? "Opening…" : "Manage billing"}
+                      {billingBusy === "portal" ? t.payouts.opening : t.billing.manageBilling}
                     </button>
                   </div>
                 )}
@@ -2175,8 +2175,8 @@ function SettingsPage() {
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
                   <Zap className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-semibold text-amber-800">SMS reminders require Pro</p>
-                    <p className="text-xs text-amber-600 mt-0.5">Upgrade to Pro to send 2-hour SMS reminders to clients. Email reminders are available on Basic and above.</p>
+                    <p className="text-xs font-semibold text-amber-800">{t.billing.smsProTitle}</p>
+                    <p className="text-xs text-amber-600 mt-0.5">{t.billing.smsProBody}</p>
                   </div>
                 </div>
               </div>
@@ -2186,15 +2186,15 @@ function SettingsPage() {
               {section !== "billing" && section !== "security" && section !== "payouts" && section !== "locations" && section !== "calendar" ? (
                 <>
                   <p className={cn("text-xs", dirty ? "text-amber-700" : "text-gray-400")}>
-                    {dirty ? "Changes on this page are not saved yet." : "No unsaved changes."}
+                    {dirty ? t.footerDirty : t.footerClean}
                   </p>
                   <Button type="submit" loading={saving} disabled={!dirty} size="md">
-                    Save changes
+                    {t.saveChanges}
                   </Button>
                 </>
               ) : (
                 <p className="text-xs text-gray-400">
-                  This section saves with its own buttons or connects to an external provider.
+                  {t.footerExternal}
                 </p>
               )}
             </div>
@@ -2207,9 +2207,9 @@ function SettingsPage() {
 
     <ConfirmDialog
       open={locationToRemove !== null}
-      title="Remove location"
-      description={`Remove "${locationToRemove?.name}"? Staff assigned to this location will become unassigned.`}
-      confirmLabel="Remove"
+      title={t.locations.removeTitle}
+      description={t.locations.removeDesc.replace("{name}", locationToRemove?.name ?? "")}
+      confirmLabel={t.locations.remove}
       variant="destructive"
       onConfirm={async () => {
         if (!locationToRemove) return;
@@ -2217,9 +2217,9 @@ function SettingsPage() {
           await api.locations.remove(bizId, locationToRemove.id);
           notifyLocationsChanged();
           loadLocations();
-          toast.success("Location removed");
+          toast.success(t.toasts.locationRemoved);
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Failed");
+          toast.error(e instanceof Error ? e.message : t.toasts.failed);
         } finally {
           setLocationToRemove(null);
         }

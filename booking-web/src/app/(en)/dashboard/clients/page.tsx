@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Plus, Phone, Mail, Calendar, DollarSign, X, Trash2, Pencil, CalendarPlus, GitMerge, Download, Upload, Ban, CheckCircle } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, ClientPackage, MigrationImportBatch, MigrationMode, MigrationSourcePlatform, Payment, ClientWithStats } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -15,24 +14,27 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ClientMergeModal } from "@/components/ClientMergeModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatPrice, cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const DAY_MS = 86_400_000;
 
-const MIGRATION_SOURCES: Array<{ value: MigrationSourcePlatform; label: string; hint: string }> = [
-  { value: "square-appointments", label: "Square Appointments", hint: "Customer Directory export" },
-  { value: "jane-app", label: "Jane App", hint: "Client list export" },
-  { value: "vagaro", label: "Vagaro", hint: "Customer export" },
-  { value: "acuity-scheduling", label: "Acuity Scheduling", hint: "Clients import/export CSV" },
-  { value: "calendly", label: "Calendly", hint: "Contacts CSV" },
-  { value: "fresha", label: "Fresha", hint: "Client export" },
-  { value: "glossgenius", label: "GlossGenius", hint: "Client list export" },
-  { value: "mindbody", label: "Mindbody", hint: "Assisted export recommended" },
-  { value: "setmore", label: "Setmore", hint: "Customer CSV" },
-  { value: "google-contacts", label: "Google Contacts", hint: "Google CSV export" },
-  { value: "phone-contacts", label: "Phone contacts", hint: "CSV or vCard export" },
-  { value: "csv", label: "Spreadsheet / CSV", hint: "Names, emails, phones, notes, tags" },
-  { value: "other", label: "Other software", hint: "Pulse will inspect the file" },
-  { value: "starting-fresh", label: "I'm starting fresh", hint: "No import needed" },
+// Brand names are proper nouns and stay untranslated; the per-source hint is
+// pulled from the dictionary (clients.migration.sourceHints) at render time.
+const MIGRATION_SOURCES: Array<{ value: MigrationSourcePlatform; label: string }> = [
+  { value: "square-appointments", label: "Square Appointments" },
+  { value: "jane-app", label: "Jane App" },
+  { value: "vagaro", label: "Vagaro" },
+  { value: "acuity-scheduling", label: "Acuity Scheduling" },
+  { value: "calendly", label: "Calendly" },
+  { value: "fresha", label: "Fresha" },
+  { value: "glossgenius", label: "GlossGenius" },
+  { value: "mindbody", label: "Mindbody" },
+  { value: "setmore", label: "Setmore" },
+  { value: "google-contacts", label: "Google Contacts" },
+  { value: "phone-contacts", label: "Phone contacts" },
+  { value: "csv", label: "Spreadsheet / CSV" },
+  { value: "other", label: "Other software" },
+  { value: "starting-fresh", label: "I'm starting fresh" },
 ];
 
 function parseCsv(data: string): string[][] {
@@ -89,6 +91,8 @@ function dueAtForCadence(cadenceDays: number) {
 }
 
 export default function ClientsPage() {
+  const { dictionary, formatDate } = useDashboardLocale();
+  const t = dictionary.clients;
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -138,8 +142,9 @@ export default function ClientsPage() {
   useEffect(() => {
     api.users.me().then(setCurrentUser).catch(() => {
       setLoading(false);
-      setLoadError("Could not verify your session. Please refresh the page.");
+      setLoadError(t.toasts.sessionError);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const bizId = currentUser?.businessId ?? "";
@@ -148,12 +153,12 @@ export default function ClientsPage() {
   const load = useCallback(async (q?: string, pg = 1, append = false) => {
     if (!currentUser) return;
     if (!bizId) {
-      setLoadError("No business account is linked to your profile. Please contact support.");
+      setLoadError(t.toasts.noBusiness);
       setLoading(false);
       return;
     }
     if (!isOwner) {
-      setLoadError("Access denied. Only owners and admins can manage the client list.");
+      setLoadError(t.toasts.accessDenied);
       setLoading(false);
       return;
     }
@@ -165,9 +170,9 @@ export default function ClientsPage() {
       setTotalPages(res.pages);
       setTotal(res.total);
     }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load clients"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : t.toasts.loadFailed); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [bizId, isOwner, currentUser]);
+  }, [bizId, isOwner, currentUser, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -206,22 +211,22 @@ export default function ClientsPage() {
         api.messages.thread(bizId, c.id).catch(() => []),
       ]);
       setSelected({ ...c, ...detail, packages, messages });
-    } catch { toast.error("Failed to load client details"); }
+    } catch { toast.error(t.toasts.detailFailed); }
     finally { setLoadingDetail(false); }
   }
 
   async function addClient() {
-    if (!form.name) { toast.error("Client name is required"); return; }
-    if (!form.email && !form.phone) { toast.error("Email or phone number is required"); return; }
+    if (!form.name) { toast.error(t.toasts.nameRequired); return; }
+    if (!form.email && !form.phone) { toast.error(t.toasts.contactRequired); return; }
     if (!bizId) return;
     setSaving(true);
     try {
       await api.clients.create(bizId, form);
-      toast.success("Client added");
+      toast.success(t.toasts.added);
       setShowAdd(false);
       setForm({ name: "", email: "", phone: "", notes: "" });
       await load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.failed); }
     finally { setSaving(false); }
   }
 
@@ -238,9 +243,9 @@ export default function ClientsPage() {
       const updated = await api.clients.setBlocked(bizId, selected.id, willBlock);
       setSelected((prev) => prev ? { ...prev, isBlocked: updated.isBlocked, blockedReason: updated.blockedReason } : prev);
       setClients((prev) => prev.map((c) => c.id === selected.id ? { ...c, isBlocked: updated.isBlocked, blockedReason: updated.blockedReason } : c));
-      toast.success(willBlock ? "Client blocked from online booking" : "Client unblocked");
+      toast.success(willBlock ? t.toasts.blocked : t.toasts.unblocked);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to update block status");
+      toast.error(e instanceof Error ? e.message : t.toasts.blockFailed);
     } finally {
       setBlockingClient(false);
     }
@@ -253,12 +258,12 @@ export default function ClientsPage() {
     try {
       const res = await api.clients.delete(bizId, selected.id);
       toast.success(res.deletedAppointments > 0
-        ? `Client deleted with ${res.deletedAppointments} appointment${res.deletedAppointments === 1 ? "" : "s"}`
-        : "Client deleted");
+        ? (res.deletedAppointments === 1 ? t.toasts.deletedWithAppointments : t.toasts.deletedWithAppointmentsPlural).replace("{count}", String(res.deletedAppointments))
+        : t.toasts.deleted);
       setSelected(null);
       await load(search, 1);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not delete client");
+      toast.error(e instanceof Error ? e.message : t.toasts.deleteFailed);
     } finally {
       setDeletingClient(false);
     }
@@ -283,7 +288,7 @@ export default function ClientsPage() {
       const updated = await api.clients.update(bizId, selected.id, { tags });
       setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
       load(search, page);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not update tags"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : t.toasts.tagsFailed); }
     finally { setTagBusy(false); }
   }
   function addTag() {
@@ -297,8 +302,8 @@ export default function ClientsPage() {
 
   async function saveEdit() {
     if (!bizId || !selected) return;
-    if (!editForm.name.trim()) { toast.error("Client name is required"); return; }
-    if (!editForm.email.trim() && !editForm.phone.trim()) { toast.error("Email or phone number is required"); return; }
+    if (!editForm.name.trim()) { toast.error(t.toasts.nameRequired); return; }
+    if (!editForm.email.trim() && !editForm.phone.trim()) { toast.error(t.toasts.contactRequired); return; }
     setSavingEdit(true);
     try {
       const updated = await api.clients.update(bizId, selected.id, {
@@ -310,10 +315,10 @@ export default function ClientsPage() {
       });
       setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
       setEditMode(false);
-      toast.success("Contact updated");
+      toast.success(t.toasts.contactUpdated);
       load(search, page);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not update contact");
+      toast.error(e instanceof Error ? e.message : t.toasts.contactUpdateFailed);
     } finally { setSavingEdit(false); }
   }
 
@@ -331,9 +336,9 @@ export default function ClientsPage() {
       const dueAt = dueAtForCadence(cadenceDays);
       await api.serviceDue.set(bizId, { clientId: selected.id, cadenceDays, dueAt });
       setDueSet(cadenceDays);
-      toast.success("Follow-up routine set — you'll be reminded when it's due");
+      toast.success(t.toasts.followUpSet);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not set follow-up");
+      toast.error(e instanceof Error ? e.message : t.toasts.followUpFailed);
     } finally { setDueBusy(false); }
   }
 
@@ -364,9 +369,9 @@ export default function ClientsPage() {
         notes: migrationNotes.trim() || undefined,
       });
       setMigrationSubmitted(true);
-      toast.success(migrationSource === "starting-fresh" ? "Marked as starting fresh" : "Migration request saved");
+      toast.success(migrationSource === "starting-fresh" ? t.toasts.startingFresh : t.toasts.migrationSaved);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save migration request");
+      toast.error(e instanceof Error ? e.message : t.toasts.migrationSaveFailed);
     } finally {
       setMigrationBusy(false);
     }
@@ -379,11 +384,11 @@ export default function ClientsPage() {
       const text = await file.text();
       const rows = rowsFromCsv(text).slice(0, 1000);
       if (!rows.length) {
-        toast.error("No client rows found. Make sure the file has columns for name, email, or phone.");
+        toast.error(t.toasts.noRows);
         return;
       }
       if (rows.length >= 1000) {
-        toast.message("Preview limited to 1,000 rows. Split larger lists before importing.");
+        toast.message(t.toasts.previewLimited);
       }
       const request = await api.migrations.create(bizId, {
         sourcePlatform: migrationSource,
@@ -397,9 +402,9 @@ export default function ClientsPage() {
       });
       setMigrationFileName(file.name);
       setMigrationBatch(batch);
-      toast.success(`Reviewed ${batch.totalRows} clients before import`);
+      toast.success(t.toasts.reviewed.replace("{count}", String(batch.totalRows)));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not stage client import");
+      toast.error(e instanceof Error ? e.message : t.toasts.stageFailed);
     } finally {
       setMigrationBusy(false);
       if (migrationFileInputRef.current) migrationFileInputRef.current.value = "";
@@ -412,10 +417,10 @@ export default function ClientsPage() {
     try {
       const imported = await api.migrations.importBatch(bizId, migrationBatch.id, true);
       setMigrationBatch(imported);
-      toast.success(`Imported ${imported.importedRows} client${imported.importedRows === 1 ? "" : "s"}`);
+      toast.success((imported.importedRows === 1 ? t.toasts.imported : t.toasts.importedPlural).replace("{count}", String(imported.importedRows)));
       await load(search, 1);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Import failed");
+      toast.error(e instanceof Error ? e.message : t.toasts.importFailed);
     } finally {
       setMigrationBusy(false);
     }
@@ -427,15 +432,15 @@ export default function ClientsPage() {
     packages?: ClientPackage[];
     messages?: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }>;
   }) | null;
-  const migrationSourceLabel = MIGRATION_SOURCES.find((source) => source.value === migrationSource)?.label ?? "your old app";
+  const migrationSourceLabel = MIGRATION_SOURCES.find((source) => source.value === migrationSource)?.label ?? t.migration.fallbackSource;
 
   return (
     <>
     <ConfirmDialog
       open={deleteDialog}
-      title={`Delete ${selected?.name ?? "client"}?`}
-      description="This removes the client profile and appointment history from the log. Payments remain in reporting."
-      confirmLabel="Delete client"
+      title={t.deleteTitle.replace("{name}", selected?.name ?? t.deleteFallbackName)}
+      description={t.deleteDescription}
+      confirmLabel={t.deleteConfirm}
       variant="destructive"
       onConfirm={confirmDeleteClient}
       onCancel={() => setDeleteDialog(false)}
@@ -443,42 +448,42 @@ export default function ClientsPage() {
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Clients</h2>
-          <p className="text-sm text-gray-500">{total} client{total !== 1 ? "s" : ""}</p>
+          <h2 className="text-xl font-bold text-gray-900">{t.title}</h2>
+          <p className="text-sm text-gray-500">{(total !== 1 ? t.countPlural : t.count).replace("{count}", String(total))}</p>
         </div>
         {/* RBAC: Hide management controls from staff */}
         {isOwner && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />Merge duplicates</Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowMerge(true)} className="gap-1.5"><GitMerge className="w-4 h-4" />{t.mergeDuplicates}</Button>
             <a href={api.clients.exportCsv(bizId)} download="clients.csv"
               className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
-              <Download className="w-4 h-4" />Export CSV
+              <Download className="w-4 h-4" />{t.exportCsv}
             </a>
             <button
               type="button"
               onClick={() => setShowMigration(true)}
               className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 transition-colors">
-              <Upload className="w-4 h-4" />Move clients to Pulse
+              <Upload className="w-4 h-4" />{t.moveToPulse}
             </button>
-            <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />Add client</Button>
+            <Button size="sm" onClick={() => setShowAdd(true)} className="gap-1.5"><Plus className="w-4 h-4" />{t.addClient}</Button>
           </div>
         )}
       </div>
 
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input placeholder="Search by name, email, or phone…" value={search}
+        <Input placeholder={t.searchPlaceholder} value={search}
           onChange={(e) => setSearch(e.target.value)} className="pl-9"
-          aria-label="Search by name, email, or phone" />
+          aria-label={t.searchAria} />
       </div>
 
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{t.retry}</button>
         </div>
       ) : loading ? <SkeletonList rows={8} /> : clients.length === 0 ? (
-        <EmptyState title="No clients found" description="Add your first client, or share your booking link so they add themselves when they book." action={{ label: "Share booking link", href: "/dashboard/booking-page" }} />
+        <EmptyState title={t.emptyTitle} description={t.emptyBody} action={{ label: t.shareBookingLink, href: "/dashboard/booking-page" }} />
       ) : (
         <div className="space-y-2">
           {clients.map((c) => (
@@ -491,7 +496,7 @@ export default function ClientsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900 truncate">{c.name}</p>
-                    {c.isBlocked && <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"><Ban className="w-2.5 h-2.5" />Blocked</span>}
+                    {c.isBlocked && <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"><Ban className="w-2.5 h-2.5" />{t.blocked}</span>}
                     {(c.tags ?? []).slice(0, 3).map((t) => (
                       <span key={t} className="rounded-full bg-violet-50 text-violet-700 px-2 py-0.5 text-[10px] font-medium">{t}</span>
                     ))}
@@ -502,8 +507,8 @@ export default function ClientsPage() {
                   </div>
                 </div>
                 <div className="text-right text-xs text-gray-500 shrink-0 hidden sm:block">
-                  <div className="flex items-center gap-1"><Calendar className="w-3 h-3" />{c.totalVisits} visits</div>
-                  {c.lastVisit && <div className="mt-0.5">Last: {format(new Date(c.lastVisit), "MMM d")}</div>}
+                  <div className="flex items-center gap-1"><Calendar className="w-3 h-3" />{t.visits.replace("{count}", String(c.totalVisits))}</div>
+                  {c.lastVisit && <div className="mt-0.5">{t.last.replace("{date}", formatDate(c.lastVisit, { month: "short", day: "numeric" }))}</div>}
                 </div>
               </button>
             </Card>
@@ -518,7 +523,7 @@ export default function ClientsPage() {
             onClick={() => load(search, page + 1, true)}
             disabled={loadingMore}
             className="px-5 py-2 text-sm font-medium text-violet-700 border border-violet-200 rounded-xl hover:bg-violet-50 disabled:opacity-50 transition-colors">
-            {loadingMore ? "Loading…" : `Load more (${total - clients.length} remaining)`}
+            {loadingMore ? t.loading : t.loadMore.replace("{count}", String(total - clients.length))}
           </button>
         </div>
       )}
@@ -538,41 +543,41 @@ export default function ClientsPage() {
             <div className="flex flex-col gap-3 px-4 py-4 border-b border-gray-100 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
               <div className="flex items-center gap-2 min-w-0">
                 <h2 id="client-drawer-title" className="text-lg font-bold text-gray-900 truncate">{selected.name}</h2>
-                {selected.isBlocked && <span className="inline-flex items-center gap-1 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"><Ban className="w-3 h-3" /> Blocked</span>}
+                {selected.isBlocked && <span className="inline-flex items-center gap-1 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"><Ban className="w-3 h-3" /> {t.blocked}</span>}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Button size="sm" onClick={rebook} className="gap-1.5">
-                  <CalendarPlus className="w-4 h-4" />Book again
+                  <CalendarPlus className="w-4 h-4" />{t.bookAgain}
                 </Button>
                 {/* RBAC: Hide edit/delete for staff */}
                 {isOwner && (
                   <>
-                    <button onClick={startEdit} title="Edit contact" aria-label="Edit"
+                    <button onClick={startEdit} title={t.editContact} aria-label={t.editAria}
                       className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors"><Pencil className="w-4 h-4" /></button>
                     <button
                       onClick={toggleBlock}
                       disabled={blockingClient}
-                      title={selected.isBlocked ? "Unblock client" : "Block client from online booking"}
-                      aria-label={selected.isBlocked ? "Unblock client" : "Block client"}
+                      title={selected.isBlocked ? t.unblock : t.blockTitle}
+                      aria-label={selected.isBlocked ? t.unblock : t.blockAria}
                       className={cn("p-2 rounded-lg transition-colors disabled:opacity-50", selected.isBlocked ? "text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100" : "text-gray-400 hover:text-amber-600 hover:bg-amber-50")}>
                       {selected.isBlocked ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                     </button>
-                    <button onClick={deleteClient} disabled={deletingClient} title="Delete contact" aria-label="Delete client"
+                    <button onClick={deleteClient} disabled={deletingClient} title={t.deleteContact} aria-label={t.deleteAria}
                       className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
                   </>
                 )}
-                <button onClick={() => setSelected(null)} aria-label="Close" className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
+                <button onClick={() => setSelected(null)} aria-label={t.close} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-5 h-5" /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {editMode ? (
                 <div className="space-y-3 rounded-xl border border-violet-100 bg-violet-50/40 p-4">
-                  <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Edit contact</p>
+                  <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide">{t.editContact}</p>
                   {([
-                    { k: "name",  label: "Full name *", type: "text",  ph: "Jane Doe" },
-                    { k: "email", label: "Email",        type: "email", ph: "jane@example.com" },
-                    { k: "phone", label: "Phone",        type: "tel",   ph: "+1 (416) 555-0123" },
-                    { k: "notes", label: "Notes",        type: "text",  ph: "" },
+                    { k: "name",  label: t.fullName, type: "text",  ph: t.phName },
+                    { k: "email", label: t.email,    type: "email", ph: t.phEmail },
+                    { k: "phone", label: t.phone,    type: "tel",   ph: t.phPhone },
+                    { k: "notes", label: t.notes,    type: "text",  ph: "" },
                   ] as const).map(({ k, label, type, ph }) => (
                     <div key={k}>
                       <label htmlFor={`edit-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -582,32 +587,32 @@ export default function ClientsPage() {
                           const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                           setEditForm((p) => ({ ...p, [k]: val }));
                         }} />
-                      {k === "phone" && <p className="mt-1 text-xs text-gray-500">At least one of email or phone is required.</p>}
+                      {k === "phone" && <p className="mt-1 text-xs text-gray-500">{t.contactRequired}</p>}
                     </div>
                   ))}
                   <div>
-                    <label htmlFor="edit-birthday" className="block text-sm font-medium text-gray-700 mb-1">Birthday</label>
+                    <label htmlFor="edit-birthday" className="block text-sm font-medium text-gray-700 mb-1">{t.birthday}</label>
                     <Input id="edit-birthday" type="date" value={editForm.birthday ? `2000-${editForm.birthday}` : ""}
                       onChange={(e) => setEditForm((p) => ({ ...p, birthday: e.target.value ? e.target.value.slice(5) : "" }))} />
-                    <p className="mt-1 text-xs text-gray-500">Used for an automatic birthday greeting (year is ignored).</p>
+                    <p className="mt-1 text-xs text-gray-500">{t.birthdayHint}</p>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <Button variant="secondary" className="flex-1" onClick={() => setEditMode(false)}>Cancel</Button>
-                    <Button className="flex-1" loading={savingEdit} onClick={saveEdit}>Save</Button>
+                    <Button variant="secondary" className="flex-1" onClick={() => setEditMode(false)}>{t.cancel}</Button>
+                    <Button className="flex-1" loading={savingEdit} onClick={saveEdit}>{t.save}</Button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-1.5 text-sm">
                   <div className="flex min-w-0 items-center gap-2 break-all text-gray-600"><Mail className="w-4 h-4 shrink-0 text-gray-400" />{selected.email}</div>
                   {selected.phone && <div className="flex items-center gap-2 text-gray-600"><Phone className="w-4 h-4 text-gray-400" />{formatPhoneDisplay(selected.phone)}</div>}
-                  {selected.birthday && <div className="flex items-center gap-2 text-gray-600"><span className="w-4 text-center">🎂</span>{format(new Date(`2000-${selected.birthday}T00:00:00`), "MMMM d")}</div>}
+                  {selected.birthday && <div className="flex items-center gap-2 text-gray-600"><span className="w-4 text-center">🎂</span>{formatDate(`2000-${selected.birthday}T00:00:00`, { month: "long", day: "numeric" })}</div>}
                 </div>
               )}
               <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-3">
                 {[
-                  { label: "Total visits", value: selected.totalVisits, icon: Calendar },
-                  { label: "Total spent",  value: formatPrice(selected.totalSpentCents ?? 0), icon: DollarSign },
-                  { label: "Member since", value: format(new Date(selected.createdAt), "MMM yyyy"), icon: Calendar },
+                  { label: t.totalVisits, value: selected.totalVisits, icon: Calendar },
+                  { label: t.totalSpent,  value: formatPrice(selected.totalSpentCents ?? 0), icon: DollarSign },
+                  { label: t.memberSince, value: formatDate(selected.createdAt, { month: "short", year: "numeric" }), icon: Calendar },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
                     <p className="text-base font-bold text-gray-900">{value}</p>
@@ -618,15 +623,13 @@ export default function ClientsPage() {
 
               {/* Recurring follow-up: set when this client's next visit is due */}
               <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-                <p className="text-sm font-semibold text-violet-900">Next visit due</p>
+                <p className="text-sm font-semibold text-violet-900">{t.nextVisitDue}</p>
                 <p className="text-xs text-violet-700 mt-0.5">
-                  {dueSet
-                    ? `Routine set — we'll remind you when it's due, and you can approve a rebook nudge.`
-                    : `Put this client on a routine (e.g. grooming every 8 weeks). You'll be prompted to invite them back when it's due.`}
+                  {dueSet ? t.routineSet : t.routinePrompt}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {[
-                    { d: 14, l: "2 weeks" }, { d: 30, l: "Monthly" }, { d: 42, l: "6 weeks" }, { d: 56, l: "8 weeks" },
+                    { d: 14, l: t.cadence2w }, { d: 30, l: t.cadenceMonthly }, { d: 42, l: t.cadence6w }, { d: 56, l: t.cadence8w },
                   ].map(({ d, l }) => (
                     <button key={d} disabled={dueBusy || !isOwner} onClick={() => setNextDue(d)}
                       className={cn("text-xs font-semibold rounded-lg px-3 py-1.5 border transition-colors disabled:opacity-50",
@@ -639,14 +642,14 @@ export default function ClientsPage() {
 
               {/* Tags */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.tags}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  {(selected.tags ?? []).map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
-                      {t}
+                  {(selected.tags ?? []).map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
+                      {tag}
                       {isOwner && (
-                        <button disabled={tagBusy} onClick={() => saveTags((selected.tags ?? []).filter((x) => x !== t))}
-                          className="text-violet-400 hover:text-red-600" aria-label={`Remove ${t}`}>×</button>
+                        <button disabled={tagBusy} onClick={() => saveTags((selected.tags ?? []).filter((x) => x !== tag))}
+                          className="text-violet-400 hover:text-red-600" aria-label={t.removeTag.replace("{tag}", tag)}>×</button>
                       )}
                     </span>
                   ))}
@@ -656,8 +659,8 @@ export default function ClientsPage() {
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
                       onBlur={addTag}
-                      placeholder="+ Add tag"
-                      aria-label="Add tag"
+                      placeholder={t.addTag}
+                      aria-label={t.addTag}
                       className="text-xs px-2 py-1 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-200 w-24" />
                   )}
                 </div>
@@ -665,55 +668,55 @@ export default function ClientsPage() {
 
               {selected.notes && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{t.notes}</p>
                   <p className="text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">{selected.notes}</p>
                 </div>
               )}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Appointment history</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.appointmentHistory}</p>
                 {loadingDetail ? <div className="space-y-2 py-2"><SkeletonCard /><SkeletonCard /></div> :
-                  (detail?.appointments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No appointments yet.</p> : (
+                  (detail?.appointments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">{t.noAppointments}</p> : (
                   <div className="space-y-2">
                     {(detail?.appointments ?? []).map((apt) => (
                       <div key={apt.id} className="flex items-center justify-between py-2 border-b border-gray-100">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{apt.service.name}</p>
-                          <p className="text-xs text-gray-500">{format(new Date(apt.startsAt), "MMM d, yyyy")} · {apt.staff.user.name}</p>
+                          <p className="text-xs text-gray-500">{formatDate(apt.startsAt, { month: "short", day: "numeric", year: "numeric" })} · {apt.staff.user.name}</p>
                         </div>
                         <StatusBadge status={apt.status} />
                       </div>
                     ))}
-                    {detail?.appointments?.length === 50 && <p className="text-[10px] text-gray-400 text-center pt-2">Showing last 50 appointments</p>}
+                    {detail?.appointments?.length === 50 && <p className="text-[10px] text-gray-400 text-center pt-2">{t.showingLastAppointments}</p>}
                   </div>
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payments</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.payments}</p>
                 {loadingDetail ? <div className="space-y-2 py-2"><SkeletonCard /></div> :
-                  (detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No payments recorded.</p> : (
+                  (detail?.payments?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">{t.noPayments}</p> : (
                   <div className="space-y-2">
                     {(detail?.payments ?? []).map((p) => (
                       <div key={p.id} className="flex items-center justify-between border-b border-gray-100 py-2">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{formatPrice(p.amountCents - p.refundedCents)}</p>
-                          <p className="text-xs text-gray-500">{p.kind.replaceAll("_", " ")} · {format(new Date(p.createdAt), "MMM d, yyyy")}</p>
+                          <p className="text-xs text-gray-500">{p.kind.replaceAll("_", " ")} · {formatDate(p.createdAt, { month: "short", day: "numeric", year: "numeric" })}</p>
                         </div>
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{p.status.replaceAll("_", " ")}</span>
                       </div>
                     ))}
-                    {detail?.payments?.length === 50 && <p className="text-[10px] text-gray-400 text-center pt-2">Showing last 50 payments</p>}
+                    {detail?.payments?.length === 50 && <p className="text-[10px] text-gray-400 text-center pt-2">{t.showingLastPayments}</p>}
                   </div>
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Packages</p>
-                {(detail?.packages?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No active packages.</p> : (
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.packages}</p>
+                {(detail?.packages?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">{t.noPackages}</p> : (
                   <div className="space-y-2">
                     {(detail?.packages ?? []).slice(0, 6).map((pkg) => (
                       <div key={pkg.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{pkg.name}</p>
-                          <p className="text-xs text-gray-500">{pkg.creditsRemaining} of {pkg.creditsTotal} credits left</p>
+                          <p className="text-xs text-gray-500">{t.creditsLeft.replace("{remaining}", String(pkg.creditsRemaining)).replace("{total}", String(pkg.creditsTotal))}</p>
                         </div>
                         <span className="text-xs font-semibold text-gray-600">{pkg.status}</span>
                       </div>
@@ -722,12 +725,12 @@ export default function ClientsPage() {
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent messages</p>
-                {(detail?.messages?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">No messages yet.</p> : (
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{t.recentMessages}</p>
+                {(detail?.messages?.length ?? 0) === 0 ? <p className="text-sm text-gray-500">{t.noMessages}</p> : (
                   <div className="space-y-2">
                     {(detail?.messages ?? []).slice(-5).reverse().map((m) => (
                       <div key={m.id} className="rounded-lg bg-gray-50 px-3 py-2">
-                        <p className="text-xs font-semibold text-gray-500">{m.fromClient ? "Client" : "Business"} · {format(new Date(m.createdAt), "MMM d")}</p>
+                        <p className="text-xs font-semibold text-gray-500">{m.fromClient ? t.fromClient : t.fromBusiness} · {formatDate(m.createdAt, { month: "short", day: "numeric" })}</p>
                         <p className="mt-1 text-sm text-gray-700 line-clamp-2">{m.content}</p>
                       </div>
                     ))}
@@ -750,13 +753,13 @@ export default function ClientsPage() {
             onKeyDown={(e) => { if (e.key === 'Escape') setShowAdd(false) }}
             tabIndex={-1}
             className="relative w-full max-w-sm z-10">
-            <CardHeader><CardTitle id="add-client-modal-title">Add client</CardTitle></CardHeader>
+            <CardHeader><CardTitle id="add-client-modal-title">{t.addClient}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {[
-                { k:"name",  label:"Full name *",   type:"text",  ph:"Jane Doe" },
-                { k:"email", label:"Email",          type:"email", ph:"jane@example.com" },
-                { k:"phone", label:"Phone",          type:"tel",   ph:"+1 (416) 555-0123" },
-                { k:"notes", label:"Notes",          type:"text",  ph:"Any notes…" },
+                { k:"name",  label:t.fullName, type:"text",  ph:t.phName },
+                { k:"email", label:t.email,    type:"email", ph:t.phEmail },
+                { k:"phone", label:t.phone,    type:"tel",   ph:t.phPhone },
+                { k:"notes", label:t.notes,    type:"text",  ph:t.phNotes },
               ].map(({ k, label, type, ph }) => (
                 <div key={k}>
                   <label htmlFor={`add-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -767,12 +770,12 @@ export default function ClientsPage() {
                       const val = k === "phone" ? formatPhoneInput(e.target.value) : e.target.value;
                       setForm((p) => ({ ...p, [k]: val }));
                     }} />
-                  {k === "phone" && <p className="mt-1 text-xs text-gray-500">At least one of email or phone is required.</p>}
+                  {k === "phone" && <p className="mt-1 text-xs text-gray-500">{t.contactRequired}</p>}
                 </div>
               ))}
               <div className="flex gap-3 pt-2">
-                <Button variant="secondary" className="flex-1" onClick={() => setShowAdd(false)}>Cancel</Button>
-                <Button className="flex-1" loading={saving} onClick={addClient}>Add</Button>
+                <Button variant="secondary" className="flex-1" onClick={() => setShowAdd(false)}>{t.cancel}</Button>
+                <Button className="flex-1" loading={saving} onClick={addClient}>{t.add}</Button>
               </div>
             </CardContent>
           </Card>
@@ -790,24 +793,24 @@ export default function ClientsPage() {
             tabIndex={-1}
             className="relative z-10 w-full max-w-2xl">
             <CardHeader>
-              <CardTitle id="migration-modal-title">Move clients to Pulse</CardTitle>
-              <p className="text-sm text-gray-500">Choose where you are moving from, then upload a file for review or ask Pulse to help.</p>
+              <CardTitle id="migration-modal-title">{t.migration.title}</CardTitle>
+              <p className="text-sm text-gray-500">{t.migration.subtitle}</p>
             </CardHeader>
             <CardContent className="space-y-5">
               {migrationSubmitted ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                  <p className="font-semibold text-emerald-900">Migration request saved</p>
+                  <p className="font-semibold text-emerald-900">{t.migration.savedTitle}</p>
                   <p className="mt-1 text-sm text-emerald-800">
-                    Your request for {migrationSourceLabel} is ready for follow-up. You can keep adding clients manually while migration is reviewed.
+                    {t.migration.savedBody.replace("{source}", migrationSourceLabel)}
                   </p>
                   <div className="mt-4 flex justify-end">
-                    <Button onClick={closeMigration}>Done</Button>
+                    <Button onClick={closeMigration}>{t.migration.done}</Button>
                   </div>
                 </div>
               ) : (
                 <>
                   <div>
-                    <label htmlFor="migration-source" className="block text-sm font-medium text-gray-700 mb-1">Where are you moving from?</label>
+                    <label htmlFor="migration-source" className="block text-sm font-medium text-gray-700 mb-1">{t.migration.whereFrom}</label>
                     <select
                       id="migration-source"
                       value={migrationSource}
@@ -818,7 +821,7 @@ export default function ClientsPage() {
                       }}
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200">
                       {MIGRATION_SOURCES.map((source) => (
-                        <option key={source.value} value={source.value}>{source.label} - {source.hint}</option>
+                        <option key={source.value} value={source.value}>{source.label} - {t.migration.sourceHints[source.value]}</option>
                       ))}
                     </select>
                   </div>
@@ -826,9 +829,9 @@ export default function ClientsPage() {
                   {migrationSource !== "starting-fresh" && (
                     <div className="grid gap-2 sm:grid-cols-3">
                       {([
-                        { mode: "DONE_FOR_YOU", title: "Let Pulse migrate", desc: "Best if you want help reviewing the file." },
-                        { mode: "SELF_SERVICE", title: "I'll upload a file", desc: "Preview, catch issues, then import valid rows." },
-                        { mode: "ASSISTED_CALL", title: "Book guided help", desc: "Use this for complex exports or large lists." },
+                        { mode: "DONE_FOR_YOU", title: t.migration.modeDoneForYou[0], desc: t.migration.modeDoneForYou[1] },
+                        { mode: "SELF_SERVICE", title: t.migration.modeSelfService[0], desc: t.migration.modeSelfService[1] },
+                        { mode: "ASSISTED_CALL", title: t.migration.modeAssisted[0], desc: t.migration.modeAssisted[1] },
                       ] as const).map((option) => (
                         <button
                           key={option.mode}
@@ -846,30 +849,30 @@ export default function ClientsPage() {
                   )}
 
                   <div>
-                    <label htmlFor="migration-notes" className="block text-sm font-medium text-gray-700 mb-1">Notes for migration</label>
+                    <label htmlFor="migration-notes" className="block text-sm font-medium text-gray-700 mb-1">{t.migration.notesLabel}</label>
                     <textarea
                       id="migration-notes"
                       value={migrationNotes}
                       onChange={(e) => setMigrationNotes(e.target.value)}
                       rows={3}
                       maxLength={2000}
-                      placeholder="Example: I have about 400 clients and want tags/notes preserved."
+                      placeholder={t.migration.notesPlaceholder}
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200" />
                   </div>
 
                   {migrationSource === "starting-fresh" ? (
                     <div className="flex justify-end gap-2">
-                      <Button variant="secondary" onClick={closeMigration}>Cancel</Button>
-                      <Button loading={migrationBusy} onClick={submitMigrationHelp}>Save</Button>
+                      <Button variant="secondary" onClick={closeMigration}>{t.migration.cancel}</Button>
+                      <Button loading={migrationBusy} onClick={submitMigrationHelp}>{t.migration.save}</Button>
                     </div>
                   ) : migrationMode === "SELF_SERVICE" ? (
                     <div className="space-y-4">
                       <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
-                        <p className="text-sm font-semibold text-gray-900">Upload a CSV from {migrationSourceLabel}</p>
-                        <p className="mt-1 text-xs text-gray-500">Pulse will stage the file first. Nothing is imported until you review and confirm.</p>
+                        <p className="text-sm font-semibold text-gray-900">{t.migration.uploadTitle.replace("{source}", migrationSourceLabel)}</p>
+                        <p className="mt-1 text-xs text-gray-500">{t.migration.uploadHint}</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button variant="secondary" loading={migrationBusy} onClick={() => migrationFileInputRef.current?.click()}>
-                            <Upload className="w-4 h-4 mr-1.5" />Choose CSV
+                            <Upload className="w-4 h-4 mr-1.5" />{t.migration.chooseCsv}
                           </Button>
                           <input
                             ref={migrationFileInputRef}
@@ -888,22 +891,22 @@ export default function ClientsPage() {
                         <div className="rounded-xl border border-gray-200 bg-white p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <p className="text-sm font-semibold text-gray-900">Migration confidence: {migrationBatch.confidenceScore}%</p>
-                              <p className="mt-1 text-xs text-gray-500">{migrationBatch.totalRows} rows reviewed before import</p>
+                              <p className="text-sm font-semibold text-gray-900">{t.migration.confidence.replace("{score}", String(migrationBatch.confidenceScore))}</p>
+                              <p className="mt-1 text-xs text-gray-500">{t.migration.rowsReviewed.replace("{count}", String(migrationBatch.totalRows))}</p>
                             </div>
                             <Button
                               loading={migrationBusy}
                               disabled={migrationBatch.status === "IMPORTED" || migrationBatch.validRows === 0}
                               onClick={confirmMigrationImport}>
-                              {migrationBatch.status === "IMPORTED" ? "Imported" : "Import valid clients"}
+                              {migrationBatch.status === "IMPORTED" ? t.migration.imported : t.migration.importValid}
                             </Button>
                           </div>
                           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {[
-                              ["Valid", migrationBatch.validRows, "text-emerald-700 bg-emerald-50"],
-                              ["Duplicates", migrationBatch.duplicateRows, "text-amber-700 bg-amber-50"],
-                              ["Need fixes", migrationBatch.invalidRows, "text-red-700 bg-red-50"],
-                              ["Imported", migrationBatch.importedRows, "text-violet-700 bg-violet-50"],
+                              [t.migration.statValid, migrationBatch.validRows, "text-emerald-700 bg-emerald-50"],
+                              [t.migration.statDuplicates, migrationBatch.duplicateRows, "text-amber-700 bg-amber-50"],
+                              [t.migration.statNeedFixes, migrationBatch.invalidRows, "text-red-700 bg-red-50"],
+                              [t.migration.statImported, migrationBatch.importedRows, "text-violet-700 bg-violet-50"],
                             ].map(([label, value, tone]) => (
                               <div key={label} className={cn("rounded-lg px-3 py-2 text-center", tone as string)}>
                                 <p className="text-base font-bold">{value}</p>
@@ -915,8 +918,8 @@ export default function ClientsPage() {
                             <div className="mt-4 max-h-36 overflow-y-auto rounded-lg border border-gray-100">
                               {(migrationBatch.rows ?? []).filter((row) => row.status !== "VALID").slice(0, 8).map((row) => (
                                 <div key={row.id} className="border-b border-gray-100 px-3 py-2 text-xs last:border-b-0">
-                                  <p className="font-semibold text-gray-700">Row {row.rowNumber}: {row.status}</p>
-                                  <p className="mt-0.5 text-gray-500">{[...row.errors, ...row.warnings].join(", ") || "Possible duplicate"}</p>
+                                  <p className="font-semibold text-gray-700">{t.migration.rowStatus.replace("{number}", String(row.rowNumber)).replace("{status}", row.status)}</p>
+                                  <p className="mt-0.5 text-gray-500">{[...row.errors, ...row.warnings].join(", ") || t.migration.possibleDuplicate}</p>
                                 </div>
                               ))}
                             </div>
@@ -925,13 +928,13 @@ export default function ClientsPage() {
                       )}
 
                       <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={closeMigration}>Close</Button>
+                        <Button variant="secondary" onClick={closeMigration}>{t.migration.close}</Button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex justify-end gap-2">
-                      <Button variant="secondary" onClick={closeMigration}>Cancel</Button>
-                      <Button loading={migrationBusy} onClick={submitMigrationHelp}>Request migration help</Button>
+                      <Button variant="secondary" onClick={closeMigration}>{t.migration.cancel}</Button>
+                      <Button loading={migrationBusy} onClick={submitMigrationHelp}>{t.migration.requestHelp}</Button>
                     </div>
                   )}
                 </>

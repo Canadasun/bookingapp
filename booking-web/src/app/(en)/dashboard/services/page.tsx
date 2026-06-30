@@ -16,6 +16,7 @@ import { SkeletonList } from "@/components/Skeleton";
 import { formatPrice, cn } from "@/lib/utils";
 import { OwnerOnly } from "@/components/OwnerOnly";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const COLORS = [
   "#E9A23C","#EFAA44","#8b5cf6","#ec4899","#f43f5e",
@@ -31,11 +32,11 @@ function fmtDuration(mins: number) {
 // Scrollable duration picker options (minutes) + a readable hours:minutes label.
 const HOUR_OPTS = Array.from({ length: 13 }, (_, i) => i); // 0–12 hours
 const MIN_OPTS = Array.from({ length: 60 }, (_, i) => i);  // 0–59 minutes
-function fmtDurationLong(mins: number) {
+function fmtDurationLong(mins: number, labels: { hrShort: string; hrsShort: string; minShort: string }) {
   const h = Math.floor(mins / 60), m = mins % 60;
-  const hLabel = h > 0 ? `${h} hr${h > 1 ? "s" : ""}` : "";
-  const mLabel = m > 0 ? `${m} min` : "";
-  return [hLabel, mLabel].filter(Boolean).join(" ") || `${mins} min`;
+  const hLabel = h > 0 ? (h > 1 ? labels.hrsShort : labels.hrShort).replace("{count}", String(h)) : "";
+  const mLabel = m > 0 ? labels.minShort.replace("{count}", String(m)) : "";
+  return [hLabel, mLabel].filter(Boolean).join(" ") || labels.minShort.replace("{count}", String(mins));
 }
 
 // ── Service form modal ────────────────────────────────────────────────────────
@@ -52,11 +53,9 @@ const EMPTY_SVC: ServiceFormState = {
   locationMode: "IN_PERSON", virtualMeetingUrl: "", color: "#E9A23C", active: true, categoryId: "",
 };
 
-const LOCATION_MODES: { value: ServiceLocationMode; label: string; hint: string }[] = [
-  { value: "IN_PERSON", label: "At my business", hint: "Client comes to your location." },
-  { value: "VIRTUAL", label: "Virtual", hint: "Video call — a meeting link is sent to the client." },
-  { value: "CUSTOMER", label: "At customer", hint: "You travel to the client; their address is collected at booking." },
-  { value: "PHONE", label: "Phone only", hint: "You call the client at their number." },
+// Labels and hints come from the dictionary (services.form.locationModes).
+const LOCATION_MODES: { value: ServiceLocationMode }[] = [
+  { value: "IN_PERSON" }, { value: "VIRTUAL" }, { value: "CUSTOMER" }, { value: "PHONE" },
 ];
 
 function preferredPriceType(): ServiceFormState["priceType"] {
@@ -91,11 +90,13 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
     } : { ...EMPTY_SVC, priceType: preferredPriceType() }
   );
   const [saving, setSaving] = useState(false);
+  const { dictionary } = useDashboardLocale();
+  const t = dictionary.services.form;
   const f = (k: keyof ServiceFormState, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
 
   async function save() {
-    if (!form.name || !form.priceCents) { toast.error("Name and price are required"); return; }
-    if (Number(form.durationMinutes) < 1) { toast.error("Set how long the service takes"); return; }
+    if (!form.name || !form.priceCents) { toast.error(t.nameAndPriceRequired); return; }
+    if (Number(form.durationMinutes) < 1) { toast.error(t.setDuration); return; }
     if (!bizId) return;
     setSaving(true);
     try {
@@ -119,9 +120,9 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       if (editing) await api.services.update(bizId, editing.id, data);
       else await api.services.create(bizId, data);
       window.localStorage.setItem("pulse.preferred-price-type.v1", form.priceType);
-      toast.success(editing ? "Service updated" : "Service created");
+      toast.success(editing ? t.serviceUpdated : t.serviceCreated);
       onSaved();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : t.saveFailed); }
     finally { setSaving(false); }
   }
 
@@ -137,24 +138,24 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <Card className="dashboard-safe-bottom relative w-full max-w-md z-10 max-h-[90dvh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-100 sticky top-0 bg-white flex items-center justify-between">
-          <h3 id="service-modal-title" className="text-base font-semibold text-gray-900">{editing ? "Edit service" : "New service"}</h3>
-          <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
+          <h3 id="service-modal-title" className="text-base font-semibold text-gray-900">{editing ? t.editTitle : t.newTitle}</h3>
+          <button onClick={onClose} aria-label={t.closeAria}><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <CardContent className="space-y-4 pt-4">
 
           {/* Category */}
           <div>
-            <label htmlFor="svc-categoryId" className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+            <label htmlFor="svc-categoryId" className="block text-sm font-medium text-gray-700 mb-1.5">{t.category}</label>
             <select id="svc-categoryId" value={form.categoryId} onChange={e => f("categoryId", e.target.value)}
               className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-              <option value="">— No category —</option>
+              <option value="">{t.noCategory}</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
           {[
-            { k: "name",            label: "Service name *",     type: "text",   ph: "e.g. Full groom · Lash fill · Cut & style" },
-            { k: "description",     label: "Description",        type: "text",   ph: "Optional detail" },
+            { k: "name",            label: t.name,        type: "text",   ph: t.namePlaceholder },
+            { k: "description",     label: t.description, type: "text",   ph: t.descriptionPlaceholder },
           ].map(({ k, label, type, ph }) => (
             <div key={k}>
               <label htmlFor={`svc-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -165,46 +166,46 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
 
           {/* Duration — pick hours and minutes separately (e.g. 1:15, 2:08) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">How long does it take?</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.duration}</label>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <select
-                  aria-label="Duration hours"
+                  aria-label={t.durationHoursAria}
                   value={Math.floor(Number(form.durationMinutes || 0) / 60)}
                   onChange={e => f("durationMinutes", String(Number(e.target.value) * 60 + (Number(form.durationMinutes || 0) % 60)))}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                  {HOUR_OPTS.map(h => <option key={h} value={h}>{h} hour{h === 1 ? "" : "s"}</option>)}
+                  {HOUR_OPTS.map(h => <option key={h} value={h}>{(h === 1 ? t.hour : t.hours).replace("{count}", String(h))}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-gray-600">Hours</p>
+                <p className="mt-1 text-xs text-gray-600">{t.hoursLabel}</p>
               </div>
               <div>
                 <select
-                  aria-label="Duration minutes"
+                  aria-label={t.durationMinutesAria}
                   value={Number(form.durationMinutes || 0) % 60}
                   onChange={e => f("durationMinutes", String(Math.floor(Number(form.durationMinutes || 0) / 60) * 60 + Number(e.target.value)))}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                  {MIN_OPTS.map(m => <option key={m} value={m}>{String(m).padStart(2, "0")} min</option>)}
+                  {MIN_OPTS.map(m => <option key={m} value={m}>{t.minuteOption.replace("{count}", String(m).padStart(2, "0"))}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-gray-600">Minutes</p>
+                <p className="mt-1 text-xs text-gray-600">{t.minutesLabel}</p>
               </div>
             </div>
-            <p className="mt-1.5 text-xs text-violet-600 font-medium">Total: {fmtDurationLong(Number(form.durationMinutes || 0))}</p>
+            <p className="mt-1.5 text-xs text-violet-600 font-medium">{t.total.replace("{duration}", fmtDurationLong(Number(form.durationMinutes || 0), t))}</p>
           </div>
 
           <div>
-            <label htmlFor="svc-priceCents" className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
-            <Input id="svc-priceCents" type="number" placeholder="45.00" value={form.priceCents}
+            <label htmlFor="svc-priceCents" className="block text-sm font-medium text-gray-700 mb-1">{t.price}</label>
+            <Input id="svc-priceCents" type="number" placeholder={t.pricePlaceholder} value={form.priceCents}
               onChange={e => f("priceCents", e.target.value)}
               min={0} step="0.01" />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Pricing style</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t.pricingStyle}</label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {[
-                { value: "FLAT" as const, label: "Flat rate" },
-                { value: "PER_HOUR" as const, label: "Per hour" },
-                { value: "STARTING_AT" as const, label: "Starting at" },
+                { value: "FLAT" as const, label: t.flat },
+                { value: "PER_HOUR" as const, label: t.perHour },
+                { value: "STARTING_AT" as const, label: t.startingAt },
               ].map((opt) => (
                 <button key={opt.value} type="button" onClick={() => f("priceType", opt.value)}
                   className={cn("rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
@@ -214,37 +215,37 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
               ))}
             </div>
             <p className="mt-1 text-xs text-gray-600">
-              Use starting at when the final amount may change after seeing the client, pet, or job.
+              {t.pricingHint}
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Where is it delivered?</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t.delivery}</label>
             <div className="grid grid-cols-2 gap-2">
               {LOCATION_MODES.map((m) => (
                 <button key={m.value} type="button" onClick={() => f("locationMode", m.value)}
                   aria-pressed={form.locationMode === m.value}
                   className={cn("rounded-xl border px-3 py-2 text-xs font-semibold text-left transition-colors",
                     form.locationMode === m.value ? "border-violet-300 bg-violet-50 text-violet-700" : "border-gray-200 text-gray-500 hover:bg-gray-50")}>
-                  {m.label}
+                  {t.locationModes[m.value][0]}
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-gray-600">{LOCATION_MODES.find((m) => m.value === form.locationMode)?.hint}</p>
+            <p className="mt-1 text-xs text-gray-600">{t.locationModes[form.locationMode][1]}</p>
           </div>
 
           {form.locationMode === "VIRTUAL" && (
             <div>
-              <label htmlFor="svc-virtualMeetingUrl" className="block text-sm font-medium text-gray-700 mb-1">Meeting link</label>
-              <Input id="svc-virtualMeetingUrl" type="url" inputMode="url" placeholder="https://meet.google.com/abc-defg-hij"
+              <label htmlFor="svc-virtualMeetingUrl" className="block text-sm font-medium text-gray-700 mb-1">{t.meetingLink}</label>
+              <Input id="svc-virtualMeetingUrl" type="url" inputMode="url" placeholder={t.meetingPlaceholder}
                 value={form.virtualMeetingUrl} onChange={e => f("virtualMeetingUrl", e.target.value)} />
-              <p className="mt-1 text-xs text-gray-600">Sent to the client in their confirmation and reminders. Leave blank to add the link per appointment.</p>
+              <p className="mt-1 text-xs text-gray-600">{t.meetingHint}</p>
             </div>
           )}
 
           {[
-            { k: "bufferBeforeMin", label: "Buffer before (min)", type: "number", ph: "0" },
-            { k: "bufferAfterMin",  label: "Buffer after (min)",  type: "number", ph: "0" },
+            { k: "bufferBeforeMin", label: t.bufferBefore, type: "number", ph: t.bufferPlaceholder },
+            { k: "bufferAfterMin",  label: t.bufferAfter,  type: "number", ph: t.bufferPlaceholder },
           ].map(({ k, label, type, ph }) => (
             <div key={k}>
               <label htmlFor={`svc-${k}`} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -257,22 +258,22 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
           {/* Room / resource this service occupies */}
           {resources.length > 0 && (
             <div>
-              <label htmlFor="svc-resourceId" className="block text-sm font-medium text-gray-700 mb-1.5">Room / resource</label>
+              <label htmlFor="svc-resourceId" className="block text-sm font-medium text-gray-700 mb-1.5">{t.room}</label>
               <select id="svc-resourceId" value={form.resourceId} onChange={e => f("resourceId", e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                <option value="">— None —</option>
+                <option value="">{t.roomNone}</option>
                 {resources.filter(r => r.active).map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
-              <p className="mt-1 text-xs text-gray-600">If set, the slot is blocked whenever this resource is already in use.</p>
+              <p className="mt-1 text-xs text-gray-600">{t.roomHint}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t.color}</label>
             <div className="flex gap-2 flex-wrap">
               {COLORS.map(c => (
                 <button key={c} onClick={() => f("color", c)}
-                  aria-label={`Select color ${c}${form.color === c ? " (selected)" : ""}`}
+                  aria-label={t.colorAria.replace("{color}", c) + (form.color === c ? t.colorSelected : "")}
                   aria-pressed={form.color === c}
                   className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
                   style={{ background: c, outline: form.color === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}>
@@ -284,12 +285,12 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={form.active} onChange={e => f("active", e.target.checked)} className="accent-violet-600 w-4 h-4" />
-            <span className="text-sm text-gray-700">Active — visible in booking flow</span>
+            <span className="text-sm text-gray-700">{t.active}</span>
           </label>
 
           <div className="flex gap-3 pt-2">
-            <Button variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button className="flex-1" loading={saving} onClick={save}>{editing ? "Save changes" : "Create service"}</Button>
+            <Button variant="secondary" className="flex-1" onClick={onClose}>{t.cancel}</Button>
+            <Button className="flex-1" loading={saving} onClick={save}>{editing ? t.saveChanges : t.createService}</Button>
           </div>
         </CardContent>
       </Card>
@@ -311,17 +312,19 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
   const [desc, setDesc] = useState(editing?.description ?? "");
   const [color, setColor] = useState(editing?.color ?? "#E9A23C");
   const [saving, setSaving] = useState(false);
+  const { dictionary } = useDashboardLocale();
+  const t = dictionary.services.category;
 
   async function save() {
-    if (!name.trim()) { toast.error("Category name is required"); return; }
+    if (!name.trim()) { toast.error(t.nameRequired); return; }
     if (!bizId) return;
     setSaving(true);
     try {
       if (editing) await api.serviceCategories.update(bizId, editing.id, { name, description: desc || undefined, color });
       else await api.serviceCategories.create(bizId, { name, description: desc || undefined, color });
-      toast.success(editing ? "Category updated" : "Category created");
+      toast.success(editing ? t.updated : t.created);
       onSaved();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : t.saveFailed); }
     finally { setSaving(false); }
   }
 
@@ -337,24 +340,24 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <Card className="dashboard-safe-bottom relative w-full max-w-sm max-h-[90dvh] overflow-y-auto z-10">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 id="category-modal-title" className="text-base font-semibold text-gray-900">{editing ? "Edit category" : "New category"}</h3>
-          <button onClick={onClose} aria-label="Close dialog"><X className="w-4 h-4 text-gray-400" /></button>
+          <h3 id="category-modal-title" className="text-base font-semibold text-gray-900">{editing ? t.editTitle : t.newTitle}</h3>
+          <button onClick={onClose} aria-label={t.closeAria}><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <CardContent className="space-y-4 pt-4">
           <div>
-            <label htmlFor="cat-name" className="block text-sm font-medium text-gray-700 mb-1">Category name *</label>
-            <Input id="cat-name" placeholder="e.g. Hair Services" value={name} onChange={e => setName(e.target.value)} autoFocus />
+            <label htmlFor="cat-name" className="block text-sm font-medium text-gray-700 mb-1">{t.name}</label>
+            <Input id="cat-name" placeholder={t.namePlaceholder} value={name} onChange={e => setName(e.target.value)} autoFocus />
           </div>
           <div>
-            <label htmlFor="cat-desc" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <Input id="cat-desc" placeholder="Optional" value={desc} onChange={e => setDesc(e.target.value)} />
+            <label htmlFor="cat-desc" className="block text-sm font-medium text-gray-700 mb-1">{t.description}</label>
+            <Input id="cat-desc" placeholder={t.descriptionPlaceholder} value={desc} onChange={e => setDesc(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t.color}</label>
             <div className="flex gap-2 flex-wrap">
               {CAT_COLORS.map(c => (
                 <button key={c} onClick={() => setColor(c)}
-                  aria-label={`Select color ${c}${color === c ? " (selected)" : ""}`}
+                  aria-label={t.colorAria.replace("{color}", c) + (color === c ? t.colorSelected : "")}
                   aria-pressed={color === c}
                   className="w-7 h-7 rounded-full flex items-center justify-center"
                   style={{ background: c, outline: color === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}>
@@ -364,8 +367,8 @@ function CategoryModal({ bizId, editing, onClose, onSaved }: CategoryModalProps)
             </div>
           </div>
           <div className="flex gap-3 pt-1">
-            <Button variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button className="flex-1" loading={saving} onClick={save}>{editing ? "Save" : "Create"}</Button>
+            <Button variant="secondary" className="flex-1" onClick={onClose}>{t.cancel}</Button>
+            <Button className="flex-1" loading={saving} onClick={save}>{editing ? t.save : t.create}</Button>
           </div>
         </CardContent>
       </Card>
@@ -396,6 +399,8 @@ export default function ServicesPage() {
 
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
+  const { dictionary } = useDashboardLocale();
+  const t = dictionary.services;
 
   const load = useCallback(async () => {
     if (!bizId) return;
@@ -410,27 +415,27 @@ export default function ServicesPage() {
       setServices(svcs);
       setCategories(cats);
       setResources(res);
-    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load services"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : t.loadFailed); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, t.loadFailed]);
 
   useEffect(() => { load(); }, [load]);
 
   async function toggleActive(svc: Service) {
     if (!bizId) return;
     try { await api.services.update(bizId, svc.id, { active: !svc.active }); load(); }
-    catch { toast.error("Failed to update"); }
+    catch { toast.error(t.updateFailed); }
   }
 
   async function doDeleteService() {
     if (!bizId || !serviceToDelete) return;
     try {
       await api.services.remove(bizId, serviceToDelete.id);
-      toast.success("Service deleted");
+      toast.success(t.serviceDeleted);
       setServiceToDelete(null);
       load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Delete failed");
+      toast.error(e instanceof Error ? e.message : t.deleteFailed);
       setServiceToDelete(null);
     }
   }
@@ -440,18 +445,18 @@ export default function ServicesPage() {
     if (!n || !bizId) return;
     setSavingResource(true);
     try { await api.resources.create(bizId, { name: n }); setResourceName(""); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to add"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : t.resources.addFailed); }
     finally { setSavingResource(false); }
   }
   async function doRemoveResource() {
     if (!bizId || !resourceToDelete) return;
     try { await api.resources.remove(bizId, resourceToDelete.id); setResourceToDelete(null); load(); }
-    catch { toast.error("Failed to delete"); setResourceToDelete(null); }
+    catch { toast.error(t.resources.deleteFailed); setResourceToDelete(null); }
   }
   async function toggleResourceActive(r: Resource) {
     if (!bizId) return;
     try { await api.resources.update(bizId, r.id, { active: !r.active }); load(); }
-    catch { toast.error("Failed to update"); }
+    catch { toast.error(t.updateFailed); }
   }
   async function saveResourceRename() {
     if (!editingResource || !bizId) return;
@@ -459,14 +464,14 @@ export default function ServicesPage() {
     if (!name) return;
     setSavingResource(true);
     try { await api.resources.update(bizId, editingResource.id, { name }); setEditingResource(null); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to rename"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : t.resources.renameFailed); }
     finally { setSavingResource(false); }
   }
 
   async function doDeleteCategory() {
     if (!bizId || !categoryToDelete) return;
-    try { await api.serviceCategories.remove(bizId, categoryToDelete.id); toast.success("Category deleted"); setCategoryToDelete(null); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); setCategoryToDelete(null); }
+    try { await api.serviceCategories.remove(bizId, categoryToDelete.id); toast.success(t.categoryDeleted); setCategoryToDelete(null); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : t.deleteFailed); setCategoryToDelete(null); }
   }
 
   // Group services: by category, then uncategorised
@@ -481,27 +486,27 @@ export default function ServicesPage() {
     <OwnerOnly>
       <ConfirmDialog
         open={serviceToDelete !== null}
-        title={`Delete "${serviceToDelete?.name}"?`}
-        description="This cannot be undone."
-        confirmLabel="Delete service"
+        title={t.deleteServiceTitle.replace("{name}", serviceToDelete?.name ?? "")}
+        description={t.deleteServiceDesc}
+        confirmLabel={t.deleteServiceConfirm}
         variant="destructive"
         onConfirm={doDeleteService}
         onCancel={() => setServiceToDelete(null)}
       />
       <ConfirmDialog
         open={categoryToDelete !== null}
-        title={`Delete "${categoryToDelete?.name}"?`}
-        description="Services in this category will become uncategorised."
-        confirmLabel="Delete category"
+        title={t.deleteCategoryTitle.replace("{name}", categoryToDelete?.name ?? "")}
+        description={t.deleteCategoryDesc}
+        confirmLabel={t.deleteCategoryConfirm}
         variant="destructive"
         onConfirm={doDeleteCategory}
         onCancel={() => setCategoryToDelete(null)}
       />
       <ConfirmDialog
         open={resourceToDelete !== null}
-        title={`Delete "${resourceToDelete?.name}"?`}
-        description="Services using it will lose their room assignment."
-        confirmLabel="Delete resource"
+        title={t.deleteResourceTitle.replace("{name}", resourceToDelete?.name ?? "")}
+        description={t.deleteResourceDesc}
+        confirmLabel={t.deleteResourceConfirm}
         variant="destructive"
         onConfirm={doRemoveResource}
         onCancel={() => setResourceToDelete(null)}
@@ -511,17 +516,17 @@ export default function ServicesPage() {
         {/* Header */}
         <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Services</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t.title}</h2>
             <p className="text-sm text-gray-500">
-              {totalActive} active · {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+              {(categories.length !== 1 ? t.summaryPlural : t.summary).replace("{active}", String(totalActive)).replace("{count}", String(categories.length))}
             </p>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => { setEditCat(null); setCatModal(true); }} className="gap-1.5">
-              <FolderPlus className="w-4 h-4" /> New category
+              <FolderPlus className="w-4 h-4" /> {t.newCategory}
             </Button>
             <Button size="sm" onClick={() => { setEditSvc(null); setSvcModal(true); }} className="gap-1.5">
-              <Plus className="w-4 h-4" /> New service
+              <Plus className="w-4 h-4" /> {t.newService}
             </Button>
           </div>
         </div>
@@ -529,20 +534,20 @@ export default function ServicesPage() {
         {/* Rooms & resources */}
         <div className="mb-5 rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
           <button onClick={() => setShowResources((s) => !s)}
-            aria-label={showResources ? "Hide rooms and resources" : "Manage rooms and resources"}
+            aria-label={showResources ? t.resources.hideAria : t.resources.manageAria}
             className="flex w-full items-center justify-between px-4 py-3 text-left">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">Rooms &amp; resources</span>
+              <span className="text-sm font-semibold text-gray-900">{t.resources.title}</span>
               {resources.length > 0 && (
                 <span className="text-xs bg-gray-100 text-gray-500 font-medium px-2 py-0.5 rounded-full">{resources.length}</span>
               )}
             </div>
-            <span className="text-xs text-violet-600 font-medium">{showResources ? "Hide" : "Manage"}</span>
+            <span className="text-xs text-violet-600 font-medium">{showResources ? t.resources.hide : t.resources.manage}</span>
           </button>
           {showResources && (
             <div className="border-t border-gray-50">
               <p className="text-xs text-gray-600 px-4 pt-3 pb-2">
-                Shared rooms, chairs, or equipment. Assign one to a service and the slot is blocked whenever that resource is already in use.
+                {t.resources.intro}
               </p>
 
               {/* Resource list */}
@@ -571,10 +576,10 @@ export default function ServicesPage() {
                             />
                             <button onClick={saveResourceRename} disabled={savingResource}
                               className="text-xs font-medium text-violet-600 hover:text-violet-800 shrink-0">
-                              {savingResource ? "…" : "Save"}
+                              {savingResource ? t.resources.saving : t.resources.save}
                             </button>
                             <button onClick={() => setEditingResource(null)}
-                              className="text-xs text-gray-400 hover:text-gray-600 shrink-0">Cancel</button>
+                              className="text-xs text-gray-400 hover:text-gray-600 shrink-0">{t.resources.cancel}</button>
                           </div>
                         ) : (
                           <div className="flex-1 min-w-0">
@@ -583,7 +588,7 @@ export default function ServicesPage() {
                             </span>
                             {usedBy.length > 0 && (
                               <span className="ml-2 text-xs text-gray-500">
-                                {usedBy.length} service{usedBy.length !== 1 ? "s" : ""}
+                                {(usedBy.length !== 1 ? t.resources.usedByPlural : t.resources.usedBy).replace("{count}", String(usedBy.length))}
                               </span>
                             )}
                           </div>
@@ -594,24 +599,24 @@ export default function ServicesPage() {
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               onClick={() => toggleResourceActive(r)}
-                              aria-label={r.active ? "Deactivate" : "Activate"}
+                              aria-label={r.active ? t.resources.deactivate : t.resources.activate}
                               className={cn(
                                 "text-xs px-2 py-0.5 rounded-full border font-medium transition-colors",
                                 r.active
                                   ? "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
                                   : "text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100",
                               )}>
-                              {r.active ? "Active" : "Inactive"}
+                              {r.active ? t.resources.active : t.resources.inactive}
                             </button>
                             <button
                               onClick={() => setEditingResource({ id: r.id, name: r.name })}
-                              aria-label="Rename"
+                              aria-label={t.resources.rename}
                               className="p-1 text-gray-400 hover:text-gray-700 rounded">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setResourceToDelete(r)}
-                              aria-label="Delete"
+                              aria-label={t.resources.delete}
                               className="p-1 text-gray-400 hover:text-red-600 rounded">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -624,19 +629,19 @@ export default function ServicesPage() {
               )}
 
               {resources.length === 0 && (
-                <p className="px-4 pb-3 text-xs text-gray-600">No resources yet. Add one below.</p>
+                <p className="px-4 pb-3 text-xs text-gray-600">{t.resources.empty}</p>
               )}
 
               {/* Add new resource */}
               <div className="flex gap-2 px-4 pb-4 pt-2 border-t border-gray-50">
                 <Input
-                  placeholder="e.g. Room 1, Chair 2, Laser"
+                  placeholder={t.resources.placeholder}
                   value={resourceName}
                   onChange={(e) => setResourceName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addResource(); } }}
                 />
                 <Button size="sm" onClick={addResource} disabled={!resourceName.trim() || savingResource}>
-                  {savingResource ? "Adding…" : "Add"}
+                  {savingResource ? t.resources.adding : t.resources.add}
                 </Button>
               </div>
             </div>
@@ -646,11 +651,11 @@ export default function ServicesPage() {
         {loadError ? (
           <div className="text-center py-20">
             <p className="text-red-500 mb-3">{loadError}</p>
-            <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+            <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{t.retry}</button>
           </div>
         ) : loading ? <SkeletonList rows={6} /> : services.length === 0 && categories.length === 0 ? (
-          <EmptyState title="No services yet"
-            description="Create categories to organise your services, then add services under each one." />
+          <EmptyState title={t.emptyTitle}
+            description={t.emptyBody} />
         ) : (
           <div className="space-y-4">
 
@@ -672,12 +677,12 @@ export default function ServicesPage() {
                     </button>
                     <div className="flex gap-1 shrink-0">
                       <button onClick={() => { setEditCat(cat); setCatModal(true); }}
-                        aria-label={`Edit ${cat.name} category`}
+                        aria-label={t.editCategoryAria.replace("{name}", cat.name)}
                         className="p-1.5 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => setCategoryToDelete(cat)}
-                        aria-label={`Delete ${cat.name} category`}
+                        aria-label={t.deleteCategoryAria.replace("{name}", cat.name)}
                         className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -704,7 +709,7 @@ export default function ServicesPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 bg-gray-50/60">
                   <Tag className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-sm font-bold text-gray-500">Uncategorised</span>
+                  <span className="text-sm font-bold text-gray-500">{t.uncategorised}</span>
                   <span className="text-xs text-gray-400 bg-gray-200 rounded-full px-1.5 py-0.5">{uncategorised.length}</span>
                 </div>
                 <div className="divide-y divide-gray-50">
@@ -723,7 +728,7 @@ export default function ServicesPage() {
               <div key={cat.id} className="bg-white rounded-2xl border border-dashed border-gray-200 px-4 py-3 flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.color }} />
                 <span className="text-sm font-semibold text-gray-500">{cat.name}</span>
-                <span className="text-xs text-gray-400">— empty</span>
+                <span className="text-xs text-gray-400">{t.empty}</span>
                 <div className="ml-auto flex gap-1">
                   <button onClick={() => { setEditCat(cat); setCatModal(true); }}
                     aria-label={`Edit ${cat.name} category`}
@@ -768,10 +773,12 @@ export default function ServicesPage() {
 function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
   svc: Service; onEdit: () => void; onToggle: () => void; onDelete: () => void;
 }) {
+  const { dictionary } = useDashboardLocale();
+  const t = dictionary.services.row;
   const priceLabel = svc.priceType === "STARTING_AT"
-    ? `Starting at ${formatPrice(svc.priceCents)}`
+    ? t.startingAt.replace("{price}", formatPrice(svc.priceCents))
     : svc.priceType === "PER_HOUR"
-      ? `${formatPrice(svc.priceCents)} / hr`
+      ? t.perHour.replace("{price}", formatPrice(svc.priceCents))
       : formatPrice(svc.priceCents);
   return (
     <div className={cn("flex items-center gap-4 px-4 py-3", !svc.active && "opacity-50")}>
@@ -779,20 +786,20 @@ function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-semibold text-sm text-gray-900">{svc.name}</p>
-          {!svc.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">archived</span>}
+          {!svc.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{t.archived}</span>}
         </div>
         {svc.description && <p className="text-xs text-gray-500 truncate mt-0.5">{svc.description}</p>}
         <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(svc.durationMinutes)}</span>
           <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{priceLabel}</span>
           {(svc.bufferBeforeMin > 0 || svc.bufferAfterMin > 0) && (
-            <span>+{svc.bufferBeforeMin}/{svc.bufferAfterMin}m buffer</span>
+            <span>{t.buffer.replace("{before}", String(svc.bufferBeforeMin)).replace("{after}", String(svc.bufferAfterMin))}</span>
           )}
         </div>
       </div>
       <div className="flex gap-1 shrink-0">
         <button onClick={onToggle}
-          aria-label={svc.active ? `Hide ${svc.name}` : `Show ${svc.name}`}
+          aria-label={(svc.active ? t.hideAria : t.showAria).replace("{name}", svc.name)}
           className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
           {svc.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </button>
@@ -802,7 +809,7 @@ function ServiceRow({ svc, onEdit, onToggle, onDelete }: {
         </button>
         <button onClick={onDelete}
           className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-          aria-label={`Delete ${svc.name}`}>
+          aria-label={t.deleteAria.replace("{name}", svc.name)}>
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
