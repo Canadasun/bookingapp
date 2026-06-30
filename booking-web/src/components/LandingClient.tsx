@@ -170,16 +170,16 @@ export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: 
       <Link href={locale === "fr" ? "/fr/for" : "/for"} className="hover:text-indigo-600 transition-colors">{t.industries}</Link>
       <Link href={locale === "fr" ? "/fr/compare" : "/compare"} className="hover:text-indigo-600 transition-colors">{t.compare}</Link>
       <Link href={locale === "fr" ? "/fr/pricing" : "/pricing"} className="hover:text-indigo-600 transition-colors">{t.pricing}</Link>
-      <Link href="/demo" className="hover:text-indigo-600 transition-colors">{t.demo}</Link>
-      <Link href="/reviews" className="hover:text-indigo-600 transition-colors">{t.reviews}</Link>
-      <Link href="/referrals" className="hover:text-indigo-600 transition-colors">{t.referrals}</Link>
-      <Link href="/changelog" className="hover:text-indigo-600 transition-colors">{t.changelog}</Link>
+      <Link href={locale === "fr" ? "/fr/demo" : "/demo"} className="hover:text-indigo-600 transition-colors">{t.demo}</Link>
+      <Link href={locale === "fr" ? "/fr/reviews" : "/reviews"} className="hover:text-indigo-600 transition-colors">{t.reviews}</Link>
+      <Link href={locale === "fr" ? "/fr/referrals" : "/referrals"} className="hover:text-indigo-600 transition-colors">{t.referrals}</Link>
+      <Link href={locale === "fr" ? "/fr/changelog" : "/changelog"} className="hover:text-indigo-600 transition-colors">{t.changelog}</Link>
       <Link href={locale === "fr" ? "/fr/security" : "/security"} className="hover:text-indigo-600 transition-colors">{t.security}</Link>
       <Link href={locale === "fr" ? "/fr/canadian-privacy" : "/canadian-privacy"} className="hover:text-indigo-600 transition-colors">{t.canadianPrivacy}</Link>
-      <Link href="/support" className="hover:text-indigo-600 transition-colors">{t.support}</Link>
+      <Link href={locale === "fr" ? "/fr/support" : "/support"} className="hover:text-indigo-600 transition-colors">{t.support}</Link>
       <Link href={locale === "fr" ? "/fr/contact" : "/contact"} className="hover:text-indigo-600 transition-colors">{t.contact}</Link>
       <Link href={locale === "fr" ? "/fr/faq" : "/faq"} className="hover:text-indigo-600 transition-colors">{t.faq}</Link>
-      <Link href="/status" className="hover:text-indigo-600 transition-colors">{t.status}</Link>
+      <Link href={locale === "fr" ? "/fr/status" : "/status"} className="hover:text-indigo-600 transition-colors">{t.status}</Link>
     </>
   );
   if (user && home) {
