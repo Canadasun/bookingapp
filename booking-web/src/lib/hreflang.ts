@@ -36,6 +36,17 @@ export const LOCALIZED_PATHS = new Set<string>([
   "/for/nail-techs",
   "/for/spas",
   "/for/yoga-studios",
+  "/for",
+  "/for/toronto",
+  "/for/vancouver",
+  "/for/calgary",
+  "/for/ottawa",
+  "/for/edmonton",
+  "/for/winnipeg",
+  "/for/montreal",
+  "/for/quebec-city",
+  "/for/laval",
+  "/for/gatineau",
 ]);
 
 export type Locale = "en" | "fr";
