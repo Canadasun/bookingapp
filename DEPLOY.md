@@ -1,7 +1,7 @@
 # BookingApp — Production Deployment
 
 ## Stack
-- **Web**: Next.js → Vercel
+- **Web**: Next.js → Railway
 - **API**: NestJS → Railway
 - **Database**: PostgreSQL → Railway (managed)
 - **Cache/Queue**: Redis → Railway (managed)
@@ -131,13 +131,14 @@ Railway auto-injects `DATABASE_URL` and `REDIS_URL` from the managed services.
 
 ---
 
-## Step 2 — Deploy Web to Vercel
+## Step 2 — Deploy Web to Railway
 
-### 2a. Import project
-1. Go to [vercel.com](https://vercel.com) → New Project
-2. Import from GitHub → select `bookingapp` → set **Root Directory** to `booking-web`
+### 2a. Create the service
+1. Go to [railway.app](https://railway.app) → open the project (or **New Project**)
+2. **+ New Service** → Deploy from GitHub repo → select `bookingapp` → set **Root Directory** to `booking-web`
+3. The build uses `booking-web/railway.toml` (Dockerfile builder, healthcheck `/api/health`). No extra build config needed.
 
-### 2b. Set environment variables in Vercel
+### 2b. Set environment variables in Railway
 
 **Required**
 ```
@@ -148,6 +149,7 @@ NEXT_PUBLIC_WEB_URL=https://www.pulseappointments.com
 COOKIE_SIGN_SECRET=<openssl rand -hex 32>
 ```
 > `COOKIE_SIGN_SECRET` is required — the web app throws at startup if missing in production.
+> `PORT=3000` and `NODE_ENV=production` are already set in `railway.toml`.
 
 **Optional**
 ```
@@ -157,7 +159,7 @@ NEXT_PUBLIC_STATUS_PAGE_URL=https://status.pulseappointments.com
 ```
 
 ### 2c. Deploy
-Vercel auto-deploys on every push to `main`.
+The `booking-web` service is connected to the GitHub repo, so Railway auto-deploys on every push to `main`. To deploy from a local working tree instead, run `railway up` from `booking-web/`.
 
 ---
 
