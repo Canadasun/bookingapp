@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Mail, MessageSquare, Send, Trash2, Plus, Users, Check } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, type Campaign, type CampaignChannel, type CampaignAudience } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
@@ -29,7 +28,7 @@ export default function MarketingPage() {
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
-  const { french } = useDashboardLocale();
+  const { french, formatDate } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -113,14 +112,14 @@ export default function MarketingPage() {
                     <p className="text-xs text-gray-400 mt-1.5">
                       {AUDIENCES.find((a) => a.value === c.audience)?.label ?? c.audience}
                       {c.status !== "DRAFT" && ` · sent to ${c.sentCount}/${c.recipientCount}`}
-                      {c.sentAt && ` · ${format(new Date(c.sentAt), "MMM d, yyyy")}`}
+                      {c.sentAt && ` · ${formatDate(c.sentAt, { year: "numeric", month: "short", day: "numeric" })}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {c.status === "DRAFT" && (
                       <>
-                        <button onClick={() => setCampaignToSend(c)} aria-label="Send campaign now" className="text-violet-600 hover:bg-violet-50 p-2 rounded-lg"><Send className="w-4 h-4" /></button>
-                        <button onClick={() => setCampaignToDelete(c)} aria-label="Delete campaign" className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setCampaignToSend(c)} aria-label={french ? "Envoyer la campagne maintenant" : "Send campaign now"} className="text-violet-600 hover:bg-violet-50 p-2 rounded-lg"><Send className="w-4 h-4" /></button>
+                        <button onClick={() => setCampaignToDelete(c)} aria-label={french ? "Supprimer la campagne" : "Delete campaign"} className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </>
                     )}
                     {c.status === "SENT" && <Check className="w-5 h-5 text-emerald-500" />}
@@ -161,20 +160,20 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
   }, [bizId, channel, audience]);
 
   async function save(thenSend: boolean) {
-    if (!name.trim()) { toast.error("Give your campaign a name"); return; }
-    if (!body.trim()) { toast.error("Write a message"); return; }
-    if (channel === "EMAIL" && !subject.trim()) { toast.error("Email campaigns need a subject"); return; }
+    if (!name.trim()) { toast.error(french ? "Donnez un nom à votre campagne" : "Give your campaign a name"); return; }
+    if (!body.trim()) { toast.error(french ? "Rédigez un message" : "Write a message"); return; }
+    if (channel === "EMAIL" && !subject.trim()) { toast.error(french ? "Les campagnes par courriel nécessitent un objet" : "Email campaigns need a subject"); return; }
     setSaving(true);
     try {
       const c = await api.campaigns.create(bizId, { name, channel, audience, subject: channel === "EMAIL" ? subject : undefined, body });
       if (thenSend) {
         const res = await api.campaigns.send(bizId, c.id);
-        toast.success(`Sending to ${res.recipientCount} client${res.recipientCount === 1 ? "" : "s"}`);
+        toast.success(french ? `Envoi à ${res.recipientCount} client${res.recipientCount === 1 ? "" : "s"}` : `Sending to ${res.recipientCount} client${res.recipientCount === 1 ? "" : "s"}`);
       } else {
-        toast.success("Saved as draft");
+        toast.success(french ? "Enregistrée comme brouillon" : "Saved as draft");
       }
       onDone();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
     finally { setSaving(false); }
   }
 

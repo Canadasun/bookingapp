@@ -400,7 +400,7 @@ export default function CheckoutPage() {
             <h3 className="text-base font-semibold text-gray-900 mb-4">{french ? "Choisir un professionnel" : "Choose a provider"}</h3>
             {staffList.length === 0 && (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                No provider is assigned to every selected service yet. You can still use <span className="font-semibold">Custom owner time</span> on the next step with any active provider.
+                {french ? <>Aucun professionnel n’est encore affecté à tous les services sélectionnés. Vous pouvez tout de même utiliser <span className="font-semibold">l’heure personnalisée du propriétaire</span> à l’étape suivante avec n’importe quel professionnel actif.</> : <>No provider is assigned to every selected service yet. You can still use <span className="font-semibold">Custom owner time</span> on the next step with any active provider.</>}
               </div>
             )}
             <div className="space-y-2">
@@ -448,7 +448,7 @@ export default function CheckoutPage() {
                     <div className="flex-1">
                       <p className="font-semibold text-sm text-gray-900">{st.user.name}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{loc ? loc.name : salonName}</p>
-                      <p className="text-xs text-amber-600 mt-0.5">Owner override provider</p>
+                      <p className="text-xs text-amber-600 mt-0.5">{french ? "Professionnel (remplacement du propriétaire)" : "Owner override provider"}</p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-gray-500" />
                   </button>

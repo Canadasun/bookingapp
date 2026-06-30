@@ -255,9 +255,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
             <div className="space-y-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">PO Number</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{french ? "N° de bon de commande" : "PO Number"}</p>
                 {editing ? (
-                  <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="Optional" className="h-7 text-xs" />
+                  <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder={french ? "Facultatif" : "Optional"} className="h-7 text-xs" />
                 ) : (
                   <p className="text-gray-700">{inv.poNumber || "—"}</p>
                 )}

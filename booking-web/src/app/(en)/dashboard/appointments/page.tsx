@@ -6,6 +6,7 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
   isSameMonth, addMonths, subMonths, addDays, addWeeks, subWeeks, isSameDay,
 } from "date-fns";
+import { frCA } from "date-fns/locale";
 import { RefreshCw, Search, X, CheckCircle, XCircle, AlertCircle, CheckSquare, DollarSign, ChevronLeft, ChevronRight, CalendarOff, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api, Appointment, AvailabilityRule, Service } from "@/lib/api";
@@ -295,11 +296,16 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
   onSelect: (a: Appointment) => void;
   onReschedule: (id: string, dayKey: string) => void;
 }) {
+  const { dictionary, french } = useDashboardLocale();
+  const cal = dictionary.appointments.calendar;
+  const dfLocale = french ? { locale: frCA } : undefined;
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(month), { weekStartsOn: 0 }),
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 0 }),
   });
+  const weekdayHeaders = eachDayOfInterval({ start: startOfWeek(new Date(), { weekStartsOn: 0 }), end: endOfWeek(new Date(), { weekStartsOn: 0 }) })
+    .map((d) => format(d, "EEE", dfLocale));
   const byDay = new Map<string, Appointment[]>();
   for (const a of appts) {
     const k = format(new Date(a.startsAt), "yyyy-MM-dd");
@@ -308,16 +314,16 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
   return (
     <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-x-auto">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <p className="text-sm font-semibold text-gray-900">{format(month, "MMMM yyyy")}</p>
+        <p className="text-sm font-semibold text-gray-900">{format(month, "MMMM yyyy", dfLocale)}</p>
         <div className="flex items-center gap-1">
-          <button onClick={onToday} className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">Today</button>
-          <button onClick={onPrev} aria-label="Previous month" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
-          <button onClick={onNext} aria-label="Next month" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={onToday} className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">{cal.today}</button>
+          <button onClick={onPrev} aria-label={cal.prevMonth} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={onNext} aria-label={cal.nextMonth} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
       <div className="grid min-w-[700px] grid-cols-7 bg-gray-50 border-b border-gray-100">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-500">{d}</div>
+        {weekdayHeaders.map((d) => (
+          <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold text-gray-500 capitalize">{d}</div>
         ))}
       </div>
       <div className="grid min-w-[700px] grid-cols-7">
@@ -340,8 +346,8 @@ function MonthView({ month, appts, onPrev, onNext, onToday, onSelect, onReschedu
                   <button key={a.id} onClick={() => onSelect(a)}
                     draggable
                     onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
-                    aria-label={`${format(new Date(a.startsAt), "h:mm a")} – ${a.client.name}`}
-                    title="Drag to move to another day, or click to open and use Edit to change date/time"
+                    aria-label={`${format(new Date(a.startsAt), french ? "HH:mm" : "h:mm a", dfLocale)} – ${a.client.name}`}
+                    title={cal.dragHint}
                     className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-gray-100 cursor-grab active:cursor-grabbing">
                     <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[a.status] ?? "bg-gray-300")} />
                     <span className="truncate text-[11px] text-gray-700">{format(new Date(a.startsAt), "h:mm a")} {a.client.name}</span>
@@ -714,6 +720,9 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
   onSelect: (a: Appointment) => void;
   onReschedule: (id: string, dayKey: string) => void;
 }) {
+  const { dictionary, french } = useDashboardLocale();
+  const cal = dictionary.appointments.calendar;
+  const dfLocale = french ? { locale: frCA } : undefined;
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [nowOffset, setNowOffset] = useState<number | null>(null);
 
@@ -740,7 +749,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
     (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(a);
   }
   const weekEnd = addDays(weekStart, 6);
-  const rangeLabel = format(weekStart, "MMM d") + " – " + format(weekEnd, isSameMonth(weekStart, weekEnd) ? "d" : "MMM d");
+  const rangeLabel = format(weekStart, "MMM d", dfLocale) + " – " + format(weekEnd, isSameMonth(weekStart, weekEnd) ? "d" : "MMM d", dfLocale);
 
   // Aggregate business open hours per day-of-week (0=Sun–6=Sat) from all staff rules
   const bizHours = useMemo(() => {
@@ -765,9 +774,9 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-900">{rangeLabel}</p>
         <div className="flex items-center gap-1">
-          <button onClick={onToday} className="px-3 py-2 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">This week</button>
-          <button onClick={onPrev} aria-label="Previous week" className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
-          <button onClick={onNext} aria-label="Next week" className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
+          <button onClick={onToday} className="px-3 py-2 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100">{cal.thisWeek}</button>
+          <button onClick={onPrev} aria-label={cal.prevWeek} className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={onNext} aria-label={cal.nextWeek} className="p-2.5 rounded-lg text-gray-500 hover:bg-gray-100"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
 
@@ -784,7 +793,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
             "flex-1 text-center py-2 border-l border-gray-50",
             isSameDay(day, new Date()) && "bg-violet-50",
           )}>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{format(day, "EEE")}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{format(day, "EEE", dfLocale)}</p>
             <p className={cn("text-sm font-bold", isSameDay(day, new Date()) ? "text-violet-700" : "text-gray-700")}>{format(day, "d")}</p>
           </div>
         ))}
@@ -798,7 +807,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
             {hours.map((h) => (
               <div key={h} style={{ position: "absolute", top: `${(h - GRID_START) * ROW_H - 8}px`, right: "4px" }}
                 className="text-[10px] text-gray-500 text-right w-10">
-                {format(new Date(2000, 0, 1, h), "ha")}
+                {format(new Date(2000, 0, 1, h), french ? "H'h'" : "ha")}
               </div>
             ))}
           </div>
@@ -872,8 +881,8 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
                       draggable
                       onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); e.dataTransfer.effectAllowed = "move"; }}
                       onClick={() => onSelect(a)}
-                      aria-label={`${format(new Date(a.startsAt), "h:mm a")} – ${a.client.name}, ${a.service?.name ?? ""}`}
-                      title="Drag to move to another day, or click to open and use Edit to change date/time"
+                      aria-label={`${format(new Date(a.startsAt), french ? "HH:mm" : "h:mm a")} – ${a.client.name}, ${a.service?.name ?? ""}`}
+                      title={cal.dragHint}
                       className={cn(
                         "z-10 rounded-md text-left overflow-hidden border text-white cursor-grab active:cursor-grabbing hover:brightness-95 transition-all",
                         a.status === "CONFIRMED"  ? "bg-emerald-500 border-emerald-600"
@@ -883,7 +892,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
                           : "bg-amber-400 border-amber-500",
                       )}>
                       <div className="px-1.5 pt-1 leading-tight">
-                        <p className="text-[10px] font-bold truncate">{format(new Date(a.startsAt), "h:mm a")}</p>
+                        <p className="text-[10px] font-bold truncate">{format(new Date(a.startsAt), french ? "HH:mm" : "h:mm a")}</p>
                         <p className="text-[10px] truncate opacity-90">{a.client.name}</p>
                         {height >= 48 && <p className="text-[10px] truncate opacity-75">{a.service?.name}</p>}
                       </div>
@@ -894,7 +903,7 @@ function WeekView({ weekStart, appts, allStaff, onPrev, onNext, onToday, onSelec
                 {/* Closed label */}
                 {!isOpen && bizHours.size > 0 && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest rotate-[-90deg]">Closed</span>
+                    <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest rotate-[-90deg]">{cal.closed}</span>
                   </div>
                 )}
               </div>

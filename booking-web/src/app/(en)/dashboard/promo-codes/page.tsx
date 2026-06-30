@@ -31,10 +31,10 @@ export default function PromoCodesPage() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.code.trim()) { toast.error("Code is required"); return; }
+    if (!form.code.trim()) { toast.error(french ? "Le code est requis" : "Code is required"); return; }
     const val = parseFloat(form.discountValue);
-    if (!val || val <= 0) { toast.error("Enter a valid discount value"); return; }
-    if (form.discountType === "PERCENT" && val > 100) { toast.error("Percentage must be 0–100"); return; }
+    if (!val || val <= 0) { toast.error(french ? "Entrez une valeur de réduction valide" : "Enter a valid discount value"); return; }
+    if (form.discountType === "PERCENT" && val > 100) { toast.error(french ? "Le pourcentage doit être de 0 à 100" : "Percentage must be 0–100"); return; }
     try {
       const pc = await api.promoCodes.create(bizId!, {
         code: form.code.trim().toUpperCase(),
@@ -47,14 +47,14 @@ export default function PromoCodesPage() {
       setShowForm(false);
       setForm({ code: "", discountType: "PERCENT", discountValue: "", maxUsages: "", expiresAt: "" });
       toast.success(french ? "Code promo créé" : "Promo code created");
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to create"); }
+    } catch (err) { toast.error(err instanceof Error ? err.message : (french ? "Échec de la création" : "Failed to create")); }
   }
 
   async function toggle(pc: PromoCode) {
     try {
       const updated = await api.promoCodes.update(bizId!, pc.id, { active: !pc.active });
       setCodes(p => p.map(c => c.id === pc.id ? updated : c));
-    } catch { toast.error("Failed to update"); }
+    } catch { toast.error(french ? "Échec de la mise à jour" : "Failed to update"); }
   }
 
   async function doRemove() {
@@ -63,14 +63,14 @@ export default function PromoCodesPage() {
       await api.promoCodes.remove(bizId!, codeToDelete.id);
       setCodes(p => p.filter(c => c.id !== codeToDelete.id));
       setCodeToDelete(null);
-      toast.success("Deleted");
-    } catch { toast.error("Failed to delete"); setCodeToDelete(null); }
+      toast.success(french ? "Supprimé" : "Deleted");
+    } catch { toast.error(french ? "Échec de la suppression" : "Failed to delete"); setCodeToDelete(null); }
   }
 
   function copyCode(code: string) {
     navigator.clipboard.writeText(code)
       .then(() => { setCopied(code); setTimeout(() => setCopied(null), 1500); })
-      .catch(() => toast.error("Could not copy code"));
+      .catch(() => toast.error(french ? "Impossible de copier le code" : "Could not copy code"));
   }
 
   function fmtDiscount(pc: PromoCode) {
@@ -104,7 +104,7 @@ export default function PromoCodesPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Code</label>
-              <Input placeholder="e.g. SUMMER20" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} className="uppercase" />
+              <Input placeholder={french ? "ex. ETE20" : "e.g. SUMMER20"} value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} className="uppercase" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Type de réduction" : "Discount type"}</label>
@@ -114,15 +114,15 @@ export default function PromoCodesPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">{form.discountType === "PERCENT" ? "Percentage off" : "Amount off ($)"}</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">{form.discountType === "PERCENT" ? (french ? "Pourcentage de réduction" : "Percentage off") : (french ? "Montant de réduction ($)" : "Amount off ($)")}</label>
               <Input type="number" min={1} max={form.discountType === "PERCENT" ? 100 : undefined} placeholder={form.discountType === "PERCENT" ? "20" : "10"} value={form.discountValue} onChange={e => setForm(p => ({ ...p, discountValue: e.target.value })) } />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Max uses (blank = unlimited)</label>
-              <Input type="number" min={1} placeholder="Unlimited" value={form.maxUsages} onChange={e => setForm(p => ({ ...p, maxUsages: e.target.value }))} />
+              <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Utilisations max. (vide = illimité)" : "Max uses (blank = unlimited)"}</label>
+              <Input type="number" min={1} placeholder={french ? "Illimité" : "Unlimited"} value={form.maxUsages} onChange={e => setForm(p => ({ ...p, maxUsages: e.target.value }))} />
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Expiry date (optional)</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Date d’expiration (facultatif)" : "Expiry date (optional)"}</label>
               <Input type="date" value={form.expiresAt} onChange={e => setForm(p => ({ ...p, expiresAt: e.target.value }))} />
             </div>
           </div>
@@ -151,17 +151,17 @@ export default function PromoCodesPage() {
                   <button onClick={() => copyCode(pc.code)} className="text-gray-400 hover:text-violet-600">
                     {copied === pc.code ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
-                  {!pc.active && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
+                  {!pc.active && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{french ? "Inactif" : "Inactive"}</span>}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {fmtDiscount(pc)} · {pc.usageCount} uses{pc.maxUsages ? ` of ${pc.maxUsages}` : ""}
-                  {pc.expiresAt ? ` · expires ${new Date(pc.expiresAt).toLocaleDateString()}` : ""}
+                  {fmtDiscount(pc)} · {pc.usageCount} {french ? "utilisations" : "uses"}{pc.maxUsages ? ` ${french ? "sur" : "of"} ${pc.maxUsages}` : ""}
+                  {pc.expiresAt ? ` · ${french ? "expire le" : "expires"} ${formatDate(pc.expiresAt)}` : ""}
                 </p>
               </div>
-              <button onClick={() => toggle(pc)} aria-label={pc.active ? "Deactivate promo code" : "Activate promo code"} className="text-gray-400 hover:text-violet-600">
+              <button onClick={() => toggle(pc)} aria-label={pc.active ? (french ? "Désactiver le code promo" : "Deactivate promo code") : (french ? "Activer le code promo" : "Activate promo code")} className="text-gray-400 hover:text-violet-600">
                 {pc.active ? <ToggleRight className="w-5 h-5 text-violet-600" /> : <ToggleLeft className="w-5 h-5" />}
               </button>
-              <button onClick={() => setCodeToDelete(pc)} aria-label="Delete promo code" className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => setCodeToDelete(pc)} aria-label={french ? "Supprimer le code promo" : "Delete promo code"} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
         </div>

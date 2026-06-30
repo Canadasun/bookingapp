@@ -108,14 +108,14 @@ export default function LocationsPage() {
       setModalOpen(false);
       notifyLocationsChanged();
       load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec de l’enregistrement" : "Save failed")); }
     finally { setSaving(false); }
   }
 
   async function doRemove() {
     if (!bizId || !toDelete) return;
-    try { await api.locations.remove(bizId, toDelete.id); toast.success("Location deleted"); setToDelete(null); notifyLocationsChanged(); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed to delete"); setToDelete(null); }
+    try { await api.locations.remove(bizId, toDelete.id); toast.success(french ? "Emplacement supprimé" : "Location deleted"); setToDelete(null); notifyLocationsChanged(); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec de la suppression" : "Failed to delete")); setToDelete(null); }
   }
 
   return (
@@ -140,7 +140,7 @@ export default function LocationsPage() {
 
       {!loading && !loadError && locations.length > 0 && (
         <div className="mb-4 rounded-xl border border-violet-100 bg-violet-50/60 p-3 text-xs leading-relaxed text-violet-800">
-          Open a branch below to jump straight to its calendar. Assign each provider to a branch on the <Link href="/dashboard/staff" className="font-semibold underline">Staff</Link> page — clients booking that location only see providers who work there.
+          {french ? <>Ouvrez une succursale ci-dessous pour accéder directement à son calendrier. Affectez chaque professionnel à une succursale depuis la page <Link href="/dashboard/staff" className="font-semibold underline">Personnel</Link> — les clients qui réservent à cet emplacement ne voient que les professionnels qui y travaillent.</> : <>Open a branch below to jump straight to its calendar. Assign each provider to a branch on the <Link href="/dashboard/staff" className="font-semibold underline">Staff</Link> page — clients booking that location only see providers who work there.</>}
         </div>
       )}
 
@@ -151,9 +151,9 @@ export default function LocationsPage() {
         </div>
       ) : loading ? <LoadingSpinner /> : locations.length === 0 ? (
         <EmptyState
-          title="No locations yet"
+          title={french ? "Aucun emplacement" : "No locations yet"}
           icon={Building2}
-          description="Add a branch to assign staff and let clients pick where they book. Single-location businesses can skip this — bookings just use your main address."
+          description={french ? "Ajoutez une succursale pour affecter du personnel et laisser les clients choisir où réserver. Les entreprises à emplacement unique peuvent ignorer ceci — les réservations utilisent votre adresse principale." : "Add a branch to assign staff and let clients pick where they book. Single-location businesses can skip this — bookings just use your main address."}
         />
       ) : (
         <div className="space-y-3">
@@ -169,18 +169,18 @@ export default function LocationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-gray-900">{l.name}</p>
-                        {!l.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">inactive</span>}
+                        {!l.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{french ? "inactif" : "inactive"}</span>}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                         {l.address && <p className="text-xs text-gray-500">{l.address}</p>}
                         {l.phone && <p className="text-xs text-gray-500">{l.phone}</p>}
                         {l.timezone && <p className="text-xs text-gray-400">{l.timezone}</p>}
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">{staffCount} {staffCount === 1 ? "provider" : "providers"} assigned</p>
+                      <p className="text-xs text-gray-400 mt-1">{french ? `${staffCount} ${staffCount === 1 ? "professionnel affecté" : "professionnels affectés"}` : `${staffCount} ${staffCount === 1 ? "provider" : "providers"} assigned`}</p>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => openEdit(l)} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" aria-label="Edit"><Pencil className="w-4 h-4"/></button>
-                      <button onClick={() => setToDelete(l)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label="Delete location"><Trash2 className="w-4 h-4"/></button>
+                      <button onClick={() => openEdit(l)} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50 transition-colors" aria-label={french ? "Modifier" : "Edit"}><Pencil className="w-4 h-4"/></button>
+                      <button onClick={() => setToDelete(l)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" aria-label={french ? "Supprimer l’emplacement" : "Delete location"}><Trash2 className="w-4 h-4"/></button>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
@@ -190,20 +190,20 @@ export default function LocationsPage() {
                       disabled={!l.active}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
                     >
-                      <CalendarDays className="w-3.5 h-3.5"/>Open this branch&apos;s calendar
+                      <CalendarDays className="w-3.5 h-3.5"/>{french ? "Ouvrir le calendrier de cette succursale" : "Open this branch's calendar"}
                     </button>
                     <Link
                       href="/dashboard/staff"
                       className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50"
                     >
-                      <Users className="w-3.5 h-3.5"/>Assign staff
+                      <Users className="w-3.5 h-3.5"/>{french ? "Affecter du personnel" : "Assign staff"}
                     </Link>
                   </div>
                 </CardContent>
               </Card>
             );
           })}
-          <p className="text-xs text-gray-400 px-1">Assign each provider to a location from the <Link href="/dashboard/staff" className="text-violet-600 hover:underline">Staff</Link> page.</p>
+          <p className="text-xs text-gray-400 px-1">{french ? <>Affectez chaque professionnel à un emplacement depuis la page <Link href="/dashboard/staff" className="text-violet-600 hover:underline">Personnel</Link>.</> : <>Assign each provider to a location from the <Link href="/dashboard/staff" className="text-violet-600 hover:underline">Staff</Link> page.</>}</p>
         </div>
       )}
 
@@ -219,47 +219,46 @@ export default function LocationsPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setModalOpen(false)} />
           <Card className="dashboard-safe-bottom relative w-full max-w-sm max-h-[92dvh] overflow-y-auto z-10">
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 id="location-modal-title" className="font-semibold text-gray-900">{editingId ? "Edit location" : "Add location"}</h3>
+              <h3 id="location-modal-title" className="font-semibold text-gray-900">{editingId ? (french ? "Modifier l’emplacement" : "Edit location") : (french ? "Ajouter un emplacement" : "Add location")}</h3>
             </div>
             <CardContent className="space-y-3 pt-4">
               <div>
-                <label htmlFor="loc-name" className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
-                <Input id="loc-name" autoFocus value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Downtown · West End" />
+                <label htmlFor="loc-name" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Nom *" : "Name *"}</label>
+                <Input id="loc-name" autoFocus value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder={french ? "Centre-ville · Ouest" : "Downtown · West End"} />
               </div>
               <div>
-                <label htmlFor="loc-address" className="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                <Input id="loc-address" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder="123 Main St" />
+                <label htmlFor="loc-address" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Adresse" : "Address"}</label>
+                <Input id="loc-address" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder={french ? "123, rue Principale" : "123 Main St"} />
               </div>
               <div>
-                <label htmlFor="loc-phone" className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                <label htmlFor="loc-phone" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Téléphone" : "Phone"}</label>
                 <Input id="loc-phone" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 0000" />
               </div>
               <div>
-                <label htmlFor="loc-timezone" className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
+                <label htmlFor="loc-timezone" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Fuseau horaire" : "Timezone"}</label>
                 <select id="loc-timezone" value={form.timezone} onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                  <option value="">— Same as business —</option>
+                  <option value="">{french ? "— Identique à l’entreprise —" : "— Same as business —"}</option>
                   {TIMEZONES.map(([tz, label]) => <option key={tz} value={tz}>{label}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-gray-400">Slot generation uses this timezone for staff at this location.</p>
+                <p className="mt-1 text-xs text-gray-400">{french ? "La génération des créneaux utilise ce fuseau horaire pour le personnel de cet emplacement." : "Slot generation uses this timezone for staff at this location."}</p>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
-                <span className="text-sm text-gray-700">Active</span>
+                <span className="text-sm text-gray-700">{french ? "Actif" : "Active"}</span>
                 <button type="button" onClick={() => setForm((p) => ({ ...p, active: !p.active }))}
-                  aria-label="Toggle active" aria-pressed={form.active}
+                  aria-label={french ? "Activer/désactiver" : "Toggle active"} aria-pressed={form.active}
                   className={cn("relative w-9 h-5 rounded-full transition-colors shrink-0", form.active ? "bg-violet-600" : "bg-gray-200")}>
                   <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform", form.active ? "translate-x-4" : "translate-x-0.5")} />
                 </button>
               </div>
               {!biz?.capabilities?.multipleLocations && biz?.plan !== "UNLIMITED" && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                  Your plan limits how many locations you can add.{" "}
-                  <a href="/dashboard/settings#billing" className="underline font-medium">Upgrade</a> for more branches.
+                  {french ? <>Votre forfait limite le nombre d’emplacements que vous pouvez ajouter.{" "}<a href="/dashboard/settings#billing" className="underline font-medium">Mettez à niveau</a> pour plus de succursales.</> : <>Your plan limits how many locations you can add.{" "}<a href="/dashboard/settings#billing" className="underline font-medium">Upgrade</a> for more branches.</>}
                 </p>
               )}
               <div className="flex gap-3 pt-1">
-                <Button variant="secondary" className="flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
-                <Button className="flex-1" loading={saving} onClick={save}>{editingId ? "Save" : "Add"}</Button>
+                <Button variant="secondary" className="flex-1" onClick={() => setModalOpen(false)}>{french ? "Annuler" : "Cancel"}</Button>
+                <Button className="flex-1" loading={saving} onClick={save}>{editingId ? (french ? "Enregistrer" : "Save") : (french ? "Ajouter" : "Add")}</Button>
               </div>
             </CardContent>
           </Card>

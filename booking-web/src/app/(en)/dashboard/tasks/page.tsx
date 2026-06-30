@@ -99,7 +99,7 @@ export default function TasksPage() {
             <Input aria-label={french ? "Titre de la tâche" : "Task title"} placeholder={french ? "Que faut-il faire? p. ex. Remplir le shampoing, désinfecter les outils" : "What needs doing? e.g. Restock shampoo, sanitize tools"} value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
             <div className="grid sm:grid-cols-2 gap-3">
-              <select aria-label="Assign to staff member" value={form.staffId} onChange={(e) => setForm((p) => ({ ...p, staffId: e.target.value }))}
+              <select aria-label={french ? "Attribuer à un membre du personnel" : "Assign to staff member"} value={form.staffId} onChange={(e) => setForm((p) => ({ ...p, staffId: e.target.value }))}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                 <option value="">{french ? "Attribuer à… (facultatif)" : "Assign to… (optional)"}</option>
                 {staff.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}

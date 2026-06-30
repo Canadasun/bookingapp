@@ -50,6 +50,13 @@ export const dashboardEn = {
     views: ["List", "Staff board", "Week", "Month"], retry: "Retry",
     emptyTitle: "No appointments", emptyBody: "Try adjusting your filters.",
     appointment: "appointment", appointments: "appointments",
+    calendar: {
+      today: "Today", thisWeek: "This week",
+      prevMonth: "Previous month", nextMonth: "Next month",
+      prevWeek: "Previous week", nextWeek: "Next week",
+      dragHint: "Drag to move to another day, or click to open and use Edit to change date/time",
+      closed: "Closed",
+    },
     errors: {
       load: "Failed to load", action: "Action failed",
       noShowFee: "Could not charge the no-show fee",

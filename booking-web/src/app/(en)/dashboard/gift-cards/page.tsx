@@ -37,13 +37,13 @@ export default function GiftCardsPage() {
   async function doVoidCard() {
     if (!cardToVoid) return;
     try { await api.giftCards.void(bizId, cardToVoid.id); setCardToVoid(null); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setCardToVoid(null); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); setCardToVoid(null); }
   }
 
   function copy(code: string) {
     navigator.clipboard.writeText(code)
       .then(() => { setCopied(code); setTimeout(() => setCopied(null), 1500); })
-      .catch(() => toast.error("Could not copy to clipboard"));
+      .catch(() => toast.error(french ? "Impossible de copier dans le presse-papiers" : "Could not copy to clipboard"));
   }
 
   const outstanding = cards.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + c.balanceCents, 0);
@@ -79,7 +79,7 @@ export default function GiftCardsPage() {
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : cards.length === 0 && !mode ? (
         <EmptyState title={french ? "Aucune carte-cadeau" : "No gift cards yet"} description={french ? "Émettez votre première carte-cadeau pour commencer." : "Issue your first gift card to get started."} />
@@ -112,7 +112,7 @@ export default function GiftCardsPage() {
                     <p className="text-xs text-gray-400">{french ? "sur" : "of"} {formatCurrency(c.initialCents)}</p>
                     {c.status === "ACTIVE" && (
                       <button onClick={() => setCardToVoid(c)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1.5">
-                        <Ban className="w-3 h-3" /> Void
+                        <Ban className="w-3 h-3" /> {french ? "Annuler" : "Void"}
                       </button>
                     )}
                   </div>
@@ -127,12 +127,16 @@ export default function GiftCardsPage() {
 }
 
 function StatusPill({ status }: { status: GiftCardStatus }) {
+  const { french } = useDashboardLocale();
   const map = {
     ACTIVE: "bg-emerald-100 text-emerald-700",
     REDEEMED: "bg-gray-100 text-gray-500",
     VOID: "bg-red-100 text-red-600",
   } as const;
-  return <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status]}`}>{status}</span>;
+  const labels: Record<GiftCardStatus, string> = french
+    ? { ACTIVE: "Active", REDEEMED: "Échangée", VOID: "Annulée" }
+    : { ACTIVE: "Active", REDEEMED: "Redeemed", VOID: "Void" };
+  return <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status]}`}>{labels[status]}</span>;
 }
 
 function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => void; onCancel: () => void }) {
@@ -158,7 +162,7 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
       });
       toast.success(french ? `${card.code} émise${card.recipientEmail ? " — envoyée au destinataire" : ""}` : `Issued ${card.code}${card.recipientEmail ? " — emailed to recipient" : ""}`);
       onDone();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
     finally { setSaving(false); }
   }
 
@@ -170,12 +174,12 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
           <Input id="gc-issue-amount" type="number" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input aria-label="Recipient name (optional)" placeholder="Recipient name (optional)" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
-          <Input aria-label="Recipient email (optional)" type="email" placeholder="Recipient email (optional)" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} />
+          <Input aria-label={french ? "Nom du destinataire (facultatif)" : "Recipient name (optional)"} placeholder={french ? "Nom du destinataire (facultatif)" : "Recipient name (optional)"} value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
+          <Input aria-label={french ? "Courriel du destinataire (facultatif)" : "Recipient email (optional)"} type="email" placeholder={french ? "Courriel du destinataire (facultatif)" : "Recipient email (optional)"} value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} />
         </div>
         <textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)}
           className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400"
-          placeholder="Gift message (optional)" />
+          placeholder={french ? "Message cadeau (facultatif)" : "Gift message (optional)"} />
         <div>
           <label htmlFor="gc-recipient-language" className="text-xs font-medium text-gray-500">{french ? "Langue du destinataire" : "Recipient language"}</label>
           <select id="gc-recipient-language" value={recipientLocale} onChange={(e) => setRecipientLocale(e.target.value as "en" | "fr")}
@@ -184,7 +188,7 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
             <option value="fr">Français</option>
           </select>
         </div>
-        <p className="text-[11px] text-gray-400">If you add a recipient email we&apos;ll send them the code automatically.</p>
+        <p className="text-[11px] text-gray-400">{french ? "Si vous ajoutez un courriel de destinataire, nous lui enverrons le code automatiquement." : "If you add a recipient email we'll send them the code automatically."}</p>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onCancel} disabled={saving}>{french ? "Annuler" : "Cancel"}</Button>
           <Button onClick={submit} loading={saving}>{french ? "Émettre la carte-cadeau" : "Issue gift card"}</Button>
@@ -206,20 +210,20 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
     if (!code.trim()) return;
     setChecking(true); setBal(null);
     try { const r = await api.giftCards.balance(bizId, code.trim()); setBal({ balanceCents: r.balanceCents, status: r.status }); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Card not found"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Carte introuvable" : "Card not found")); }
     finally { setChecking(false); }
   }
 
   async function submit() {
     const dollars = parseFloat(amount);
-    if (!code.trim()) { toast.error("Enter a code"); return; }
-    if (!dollars || dollars <= 0) { toast.error("Enter an amount to redeem"); return; }
+    if (!code.trim()) { toast.error(french ? "Entrez un code" : "Enter a code"); return; }
+    if (!dollars || dollars <= 0) { toast.error(french ? "Entrez un montant à échanger" : "Enter an amount to redeem"); return; }
     setSaving(true);
     try {
       const r = await api.giftCards.redeem(bizId, { code: code.trim(), amountCents: Math.round(dollars * 100) });
       toast.success(french ? `${formatCurrency(r.redeemedCents)} échangés — solde de ${formatCurrency(r.balanceCents)}` : `Redeemed ${formatCurrency(r.redeemedCents)} — ${formatCurrency(r.balanceCents)} left`);
       onDone();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Redeem failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec de l’échange" : "Redeem failed")); }
     finally { setSaving(false); }
   }
 
@@ -233,7 +237,7 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
         {bal && (
           <p className="text-sm text-gray-600">
             {french ? "Solde" : "Balance"}: <strong className="text-gray-900">{formatCurrency(bal.balanceCents)}</strong>
-            <span className="text-gray-400"> · {bal.status}</span>
+            <span className="text-gray-400"> · {french ? ({ ACTIVE: "Active", REDEEMED: "Échangée", VOID: "Annulée" } as Record<string, string>)[bal.status] ?? bal.status : bal.status}</span>
           </p>
         )}
         <div>

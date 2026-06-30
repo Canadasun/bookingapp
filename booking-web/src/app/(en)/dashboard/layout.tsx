@@ -318,7 +318,7 @@ function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: b
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
-            placeholder={canSearchData ? "Search clients, appointments, invoices, pages…" : "Jump to a page…"}
+            placeholder={canSearchData ? (french ? "Rechercher clients, rendez-vous, factures, pages…" : "Search clients, appointments, invoices, pages…") : (french ? "Aller à une page…" : "Jump to a page…")}
             className="h-10 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-gray-400 lg:text-sm"
           />
           <kbd className="hidden rounded-md border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 sm:inline">Esc</kbd>
@@ -350,7 +350,7 @@ function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: b
           ))}
           {items.length === 0 && groups.length === 0 && (
             <p className="px-3 py-8 text-center text-sm text-gray-500">
-              {searching ? "Searching…" : query.trim().length >= 2 ? "No matches" : "No matching pages"}
+              {searching ? (french ? "Recherche…" : "Searching…") : query.trim().length >= 2 ? (french ? "Aucun résultat" : "No matches") : (french ? "Aucune page correspondante" : "No matching pages")}
             </p>
           )}
         </div>
@@ -360,6 +360,7 @@ function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: b
 }
 
 function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
+  const { french } = useDashboardLocale();
   const [dismissed, setDismissed] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -388,17 +389,17 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
     <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-800">
       <span>
         {sent
-          ? "Verification email sent — check your inbox."
-          : "Please verify your email address to unlock all features."}
+          ? (french ? "Courriel de vérification envoyé — vérifiez votre boîte de réception." : "Verification email sent — check your inbox.")
+          : (french ? "Veuillez vérifier votre adresse courriel pour débloquer toutes les fonctionnalités." : "Please verify your email address to unlock all features.")}
       </span>
       <div className="flex items-center gap-3 shrink-0">
         {!sent && (
           <button onClick={resend} disabled={sending}
             className="font-medium underline underline-offset-2 hover:text-amber-900 disabled:opacity-50">
-            {sending ? "Sending…" : "Resend email"}
+            {sending ? (french ? "Envoi…" : "Sending…") : (french ? "Renvoyer le courriel" : "Resend email")}
           </button>
         )}
-        <button onClick={() => setDismissed(true)} aria-label="Dismiss" className="hover:text-amber-900">
+        <button onClick={() => setDismissed(true)} aria-label={french ? "Ignorer" : "Dismiss"} className="hover:text-amber-900">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -407,6 +408,7 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
 }
 
 function TwoFactorRecommendation({ user }: { user: SessionUser | null }) {
+  const { french } = useDashboardLocale();
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
@@ -431,13 +433,13 @@ function TwoFactorRecommendation({ user }: { user: SessionUser | null }) {
     <div className="flex flex-col gap-2 border-b border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between sm:px-6">
       <span className="flex items-center gap-2">
         <ShieldCheck className="h-4 w-4 shrink-0 text-blue-700" />
-        Protect your business: two-factor sign-in is recommended for owners and staff.
+        {french ? "Protégez votre entreprise : la connexion à deux facteurs est recommandée pour les propriétaires et le personnel." : "Protect your business: two-factor sign-in is recommended for owners and staff."}
       </span>
       <div className="flex items-center gap-3 self-end sm:self-auto">
         <Link href="/dashboard/settings?tab=security" className="font-semibold text-blue-800 underline underline-offset-2 hover:text-blue-950">
-          Turn on two-factor
+          {french ? "Activer la double authentification" : "Turn on two-factor"}
         </Link>
-        <button type="button" onClick={dismiss} aria-label="Dismiss two-factor reminder for 30 days" className="text-blue-700 hover:text-blue-950">
+        <button type="button" onClick={dismiss} aria-label={french ? "Ignorer le rappel de double authentification pendant 30 jours" : "Dismiss two-factor reminder for 30 days"} className="text-blue-700 hover:text-blue-950">
           <X className="h-4 w-4" />
         </button>
       </div>

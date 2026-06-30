@@ -52,7 +52,7 @@ export default function MembershipsPage() {
     if (params.get("membership") === "cancel" && cancelledMembershipId) {
       api.memberships.cancel(bizId, cancelledMembershipId)
         .then(() => load())
-        .catch((error) => toast.error(error instanceof Error ? error.message : "Could not cancel membership"))
+        .catch((error) => toast.error(error instanceof Error ? error.message : (french ? "Impossible d’annuler l’abonnement" : "Could not cancel membership")))
         .finally(() => window.history.replaceState({}, "", "/dashboard/memberships"));
       return;
     }
@@ -60,25 +60,25 @@ export default function MembershipsPage() {
     if (params.get("membership") !== "success" || !sessionId) return;
     api.memberships.confirm(bizId, sessionId)
       .then((result) => {
-        if (result.confirmed) toast.success("Membership activated");
-        else toast.error("Membership checkout is not complete");
+        if (result.confirmed) toast.success(french ? "Abonnement activé" : "Membership activated");
+        else toast.error(french ? "Le paiement de l’abonnement n’est pas terminé" : "Membership checkout is not complete");
         return load();
       })
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Could not confirm membership"))
+      .catch((error) => toast.error(error instanceof Error ? error.message : (french ? "Impossible de confirmer l’abonnement" : "Could not confirm membership")))
       .finally(() => window.history.replaceState({}, "", "/dashboard/memberships"));
-  }, [bizId, load]);
+  }, [bizId, load, french]);
 
   async function createPlan(e: React.FormEvent) {
     e.preventDefault();
     const price = parseFloat(planForm.priceMonthly);
-    if (!planForm.name.trim() || !price || price <= 0) { toast.error("Name and monthly price are required"); return; }
+    if (!planForm.name.trim() || !price || price <= 0) { toast.error(french ? "Le nom et le prix mensuel sont requis" : "Name and monthly price are required"); return; }
     try {
       const plan = await api.memberships.createPlan(bizId!, { name: planForm.name.trim(), description: planForm.description.trim() || undefined, priceMonthly: Math.round(price * 100) });
       setPlans(p => [...p, plan]);
       setPlanForm({ name: "", description: "", priceMonthly: "" });
       setShowPlanForm(false);
-      toast.success("Plan created");
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
+      toast.success(french ? "Forfait créé" : "Plan created");
+    } catch (err) { toast.error(err instanceof Error ? err.message : (french ? "Échec" : "Failed")); }
   }
 
   async function togglePlan(plan: MembershipPlan) {
@@ -89,7 +89,7 @@ export default function MembershipsPage() {
       setPlans(p => p.map(x => x.id === plan.id ? updated : x));
     } catch (e) {
       setPlans(p => p.map(x => x.id === plan.id ? { ...x, active: prev } : x));
-      toast.error(e instanceof Error ? e.message : "Failed to update plan");
+      toast.error(e instanceof Error ? e.message : (french ? "Échec de la mise à jour du forfait" : "Failed to update plan"));
     }
   }
 
@@ -99,19 +99,19 @@ export default function MembershipsPage() {
       await api.memberships.cancel(bizId!, memberToCancel.id);
       setMemberToCancel(null);
       await load();
-      toast.success("Membership will cancel at the end of the billing period");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to cancel"); setMemberToCancel(null); }
+      toast.success(french ? "L’abonnement sera annulé à la fin de la période de facturation" : "Membership will cancel at the end of the billing period");
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec de l’annulation" : "Failed to cancel")); setMemberToCancel(null); }
   }
 
   async function enrollClient(e: React.FormEvent) {
     e.preventDefault();
-    if (!enrollForm.clientId || !enrollForm.planId) { toast.error("Choose a client and plan"); return; }
+    if (!enrollForm.clientId || !enrollForm.planId) { toast.error(french ? "Choisissez un client et un forfait" : "Choose a client and plan"); return; }
     setEnrolling(true);
     try {
       const { url } = await api.memberships.subscribe(bizId, enrollForm.clientId, enrollForm.planId);
       window.location.assign(url);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start membership checkout");
+      toast.error(error instanceof Error ? error.message : (french ? "Impossible de démarrer le paiement de l’abonnement" : "Could not start membership checkout"));
       setEnrolling(false);
     }
   }
@@ -147,7 +147,7 @@ export default function MembershipsPage() {
 
       {!membershipsEnabled && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Memberships require a paid Pulse plan. Upgrade to create plans and enroll clients.
+          {french ? "Les abonnements nécessitent un forfait Pulse payant. Effectuez une mise à niveau pour créer des forfaits et inscrire des clients." : "Memberships require a paid Pulse plan. Upgrade to create plans and enroll clients."}
         </div>
       )}
 
@@ -178,15 +178,15 @@ export default function MembershipsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Nom du forfait" : "Plan name"}</label>
-                  <Input placeholder="e.g. Monthly Unlimited" value={planForm.name} onChange={e => setPlanForm(p => ({ ...p, name: e.target.value }))} />
+                  <Input placeholder={french ? "ex. Illimité mensuel" : "e.g. Monthly Unlimited"} value={planForm.name} onChange={e => setPlanForm(p => ({ ...p, name: e.target.value }))} />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Prix mensuel ($)" : "Monthly price ($)"}</label>
                   <Input type="number" min={1} step="0.01" placeholder="79.00" value={planForm.priceMonthly} onChange={e => setPlanForm(p => ({ ...p, priceMonthly: e.target.value }))} />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Description (optional)</label>
-                  <Input placeholder="e.g. Unlimited haircuts + 10% off products" value={planForm.description} onChange={e => setPlanForm(p => ({ ...p, description: e.target.value }))} />
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Description (facultatif)" : "Description (optional)"}</label>
+                  <Input placeholder={french ? "ex. Coupes illimitées + 10 % sur les produits" : "e.g. Unlimited haircuts + 10% off products"} value={planForm.description} onChange={e => setPlanForm(p => ({ ...p, description: e.target.value }))} />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -208,12 +208,12 @@ export default function MembershipsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-gray-900">{plan.name}</span>
-                      {!plan.active && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
+                      {!plan.active && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{french ? "Inactif" : "Inactive"}</span>}
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(plan.priceMonthly)}/{french ? "mois" : "mo"}{plan.description ? ` · ${plan.description}` : ""}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{members.filter(m => m.planId === plan.id && m.status === "ACTIVE").length} active members</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{members.filter(m => m.planId === plan.id && m.status === "ACTIVE").length} {french ? "membres actifs" : "active members"}</p>
                   </div>
-                  <button onClick={() => togglePlan(plan)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600">{plan.active ? "Deactivate" : "Activate"}</button>
+                  <button onClick={() => togglePlan(plan)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600">{plan.active ? (french ? "Désactiver" : "Deactivate") : (french ? "Activer" : "Activate")}</button>
                 </div>
               ))}
             </div>
@@ -250,13 +250,13 @@ export default function MembershipsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-gray-900">{m.client.name}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${m.status === "ACTIVE" ? "bg-green-50 text-green-700" : m.status === "PAST_DUE" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-500"}`}>{m.cancelAtPeriodEnd ? "CANCELS AT PERIOD END" : m.status}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${m.status === "ACTIVE" ? "bg-green-50 text-green-700" : m.status === "PAST_DUE" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-500"}`}>{m.cancelAtPeriodEnd ? (french ? "ANNULE À LA FIN DE LA PÉRIODE" : "CANCELS AT PERIOD END") : (french ? ({ ACTIVE: "ACTIF", PAST_DUE: "EN RETARD", CANCELLED: "ANNULÉ" } as Record<string, string>)[m.status] ?? m.status : m.status)}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{m.plan.name} · {formatCurrency(m.plan.priceMonthly)}/{french ? "mois" : "mo"}</p>
                     {m.client.email && <p className="text-xs text-gray-400">{m.client.email}</p>}
                   </div>
                   {m.status === "ACTIVE" && !m.cancelAtPeriodEnd && (
-                    <button onClick={() => setMemberToCancel(m)} aria-label="Cancel membership" className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                    <button onClick={() => setMemberToCancel(m)} aria-label={french ? "Annuler l’abonnement" : "Cancel membership"} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
                   )}
                 </div>
               ))}

@@ -99,7 +99,7 @@ export default function ResourcesPage() {
             className="flex-1"
           />
           <Button type="submit" loading={adding} disabled={!newName.trim()}>{french ? "Ajouter" : "Add"}</Button>
-          <Button type="button" variant="ghost" aria-label="Cancel" onClick={() => { setShowAdd(false); setNewName(""); }}>
+          <Button type="button" variant="ghost" aria-label={french ? "Annuler" : "Cancel"} onClick={() => { setShowAdd(false); setNewName(""); }}>
             <X className="w-4 h-4" />
           </Button>
         </form>

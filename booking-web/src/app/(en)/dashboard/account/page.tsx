@@ -73,13 +73,13 @@ export default function AccountPage() {
     try {
       await api.business.remove(biz.id, delConfirm);
       await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-      toast.success("Your account and all its data have been permanently deleted.");
+      toast.success(french ? "Votre compte et toutes ses données ont été supprimés définitivement." : "Your account and all its data have been permanently deleted.");
       window.location.assign("/");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete your account"); setAcctBusy(false); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Impossible de supprimer votre compte" : "Could not delete your account")); setAcctBusy(false); }
   }
 
   async function save() {
-    if (!form.name.trim()) { toast.error("Your name can't be empty"); return; }
+    if (!form.name.trim()) { toast.error(french ? "Votre nom ne peut pas être vide" : "Your name can't be empty"); return; }
     setSaving(true);
     try {
       const updated = await api.users.updateMe({
@@ -96,13 +96,13 @@ export default function AccountPage() {
       if (refreshed.ok) {
         await api.users.me()
           .then((current) => patchCurrentUser({ name: current.name, email: current.email, businessId: current.businessId, avatarUrl: current.avatarUrl ?? undefined }))
-          .catch(() => toast.error("Profile saved, but the sidebar may not update until you reload."));
+          .catch(() => toast.error(french ? "Profil enregistré, mais la barre latérale pourrait ne se mettre à jour qu’après un rechargement." : "Profile saved, but the sidebar may not update until you reload."));
       } else {
-        toast.error("Profile saved, but the sidebar may not update until you reload.");
+        toast.error(french ? "Profil enregistré, mais la barre latérale pourrait ne se mettre à jour qu’après un rechargement." : "Profile saved, but the sidebar may not update until you reload.");
       }
-      toast.success("Profile saved");
+      toast.success(french ? "Profil enregistré" : "Profile saved");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save");
+      toast.error(e instanceof Error ? e.message : (french ? "Impossible d’enregistrer" : "Could not save"));
     } finally {
       setSaving(false);
     }

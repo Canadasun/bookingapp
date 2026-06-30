@@ -67,8 +67,8 @@ export default function OffersPage() {
 
   async function doRemove() {
     if (!bizId || !offerToDelete) return;
-    try { await api.offers.remove(bizId, offerToDelete.id); toast.success("Removed"); setOfferToDelete(null); load(); }
-    catch { toast.error("Failed"); setOfferToDelete(null); }
+    try { await api.offers.remove(bizId, offerToDelete.id); toast.success(french ? "Supprimée" : "Removed"); setOfferToDelete(null); load(); }
+    catch { toast.error(french ? "Échec" : "Failed"); setOfferToDelete(null); }
   }
 
   return (
@@ -120,10 +120,10 @@ export default function OffersPage() {
                   )}
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => openEdit(o)} aria-label="Edit" className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50">
+                  <button onClick={() => openEdit(o)} aria-label={french ? "Modifier" : "Edit"} className="p-2 text-gray-400 hover:text-violet-600 rounded-lg hover:bg-violet-50">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setOfferToDelete(o)} aria-label="Delete" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+                  <button onClick={() => setOfferToDelete(o)} aria-label={french ? "Supprimer" : "Delete"} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

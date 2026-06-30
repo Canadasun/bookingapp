@@ -55,6 +55,13 @@ export const dashboardFr = {
     views: ["Liste", "Tableau du personnel", "Semaine", "Mois"], retry: "Réessayer",
     emptyTitle: "Aucun rendez-vous", emptyBody: "Essayez de modifier vos filtres.",
     appointment: "rendez-vous", appointments: "rendez-vous",
+    calendar: {
+      today: "Aujourd’hui", thisWeek: "Cette semaine",
+      prevMonth: "Mois précédent", nextMonth: "Mois suivant",
+      prevWeek: "Semaine précédente", nextWeek: "Semaine suivante",
+      dragHint: "Glissez pour déplacer à un autre jour, ou cliquez pour ouvrir et utiliser Modifier pour changer la date et l’heure",
+      closed: "Fermé",
+    },
     errors: {
       load: "Échec du chargement", action: "Échec de l’action",
       noShowFee: "Impossible de facturer les frais d’absence",

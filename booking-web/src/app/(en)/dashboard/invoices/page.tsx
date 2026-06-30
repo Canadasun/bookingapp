@@ -166,9 +166,9 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
               {lines.map((l, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input placeholder="Description" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} className="flex-1" />
-                  <Input type="number" min={1} placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className="w-16" />
-                  <Input type="number" min={0} step="0.01" placeholder="Price" value={l.unitCents} onChange={(e) => setLine(i, { unitCents: e.target.value })} className="w-24" />
-                  <button onClick={() => removeLine(i)} disabled={lines.length === 1} aria-label="Remove line item" className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
+                  <Input type="number" min={1} placeholder={french ? "Qté" : "Qty"} value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className="w-16" />
+                  <Input type="number" min={0} step="0.01" placeholder={french ? "Prix" : "Price"} value={l.unitCents} onChange={(e) => setLine(i, { unitCents: e.target.value })} className="w-24" />
+                  <button onClick={() => removeLine(i)} disabled={lines.length === 1} aria-label={french ? "Retirer le poste" : "Remove line item"} className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>
@@ -193,13 +193,13 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
           {showAdvanced && (
             <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">PO Number (optional)</label>
-                <Input placeholder="e.g. PO-2026-001" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="h-8 text-sm" />
+                <label className="block text-xs font-medium text-gray-700 mb-1">{french ? "Numéro de bon de commande (facultatif)" : "PO Number (optional)"}</label>
+                <Input placeholder={french ? "ex. BC-2026-001" : "e.g. PO-2026-001"} value={poNumber} onChange={(e) => setPoNumber(e.target.value)} className="h-8 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Payment Terms (optional)</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">{french ? "Conditions de paiement (facultatif)" : "Payment Terms (optional)"}</label>
                 <Textarea
-                  placeholder="e.g. Net 30 days. Payment by e-transfer to payments@business.com"
+                  placeholder={french ? "ex. Net 30 jours. Paiement par virement Interac à payments@entreprise.com" : "e.g. Net 30 days. Payment by e-transfer to payments@business.com"}
                   value={paymentTerms}
                   onChange={(e) => setPaymentTerms(e.target.value)}
                   rows={2}
