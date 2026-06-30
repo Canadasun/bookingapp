@@ -725,20 +725,26 @@ export class NotificationProcessor extends WorkerHost {
       if (!user || !job.data.otpCode) return;
       this.currentBusinessId = user.businessId;
       const code = job.data.otpCode;
+      const fr = user.locale === 'fr';
       if (job.data.otpMethod === 'SMS' && job.data.otpPhone) {
-        await this.sms.send({ to: job.data.otpPhone, body: `Your Pulse verification code is ${code}. It expires in 10 minutes.` });
+        await this.sms.send({
+          to: job.data.otpPhone,
+          body: fr
+            ? `Votre code de vérification Pulse est ${code}. Il expire dans 10 minutes.`
+            : `Your Pulse verification code is ${code}. It expires in 10 minutes.`,
+        });
       } else {
         await this.email.send({
           to: user.email,
-          subject: `Your Pulse verification code: ${code}`,
+          subject: fr ? `Votre code de vérification Pulse : ${code}` : `Your Pulse verification code: ${code}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Your verification code</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, enter this code to finish signing in. It expires in 10 minutes.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Votre code de vérification' : 'Your verification code'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(user.name)}, saisissez ce code pour terminer votre connexion. Il expire dans 10 minutes.` : `Hi ${esc(user.name)}, enter this code to finish signing in. It expires in 10 minutes.`}</p>
 <div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:18px;text-align:center;margin:0 0 8px">
   <p style="margin:0;color:#E9A23C;font-size:30px;font-weight:800;letter-spacing:6px">${code}</p>
 </div>
-<p style="margin:0;color:#9CA3AF;font-size:12px">If you didn't try to sign in, you can ignore this email.</p>
-`),
+<p style="margin:0;color:#9CA3AF;font-size:12px">${fr ? "Si vous n’avez pas tenté de vous connecter, vous pouvez ignorer ce courriel." : "If you didn't try to sign in, you can ignore this email."}</p>
+`, undefined, fr ? 'fr' : 'en'),
         });
       }
       return;
@@ -1408,26 +1414,31 @@ ${aptDetails(apt)}
       case 'send-admin-booking-alert': {
         const adminEmail = apt.business.email || this.configService.get<string>('ADMIN_ALERT_EMAIL');
         const dashUrl = `${webUrl}/dashboard`;
+        // Owner-facing copy follows the owner's language, not the client's.
+        const owner = await this.prisma.user.findFirst({ where: { businessId: apt.businessId, role: 'OWNER' }, select: { locale: true } });
+        const ownerFr = owner?.locale === 'fr';
         if (adminEmail) {
           await this.email.send({
             to: adminEmail,
-            subject: `New booking: ${apt.client.name} — ${apt.service.name}`,
+            subject: ownerFr ? `Nouvelle réservation : ${apt.client.name} — ${apt.service.name}` : `New booking: ${apt.client.name} — ${apt.service.name}`,
             html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">New booking received</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">A new appointment has been booked through your booking page.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${ownerFr ? 'Nouvelle réservation reçue' : 'New booking received'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${ownerFr ? 'Un nouveau rendez-vous a été réservé via votre page de réservation.' : 'A new appointment has been booked through your booking page.'}</p>
 ${aptDetails(apt)}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
-  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>
-  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Booking ID</td><td style="color:#111827;font-size:12px;font-family:monospace">${apt.id}</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">${ownerFr ? 'Client' : 'Client'}</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">${ownerFr ? 'N° de réservation' : 'Booking ID'}</td><td style="color:#111827;font-size:12px;font-family:monospace">${apt.id}</td></tr>
 </table>
-<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View in dashboard →</a>
-            `),
+<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${ownerFr ? 'Voir dans le tableau de bord' : 'View in dashboard'} →</a>
+            `, undefined, ownerFr ? 'fr' : 'en'),
           });
         }
         if (apt.business.phone) {
           await this.sms.send({
             to: apt.business.phone,
-            body: `New booking from ${apt.client.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. View: ${dashUrl}`,
+            body: ownerFr
+              ? `Nouvelle réservation de ${apt.client.name} : ${apt.service.name} le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')}. Voir : ${dashUrl}`
+              : `New booking from ${apt.client.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. View: ${dashUrl}`,
           });
         }
         break;

@@ -406,6 +406,7 @@ model User {
   twoFactorEnabled       Boolean  @default(false)
   twoFactorMethod        String   @default("EMAIL") // EMAIL | SMS
   twoFactorRecoveryCodes String[] @default([]) // sha256 hashes of one-time recovery codes
+  locale                 String   @default("en") // en | fr; staff/owner communication language
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

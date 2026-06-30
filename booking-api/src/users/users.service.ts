@@ -9,13 +9,13 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true, createdAt: true },
+      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true, locale: true, createdAt: true },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
-  async update(id: string, data: { name?: string; phone?: string | null; avatarUrl?: string | null }) {
+  async update(id: string, data: { name?: string; phone?: string | null; avatarUrl?: string | null; locale?: 'en' | 'fr' }) {
     // Read old avatarUrl before overwriting so we can clean up the orphaned upload.
     let oldAvatarUrl: string | null | undefined;
     if (data.avatarUrl !== undefined) {
@@ -28,8 +28,9 @@ export class UsersService {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.phone !== undefined ? { phone: data.phone } : {}),
         ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+        ...(data.locale !== undefined ? { locale: data.locale } : {}),
       },
-      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true },
+      select: { id: true, email: true, name: true, phone: true, role: true, businessId: true, avatarUrl: true, locale: true },
     });
     if (oldAvatarUrl && oldAvatarUrl !== data.avatarUrl) {
       await deleteUploadByUrl(this.prisma, oldAvatarUrl);

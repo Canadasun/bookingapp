@@ -606,6 +606,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     localStorage.setItem("pulse_dashboard_locale", dashboardLocale);
   }, [dashboardLocale, french]);
 
+  // Toggling the language persists it server-side so it follows the user across
+  // devices and localizes their server-sent notifications (OTP, booking alerts).
+  const changeLocale = (next: "en" | "fr") => {
+    setDashboardLocale(next);
+    api.users.updateMe({ locale: next }).catch(() => {});
+  };
+
   // useCurrentUser() is the authoritative auth check. It calls /api/auth/me on
   // first mount (result is module-level cached), redirects to /login on 401, and
   // provides the full user profile (businessId, permissions, etc.) that the
@@ -614,7 +621,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Keep the avatar and business data fresh on every navigation.
   useEffect(() => {
-    api.users.me().then((u) => setAvatar(u.avatarUrl ?? null)).catch(() => {});
+    api.users.me().then((u) => {
+      setAvatar(u.avatarUrl ?? null);
+      // Server-stored language is authoritative (syncs across devices); it also
+      // drives the staff-facing OTP / booking-alert notifications server-side.
+      if (u.locale === "fr" || u.locale === "en") setDashboardLocale(u.locale);
+    }).catch(() => {});
   }, [pathname]);
   useEffect(() => {
     if (user) setAvatar(user.avatarUrl ?? null);
@@ -869,7 +881,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => setDashboardLocale(french ? "en" : "fr")}
+              onClick={() => changeLocale(french ? "en" : "fr")}
               className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
               aria-label={french ? "Afficher le tableau de bord en anglais" : "Afficher le tableau de bord en français"}
             >

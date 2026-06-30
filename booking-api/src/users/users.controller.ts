@@ -31,6 +31,7 @@ const UpdateMeSchema = z.object({
     (v) => v == null || isValidAvatarUrl(v),
     { message: 'avatarUrl must be an https:// URL or an internal /uploads/ path' },
   ),
+  locale: z.enum(['en', 'fr']).optional(),
 });
 
 const UpdatePrivacySchema = z.object({
@@ -65,6 +66,7 @@ export class UsersController {
       ...(data.name !== undefined ? { name: data.name } : {}),
       ...(data.phone !== undefined ? { phone: data.phone } : {}),
       ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+      ...(data.locale !== undefined ? { locale: data.locale } : {}),
     });
   }
 
