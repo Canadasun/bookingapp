@@ -61,7 +61,7 @@ export function FeaturesContent({ dict, locale }: { dict: Dictionary["features"]
             <Link href="/register" className="inline-flex items-center justify-center rounded-lg bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800">
               {dict.startFree}
             </Link>
-            <Link href="/demo" className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+            <Link href={locale === "fr" ? "/fr/pricing" : "/demo"} className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
               {dict.viewDemo}
             </Link>
           </div>

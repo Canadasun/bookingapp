@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 export default function TasksPage() {
   const { user } = useCurrentUser();
@@ -27,6 +28,7 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", staffId: "", dueAt: "", notes: "" });
   const [taskToDelete, setTaskToDelete] = useState<TaskItem | null>(null);
+  const { french } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -39,13 +41,13 @@ export default function TasksPage() {
       ]);
       setTasks(t);
       setStaff(s.filter((x) => x.active));
-    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load tasks"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des tâches" : "Failed to load tasks")); }
     finally { setLoading(false); }
-  }, [bizId, isOwner]);
+  }, [bizId, isOwner, french]);
   useEffect(() => { load(); }, [load]);
 
   async function addTask() {
-    if (!form.title.trim()) { toast.error("Add a task title"); return; }
+    if (!form.title.trim()) { toast.error(french ? "Ajoutez un titre à la tâche" : "Add a task title"); return; }
     setSaving(true);
     try {
       await api.tasks.create(bizId, {
@@ -56,9 +58,9 @@ export default function TasksPage() {
       });
       setForm({ title: "", staffId: "", dueAt: "", notes: "" });
       setShowAdd(false);
-      toast.success("Task added");
+      toast.success(french ? "Tâche ajoutée" : "Task added");
       load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not add task"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Impossible d’ajouter la tâche" : "Could not add task")); }
     finally { setSaving(false); }
   }
 
@@ -66,13 +68,13 @@ export default function TasksPage() {
     try {
       await api.tasks.update(bizId, t.id, { status: t.status === "DONE" ? "OPEN" : "DONE" });
       load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not update"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Impossible de mettre à jour" : "Could not update")); }
   }
 
   async function deleteTask() {
     if (!taskToDelete) return;
     try { await api.tasks.remove(bizId, taskToDelete.id); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not delete"); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Impossible de supprimer" : "Could not delete")); }
     finally { setTaskToDelete(null); }
   }
 
@@ -83,31 +85,31 @@ export default function TasksPage() {
     <div className="max-w-3xl mx-auto">
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Tasks</h2>
+          <h2 className="text-xl font-bold text-gray-900">{french ? "Tâches" : "Tasks"}</h2>
           <p className="text-sm text-gray-500">
-            {isOwner ? "Delegate work to your team — staff only see what you assign them." : "Your assigned tasks."}
+            {isOwner ? (french ? "Déléguez le travail à votre équipe — chacun ne voit que les tâches qui lui sont attribuées." : "Delegate work to your team — staff only see what you assign them.") : (french ? "Vos tâches attribuées." : "Your assigned tasks.")}
           </p>
         </div>
-        {isOwner && <Button size="sm" onClick={() => setShowAdd((v) => !v)} className="gap-1.5"><Plus className="w-4 h-4" />Add task</Button>}
+        {isOwner && <Button size="sm" onClick={() => setShowAdd((v) => !v)} className="gap-1.5"><Plus className="w-4 h-4" />{french ? "Ajouter une tâche" : "Add task"}</Button>}
       </div>
 
       {isOwner && showAdd && (
         <Card className="mb-5">
           <CardContent className="py-4 space-y-3">
-            <Input aria-label="Task title" placeholder="What needs doing? e.g. Restock shampoo, sanitize tools" value={form.title}
+            <Input aria-label={french ? "Titre de la tâche" : "Task title"} placeholder={french ? "Que faut-il faire? p. ex. Remplir le shampoing, désinfecter les outils" : "What needs doing? e.g. Restock shampoo, sanitize tools"} value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
             <div className="grid sm:grid-cols-2 gap-3">
               <select aria-label="Assign to staff member" value={form.staffId} onChange={(e) => setForm((p) => ({ ...p, staffId: e.target.value }))}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                <option value="">Assign to… (optional)</option>
+                <option value="">{french ? "Attribuer à… (facultatif)" : "Assign to… (optional)"}</option>
                 {staff.map((s) => <option key={s.id} value={s.id}>{s.user.name}</option>)}
               </select>
-              <Input aria-label="Due date and time" type="datetime-local" value={form.dueAt} onChange={(e) => setForm((p) => ({ ...p, dueAt: e.target.value }))} />
+              <Input aria-label={french ? "Date et heure d’échéance" : "Due date and time"} type="datetime-local" value={form.dueAt} onChange={(e) => setForm((p) => ({ ...p, dueAt: e.target.value }))} />
             </div>
-            <Input aria-label="Task notes" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+            <Input aria-label={french ? "Notes de la tâche" : "Task notes"} placeholder={french ? "Notes (facultatif)" : "Notes (optional)"} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             <div className="flex gap-2 justify-end">
-              <Button size="sm" variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button size="sm" loading={saving} onClick={addTask}>Add task</Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowAdd(false)}>{french ? "Annuler" : "Cancel"}</Button>
+              <Button size="sm" loading={saving} onClick={addTask}>{french ? "Ajouter la tâche" : "Add task"}</Button>
             </div>
           </CardContent>
         </Card>
@@ -116,20 +118,20 @@ export default function TasksPage() {
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : tasks.length === 0 ? (
-        <EmptyState title="No tasks yet" icon={Check} description={isOwner ? "Add a task and assign it to a team member." : "Nothing assigned to you right now."} />
+        <EmptyState title={french ? "Aucune tâche" : "No tasks yet"} icon={Check} description={isOwner ? (french ? "Ajoutez une tâche et attribuez-la à un membre de l’équipe." : "Add a task and assign it to a team member.") : (french ? "Rien ne vous est attribué pour le moment." : "Nothing assigned to you right now.")} />
       ) : (
         <div className="space-y-5">
           <div className="space-y-2">
-            {open.length === 0 ? <p className="text-sm text-gray-400">No open tasks 🎉</p> : open.map((t) => (
+            {open.length === 0 ? <p className="text-sm text-gray-400">{french ? "Aucune tâche ouverte" : "No open tasks"} 🎉</p> : open.map((t) => (
               <TaskRow key={t.id} t={t} isOwner={isOwner} onToggle={() => toggle(t)} onRemove={() => setTaskToDelete(t)} />
             ))}
           </div>
           {done.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Done ({done.length})</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{french ? "Terminées" : "Done"} ({done.length})</p>
               <div className="space-y-2 opacity-70">
                 {done.map((t) => <TaskRow key={t.id} t={t} isOwner={isOwner} onToggle={() => toggle(t)} onRemove={() => setTaskToDelete(t)} />)}
               </div>
@@ -140,9 +142,9 @@ export default function TasksPage() {
 
       <ConfirmDialog
         open={taskToDelete !== null}
-        title="Delete task"
-        description={`Delete "${taskToDelete?.title}"? This cannot be undone.`}
-        confirmLabel="Delete"
+        title={french ? "Supprimer la tâche" : "Delete task"}
+        description={french ? `Supprimer « ${taskToDelete?.title} » ? Cette action est irréversible.` : `Delete "${taskToDelete?.title}"? This cannot be undone.`}
+        confirmLabel={french ? "Supprimer" : "Delete"}
         variant="destructive"
         onConfirm={deleteTask}
         onCancel={() => setTaskToDelete(null)}
@@ -154,11 +156,12 @@ export default function TasksPage() {
 function TaskRow({ t, isOwner, onToggle, onRemove }: { t: TaskItem; isOwner: boolean; onToggle: () => void; onRemove: () => void }) {
   const dueDate = t.dueAt ? new Date(t.dueAt) : null;
   const overdue = dueDate && t.status !== "DONE" && dueDate < new Date();
+  const { french } = useDashboardLocale();
   return (
     <Card>
       <CardContent className="py-3 flex items-center gap-3">
         <button type="button" onClick={onToggle}
-          aria-label={t.status === "DONE" ? "Reopen task" : "Mark task done"}
+          aria-label={t.status === "DONE" ? (french ? "Rouvrir la tâche" : "Reopen task") : (french ? "Marquer la tâche comme terminée" : "Mark task done")}
           className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
             t.status === "DONE" ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300 text-transparent hover:border-violet-400")}>
           {t.status === "DONE" && <Check className="w-3.5 h-3.5" />}
@@ -172,7 +175,7 @@ function TaskRow({ t, isOwner, onToggle, onRemove }: { t: TaskItem; isOwner: boo
           </div>
         </div>
         {isOwner && (
-          <button type="button" onClick={onRemove} aria-label="Delete task" className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0">
+          <button type="button" onClick={onRemove} aria-label={french ? "Supprimer la tâche" : "Delete task"} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0">
             <Trash2 className="w-4 h-4" />
           </button>
         )}

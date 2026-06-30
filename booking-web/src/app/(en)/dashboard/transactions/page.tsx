@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { Receipt, RotateCcw } from "lucide-react";
 import { api, type Payment, type PaymentStatus } from "@/lib/api";
-import { formatPrice } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const KIND_LABEL: Record<string, string> = {
   DEPOSIT: "Deposit",
@@ -34,14 +33,21 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [refundFor, setRefundFor] = useState<string | null>(null);
+  const { french, formatCurrency, formatDate } = useDashboardLocale();
 
   const load = useCallback(async () => {
     setLoadError("");
     setLoading(true);
     try { setPayments(await api.payments.list()); }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load transactions"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des transactions" : "Failed to load transactions")); }
     finally { setLoading(false); }
-  }, []);
+  }, [french]);
+  const kindLabel = (kind: string) => french
+    ? ({ DEPOSIT: "Dépôt", NO_SHOW_FEE: "Frais d’absence", LATE_CANCEL_FEE: "Frais d’annulation tardive", IN_PERSON: "En personne", OTHER: "Débit" } as Record<string, string>)[kind] ?? kind
+    : KIND_LABEL[kind] ?? kind;
+  const statusLabel = (status: PaymentStatus) => french
+    ? ({ SUCCEEDED: "réussie", PENDING: "en attente", FAILED: "échouée", CANCELED: "annulée", REFUNDED: "remboursée", PARTIALLY_REFUNDED: "remboursée en partie" } as const)[status]
+    : status.replace("_", " ").toLowerCase();
   useEffect(() => { load(); }, [load]);
 
   const collected = payments.filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED" || p.status === "REFUNDED")
@@ -52,10 +58,10 @@ export default function TransactionsPage() {
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">Transactions</h2>
-        <p className="text-sm text-gray-500">Deposits, no-show &amp; late-cancel fees, and in-person charges — with refunds.</p>
+        <p className="text-sm text-gray-500">{french ? "Dépôts, frais d’absence et d’annulation tardive, paiements en personne et remboursements." : "Deposits, no-show & late-cancel fees, and in-person charges — with refunds."}</p>
         {payments.length > 0 && (
           <p className="text-xs text-gray-400 mt-1">
-            {formatPrice(collected)} collected · {formatPrice(refunded)} refunded
+            {formatCurrency(collected)} {french ? "perçus" : "collected"} · {formatCurrency(refunded)} {french ? "remboursés" : "refunded"}
           </p>
         )}
       </div>
@@ -63,10 +69,10 @@ export default function TransactionsPage() {
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : payments.length === 0 ? (
-        <EmptyState title="No transactions yet" description="Deposits and in-person charges will appear here." />
+        <EmptyState title={french ? "Aucune transaction" : "No transactions yet"} description={french ? "Les dépôts et paiements en personne apparaîtront ici." : "Deposits and in-person charges will appear here."} />
       ) : (
         <div className="space-y-3">
           {payments.map((p) => {
@@ -78,29 +84,29 @@ export default function TransactionsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-gray-900">{formatPrice(p.amountCents)}</span>
+                        <span className="text-lg font-bold text-gray-900">{formatCurrency(p.amountCents)}</span>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLE[p.status]}`}>
-                          {p.status.replace("_", " ").toLowerCase()}
+                          {statusLabel(p.status)}
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-0.5">
-                        {KIND_LABEL[p.kind] ?? p.kind}
+                        {kindLabel(p.kind)}
                         {p.client ? ` · ${p.client.name}` : ""}
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {format(new Date(p.createdAt), "MMM d, yyyy · HH:mm")}
-                        {p.refundedCents > 0 && <span className="text-amber-600"> · {formatPrice(p.refundedCents)} refunded</span>}
+                        {formatDate(p.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {p.refundedCents > 0 && <span className="text-amber-600"> · {formatCurrency(p.refundedCents)} {french ? "remboursés" : "refunded"}</span>}
                       </p>
                       {p.receiptUrl && (
                         <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 mt-1">
-                          <Receipt className="w-3.5 h-3.5" /> View receipt
+                          <Receipt className="w-3.5 h-3.5" /> {french ? "Voir le reçu" : "View receipt"}
                         </a>
                       )}
                     </div>
                     {refundable && refundFor !== p.id && (
                       <Button variant="outline" size="sm" className="shrink-0" onClick={() => setRefundFor(p.id)}>
-                        <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Refund
+                        <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> {french ? "Rembourser" : "Refund"}
                       </Button>
                     )}
                   </div>
@@ -111,6 +117,7 @@ export default function TransactionsPage() {
                       onCancel={() => setRefundFor(null)}
                       onDone={() => { setRefundFor(null); load(); }}
                       paymentId={p.id}
+                      french={french}
                     />
                   )}
                 </CardContent>
@@ -121,33 +128,34 @@ export default function TransactionsPage() {
       )}
 
       <p className="mt-6 text-center text-xs text-gray-400 flex items-center justify-center gap-1.5">
-        <Receipt className="w-3.5 h-3.5" /> Records reconcile automatically with Stripe.
+        <Receipt className="w-3.5 h-3.5" /> {french ? "Les registres sont rapprochés automatiquement avec Stripe." : "Records reconcile automatically with Stripe."}
       </p>
     </div>
   );
 }
 
-function RefundForm({ paymentId, remainingCents, onDone, onCancel }: {
-  paymentId: string; remainingCents: number; onDone: () => void; onCancel: () => void;
+function RefundForm({ paymentId, remainingCents, onDone, onCancel, french }: {
+  paymentId: string; remainingCents: number; onDone: () => void; onCancel: () => void; french: boolean;
 }) {
   const [amount, setAmount] = useState((remainingCents / 100).toFixed(2));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const { formatCurrency } = useDashboardLocale();
 
   async function submit() {
     const cents = Math.round(parseFloat(amount) * 100);
     if (!cents || cents <= 0 || cents > remainingCents) {
-      toast.error(`Enter an amount between $0.01 and ${formatPrice(remainingCents)}`);
+      toast.error(french ? `Entrez un montant entre 0,01 $ et ${formatCurrency(remainingCents)}` : `Enter an amount between $0.01 and ${formatCurrency(remainingCents)}`);
       return;
     }
     setBusy(true);
     try {
       // Full remaining → omit amount so the backend refunds the exact balance.
       await api.payments.refund(paymentId, cents === remainingCents ? undefined : cents, reason.trim() || undefined);
-      toast.success("Refund issued");
+      toast.success(french ? "Remboursement effectué" : "Refund issued");
       onDone();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Refund failed");
+      toast.error(e instanceof Error ? e.message : (french ? "Échec du remboursement" : "Refund failed"));
     } finally {
       setBusy(false);
     }
@@ -156,17 +164,17 @@ function RefundForm({ paymentId, remainingCents, onDone, onCancel }: {
   return (
     <div className="mt-3 pt-3 border-t border-gray-100 grid gap-2 sm:grid-cols-[120px_1fr_auto] items-end">
       <div>
-        <label htmlFor="refund-amount" className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
+        <label htmlFor="refund-amount" className="block text-xs font-medium text-gray-600 mb-1">{french ? "Montant" : "Amount"}</label>
         <Input id="refund-amount" type="number" step="0.01" min="0.01" max={(remainingCents / 100).toFixed(2)}
           value={amount} onChange={(e) => setAmount(e.target.value)} />
       </div>
       <div>
-        <label htmlFor="refund-reason" className="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>
-        <Input id="refund-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. customer request" />
+        <label htmlFor="refund-reason" className="block text-xs font-medium text-gray-600 mb-1">{french ? "Motif (facultatif)" : "Reason (optional)"}</label>
+        <Input id="refund-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={french ? "p. ex. demande du client" : "e.g. customer request"} />
       </div>
       <div className="flex gap-2">
-        <Button size="sm" variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
-        <Button size="sm" onClick={submit} loading={busy}>Refund</Button>
+        <Button size="sm" variant="outline" onClick={onCancel} disabled={busy}>{french ? "Annuler" : "Cancel"}</Button>
+        <Button size="sm" onClick={submit} loading={busy}>{french ? "Rembourser" : "Refund"}</Button>
       </div>
     </div>
   );

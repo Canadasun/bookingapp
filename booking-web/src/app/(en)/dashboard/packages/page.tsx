@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 export default function PackagesPage() {
   const [tab, setTab] = useState<"products" | "issued">("products");
@@ -27,6 +28,7 @@ export default function PackagesPage() {
   const [cpToVoid, setCpToVoid] = useState<ClientPackage | null>(null);
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
+  const { french } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -39,51 +41,51 @@ export default function PackagesPage() {
         api.services.list(bizId),
       ]);
       setProducts(p); setIssued(i); setServices(s);
-    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
   useEffect(() => { load(); }, [load]);
 
-  const svcName = (id?: string | null) => services.find((s) => s.id === id)?.name ?? "Any service";
+  const svcName = (id?: string | null) => services.find((s) => s.id === id)?.name ?? (french ? "Tous les services" : "Any service");
 
   async function doRemoveProduct() {
     if (!productToDelete) return;
     try { await api.packages.remove(bizId, productToDelete.id); setProductToDelete(null); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setProductToDelete(null); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); setProductToDelete(null); }
   }
   async function redeem(cp: ClientPackage) {
-    try { const r = await api.packages.redeem(bizId, cp.id); toast.success(`Credit used — ${r.creditsRemaining} left`); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    try { const r = await api.packages.redeem(bizId, cp.id); toast.success(french ? `Crédit utilisé — ${r.creditsRemaining} restant${r.creditsRemaining === 1 ? "" : "s"}` : `Credit used — ${r.creditsRemaining} left`); load(); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
   }
   async function doVoidCP() {
     if (!cpToVoid) return;
     try { await api.packages.void(bizId, cpToVoid.id); setCpToVoid(null); load(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); setCpToVoid(null); }
+    catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); setCpToVoid(null); }
   }
 
   return (
     <div className="max-w-3xl mx-auto">
       <ConfirmDialog
         open={productToDelete !== null}
-        title={`Delete "${productToDelete?.name}"?`}
-        description="Already-issued packages are kept. Only the product template is removed."
-        confirmLabel="Delete package"
+        title={french ? `Supprimer « ${productToDelete?.name} » ?` : `Delete "${productToDelete?.name}"?`}
+        description={french ? "Les forfaits déjà émis sont conservés. Seul le modèle de produit est supprimé." : "Already-issued packages are kept. Only the product template is removed."}
+        confirmLabel={french ? "Supprimer le forfait" : "Delete package"}
         variant="destructive"
         onConfirm={doRemoveProduct}
         onCancel={() => setProductToDelete(null)}
       />
       <ConfirmDialog
         open={cpToVoid !== null}
-        title={`Void ${cpToVoid?.client?.name ?? "client"}'s "${cpToVoid?.name}"?`}
-        description="The remaining credits will be cancelled."
-        confirmLabel="Void"
+        title={french ? `Annuler le forfait « ${cpToVoid?.name} » de ${cpToVoid?.client?.name ?? "client"} ?` : `Void ${cpToVoid?.client?.name ?? "client"}'s "${cpToVoid?.name}"?`}
+        description={french ? "Les crédits restants seront annulés." : "The remaining credits will be cancelled."}
+        confirmLabel={french ? "Annuler" : "Void"}
         variant="destructive"
         onConfirm={doVoidCP}
         onCancel={() => setCpToVoid(null)}
       />
       <div className="mb-5">
-        <h2 className="text-xl font-bold text-gray-900">Packages</h2>
-        <p className="text-sm text-gray-500">Sell prepaid session bundles, then redeem credits as clients visit.</p>
+        <h2 className="text-xl font-bold text-gray-900">{french ? "Forfaits" : "Packages"}</h2>
+        <p className="text-sm text-gray-500">{french ? "Vendez des ensembles de séances prépayées, puis utilisez les crédits lors des visites." : "Sell prepaid session bundles, then redeem credits as clients visit."}</p>
       </div>
 
       <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -91,12 +93,12 @@ export default function PackagesPage() {
           {(["products", "issued"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${tab === t ? "bg-white text-violet-700 shadow-sm" : "text-gray-500"}`}>
-              {t === "products" ? "Package products" : "Issued"}
+              {t === "products" ? (french ? "Produits forfaits" : "Package products") : (french ? "Émis" : "Issued")}
             </button>
           ))}
         </div>
-        {tab === "products" && !creating && <Button onClick={() => setCreating(true)}><Plus className="w-4 h-4 mr-1.5" /> New package</Button>}
-        {tab === "issued" && !issuing && <Button onClick={() => setIssuing(true)}><Ticket className="w-4 h-4 mr-1.5" /> Issue</Button>}
+        {tab === "products" && !creating && <Button onClick={() => setCreating(true)}><Plus className="w-4 h-4 mr-1.5" /> {french ? "Nouveau forfait" : "New package"}</Button>}
+        {tab === "issued" && !issuing && <Button onClick={() => setIssuing(true)}><Ticket className="w-4 h-4 mr-1.5" /> {french ? "Émettre" : "Issue"}</Button>}
       </div>
 
       {tab === "products" && creating && (
@@ -109,10 +111,10 @@ export default function PackagesPage() {
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : tab === "products" ? (
-        products.length === 0 && !creating ? <EmptyState title="No package products yet" icon={PackageIcon} description="Define a bundle like “5x Haircut — $200”." /> : (
+        products.length === 0 && !creating ? <EmptyState title={french ? "Aucun produit forfaitaire" : "No package products yet"} icon={PackageIcon} description={french ? "Définissez un ensemble comme « 5 coupes — 200 $ »." : "Define a bundle like “5x Haircut — $200”."} /> : (
           <div className="space-y-3 mt-4">
             {products.map((p) => (
               <Card key={p.id} className={p.active ? "" : "opacity-60"}>
@@ -122,11 +124,11 @@ export default function PackagesPage() {
                       <PackageIcon className="w-4 h-4 text-violet-500 shrink-0" />
                       <span className="font-medium text-gray-900 truncate">{p.name}</span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-0.5">{p.credits} credits · {svcName(p.serviceId)}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{p.credits} {french ? "crédits" : "credits"} · {svcName(p.serviceId)}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-gray-900">{formatPrice(p.priceCents)}</p>
-                    <button onClick={() => setProductToDelete(p)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1"><Trash2 className="w-3 h-3" /> Delete</button>
+                    <button onClick={() => setProductToDelete(p)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1"><Trash2 className="w-3 h-3" /> {french ? "Supprimer" : "Delete"}</button>
                   </div>
                 </CardContent>
               </Card>
@@ -134,7 +136,7 @@ export default function PackagesPage() {
           </div>
         )
       ) : (
-        issued.length === 0 && !issuing ? <EmptyState title="No issued packages yet" icon={Ticket} description="Issue a package to a client to track their credits." /> : (
+        issued.length === 0 && !issuing ? <EmptyState title={french ? "Aucun forfait émis" : "No issued packages yet"} icon={Ticket} description={french ? "Émettez un forfait à un client pour suivre ses crédits." : "Issue a package to a client to track their credits."} /> : (
           <div className="space-y-3 mt-4">
             {issued.map((cp) => (
               <Card key={cp.id} className={cp.status === "ACTIVE" ? "" : "opacity-70"}>
@@ -147,17 +149,17 @@ export default function PackagesPage() {
                       </div>
                       <p className="text-sm text-gray-500 mt-0.5">{cp.name} · {svcName(cp.serviceId)}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Issued {format(new Date(cp.createdAt), "MMM d, yyyy")}
-                        {cp.expiresAt ? ` · expires ${format(new Date(cp.expiresAt), "MMM d, yyyy")}` : ""}
+                        {french ? "Émis le" : "Issued"} {format(new Date(cp.createdAt), "MMM d, yyyy")}
+                        {cp.expiresAt ? ` · ${french ? "expire le" : "expires"} ${format(new Date(cp.expiresAt), "MMM d, yyyy")}` : ""}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-lg font-bold text-gray-900">{cp.creditsRemaining}<span className="text-sm text-gray-400 font-normal">/{cp.creditsTotal}</span></p>
-                      <p className="text-xs text-gray-400">credits left</p>
+                      <p className="text-xs text-gray-400">{french ? "crédits restants" : "credits left"}</p>
                       {cp.status === "ACTIVE" && (
                         <div className="flex gap-2 justify-end mt-1.5">
-                          <button onClick={() => redeem(cp)} className="text-xs text-violet-600 hover:underline font-medium">Use credit</button>
-                          <button onClick={() => setCpToVoid(cp)} aria-label="Void package" className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1"><Ban className="w-3 h-3" /></button>
+                          <button onClick={() => redeem(cp)} className="text-xs text-violet-600 hover:underline font-medium">{french ? "Utiliser un crédit" : "Use credit"}</button>
+                          <button onClick={() => setCpToVoid(cp)} aria-label={french ? "Annuler le forfait" : "Void package"} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1"><Ban className="w-3 h-3" /></button>
                         </div>
                       )}
                     </div>
@@ -188,45 +190,46 @@ function ProductForm({ bizId, services, onDone, onCancel }: { bizId: string; ser
   const [credits, setCredits] = useState("5");
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
+  const { french } = useDashboardLocale();
 
   async function submit() {
     const c = parseInt(credits, 10); const pr = parseFloat(price);
-    if (!name.trim()) { toast.error("Name your package"); return; }
-    if (!c || c < 1) { toast.error("Credits must be at least 1"); return; }
-    if (isNaN(pr) || pr < 0) { toast.error("Enter a price"); return; }
+    if (!name.trim()) { toast.error(french ? "Nommez le forfait" : "Name your package"); return; }
+    if (!c || c < 1) { toast.error(french ? "Les crédits doivent être au moins de 1" : "Credits must be at least 1"); return; }
+    if (isNaN(pr) || pr < 0) { toast.error(french ? "Entrez un prix" : "Enter a price"); return; }
     setSaving(true);
     try {
       await api.packages.create(bizId, { name, serviceId: serviceId || undefined, credits: c, priceCents: Math.round(pr * 100) });
-      toast.success("Package created"); onDone();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+      toast.success(french ? "Forfait créé" : "Package created"); onDone();
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
     finally { setSaving(false); }
   }
 
   return (
     <Card className="border-violet-200">
       <CardContent className="py-5 space-y-3">
-        <Input placeholder="Package name, e.g. “5x Haircut”" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder={french ? "Nom du forfait, p. ex. « 5 coupes »" : "Package name, e.g. “5x Haircut”"} value={name} onChange={(e) => setName(e.target.value)} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label htmlFor="pkg-credits" className="text-xs font-medium text-gray-500">Credits</label>
+            <label htmlFor="pkg-credits" className="text-xs font-medium text-gray-500">{french ? "Crédits" : "Credits"}</label>
             <Input id="pkg-credits" type="number" min={1} value={credits} onChange={(e) => setCredits(e.target.value)} />
           </div>
           <div>
-            <label htmlFor="pkg-price" className="text-xs font-medium text-gray-500">Price ($)</label>
+            <label htmlFor="pkg-price" className="text-xs font-medium text-gray-500">{french ? "Prix ($)" : "Price ($)"}</label>
             <Input id="pkg-price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div>
-            <label htmlFor="pkg-service" className="text-xs font-medium text-gray-500">Service</label>
+            <label htmlFor="pkg-service" className="text-xs font-medium text-gray-500">{french ? "Service" : "Service"}</label>
             <select id="pkg-service" value={serviceId} onChange={(e) => setServiceId(e.target.value)}
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 bg-white">
-              <option value="">Any service</option>
+              <option value="">{french ? "Tous les services" : "Any service"}</option>
               {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} loading={saving}>Create package</Button>
+          <Button variant="outline" onClick={onCancel} disabled={saving}>{french ? "Annuler" : "Cancel"}</Button>
+          <Button onClick={submit} loading={saving}>{french ? "Créer le forfait" : "Create package"}</Button>
         </div>
       </CardContent>
     </Card>
@@ -239,6 +242,7 @@ function IssueForm({ bizId, products, services, onDone, onCancel }: { bizId: str
   const [client, setClient] = useState<ClientWithStats | null>(null);
   const [packageId, setPackageId] = useState("");
   const [saving, setSaving] = useState(false);
+  const { french } = useDashboardLocale();
 
   useEffect(() => {
     if (client || search.trim().length < 2) { setResults([]); return; }
@@ -250,17 +254,17 @@ function IssueForm({ bizId, products, services, onDone, onCancel }: { bizId: str
   }, [search, client, bizId]);
 
   async function submit() {
-    if (!client) { toast.error("Pick a client"); return; }
-    if (!packageId) { toast.error("Pick a package"); return; }
+    if (!client) { toast.error(french ? "Choisissez un client" : "Pick a client"); return; }
+    if (!packageId) { toast.error(french ? "Choisissez un forfait" : "Pick a package"); return; }
     setSaving(true);
     try {
       await api.packages.issue(bizId, { clientId: client.id, packageId });
-      toast.success(`Package issued to ${client.name}`); onDone();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+      toast.success(french ? `Forfait émis pour ${client.name}` : `Package issued to ${client.name}`); onDone();
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
     finally { setSaving(false); }
   }
 
-  const svcName = (id?: string | null) => services.find((s) => s.id === id)?.name ?? "Any service";
+  const svcName = (id?: string | null) => services.find((s) => s.id === id)?.name ?? (french ? "Tous les services" : "Any service");
 
   return (
     <Card className="border-violet-200">
@@ -268,11 +272,11 @@ function IssueForm({ bizId, products, services, onDone, onCancel }: { bizId: str
         {client ? (
           <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
             <span className="text-sm font-medium text-gray-800">{client.name} <span className="text-gray-400 font-normal">· {client.email}</span></span>
-            <button onClick={() => { setClient(null); setSearch(""); }} className="text-xs text-violet-600 hover:underline">Change</button>
+            <button onClick={() => { setClient(null); setSearch(""); }} className="text-xs text-violet-600 hover:underline">{french ? "Changer" : "Change"}</button>
           </div>
         ) : (
           <div className="relative">
-            <Input placeholder="Search client by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder={french ? "Rechercher un client par nom ou courriel…" : "Search client by name or email…"} value={search} onChange={(e) => setSearch(e.target.value)} />
             {results.length > 0 && (
               <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-sm max-h-52 overflow-y-auto">
                 {results.map((c) => (
@@ -287,20 +291,20 @@ function IssueForm({ bizId, products, services, onDone, onCancel }: { bizId: str
         )}
 
         {products.length === 0 ? (
-          <p className="text-sm text-gray-400 flex items-center gap-1.5"><Tag className="w-4 h-4" /> Create a package product first.</p>
+          <p className="text-sm text-gray-400 flex items-center gap-1.5"><Tag className="w-4 h-4" /> {french ? "Créez d’abord un produit forfait." : "Create a package product first."}</p>
         ) : (
           <select value={packageId} onChange={(e) => setPackageId(e.target.value)}
             className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400 bg-white">
-            <option value="">Select a package…</option>
+            <option value="">{french ? "Choisir un forfait…" : "Select a package…"}</option>
             {products.filter((p) => p.active).map((p) => (
-              <option key={p.id} value={p.id}>{p.name} — {p.credits} credits · {svcName(p.serviceId)} · {formatPrice(p.priceCents)}</option>
+              <option key={p.id} value={p.id}>{p.name} — {p.credits} {french ? "crédits" : "credits"} · {svcName(p.serviceId)} · {formatPrice(p.priceCents)}</option>
             ))}
           </select>
         )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} loading={saving} disabled={!client || !packageId}>Issue package</Button>
+          <Button variant="outline" onClick={onCancel} disabled={saving}>{french ? "Annuler" : "Cancel"}</Button>
+          <Button onClick={submit} loading={saving} disabled={!client || !packageId}>{french ? "Émettre le forfait" : "Issue package"}</Button>
         </div>
       </CardContent>
     </Card>

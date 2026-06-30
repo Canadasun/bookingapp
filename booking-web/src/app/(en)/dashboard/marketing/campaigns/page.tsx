@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const AUDIENCES: { value: CampaignAudience; label: string; hint: string }[] = [
   { value: "ALL", label: "All clients", hint: "Everyone with a contact on file" },
@@ -28,15 +29,16 @@ export default function MarketingPage() {
   const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
+  const { french } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
     setLoadError("");
     setLoading(true);
     try { setCampaigns(await api.campaigns.list(bizId)); }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
   useEffect(() => { load(); }, [load]);
 
   async function doSend() {
@@ -78,10 +80,10 @@ export default function MarketingPage() {
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Marketing</h2>
-          <p className="text-sm text-gray-500">Reach your clients by email or text — promotions, news, win-backs.</p>
+          <p className="text-sm text-gray-500">{french ? "Joignez vos clients par courriel ou texto — promotions, nouvelles et reconquête." : "Reach your clients by email or text — promotions, news, win-backs."}</p>
         </div>
         {!composing && (
-          <Button onClick={() => setComposing(true)}><Plus className="w-4 h-4 mr-1.5" /> New campaign</Button>
+          <Button onClick={() => setComposing(true)}><Plus className="w-4 h-4 mr-1.5" /> {french ? "Nouvelle campagne" : "New campaign"}</Button>
         )}
       </div>
 
@@ -90,10 +92,10 @@ export default function MarketingPage() {
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : campaigns.length === 0 && !composing ? (
-        <EmptyState title="No campaigns yet" description="Create your first campaign to start reaching clients." />
+        <EmptyState title={french ? "Aucune campagne" : "No campaigns yet"} description={french ? "Créez votre première campagne pour joindre vos clients." : "Create your first campaign to start reaching clients."} />
       ) : (
         <div className="space-y-3 mt-4">
           {campaigns.map((c) => (
@@ -143,6 +145,7 @@ function StatusPill({ status }: { status: Campaign["status"] }) {
 }
 
 function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => void; onCancel: () => void }) {
+  const { french } = useDashboardLocale();
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<CampaignChannel>("EMAIL");
   const [audience, setAudience] = useState<CampaignAudience>("ALL");
@@ -178,7 +181,7 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
   return (
     <Card className="border-violet-200">
       <CardContent className="py-5 space-y-4">
-        <Input placeholder="Campaign name (internal)" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder={french ? "Nom de la campagne (interne)" : "Campaign name (internal)"} value={name} onChange={(e) => setName(e.target.value)} />
 
         <div className="flex gap-2">
           {(["EMAIL", "SMS"] as CampaignChannel[]).map((ch) => (
@@ -200,13 +203,13 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
         </div>
 
         {channel === "EMAIL" && (
-          <Input placeholder="Subject line" value={subject} onChange={(e) => setSubject(e.target.value)} />
+          <Input placeholder={french ? "Objet du courriel" : "Subject line"} value={subject} onChange={(e) => setSubject(e.target.value)} />
         )}
 
         <div>
           <textarea rows={5} value={body} onChange={(e) => setBody(e.target.value)}
             className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400"
-            placeholder="Your message…" />
+            placeholder={french ? "Votre message…" : "Your message…"} />
           <div className="flex items-center justify-between mt-1">
             <p className="text-[11px] text-gray-400">Use <code className="bg-gray-100 px-1 rounded">{"{{name}}"}</code> and <code className="bg-gray-100 px-1 rounded">{"{{business}}"}</code> as merge tags.</p>
             {channel === "SMS" && (
@@ -223,9 +226,9 @@ function Composer({ bizId, onDone, onCancel }: { bizId: string; onDone: () => vo
             {count === null ? "…" : <><strong className="text-gray-700">{count}</strong> recipient{count === 1 ? "" : "s"}</>}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
-            <Button variant="outline" onClick={() => save(false)} disabled={saving}>Save draft</Button>
-            <Button onClick={() => save(true)} loading={saving} disabled={!count}><Send className="w-4 h-4 mr-1.5" /> Send now</Button>
+            <Button variant="outline" onClick={onCancel} disabled={saving}>{french ? "Annuler" : "Cancel"}</Button>
+            <Button variant="outline" onClick={() => save(false)} disabled={saving}>{french ? "Enregistrer le brouillon" : "Save draft"}</Button>
+            <Button onClick={() => save(true)} loading={saving} disabled={!count}><Send className="w-4 h-4 mr-1.5" /> {french ? "Envoyer maintenant" : "Send now"}</Button>
           </div>
         </div>
       </CardContent>

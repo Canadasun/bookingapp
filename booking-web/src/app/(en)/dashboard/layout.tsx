@@ -20,7 +20,7 @@ import { useEvents } from "@/lib/hooks";
 import { toast } from "sonner";
 import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
 import { LOCATIONS_CHANGED_EVENT, LocationScopeContext } from "@/lib/location-scope";
-import { DashboardLocaleContext } from "@/lib/dashboard-locale";
+import { DashboardLocaleContext, useDashboardLocale } from "@/lib/dashboard-locale";
 
 interface NavItem {
   href: string;
@@ -237,6 +237,7 @@ function commandItems(nav: NavItem[]) {
 }
 
 function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: boolean; nav: NavItem[]; onClose: () => void; canSearchData?: boolean }) {
+  const { french } = useDashboardLocale();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<SearchGroup[]>([]);
@@ -305,7 +306,7 @@ function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: b
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Jump to a page"
+        aria-label={french ? "Accéder à une page" : "Jump to a page"}
         className="mx-auto mt-16 w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -313,7 +314,7 @@ function CommandPalette({ open, nav, onClose, canSearchData = false }: { open: b
           <Search className="h-4 w-4 text-gray-400" />
           <input
             autoFocus
-            aria-label="Search pages"
+            aria-label={french ? "Rechercher des pages" : "Search pages"}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
@@ -471,6 +472,7 @@ function LocationPicker({
   selectedIds: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const { french } = useDashboardLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -526,7 +528,7 @@ function LocationPicker({
         <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div role="dialog" aria-label="Choose locations" className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl sm:w-80">
+        <div role="dialog" aria-label={french ? "Choisir les emplacements" : "Choose locations"} className="absolute left-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl sm:w-80">
           <div className="border-b border-gray-100 p-3">
             <div className="flex items-center gap-2 rounded-xl border border-gray-200 px-3">
               <Search className="h-4 w-4 text-gray-400" />
@@ -534,8 +536,8 @@ function LocationPicker({
                 autoFocus
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search locations"
-                aria-label="Search locations"
+                placeholder={french ? "Rechercher des emplacements" : "Search locations"}
+                aria-label={french ? "Rechercher des emplacements" : "Search locations"}
                 className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
             </div>
@@ -546,13 +548,13 @@ function LocationPicker({
               onClick={() => onChange(locations.map((location) => location.id))}
               className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50"
             >
-              <span>Select all</span>
+              <span>{french ? "Tout sélectionner" : "Select all"}</span>
               <span className={cn("flex h-5 w-5 items-center justify-center rounded border", allSelected ? "border-violet-600 bg-violet-600 text-white" : "border-gray-300")}>
                 {allSelected && <Check className="h-3.5 w-3.5" />}
               </span>
             </button>
             {visible.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-gray-500">No matching locations</p>
+              <p className="px-3 py-6 text-center text-sm text-gray-500">{french ? "Aucun emplacement correspondant" : "No matching locations"}</p>
             ) : visible.map((location) => (
               <button
                 type="button"
@@ -790,7 +792,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Business Logo/Name — Clicking leads to settings.
             Tapping it on mobile previously dumped owners onto "/", which reads as a
             sign-out. Keep them in the dashboard. */}
-        <Link href="/dashboard" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title="Home">
+        <Link href="/dashboard" className="h-16 flex items-center gap-2.5 px-5 border-b border-[#E9DDCB] hover:bg-gray-50 transition-colors" title={french ? "Accueil" : "Home"}>
           {biz?.logoUrl ? (
             <Image src={biz.logoUrl} alt="Business logo" width={36} height={36} className="w-9 h-9 rounded-xl object-cover shadow-lg shrink-0" />
           ) : (
@@ -800,7 +802,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Link>
 
         {/* Nav */}
-        <nav aria-label="Main navigation" className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        <nav aria-label={french ? "Navigation principale" : "Main navigation"} className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {nav.map((item) => (
             <NavLink key={item.href} item={item} onClose={() => setOpen(false)} unreadMessages={unreadMessages} />
           ))}
@@ -852,7 +854,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               className="lg:hidden min-h-11 min-w-11 p-2 rounded-xl hover:bg-gray-100 transition-colors"
               onClick={() => setOpen((o) => !o)}
-              aria-label="Toggle menu">
+              aria-label={french ? "Afficher ou masquer le menu" : "Toggle menu"}>
               {open
                 ? <X className="w-5 h-5 text-gray-600" />
                 : <MenuIcon className="w-5 h-5 text-gray-600" />}
@@ -879,7 +881,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button type="button" onClick={() => setCommandOpen(true)}
               className="hidden items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 lg:inline-flex">
               <Search className="h-4 w-4" />
-              <span>Search</span>
+              <span>{french ? "Rechercher" : "Search"}</span>
               <kbd className="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">⌘K</kbd>
             </button>
             <Link href="/dashboard/notifications"
@@ -895,7 +897,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Messages quick-link */}
             <Link href="/dashboard/messages"
               className="relative flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-violet-50 p-2 text-violet-700 transition-colors hover:bg-violet-100"
-              aria-label={unreadMessages > 0 ? `${unreadMessages} unread client messages` : "Messages"}>
+              aria-label={unreadMessages > 0 ? (french ? `${unreadMessages} messages clients non lus` : `${unreadMessages} unread client messages`) : "Messages"}>
               <MessageSquare className="w-4.5 h-4.5" />
               {unreadMessages > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 min-w-5 h-5 rounded-full bg-red-600 px-1 text-[10px] leading-5 text-white text-center font-bold ring-2 ring-white">
@@ -904,7 +906,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </Link>
             {user && (
-              <Link href="/dashboard/account" className="flex min-h-11 items-center gap-2 rounded-full pr-2 transition-colors hover:bg-gray-100" title="Your account">
+              <Link href="/dashboard/account" className="flex min-h-11 items-center gap-2 rounded-full pr-2 transition-colors hover:bg-gray-100" title={french ? "Votre compte" : "Your account"}>
                 <div className="relative w-7 h-7 rounded-full bg-violet-100 ring-2 ring-white overflow-hidden flex items-center justify-center text-violet-700 font-bold text-xs">
                   {avatar
                     ? <Image src={avatar} alt={`${user.name} profile photo`} fill className="object-cover" />

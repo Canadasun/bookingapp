@@ -235,9 +235,19 @@ export function FeatureLandingPage({
             <div className="flex gap-6 text-sm text-slate-500">
               <Link href={locale === "fr" ? "/fr" : "/"} className="hover:text-violet-600 transition-colors">{footer.home}</Link>
               <Link href={locale === "fr" ? "/fr/pricing" : "/pricing"} className="hover:text-violet-600 transition-colors">{footer.pricing}</Link>
-              <Link href="/terms" className="hover:text-violet-600 transition-colors">{footer.terms}</Link>
-              <Link href="/privacy" className="hover:text-violet-600 transition-colors">{footer.privacy}</Link>
-              <Link href="/support" className="hover:text-violet-600 transition-colors">{footer.support}</Link>
+              {locale === "fr" ? (
+                <>
+                  <Link href="/fr/features" className="hover:text-violet-600 transition-colors">Fonctionnalités</Link>
+                  <Link href="/fr/security" className="hover:text-violet-600 transition-colors">Sécurité</Link>
+                  <Link href="mailto:support@pulseappointments.com?subject=Demande%20de%20soutien" className="hover:text-violet-600 transition-colors">{footer.support}</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/terms" className="hover:text-violet-600 transition-colors">{footer.terms}</Link>
+                  <Link href="/privacy" className="hover:text-violet-600 transition-colors">{footer.privacy}</Link>
+                  <Link href="/support" className="hover:text-violet-600 transition-colors">{footer.support}</Link>
+                </>
+              )}
             </div>
           </div>
         </footer>

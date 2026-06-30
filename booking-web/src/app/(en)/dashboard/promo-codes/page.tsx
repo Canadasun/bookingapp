@@ -7,8 +7,8 @@ import { api, PromoCode } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatPrice } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 export default function PromoCodesPage() {
   const { user } = useCurrentUser();
@@ -19,12 +19,13 @@ export default function PromoCodesPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [codeToDelete, setCodeToDelete] = useState<PromoCode | null>(null);
   const [form, setForm] = useState({ code: "", discountType: "PERCENT" as "PERCENT" | "FLAT", discountValue: "", maxUsages: "", expiresAt: "" });
+  const { french, formatCurrency, formatDate } = useDashboardLocale();
 
   const load = useCallback(async () => {
     try { setCodes(await api.promoCodes.list(bizId)); }
-    catch { toast.error("Could not load promo codes"); }
+    catch { toast.error(french ? "Impossible de charger les codes promo" : "Could not load promo codes"); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
 
   useEffect(() => { if (bizId) void load(); }, [bizId, load]);
 
@@ -45,7 +46,7 @@ export default function PromoCodesPage() {
       setCodes(p => [pc, ...p]);
       setShowForm(false);
       setForm({ code: "", discountType: "PERCENT", discountValue: "", maxUsages: "", expiresAt: "" });
-      toast.success("Promo code created");
+      toast.success(french ? "Code promo créé" : "Promo code created");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Failed to create"); }
   }
 
@@ -73,7 +74,7 @@ export default function PromoCodesPage() {
   }
 
   function fmtDiscount(pc: PromoCode) {
-    return pc.discountType === "PERCENT" ? `${pc.discountValue}% off` : `${formatPrice(pc.discountValue)} off`;
+    return pc.discountType === "PERCENT" ? `${pc.discountValue}% ${french ? "de réduction" : "off"}` : `${formatCurrency(pc.discountValue)} ${french ? "de réduction" : "off"}`;
   }
 
   if (!bizId) return null;
@@ -82,34 +83,34 @@ export default function PromoCodesPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <ConfirmDialog
         open={codeToDelete !== null}
-        title={`Delete promo code "${codeToDelete?.code}"?`}
-        description="Any existing uses are already counted but new redemptions will no longer work."
-        confirmLabel="Delete code"
+        title={french ? `Supprimer le code promo « ${codeToDelete?.code} »?` : `Delete promo code "${codeToDelete?.code}"?`}
+        description={french ? "Les utilisations existantes restent comptabilisées, mais aucun nouvel échange ne sera accepté." : "Any existing uses are already counted but new redemptions will no longer work."}
+        confirmLabel={french ? "Supprimer le code" : "Delete code"}
         variant="destructive"
         onConfirm={doRemove}
         onCancel={() => setCodeToDelete(null)}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Tag className="w-6 h-6 text-violet-600" /> Promo Codes</h1>
-          <p className="text-sm text-gray-500 mt-1">Clients enter these at checkout to receive a discount.</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Tag className="w-6 h-6 text-violet-600" /> {french ? "Codes promo" : "Promo Codes"}</h1>
+          <p className="text-sm text-gray-500 mt-1">{french ? "Les clients les saisissent au paiement pour obtenir une réduction." : "Clients enter these at checkout to receive a discount."}</p>
         </div>
-        <Button onClick={() => setShowForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> New code</Button>
+        <Button onClick={() => setShowForm(s => !s)} className="gap-2"><Plus className="w-4 h-4" /> {french ? "Nouveau code" : "New code"}</Button>
       </div>
 
       {showForm && (
         <form onSubmit={create} className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-sm">
-          <h2 className="font-semibold text-gray-900">Create promo code</h2>
+          <h2 className="font-semibold text-gray-900">{french ? "Créer un code promo" : "Create promo code"}</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Code</label>
               <Input placeholder="e.g. SUMMER20" value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} className="uppercase" />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Discount type</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Type de réduction" : "Discount type"}</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={form.discountType} onChange={e => setForm(p => ({ ...p, discountType: e.target.value as "PERCENT" | "FLAT" }))}>
-                <option value="PERCENT">Percentage (%)</option>
-                <option value="FLAT">Flat amount ($)</option>
+                <option value="PERCENT">{french ? "Pourcentage (%)" : "Percentage (%)"}</option>
+                <option value="FLAT">{french ? "Montant fixe ($)" : "Flat amount ($)"}</option>
               </select>
             </div>
             <div>
@@ -126,19 +127,19 @@ export default function PromoCodesPage() {
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <Button type="submit">Create</Button>
-            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button type="submit">{french ? "Créer" : "Create"}</Button>
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{french ? "Annuler" : "Cancel"}</Button>
           </div>
         </form>
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading…</div>
+        <div className="text-center py-12 text-gray-400">{french ? "Chargement…" : "Loading…"}</div>
       ) : codes.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Tag className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No promo codes yet</p>
-          <p className="text-sm mt-1">Create one to run discounts on Instagram, TikTok, or walk-ins.</p>
+          <p className="font-medium">{french ? "Aucun code promo" : "No promo codes yet"}</p>
+          <p className="text-sm mt-1">{french ? "Créez-en un pour offrir des réductions sur Instagram, TikTok ou en personne." : "Create one to run discounts on Instagram, TikTok, or walk-ins."}</p>
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl divide-y divide-gray-100 shadow-sm">

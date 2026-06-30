@@ -6,6 +6,7 @@ import { api, type Business } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { IntakeFormEditor } from "@/components/IntakeFormEditor";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 export default function FormsPage() {
   const { user } = useCurrentUser();
@@ -13,6 +14,7 @@ export default function FormsPage() {
   const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const { french } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
@@ -21,11 +23,11 @@ export default function FormsPage() {
     try {
       setBiz(await api.business.get(bizId));
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Failed to load");
+      setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load"));
     } finally {
       setLoading(false);
     }
-  }, [bizId]);
+  }, [bizId, french]);
   useEffect(() => { load(); }, [load]);
 
   return (
@@ -33,10 +35,10 @@ export default function FormsPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <ClipboardList className="w-5 h-5 text-violet-600" />
-          <h1 className="text-xl font-bold text-gray-900">Forms</h1>
+          <h1 className="text-xl font-bold text-gray-900">{french ? "Formulaires" : "Forms"}</h1>
         </div>
         <p className="text-sm text-gray-500 mt-1">
-          Build the intake &amp; consultation questions clients answer when they book online.
+          {french ? "Créez les questions d’admission et de consultation auxquelles les clients répondent lors de la réservation en ligne." : "Build the intake & consultation questions clients answer when they book online."}
         </p>
       </div>
 

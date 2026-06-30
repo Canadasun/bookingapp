@@ -7,8 +7,9 @@ export const IssueGiftCardSchema = z.object({
   purchaserName: z.string().max(120).optional(),
   message: z.string().max(500).optional(),
   expiresAt: z.string().datetime().optional(),
+  locale: z.enum(['en', 'fr']).default('en'),
 });
-export type IssueGiftCardDto = z.infer<typeof IssueGiftCardSchema>;
+export type IssueGiftCardDto = z.input<typeof IssueGiftCardSchema>;
 
 export const RedeemGiftCardSchema = z.object({
   code: z.string().min(1).max(32),

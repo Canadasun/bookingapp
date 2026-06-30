@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, use, useCallback, useRef } from "react";
-import { format } from "date-fns";
 import { Printer, ArrowLeft, Edit2, Check, X, Plus, Trash2, Mail } from "lucide-react";
 import Link from "next/link";
 import { api, Invoice, Business, InvoiceCreatePayload } from "@/lib/api";
@@ -12,28 +11,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
-
-const NEXT_STATUS: Record<Invoice["status"], { label: string; to: Invoice["status"] }[]> = {
-  DRAFT: [{ label: "Mark sent", to: "SENT" }, { label: "Mark paid", to: "PAID" }, { label: "Void", to: "VOID" }],
-  SENT: [{ label: "Mark paid", to: "PAID" }, { label: "Void", to: "VOID" }],
-  PAID: [{ label: "Reopen (draft)", to: "DRAFT" }],
-  VOID: [{ label: "Reopen (draft)", to: "DRAFT" }],
-};
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 type LineItem = { description: string; quantity: number; unitCents: number };
 
-function money(cents: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: currency as "CAD" | "USD" }).format(cents / 100);
-}
-
-function StatusBadge({ status }: { status: Invoice["status"] }) {
+function StatusBadge({ status, french }: { status: Invoice["status"]; french: boolean }) {
   const colors: Record<Invoice["status"], string> = {
     DRAFT: "bg-gray-100 text-gray-600",
     SENT: "bg-amber-100 text-amber-700",
     PAID: "bg-emerald-100 text-emerald-700",
     VOID: "bg-red-100 text-red-500",
   };
-  return <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide", colors[status])}>{status}</span>;
+  const label = french ? ({ DRAFT: "BROUILLON", SENT: "ENVOYÉE", PAID: "PAYÉE", VOID: "ANNULÉE" } as const)[status] : status;
+  return <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide", colors[status])}>{label}</span>;
 }
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,6 +37,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [editing, setEditing] = useState(false);
   const [sending, setSending] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const { french, formatCurrency, formatDate } = useDashboardLocale();
 
   // Edit state
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -65,9 +56,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       const [i, b] = await Promise.all([api.invoices.get(bizId, id), api.business.get(bizId).catch(() => null)]);
       setInv(i); setBiz(b);
       resetEditState(i);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to load invoice"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec du chargement de la facture" : "Failed to load invoice")); }
     finally { setLoading(false); }
-  }, [bizId, id]);
+  }, [bizId, id, french]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -89,8 +80,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     try {
       const u = await api.invoices.setStatus(bizId, inv.id, to);
       setInv((p) => p ? { ...p, status: u.status } : p);
-      toast.success(`Marked ${to.toLowerCase()}`);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+      toast.success(french ? "État mis à jour" : `Marked ${to.toLowerCase()}`);
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
     finally { setBusy(false); }
   }
 
@@ -113,8 +104,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       setInv(updated);
       resetEditState(updated);
       setEditing(false);
-      toast.success("Invoice saved");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to save"); }
+      toast.success(french ? "Facture enregistrée" : "Invoice saved");
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec de l’enregistrement" : "Failed to save")); }
     finally { setBusy(false); }
   }
 
@@ -123,16 +114,30 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     setSending(true);
     try {
       const result = await api.invoices.sendByEmail(bizId, inv.id);
-      toast.success(`Invoice sent to ${result.sentTo}`);
+      toast.success(french ? `Facture envoyée à ${result.sentTo}` : `Invoice sent to ${result.sentTo}`);
       setInv((p) => p ? { ...p, status: p.status === "DRAFT" ? "SENT" : p.status } : p);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to send"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec de l’envoi" : "Failed to send")); }
     finally { setSending(false); }
   }
 
   if (loading) return <LoadingSpinner />;
-  if (!inv) return <p className="text-center text-gray-400 py-12">Invoice not found.</p>;
+  if (!inv) return <p className="text-center text-gray-400 py-12">{french ? "Facture introuvable." : "Invoice not found."}</p>;
 
   const curr = inv.currency || biz?.currency || "CAD";
+  const money = (cents: number) => formatCurrency(cents, curr as "CAD" | "USD");
+  const nextStatus: Record<Invoice["status"], { label: string; to: Invoice["status"] }[]> = {
+    DRAFT: [
+      { label: french ? "Marquer envoyée" : "Mark sent", to: "SENT" },
+      { label: french ? "Marquer payée" : "Mark paid", to: "PAID" },
+      { label: french ? "Annuler" : "Void", to: "VOID" },
+    ],
+    SENT: [
+      { label: french ? "Marquer payée" : "Mark paid", to: "PAID" },
+      { label: french ? "Annuler" : "Void", to: "VOID" },
+    ],
+    PAID: [{ label: french ? "Rouvrir (brouillon)" : "Reopen (draft)", to: "DRAFT" }],
+    VOID: [{ label: french ? "Rouvrir (brouillon)" : "Reopen (draft)", to: "DRAFT" }],
+  };
   const lineTotal = lines.reduce((s, li) => s + li.quantity * li.unitCents, 0);
   const discountAmt = discountCents === "" ? 0 : Math.round(Number(discountCents) * 100);
   const discounted = Math.max(lineTotal - discountAmt, 0);
@@ -144,34 +149,34 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       {/* Action bar */}
       <div className="flex items-center justify-between mb-4 gap-2 print:hidden flex-wrap">
         <Link href="/dashboard/invoices" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600">
-          <ArrowLeft className="w-4 h-4" /> Invoices
+          <ArrowLeft className="w-4 h-4" /> {french ? "Factures" : "Invoices"}
         </Link>
         <div className="flex items-center gap-2 flex-wrap">
           {!editing && inv.status === "DRAFT" && (
             <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="gap-1.5">
-              <Edit2 className="w-3.5 h-3.5" /> Edit
+              <Edit2 className="w-3.5 h-3.5" /> {french ? "Modifier" : "Edit"}
             </Button>
           )}
           {editing && (
             <>
               <Button size="sm" variant="outline" onClick={() => { setEditing(false); if (inv) resetEditState(inv); }} className="gap-1.5">
-                <X className="w-3.5 h-3.5" /> Cancel
+                <X className="w-3.5 h-3.5" /> {french ? "Annuler" : "Cancel"}
               </Button>
               <Button size="sm" disabled={busy} onClick={saveEdits} className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white">
-                <Check className="w-3.5 h-3.5" /> Save
+                <Check className="w-3.5 h-3.5" /> {french ? "Enregistrer" : "Save"}
               </Button>
             </>
           )}
           {!editing && inv.client?.email && (
             <Button size="sm" variant="outline" disabled={sending} onClick={sendEmail} className="gap-1.5">
-              <Mail className="w-3.5 h-3.5" /> {sending ? "Sending…" : "Send by email"}
+              <Mail className="w-3.5 h-3.5" /> {sending ? (french ? "Envoi…" : "Sending…") : (french ? "Envoyer par courriel" : "Send by email")}
             </Button>
           )}
-          {!editing && NEXT_STATUS[inv.status].map((a) => (
-            <Button key={a.to} size="sm" variant="outline" disabled={busy} onClick={() => setStatus(a.to)}>{a.label}</Button>
+          {!editing && nextStatus[inv.status].map((a) => (
+            <Button key={a.to} size="sm" variant="outline" disabled={busy} onClick={() => setStatus(a.to)}>{french ? ({ SENT: "Marquer envoyée", PAID: "Marquer payée", VOID: "Annuler", DRAFT: "Rouvrir (brouillon)" } as const)[a.to] : a.label}</Button>
           ))}
           <Button size="sm" onClick={() => window.print()} className="gap-1.5 print:hidden">
-            <Printer className="w-4 h-4" /> Print / PDF
+            <Printer className="w-4 h-4" /> {french ? "Imprimer / PDF" : "Print / PDF"}
           </Button>
         </div>
       </div>
@@ -193,14 +198,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               {(biz?.email ?? inv.business?.email) && <p className="text-white/80 text-sm">{biz?.email ?? inv.business?.email}</p>}
               {(biz?.phone ?? inv.business?.phone) && <p className="text-white/80 text-sm">{biz?.phone ?? inv.business?.phone}</p>}
               {(biz?.address ?? inv.business?.address) && <p className="text-white/70 text-xs mt-0.5">{biz?.address ?? inv.business?.address}</p>}
-              {inv.business?.taxNumber && <p className="text-white/70 text-xs">Tax #: {inv.business.taxNumber}</p>}
+              {inv.business?.taxNumber && <p className="text-white/70 text-xs">{french ? "N° de taxe" : "Tax #"}: {inv.business.taxNumber}</p>}
             </div>
           </div>
           <div className="text-right shrink-0">
-            <p className="text-white/70 text-xs uppercase tracking-widest font-semibold mb-1">Invoice</p>
+            <p className="text-white/70 text-xs uppercase tracking-widest font-semibold mb-1">{french ? "Facture" : "Invoice"}</p>
             <p className="text-white font-bold text-3xl">#{String(inv.number).padStart(4, "0")}</p>
-            <div className="mt-2"><StatusBadge status={inv.status} /></div>
-            {inv.dueAt && <p className="text-white/80 text-xs mt-1.5">Due: {format(new Date(inv.dueAt), "MMM d, yyyy")}</p>}
+            <div className="mt-2"><StatusBadge status={inv.status} french={french} /></div>
+            {inv.dueAt && <p className="text-white/80 text-xs mt-1.5">{french ? "Échéance" : "Due"}: {formatDate(inv.dueAt, { year: "numeric", month: "short", day: "numeric" })}</p>}
           </div>
         </div>
 
@@ -209,7 +214,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {/* Meta row: client + dates + PO */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Bill To</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{french ? "Facturer à" : "Bill To"}</p>
               {editing ? (
                 <Textarea
                   value={billingAddress}
@@ -235,15 +240,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
             <div className="space-y-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Invoice Date</p>
-                <p className="text-gray-700">{format(new Date(inv.createdAt), "MMM d, yyyy")}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{french ? "Date de facture" : "Invoice Date"}</p>
+                <p className="text-gray-700">{formatDate(inv.createdAt, { year: "numeric", month: "short", day: "numeric" })}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Due Date</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{french ? "Date d’échéance" : "Due Date"}</p>
                 {editing ? (
                   <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="h-7 text-xs" />
                 ) : (
-                  <p className="text-gray-700">{inv.dueAt ? format(new Date(inv.dueAt), "MMM d, yyyy") : "On receipt"}</p>
+                  <p className="text-gray-700">{inv.dueAt ? formatDate(inv.dueAt, { year: "numeric", month: "short", day: "numeric" }) : (french ? "Sur réception" : "On receipt")}</p>
                 )}
               </div>
             </div>
@@ -263,10 +268,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {/* Line items */}
           <div className="border border-gray-100 rounded-xl overflow-hidden">
             <div className="grid grid-cols-[1fr_56px_88px_88px] gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Description</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center">Qty</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">Unit Price</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">Amount</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{french ? "Description" : "Description"}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-center">{french ? "Qté" : "Qty"}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">{french ? "Prix unitaire" : "Unit Price"}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right">{french ? "Montant" : "Amount"}</span>
             </div>
 
             {editing ? (
@@ -277,23 +282,23 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       aria-label={`Description for line ${i + 1}`}
                       value={li.description}
                       onChange={(e) => setLines((prev) => prev.map((l, j) => j === i ? { ...l, description: e.target.value } : l))}
-                      placeholder="Service or item"
+                      placeholder={french ? "Service ou article" : "Service or item"}
                       className="h-7 text-xs"
                     />
                     <Input
-                      aria-label={`Quantity for line ${i + 1}`}
+                      aria-label={french ? `Quantité pour la ligne ${i + 1}` : `Quantity for line ${i + 1}`}
                       type="number" min={1} value={li.quantity}
                       onChange={(e) => setLines((prev) => prev.map((l, j) => j === i ? { ...l, quantity: Number(e.target.value) } : l))}
                       className="h-7 text-xs text-center"
                     />
                     <Input
-                      aria-label={`Unit price for line ${i + 1}`}
+                      aria-label={french ? `Prix unitaire pour la ligne ${i + 1}` : `Unit price for line ${i + 1}`}
                       type="number" min={0} step="0.01" value={(li.unitCents / 100).toFixed(2)}
                       onChange={(e) => setLines((prev) => prev.map((l, j) => j === i ? { ...l, unitCents: Math.round(Number(e.target.value) * 100) } : l))}
                       className="h-7 text-xs text-right"
                     />
-                    <span className="text-xs text-gray-500 text-right">{money(li.quantity * li.unitCents, curr)}</span>
-                    <button onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} aria-label="Remove line item" className="text-gray-300 hover:text-red-400 transition-colors">
+                    <span className="text-xs text-gray-500 text-right">{money(li.quantity * li.unitCents)}</span>
+                    <button onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} aria-label={french ? "Supprimer le poste" : "Remove line item"} className="text-gray-300 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -302,7 +307,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   onClick={() => setLines((prev) => [...prev, { description: "", quantity: 1, unitCents: 0 }])}
                   className="w-full flex items-center gap-1.5 px-4 py-2.5 text-xs text-violet-600 hover:bg-violet-50 transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add line item
+                  <Plus className="w-3.5 h-3.5" /> {french ? "Ajouter un poste" : "Add line item"}
                 </button>
               </>
             ) : (
@@ -310,8 +315,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <div key={i} className="grid grid-cols-[1fr_56px_88px_88px] gap-2 px-4 py-3 border-b border-gray-50 last:border-0">
                   <span className="text-sm text-gray-800">{li.description}</span>
                   <span className="text-sm text-gray-500 text-center">{li.quantity}</span>
-                  <span className="text-sm text-gray-500 text-right">{money(li.unitCents, curr)}</span>
-                  <span className="text-sm font-medium text-gray-900 text-right">{money(li.amountCents, curr)}</span>
+                  <span className="text-sm text-gray-500 text-right">{money(li.unitCents)}</span>
+                  <span className="text-sm font-medium text-gray-900 text-right">{money(li.amountCents)}</span>
                 </div>
               ))
             )}
@@ -321,8 +326,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex justify-end">
             <div className="w-full max-w-xs space-y-2 text-sm">
               <div className="flex justify-between text-gray-500">
-                <span>Subtotal</span>
-                <span>{money(editing ? lineTotal : inv.subtotalCents, curr)}</span>
+                <span>{french ? "Sous-total" : "Subtotal"}</span>
+                <span>{money(editing ? lineTotal : inv.subtotalCents)}</span>
               </div>
               {/* Discount row */}
               {editing ? (
@@ -330,7 +335,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <Input
                     value={discountLabel}
                     onChange={(e) => setDiscountLabel(e.target.value)}
-                    placeholder="Discount label"
+                    placeholder={french ? "Libellé de la remise" : "Discount label"}
                     className="h-7 text-xs flex-1"
                   />
                   <Input
@@ -343,15 +348,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               ) : (inv.discountCents ?? 0) > 0 ? (
                 <div className="flex justify-between text-red-500">
-                  <span>{inv.discountLabel || "Discount"}</span>
-                  <span>−{money(inv.discountCents!, curr)}</span>
+                  <span>{inv.discountLabel || (french ? "Remise" : "Discount")}</span>
+                  <span>−{money(inv.discountCents!)}</span>
                 </div>
               ) : null}
               {/* Tax row */}
               {editing ? (
                 <div className="flex justify-between items-center gap-2 text-gray-500">
                   <div className="flex items-center gap-1.5">
-                    <span className="shrink-0">Tax</span>
+                    <span className="shrink-0">{french ? "Taxe" : "Tax"}</span>
                     <Input
                       type="number" min={0} max={100} step="0.1"
                       value={taxRate}
@@ -361,17 +366,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     />
                     <span className="shrink-0">%</span>
                   </div>
-                  <span>{money(previewTax, curr)}</span>
+                  <span>{money(previewTax)}</span>
                 </div>
               ) : (inv.taxCents ?? 0) > 0 ? (
                 <div className="flex justify-between text-gray-500">
-                  <span>Tax ({inv.taxRatePercent}%)</span>
-                  <span>{money(inv.taxCents, curr)}</span>
+                  <span>{french ? "Taxe" : "Tax"} ({inv.taxRatePercent}%)</span>
+                  <span>{money(inv.taxCents)}</span>
                 </div>
               ) : null}
               <div className="flex justify-between font-bold text-gray-900 text-base border-t border-gray-100 pt-2.5">
                 <span>Total ({curr})</span>
-                <span>{money(editing ? previewTotal : inv.totalCents, curr)}</span>
+                <span>{money(editing ? previewTotal : inv.totalCents)}</span>
               </div>
             </div>
           </div>
@@ -379,30 +384,30 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           {/* Payment terms */}
           {editing ? (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Payment Terms</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{french ? "Conditions de paiement" : "Payment Terms"}</p>
               <Textarea
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value)}
-                placeholder="e.g. Net 30 days. Payment by e-transfer to payments@business.com"
+                placeholder={french ? "p. ex. 30 jours nets. Paiement par virement à payments@business.com" : "e.g. Net 30 days. Payment by e-transfer to payments@business.com"}
                 rows={2}
                 className="text-xs resize-none"
               />
             </div>
           ) : inv.paymentTerms ? (
             <div className="border-t border-gray-100 pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Payment Terms</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{french ? "Conditions de paiement" : "Payment Terms"}</p>
               <p className="text-xs text-gray-600 whitespace-pre-line">{inv.paymentTerms}</p>
             </div>
           ) : null}
 
           {/* Notes */}
           <div className={!editing && !inv.notes ? "hidden" : ""}>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Notes</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">{french ? "Notes" : "Notes"}</p>
             {editing ? (
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes, thank-you message, etc."
+                placeholder={french ? "Notes additionnelles, message de remerciement, etc." : "Additional notes, thank-you message, etc."}
                 rows={3}
                 className="text-xs resize-none"
               />

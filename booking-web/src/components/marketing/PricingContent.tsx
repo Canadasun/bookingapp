@@ -191,7 +191,7 @@ export function PricingContent({
           </Link>
           <p className="mt-4 text-xs text-white/40">
             {dict.ctaSection.questions}{" "}
-            <Link href="/support" className="underline hover:text-white/70 transition-colors">
+            <Link href={locale === "fr" ? "mailto:support@pulseappointments.com?subject=Demande%20de%20soutien" : "/support"} className="underline hover:text-white/70 transition-colors">
               {dict.ctaSection.supportLink}
             </Link>
           </p>
@@ -203,10 +203,20 @@ export function PricingContent({
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-sm text-slate-400">© {new Date().getFullYear()} Pulse Appointments</span>
           <div className="flex gap-6 text-sm text-slate-500">
-            <Link href="/" className="hover:text-indigo-600 transition-colors">{dict.footer.home}</Link>
-            <Link href="/terms" className="hover:text-indigo-600 transition-colors">{dict.footer.terms}</Link>
-            <Link href="/privacy" className="hover:text-indigo-600 transition-colors">{dict.footer.privacy}</Link>
-            <Link href="/support" className="hover:text-indigo-600 transition-colors">{dict.footer.support}</Link>
+            <Link href={locale === "fr" ? "/fr" : "/"} className="hover:text-indigo-600 transition-colors">{dict.footer.home}</Link>
+            {locale === "fr" ? (
+              <>
+                <Link href="/fr/features" className="hover:text-indigo-600 transition-colors">Fonctionnalités</Link>
+                <Link href="/fr/security" className="hover:text-indigo-600 transition-colors">Sécurité</Link>
+                <Link href="mailto:support@pulseappointments.com?subject=Demande%20de%20soutien" className="hover:text-indigo-600 transition-colors">{dict.footer.support}</Link>
+              </>
+            ) : (
+              <>
+                <Link href="/terms" className="hover:text-indigo-600 transition-colors">{dict.footer.terms}</Link>
+                <Link href="/privacy" className="hover:text-indigo-600 transition-colors">{dict.footer.privacy}</Link>
+                <Link href="/support" className="hover:text-indigo-600 transition-colors">{dict.footer.support}</Link>
+              </>
+            )}
           </div>
         </div>
       </footer>

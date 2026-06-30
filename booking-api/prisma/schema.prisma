@@ -243,6 +243,7 @@ model GiftCard {
   recipientEmail String?
   purchaserName  String?
   message        String?
+  locale         String         @default("en") // recipient communication language: en | fr
   status         GiftCardStatus @default(ACTIVE)
   createdAt      DateTime       @default(now())
   expiresAt      DateTime?
@@ -378,6 +379,7 @@ model WaitlistEntry {
   staffId     String? // preferred staff (optional)
   desiredDate DateTime? // preferred day (optional)
   notes       String?
+  locale      String         @default("en") // client communication language: en | fr
   status      WaitlistStatus @default(WAITING)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

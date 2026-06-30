@@ -1,0 +1,2 @@
+ALTER TABLE "GiftCard" ADD COLUMN "locale" TEXT NOT NULL DEFAULT 'en';
+ALTER TABLE "WaitlistEntry" ADD COLUMN "locale" TEXT NOT NULL DEFAULT 'en';

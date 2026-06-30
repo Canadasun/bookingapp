@@ -7,8 +7,8 @@ import { api, Business, ClientWithStats, MembershipPlan, MembershipMember } from
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatPrice } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 type Tab = "plans" | "members";
 
@@ -27,6 +27,7 @@ export default function MembershipsPage() {
   const [enrollForm, setEnrollForm] = useState({ clientId: "", planId: "" });
   const [enrolling, setEnrolling] = useState(false);
   const [memberToCancel, setMemberToCancel] = useState<MembershipMember | null>(null);
+  const { french, formatCurrency } = useDashboardLocale();
 
   const load = useCallback(async () => {
     try {
@@ -38,9 +39,9 @@ export default function MembershipsPage() {
       ]);
       setPlans(p); setMembers(m); setClients(c.data);
       setBusiness(b);
-    } catch { toast.error("Could not load memberships"); }
+    } catch { toast.error(french ? "Impossible de charger les abonnements" : "Could not load memberships"); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
 
   useEffect(() => { if (bizId) void load(); }, [bizId, load]);
 
@@ -125,22 +126,22 @@ export default function MembershipsPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <ConfirmDialog
         open={memberToCancel !== null}
-        title={`Cancel ${memberToCancel?.client.name}'s membership?`}
-        description={`Their ${memberToCancel?.plan.name} plan will remain active until the end of the current billing period.`}
-        confirmLabel="Cancel membership"
+        title={french ? `Annuler l’abonnement de ${memberToCancel?.client.name}?` : `Cancel ${memberToCancel?.client.name}'s membership?`}
+        description={french ? `Le forfait ${memberToCancel?.plan.name} restera actif jusqu’à la fin de la période de facturation.` : `Their ${memberToCancel?.plan.name} plan will remain active until the end of the current billing period.`}
+        confirmLabel={french ? "Annuler l’abonnement" : "Cancel membership"}
         variant="destructive"
         onConfirm={doCancelMembership}
         onCancel={() => setMemberToCancel(null)}
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Crown className="w-6 h-6 text-amber-500" /> Memberships</h1>
-          <p className="text-sm text-gray-500 mt-1">Recurring monthly plans for your best clients.</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Crown className="w-6 h-6 text-amber-500" /> {french ? "Abonnements" : "Memberships"}</h1>
+          <p className="text-sm text-gray-500 mt-1">{french ? "Forfaits mensuels récurrents pour vos meilleurs clients." : "Recurring monthly plans for your best clients."}</p>
         </div>
         {tab === "plans" ? (
-          <Button onClick={() => setShowPlanForm(s => !s)} disabled={!membershipsEnabled} className="gap-2"><Plus className="w-4 h-4" /> New plan</Button>
+          <Button onClick={() => setShowPlanForm(s => !s)} disabled={!membershipsEnabled} className="gap-2"><Plus className="w-4 h-4" /> {french ? "Nouveau forfait" : "New plan"}</Button>
         ) : (
-          <Button onClick={() => setShowEnrollForm(s => !s)} disabled={!membershipsEnabled} className="gap-2"><Plus className="w-4 h-4" /> Enroll client</Button>
+          <Button onClick={() => setShowEnrollForm(s => !s)} disabled={!membershipsEnabled} className="gap-2"><Plus className="w-4 h-4" /> {french ? "Inscrire un client" : "Enroll client"}</Button>
         )}
       </div>
 
@@ -153,34 +154,34 @@ export default function MembershipsPage() {
       {activeMembers.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-            <p className="text-xs text-amber-600 font-medium">Active members</p>
+            <p className="text-xs text-amber-600 font-medium">{french ? "Membres actifs" : "Active members"}</p>
             <p className="text-2xl font-bold text-amber-700 mt-1">{activeMembers.length}</p>
           </div>
           <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
-            <p className="text-xs text-green-600 font-medium">Monthly recurring</p>
-            <p className="text-2xl font-bold text-green-700 mt-1">{formatPrice(monthlyRevenue)}</p>
+            <p className="text-xs text-green-600 font-medium">{french ? "Revenu mensuel récurrent" : "Monthly recurring"}</p>
+            <p className="text-2xl font-bold text-green-700 mt-1">{formatCurrency(monthlyRevenue)}</p>
           </div>
         </div>
       )}
 
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
         {(["plans", "members"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>{french ? (t === "plans" ? "forfaits" : "membres") : t}</button>
         ))}
       </div>
 
-      {loading ? <div className="text-center py-12 text-gray-400">Loading…</div> : tab === "plans" ? (
+      {loading ? <div className="text-center py-12 text-gray-400">{french ? "Chargement…" : "Loading…"}</div> : tab === "plans" ? (
         <div className="space-y-4">
           {showPlanForm && (
             <form onSubmit={createPlan} className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4 shadow-sm">
-              <h2 className="font-semibold text-gray-900">New membership plan</h2>
+              <h2 className="font-semibold text-gray-900">{french ? "Nouveau forfait d’abonnement" : "New membership plan"}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Plan name</label>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Nom du forfait" : "Plan name"}</label>
                   <Input placeholder="e.g. Monthly Unlimited" value={planForm.name} onChange={e => setPlanForm(p => ({ ...p, name: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Monthly price ($)</label>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">{french ? "Prix mensuel ($)" : "Monthly price ($)"}</label>
                   <Input type="number" min={1} step="0.01" placeholder="79.00" value={planForm.priceMonthly} onChange={e => setPlanForm(p => ({ ...p, priceMonthly: e.target.value }))} />
                 </div>
                 <div className="sm:col-span-2">
@@ -189,16 +190,16 @@ export default function MembershipsPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button type="submit">Create plan</Button>
-                <Button type="button" variant="outline" onClick={() => setShowPlanForm(false)}>Cancel</Button>
+                <Button type="submit">{french ? "Créer le forfait" : "Create plan"}</Button>
+                <Button type="button" variant="outline" onClick={() => setShowPlanForm(false)}>{french ? "Annuler" : "Cancel"}</Button>
               </div>
             </form>
           )}
           {plans.length === 0 && !showPlanForm ? (
             <div className="text-center py-16 text-gray-400">
               <Crown className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No plans yet</p>
-              <p className="text-sm mt-1">Create a monthly plan and enroll clients to generate recurring revenue.</p>
+              <p className="font-medium">{french ? "Aucun forfait" : "No plans yet"}</p>
+              <p className="text-sm mt-1">{french ? "Créez un forfait mensuel et inscrivez des clients pour générer des revenus récurrents." : "Create a monthly plan and enroll clients to generate recurring revenue."}</p>
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-2xl divide-y divide-gray-100 shadow-sm">
@@ -209,7 +210,7 @@ export default function MembershipsPage() {
                       <span className="font-semibold text-sm text-gray-900">{plan.name}</span>
                       {!plan.active && <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{formatPrice(plan.priceMonthly)}/mo{plan.description ? ` · ${plan.description}` : ""}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(plan.priceMonthly)}/{french ? "mois" : "mo"}{plan.description ? ` · ${plan.description}` : ""}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{members.filter(m => m.planId === plan.id && m.status === "ACTIVE").length} active members</p>
                   </div>
                   <button onClick={() => togglePlan(plan)} className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600">{plan.active ? "Deactivate" : "Activate"}</button>
@@ -222,25 +223,25 @@ export default function MembershipsPage() {
         <div className="space-y-2">
           {showEnrollForm && (
             <form onSubmit={enrollClient} className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-              <h2 className="font-semibold text-gray-900">Enroll a client</h2>
+              <h2 className="font-semibold text-gray-900">{french ? "Inscrire un client" : "Enroll a client"}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <select className="min-h-11 rounded-xl border border-gray-200 bg-white px-3 text-base lg:text-sm" value={enrollForm.clientId} onChange={(e) => setEnrollForm((f) => ({ ...f, clientId: e.target.value }))}>
-                  <option value="">Choose client</option>
+                  <option value="">{french ? "Choisir un client" : "Choose client"}</option>
                   {clients.map((client) => <option key={client.id} value={client.id}>{client.name}{client.email ? ` - ${client.email}` : ""}</option>)}
                 </select>
                 <select className="min-h-11 rounded-xl border border-gray-200 bg-white px-3 text-base lg:text-sm" value={enrollForm.planId} onChange={(e) => setEnrollForm((f) => ({ ...f, planId: e.target.value }))}>
-                  <option value="">Choose plan</option>
-                  {plans.filter((plan) => plan.active).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {formatPrice(plan.priceMonthly)}/mo</option>)}
+                  <option value="">{french ? "Choisir un forfait" : "Choose plan"}</option>
+                  {plans.filter((plan) => plan.active).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {formatCurrency(plan.priceMonthly)}/{french ? "mois" : "mo"}</option>)}
                 </select>
               </div>
-              <div className="flex gap-2"><Button type="submit" disabled={enrolling}>{enrolling ? "Opening checkout..." : "Continue to Stripe"}</Button><Button type="button" variant="outline" onClick={() => setShowEnrollForm(false)}>Cancel</Button></div>
+              <div className="flex gap-2"><Button type="submit" disabled={enrolling}>{enrolling ? (french ? "Ouverture du paiement…" : "Opening checkout...") : (french ? "Continuer vers Stripe" : "Continue to Stripe")}</Button><Button type="button" variant="outline" onClick={() => setShowEnrollForm(false)}>{french ? "Annuler" : "Cancel"}</Button></div>
             </form>
           )}
           {members.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No members yet</p>
-              <p className="text-sm mt-1">Enroll clients from their profile page.</p>
+              <p className="font-medium">{french ? "Aucun membre" : "No members yet"}</p>
+              <p className="text-sm mt-1">{french ? "Inscrivez des clients depuis leur profil." : "Enroll clients from their profile page."}</p>
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-2xl divide-y divide-gray-100 shadow-sm">
@@ -251,7 +252,7 @@ export default function MembershipsPage() {
                       <span className="font-semibold text-sm text-gray-900">{m.client.name}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${m.status === "ACTIVE" ? "bg-green-50 text-green-700" : m.status === "PAST_DUE" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-500"}`}>{m.cancelAtPeriodEnd ? "CANCELS AT PERIOD END" : m.status}</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{m.plan.name} · {formatPrice(m.plan.priceMonthly)}/mo</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{m.plan.name} · {formatCurrency(m.plan.priceMonthly)}/{french ? "mois" : "mo"}</p>
                     {m.client.email && <p className="text-xs text-gray-400">{m.client.email}</p>}
                   </div>
                   {m.status === "ACTIVE" && !m.cancelAtPeriodEnd && (

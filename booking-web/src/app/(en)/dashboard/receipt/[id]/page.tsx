@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { format } from "date-fns";
 import { Printer, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { api, Appointment, Payment, Business } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 export default function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -17,6 +17,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   const [biz, setBiz] = useState<Business | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const { french, formatCurrency, formatDate } = useDashboardLocale();
 
   useEffect(() => {
     if (!bizId) { setLoading(false); return; }
@@ -31,15 +32,15 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
   }, [bizId, id]);
 
   if (loading) return <LoadingSpinner />;
-  if (!apt) return <p className="text-center text-gray-400 py-12">Receipt not found.</p>;
+  if (!apt) return <p className="text-center text-gray-400 py-12">{french ? "Reçu introuvable." : "Receipt not found."}</p>;
 
   const successfulPayments = payments.filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED" || p.status === "REFUNDED");
   if (successfulPayments.length === 0) {
-    return <p className="text-center text-gray-500 py-12">No receipt is available because no payment was collected for this appointment.</p>;
+    return <p className="text-center text-gray-500 py-12">{french ? "Aucun reçu n’est disponible, car aucun paiement n’a été perçu pour ce rendez-vous." : "No receipt is available because no payment was collected for this appointment."}</p>;
   }
 
   const currency = (biz?.currency ?? "CAD") as "CAD" | "USD";
-  const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format(c / 100);
+  const money = (c: number) => formatCurrency(c, currency);
   const rate = biz?.taxRatePercent ?? 0;
   const subtotal = apt.totalPriceCents ?? apt.service.priceCents;
   const taxCents = Math.round(subtotal * (rate / 100));
@@ -55,9 +56,9 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
       {/* Controls — hidden when printing */}
       <div className="flex items-center justify-between mb-4 print:hidden">
         <Link href="/dashboard/appointments" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600">
-          <ArrowLeft className="w-4 h-4" /> Back
+          <ArrowLeft className="w-4 h-4" /> {french ? "Retour" : "Back"}
         </Link>
-        <Button size="sm" onClick={() => window.print()} className="gap-1.5"><Printer className="w-4 h-4" /> Print / Save PDF</Button>
+        <Button size="sm" onClick={() => window.print()} className="gap-1.5"><Printer className="w-4 h-4" /> {french ? "Imprimer / Enregistrer en PDF" : "Print / Save PDF"}</Button>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 print:shadow-none print:border-0">
@@ -69,30 +70,30 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
               ? <img src={biz.logoUrl} alt="" className="w-12 h-12 rounded-xl object-cover" />
               : <div className="w-12 h-12 rounded-xl bg-violet-600" />}
             <div>
-              <p className="text-lg font-bold text-gray-900">{biz?.name ?? "Business"}</p>
+              <p className="text-lg font-bold text-gray-900">{biz?.name ?? (french ? "Entreprise" : "Business")}</p>
               {biz?.email && <p className="text-xs text-gray-400">{biz.email}</p>}
               {biz?.phone && <p className="text-xs text-gray-400">{biz.phone}</p>}
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm font-bold uppercase tracking-wide text-gray-400">Receipt</p>
+            <p className="text-sm font-bold uppercase tracking-wide text-gray-400">{french ? "Reçu" : "Receipt"}</p>
             <p className="text-xs text-gray-500 mt-1 font-mono">#{apt.id.slice(-8).toUpperCase()}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{format(new Date(apt.startsAt), "MMM d, yyyy")}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{formatDate(apt.startsAt, { year: "numeric", month: "short", day: "numeric" })}</p>
           </div>
         </div>
 
         {/* Bill to */}
         <div className="py-5 grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Billed to</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{french ? "Facturé à" : "Billed to"}</p>
             <p className="font-medium text-gray-900">{apt.client.name}</p>
             <p className="text-xs text-gray-500">{apt.client.email}</p>
             {apt.client.phone && <p className="text-xs text-gray-500">{apt.client.phone}</p>}
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Appointment</p>
-            <p className="text-gray-700">{format(new Date(apt.startsAt), "EEE, MMM d · h:mm a")}</p>
-            <p className="text-xs text-gray-500">with {apt.staff.user.name}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">{french ? "Rendez-vous" : "Appointment"}</p>
+            <p className="text-gray-700">{formatDate(apt.startsAt, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+            <p className="text-xs text-gray-500">{french ? "avec" : "with"} {apt.staff.user.name}</p>
           </div>
         </div>
 
@@ -109,23 +110,23 @@ export default function ReceiptPage({ params }: { params: Promise<{ id: string }
 
         {/* Totals */}
         <div className="border-t border-gray-100 mt-2 pt-4 space-y-1.5 text-sm">
-          <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-          {rate > 0 && <div className="flex justify-between text-gray-500"><span>Tax ({rate}%)</span><span>{money(taxCents)}</span></div>}
-          {tipsCollected > 0 && <div className="flex justify-between text-gray-500"><span>Tip</span><span>{money(tipsCollected)}</span></div>}
+          <div className="flex justify-between text-gray-500"><span>{french ? "Sous-total" : "Subtotal"}</span><span>{money(subtotal)}</span></div>
+          {rate > 0 && <div className="flex justify-between text-gray-500"><span>{french ? "Taxe" : "Tax"} ({rate}%)</span><span>{money(taxCents)}</span></div>}
+          {tipsCollected > 0 && <div className="flex justify-between text-gray-500"><span>{french ? "Pourboire" : "Tip"}</span><span>{money(tipsCollected)}</span></div>}
           <div className="flex justify-between font-bold text-gray-900 text-base pt-2 border-t border-gray-100">
             <span>Total</span><span>{money(total + tipsCollected)}</span>
           </div>
           {paid > 0 && (
             <>
-              <div className="flex justify-between text-emerald-600"><span>Paid</span><span>{money(paid)}</span></div>
+              <div className="flex justify-between text-emerald-600"><span>{french ? "Payé" : "Paid"}</span><span>{money(paid)}</span></div>
               <div className="flex justify-between font-semibold text-gray-700">
-                <span>Balance</span><span>{money(Math.max(0, total + tipsCollected - paid))}</span>
+                <span>{french ? "Solde" : "Balance"}</span><span>{money(Math.max(0, total + tipsCollected - paid))}</span>
               </div>
             </>
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-500 mt-8">Thank you for your business{!((biz?.bookingPageSettings as Record<string, unknown> | null)?.hidePouredBy) && " · Powered by Pulse"}</p>
+        <p className="text-center text-xs text-gray-500 mt-8">{french ? "Merci de votre confiance" : "Thank you for your business"}{!((biz?.bookingPageSettings as Record<string, unknown> | null)?.hidePouredBy) && (french ? " · Propulsé par Pulse" : " · Powered by Pulse")}</p>
       </div>
     </div>
   );

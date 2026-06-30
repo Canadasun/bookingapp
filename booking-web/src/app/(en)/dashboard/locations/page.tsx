@@ -15,6 +15,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { notifyLocationsChanged, useLocationScope } from "@/lib/location-scope";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 // Canadian timezones offered for a location. Slot generation uses the
 // location's timezone (falling back to the business timezone) so a branch in
@@ -49,6 +50,7 @@ export default function LocationsPage() {
   const bizId = user?.businessId ?? "";
   const router = useRouter();
   const { setSelectedIds } = useLocationScope();
+  const { french } = useDashboardLocale();
 
   // Focus the whole dashboard on one branch and open its calendar.
   function openBranchCalendar(id: string) {
@@ -67,9 +69,9 @@ export default function LocationsPage() {
         api.business.get(bizId).catch(() => null as Business | null),
       ]);
       setLocations(locs); setStaff(s); setBiz(b);
-    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -82,7 +84,7 @@ export default function LocationsPage() {
 
   async function save() {
     if (!bizId) return;
-    if (!form.name.trim()) { toast.error("Name required"); return; }
+    if (!form.name.trim()) { toast.error(french ? "Le nom est requis" : "Name required"); return; }
     setSaving(true);
     try {
       if (editingId) {
@@ -93,7 +95,7 @@ export default function LocationsPage() {
           timezone: form.timezone.trim() || undefined,
           active: form.active,
         });
-        toast.success("Location updated");
+        toast.success(french ? "Emplacement mis à jour" : "Location updated");
       } else {
         await api.locations.create(bizId, {
           name: form.name.trim(),
@@ -101,7 +103,7 @@ export default function LocationsPage() {
           phone: form.phone.trim() || undefined,
           timezone: form.timezone.trim() || undefined,
         });
-        toast.success("Location added");
+        toast.success(french ? "Emplacement ajouté" : "Location added");
       }
       setModalOpen(false);
       notifyLocationsChanged();
@@ -120,9 +122,9 @@ export default function LocationsPage() {
     <div className="max-w-4xl mx-auto">
       <ConfirmDialog
         open={toDelete !== null}
-        title={`Delete "${toDelete?.name}"?`}
-        description="Staff and appointments assigned to this location become unassigned. This cannot be undone."
-        confirmLabel="Delete location"
+        title={french ? `Supprimer « ${toDelete?.name} »?` : `Delete "${toDelete?.name}"?`}
+        description={french ? "Le personnel et les rendez-vous attribués à cet emplacement deviendront non attribués. Cette action est irréversible." : "Staff and appointments assigned to this location become unassigned. This cannot be undone."}
+        confirmLabel={french ? "Supprimer l’emplacement" : "Delete location"}
         variant="destructive"
         onConfirm={doRemove}
         onCancel={() => setToDelete(null)}
@@ -130,10 +132,10 @@ export default function LocationsPage() {
 
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Locations</h2>
-          <p className="text-sm text-gray-500">Manage your branches. Clients booking a location only see providers assigned to it.</p>
+          <h2 className="text-xl font-bold text-gray-900">{french ? "Emplacements" : "Locations"}</h2>
+          <p className="text-sm text-gray-500">{french ? "Gérez vos succursales. Les clients ne voient que les professionnels affectés à l’emplacement choisi." : "Manage your branches. Clients booking a location only see providers assigned to it."}</p>
         </div>
-        <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4"/>Add location</Button>
+        <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4"/>{french ? "Ajouter un emplacement" : "Add location"}</Button>
       </div>
 
       {!loading && !loadError && locations.length > 0 && (
@@ -145,7 +147,7 @@ export default function LocationsPage() {
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : locations.length === 0 ? (
         <EmptyState

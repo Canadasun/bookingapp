@@ -40,8 +40,9 @@ export class GiftCardsService {
           recipientEmail: dto.recipientEmail,
           purchaserName: dto.purchaserName,
           message: dto.message,
+          locale: dto.locale ?? 'en',
           expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
-        },
+        } as Prisma.GiftCardUncheckedCreateInput & { locale: 'en' | 'fr' },
       });
       if (card.recipientEmail) await this.notifications.sendGiftCardIssued(card.id);
       return card;

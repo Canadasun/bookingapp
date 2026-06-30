@@ -195,10 +195,10 @@ export function HomeContent({
               })}
             </div>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href="/demo" className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
+              <a href={locale === "fr" ? "/fr/features" : "/demo"} className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700 transition-colors">
                 {h.tour.viewTour} <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </a>
-              <a href="/reviews" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E9DDCB] bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-violet-50 transition-colors">
+              <a href={locale === "fr" ? "/fr/features/reviews" : "/reviews"} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E9DDCB] bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-violet-50 transition-colors">
                 {h.tour.reviewCollection}
               </a>
             </div>

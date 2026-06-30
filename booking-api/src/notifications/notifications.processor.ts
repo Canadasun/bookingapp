@@ -179,6 +179,17 @@ export class NotificationProcessor extends WorkerHost {
   private currentUserId: string | null = null;
   private currentDedupeScope: string | null = null;
 
+  // Client language follows the most recent booking. This also covers clients
+  // created before appointment.locale was introduced, without another nullable
+  // preference column or a destructive backfill.
+  private async clientLocale(clientId: string): Promise<'en' | 'fr'> {
+    const latest = await this.prisma.appointment.findFirst({
+      where: { clientId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return (latest as (typeof latest & { locale?: string }))?.locale === 'fr' ? 'fr' : 'en';
+  }
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -287,15 +298,17 @@ export class NotificationProcessor extends WorkerHost {
       if (already) continue;
       this.currentType = 'birthday';
       this.currentBusinessId = c.businessId;
-      const bookUrl = `${baseUrl}/book/${encodeURIComponent(c.business.slug)}`;
+      const locale = await this.clientLocale(c.id);
+      const fr = locale === 'fr';
+      const bookUrl = `${baseUrl}/book/${encodeURIComponent(c.business.slug)}${fr ? '?lang=fr' : ''}`;
       await this.email.send({
         to: c.email,
-        subject: `Happy birthday from ${c.business.name}! 🎉`,
+        subject: fr ? `Joyeux anniversaire de la part de ${c.business.name}! 🎉` : `Happy birthday from ${c.business.name}! 🎉`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Happy birthday, ${esc(firstName(c.name))}! 🎂</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Everyone at <strong>${esc(c.business.name)}</strong> wishes you a wonderful day. Treat yourself — we'd love to help you celebrate.</p>
-<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book a birthday treat →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Joyeux anniversaire' : 'Happy birthday'}, ${esc(firstName(c.name))}! 🎂</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Toute l’équipe de <strong>${esc(c.business.name)}</strong> vous souhaite une merveilleuse journée. Faites-vous plaisir — nous serions ravis de célébrer avec vous.` : `Everyone at <strong>${esc(c.business.name)}</strong> wishes you a wonderful day. Treat yourself — we'd love to help you celebrate.`}</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver un plaisir d’anniversaire' : 'Book a birthday treat'} →</a>
+`, undefined, locale),
       }).catch(() => {});
     }
   }
@@ -331,16 +344,18 @@ export class NotificationProcessor extends WorkerHost {
       if (already) continue;
       this.currentType = 'rebook-reminder';
       this.currentBusinessId = c.businessId;
-      const bookUrl = `${baseUrl}/book/${encodeURIComponent(c.business.slug)}`;
+      const locale = await this.clientLocale(c.id);
+      const fr = locale === 'fr';
+      const bookUrl = `${baseUrl}/book/${encodeURIComponent(c.business.slug)}${fr ? '?lang=fr' : ''}`;
       await this.email.send({
         to: c.email,
-        subject: `We haven't seen you in a while — ${c.business.name}`,
+        subject: fr ? `Vous nous manquez — ${c.business.name}` : `We haven't seen you in a while — ${c.business.name}`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">It's been a while 💛</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(c.name)}, it's been about three months since your last visit to <strong>${esc(c.business.name)}</strong>. We hope you're doing well — and we'd love to see you again!</p>
-<p style="margin:0 0 20px;color:#374151;font-size:14px">Whenever you're ready, you can book your next visit online in a couple of taps.</p>
-<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Ça fait longtemps' : "It's been a while"} 💛</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(c.name)}, votre dernière visite chez <strong>${esc(c.business.name)}</strong> remonte à environ trois mois. Nous espérons que vous allez bien et serions ravis de vous revoir!` : `Hi ${esc(c.name)}, it's been about three months since your last visit to <strong>${esc(c.business.name)}</strong>. We hope you're doing well — and we'd love to see you again!`}</p>
+<p style="margin:0 0 20px;color:#374151;font-size:14px">${fr ? 'Lorsque vous serez prêt, réservez votre prochaine visite en ligne en quelques clics.' : "Whenever you're ready, you can book your next visit online in a couple of taps."}</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver votre prochaine visite' : 'Book your next visit'} →</a>
+`, undefined, locale),
       }).catch(() => {});
     }
   }
@@ -659,13 +674,15 @@ export class NotificationProcessor extends WorkerHost {
       });
       if (!due || due.status === 'CANCELLED') return;
       this.currentBusinessId = due.businessId;
-      const bookUrl = `${baseUrl}/book/${due.business.slug}`;
-      const subject = due.messageSubject || `A follow-up from ${due.business.name}`;
-      const body = due.messageBody || `It is time to book your next appointment with ${due.business.name}.`;
+      const locale = await this.clientLocale(due.clientId);
+      const fr = locale === 'fr';
+      const bookUrl = `${baseUrl}/book/${due.business.slug}${fr ? '?lang=fr' : ''}`;
+      const subject = due.messageSubject || (fr ? `Un suivi de ${due.business.name}` : `A follow-up from ${due.business.name}`);
+      const body = due.messageBody || (fr ? `Il est temps de prendre votre prochain rendez-vous avec ${due.business.name}.` : `It is time to book your next appointment with ${due.business.name}.`);
       if (due.client.email) await this.email.send({
         to: due.client.email,
         subject,
-        html: emailWrap(`<p style="margin:0 0 18px;color:#374151;font-size:14px;white-space:pre-wrap">${esc(body)}</p><a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book follow-up</a>`),
+        html: emailWrap(`<p style="margin:0 0 18px;color:#374151;font-size:14px;white-space:pre-wrap">${esc(body)}</p><a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver le suivi' : 'Book follow-up'}</a>`, undefined, locale),
       });
       if (due.client.phone) await this.sms.send({ to: due.client.phone, body: `${due.business.name}: ${body} ${bookUrl}`.slice(0, 1500) });
       return;
@@ -820,20 +837,22 @@ export class NotificationProcessor extends WorkerHost {
       });
       if (!card || !card.recipientEmail) return;
       this.currentBusinessId = card.businessId;
-      const amount = `$${(card.initialCents / 100).toFixed(2)}`;
+      const locale = (card as typeof card & { locale?: string }).locale === 'fr' ? 'fr' : 'en';
+      const fr = locale === 'fr';
+      const amount = new Intl.NumberFormat(fr ? 'fr-CA' : 'en-CA', { style: 'currency', currency: card.business.currency ?? 'CAD' }).format(card.initialCents / 100);
       await this.email.send({
         to: card.recipientEmail,
-        subject: `You've received a ${amount} gift card for ${card.business.name}! 🎁`,
+        subject: fr ? `Vous avez reçu une carte-cadeau de ${amount} pour ${card.business.name}! 🎁` : `You've received a ${amount} gift card for ${card.business.name}! 🎁`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A gift just for you 🎁</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${card.purchaserName ? `${esc(card.purchaserName)} sent you` : "You've received"} a <strong>${esc(amount)}</strong> gift card for <strong>${esc(card.business.name)}</strong>.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Un cadeau rien que pour vous' : 'A gift just for you'} 🎁</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `${card.purchaserName ? esc(card.purchaserName) + ' vous a envoyé' : 'Vous avez reçu'} une carte-cadeau de <strong>${esc(amount)}</strong> pour <strong>${esc(card.business.name)}</strong>.` : `${card.purchaserName ? `${esc(card.purchaserName)} sent you` : "You've received"} a <strong>${esc(amount)}</strong> gift card for <strong>${esc(card.business.name)}</strong>.`}</p>
 ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-style:italic">"${esc(card.message)}"</p>` : ''}
 <div style="background:#FEF7EC;border:1px dashed #E9A23C;border-radius:12px;padding:16px;text-align:center;margin:0 0 16px">
-  <p style="margin:0 0 4px;color:#6B7280;font-size:12px">Your gift card code</p>
+  <p style="margin:0 0 4px;color:#6B7280;font-size:12px">${fr ? 'Votre code de carte-cadeau' : 'Your gift card code'}</p>
   <p style="margin:0;color:#E9A23C;font-size:22px;font-weight:700;letter-spacing:1px">${esc(card.code)}</p>
 </div>
-<p style="margin:0;color:#6B7280;font-size:13px">Present this code when you book or visit ${esc(card.business.name)}.</p>
-`),
+<p style="margin:0;color:#6B7280;font-size:13px">${fr ? `Présentez ce code lors de votre réservation ou de votre visite chez ${esc(card.business.name)}.` : `Present this code when you book or visit ${esc(card.business.name)}.`}</p>
+`, undefined, locale),
       });
       return;
     }
@@ -850,6 +869,8 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       // N2: Respect one-click unsubscribe opt-out.
       if (client.marketingOptOut) return;
       this.currentBusinessId = campaign.businessId;
+      const locale = await this.clientLocale(client.id);
+      const fr = locale === 'fr';
       const merge = (t: string) => t.replace(/\{name\}/g, () => client.name).replace(/\{business\}/g, () => campaign.business.name); // raw: SMS + subject; function replacer prevents re-expansion
       const mergeHtml = (t: string) => esc(t).replace(/\{name\}/g, () => esc(client.name)).replace(/\{business\}/g, () => esc(campaign.business.name));
 
@@ -865,8 +886,8 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
         const unsubscribeUrl = `${apiUrl}/notifications/unsubscribe?id=${encodeURIComponent(client.id)}&sig=${signUnsubscribeToken(client.id, secret)}`;
         await this.email.send({
           to: client.email,
-          subject: merge(campaign.subject ?? `A note from ${campaign.business.name}`),
-          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${mergeHtml(campaign.body)}</div>`, unsubscribeUrl),
+          subject: merge(campaign.subject ?? (fr ? `Un message de ${campaign.business.name}` : `A note from ${campaign.business.name}`)),
+          html: emailWrap(`<div style="color:#374151;font-size:14px;line-height:1.6;white-space:pre-wrap">${mergeHtml(campaign.body)}</div>`, unsubscribeUrl, locale),
         });
         sent = true;
       }
@@ -884,15 +905,17 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       });
       if (!entry) return;
       this.currentBusinessId = entry.businessId;
-      const bookUrl = `${baseUrl}/book/${entry.business.slug}`;
+      const locale = (entry as typeof entry & { locale?: string }).locale === 'fr' ? 'fr' : 'en';
+      const fr = locale === 'fr';
+      const bookUrl = `${baseUrl}/book/${entry.business.slug}${fr ? '?lang=fr' : ''}`;
       await this.email.send({
         to: entry.email,
-        subject: `A spot just opened at ${entry.business.name}`,
+        subject: fr ? `Une place vient de se libérer chez ${entry.business.name}` : `A spot just opened at ${entry.business.name}`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">A spot just opened up! 🎉</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(entry.name)}, a time just became available at <strong>${esc(entry.business.name)}</strong>. Book now before someone else grabs it.</p>
-<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book now →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Une place vient de se libérer!' : 'A spot just opened up!'} 🎉</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(entry.name)}, une plage horaire vient de se libérer chez <strong>${esc(entry.business.name)}</strong>. Réservez maintenant avant qu’elle ne soit prise.` : `Hi ${esc(entry.name)}, a time just became available at <strong>${esc(entry.business.name)}</strong>. Book now before someone else grabs it.`}</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver maintenant' : 'Book now'} →</a>
+`, undefined, locale),
       });
       return;
     }
@@ -905,17 +928,18 @@ ${card.message ? `<p style="margin:0 0 16px;color:#374151;font-size:14px;font-st
       });
       if (!apt || !apt.client.email) return;
       this.currentBusinessId = apt.businessId;
-      const bookUrl = `${baseUrl}/book/${apt.business.slug}`;
+      const fr = (apt as typeof apt & { locale?: string }).locale === 'fr';
+      const bookUrl = `${baseUrl}/book/${apt.business.slug}${fr ? '?lang=fr' : ''}`;
       await this.email.send({
         to: apt.client.email,
-        subject: `Payment failed — booking cancelled`,
+        subject: fr ? 'Échec du paiement — réservation annulée' : `Payment failed — booking cancelled`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Payment failed</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(firstName(apt.client.name))}, unfortunately your deposit payment for <strong>${esc(apt.service.name)}</strong> with <strong>${esc(apt.business.name)}</strong> could not be processed, and your booking has been cancelled.</p>
+<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">${fr ? 'Échec du paiement' : 'Payment failed'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(firstName(apt.client.name))}, le paiement de votre dépôt pour <strong>${esc(apt.service.name)}</strong> chez <strong>${esc(apt.business.name)}</strong> n’a pas pu être traité; votre réservation a donc été annulée.` : `Hi ${esc(firstName(apt.client.name))}, unfortunately your deposit payment for <strong>${esc(apt.service.name)}</strong> with <strong>${esc(apt.business.name)}</strong> could not be processed, and your booking has been cancelled.`}</p>
 ${aptDetails(apt)}
-<p style="margin:16px 0 0;color:#6B7280;font-size:13px">Please check your card details and try booking again.</p>
-<a href="${bookUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book again →</a>
-`),
+<p style="margin:16px 0 0;color:#6B7280;font-size:13px">${fr ? 'Vérifiez les renseignements de votre carte et essayez de réserver de nouveau.' : 'Please check your card details and try booking again.'}</p>
+<a href="${bookUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver de nouveau' : 'Book again'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
       return;
     }
@@ -928,17 +952,18 @@ ${aptDetails(apt)}
       });
       if (!apt || !apt.client.email) return;
       this.currentBusinessId = apt.businessId;
+      const fr = (apt as typeof apt & { locale?: string }).locale === 'fr';
       const feeCents = job.data.feeCents ?? 0;
-      const feeStr = `$${(feeCents / 100).toFixed(2)}`;
+      const feeStr = new Intl.NumberFormat(fr ? 'fr-CA' : 'en-CA', { style: 'currency', currency: apt.business.currency ?? 'CAD' }).format(feeCents / 100);
       await this.email.send({
         to: apt.client.email,
-        subject: `No-show fee charged — ${apt.service.name}`,
+        subject: fr ? `Frais d’absence facturés — ${apt.service.name}` : `No-show fee charged — ${apt.service.name}`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">No-show fee of ${esc(feeStr)} charged</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(firstName(apt.client.name))}, a no-show fee has been charged to your card on file because your appointment was not attended and was not cancelled in advance.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? `Frais d’absence de ${esc(feeStr)} facturés` : `No-show fee of ${esc(feeStr)} charged`}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(firstName(apt.client.name))}, des frais d’absence ont été portés à votre carte enregistrée puisque vous ne vous êtes pas présenté au rendez-vous et ne l’avez pas annulé à l’avance.` : `Hi ${esc(firstName(apt.client.name))}, a no-show fee has been charged to your card on file because your appointment was not attended and was not cancelled in advance.`}</p>
 ${aptDetails(apt)}
-<p style="margin:16px 0 0;color:#6B7280;font-size:13px">If you have any questions, please contact <strong>${esc(apt.business.name)}</strong> directly.</p>
-`),
+<p style="margin:16px 0 0;color:#6B7280;font-size:13px">${fr ? `Pour toute question, communiquez directement avec <strong>${esc(apt.business.name)}</strong>.` : `If you have any questions, please contact <strong>${esc(apt.business.name)}</strong> directly.`}</p>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
       return;
     }
@@ -951,17 +976,18 @@ ${aptDetails(apt)}
       });
       if (!apt || !apt.client.email) return;
       this.currentBusinessId = apt.businessId;
+      const fr = (apt as typeof apt & { locale?: string }).locale === 'fr';
       const feeCents = job.data.feeCents ?? 0;
-      const feeStr = `$${(feeCents / 100).toFixed(2)}`;
+      const feeStr = new Intl.NumberFormat(fr ? 'fr-CA' : 'en-CA', { style: 'currency', currency: apt.business.currency ?? 'CAD' }).format(feeCents / 100);
       await this.email.send({
         to: apt.client.email,
-        subject: `Late-cancellation fee charged — ${apt.service.name}`,
+        subject: fr ? `Frais d’annulation tardive facturés — ${apt.service.name}` : `Late-cancellation fee charged — ${apt.service.name}`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Late-cancellation fee of ${esc(feeStr)} charged</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(firstName(apt.client.name))}, a late-cancellation fee has been applied to your card on file because your appointment was cancelled after the cancellation window set by <strong>${esc(apt.business.name)}</strong>.</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? `Frais d’annulation tardive de ${esc(feeStr)} facturés` : `Late-cancellation fee of ${esc(feeStr)} charged`}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(firstName(apt.client.name))}, des frais d’annulation tardive ont été portés à votre carte enregistrée puisque le rendez-vous a été annulé après le délai établi par <strong>${esc(apt.business.name)}</strong>.` : `Hi ${esc(firstName(apt.client.name))}, a late-cancellation fee has been applied to your card on file because your appointment was cancelled after the cancellation window set by <strong>${esc(apt.business.name)}</strong>.`}</p>
 ${aptDetails(apt)}
-<p style="margin:16px 0 0;color:#6B7280;font-size:13px">If you believe this was charged in error, please contact <strong>${esc(apt.business.name)}</strong> directly.</p>
-`),
+<p style="margin:16px 0 0;color:#6B7280;font-size:13px">${fr ? `Si vous croyez qu’il s’agit d’une erreur, communiquez directement avec <strong>${esc(apt.business.name)}</strong>.` : `If you believe this was charged in error, please contact <strong>${esc(apt.business.name)}</strong> directly.`}</p>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
       return;
     }
@@ -994,16 +1020,18 @@ ${aptDetails(apt)}
       });
       if (!client || !client.email) return;
       this.currentBusinessId = client.businessId;
-      const bookUrl = `${baseUrl}/book/${client.business.slug}`;
+      const locale = await this.clientLocale(client.id);
+      const fr = locale === 'fr';
+      const bookUrl = `${baseUrl}/book/${client.business.slug}${fr ? '?lang=fr' : ''}`;
       await this.email.send({
         to: client.email,
-        subject: `We miss you at ${client.business.name}!`,
+        subject: fr ? `Vous nous manquez chez ${client.business.name}!` : `We miss you at ${client.business.name}!`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">It's been a while...</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(client.name)}, it's been a few weeks since your last visit to <strong>${esc(client.business.name)}</strong>. We'd love to see you again!</p>
-<p style="margin:0 0 20px;color:#374151;font-size:14px">Ready for your next appointment? You can book instantly online.</p>
-<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Ça fait longtemps…' : "It's been a while..."}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(client.name)}, quelques semaines se sont écoulées depuis votre dernière visite chez <strong>${esc(client.business.name)}</strong>. Nous serions ravis de vous revoir!` : `Hi ${esc(client.name)}, it's been a few weeks since your last visit to <strong>${esc(client.business.name)}</strong>. We'd love to see you again!`}</p>
+<p style="margin:0 0 20px;color:#374151;font-size:14px">${fr ? 'Prêt pour votre prochain rendez-vous? Réservez instantanément en ligne.' : 'Ready for your next appointment? You can book instantly online.'}</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver votre prochaine visite' : 'Book your next visit'} →</a>
+`, undefined, locale),
       });
       return;
     }
@@ -1094,12 +1122,12 @@ ${aptDetails(apt)}
         if (!apt.client.email) break;
         await this.email.send({
           to: apt.client.email,
-          subject: `How was your visit to ${apt.business.name}?`,
+          subject: fr ? `Comment s’est passée votre visite chez ${apt.business.name}?` : `How was your visit to ${apt.business.name}?`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">How did we do? ⭐</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, thanks for visiting <strong>${esc(apt.business.name)}</strong>. We'd love your feedback on your ${esc(apt.service.name)} with ${esc(apt.staff.user.name)}.</p>
-<a href="${baseUrl}/review/${apt.id}#token=${encodeURIComponent(signAppointmentToken(apt.id, 7 * 24 * 60 * 60))}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Leave a review →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Comment avons-nous fait?' : 'How did we do?'} ⭐</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, merci d’avoir choisi <strong>${esc(apt.business.name)}</strong>. Nous aimerions connaître votre avis sur votre service ${esc(apt.service.name)} avec ${esc(apt.staff.user.name)}.` : `Hi ${clientFirstName}, thanks for visiting <strong>${esc(apt.business.name)}</strong>. We'd love your feedback on your ${esc(apt.service.name)} with ${esc(apt.staff.user.name)}.`}</p>
+<a href="${baseUrl}/review/${apt.id}${fr ? '?lang=fr' : ''}#token=${encodeURIComponent(signAppointmentToken(apt.id, 7 * 24 * 60 * 60))}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Laisser un avis' : 'Leave a review'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
         });
         break;
       }
@@ -1123,7 +1151,9 @@ ${aptDetails(apt)}
               : `Booking request received by ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}. ${manageUrl}`,
           });
         }
-        await this.addInAppMessage(apt.businessId, apt.clientId, `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}. Awaiting approval.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `⏳ Demande de réservation reçue pour ${apt.service.name}, le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')}. En attente d’approbation.`
+          : `⏳ Booking request received for ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}. Awaiting approval.`);
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_NEW',
           title: `New booking — ${apt.client.name}`,
@@ -1165,7 +1195,7 @@ ${aptDetails(apt)}
 <p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, votre rendez-vous est confirmé.` : `Hi ${clientFirstName}, your appointment is confirmed.`}</p>
 ${aptDetails(apt)}
 <p style="margin:0;color:#6B7280;font-size:13px">${fr ? 'Vous recevrez un rappel 24 heures avant votre rendez-vous. Une invitation de calendrier est jointe.' : "You'll receive a reminder 24 hours before your appointment. A calendar invite is attached to this email."}</p>
-${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 A card is saved on file for this booking (for no-show/cancellation protection). You can remove it anytime from your <a href="${webUrl}/my/dashboard" style="color:#7C3AED">client portal</a>.</p>` : ''}
+${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 ${fr ? `Une carte est enregistrée pour cette réservation afin de couvrir les absences et annulations. Vous pouvez la retirer dans votre <a href="${webUrl}/my/dashboard?lang=fr" style="color:#7C3AED">portail client</a>.` : `A card is saved on file for this booking (for no-show/cancellation protection). You can remove it anytime from your <a href="${webUrl}/my/dashboard" style="color:#7C3AED">client portal</a>.`}</p>` : ''}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer le rendez-vous' : 'Manage appointment'} →</a>
           `, undefined, fr ? 'fr' : 'en'),
           attachments: [icsAttachment],
@@ -1179,7 +1209,9 @@ ${hasCardOnFile ? `<p style="margin:12px 0 0;color:#6B7280;font-size:12px">💳 
               : `Confirmed with ${apt.business.name}: ${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')}.${where ? ` ${where}.` : ''} ${manageUrl}`,
           });
         }
-        await this.addInAppMessage(apt.businessId, apt.clientId, `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `✅ Rendez-vous confirmé : ${apt.service.name}, le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')}.`
+          : `✅ Appointment confirmed: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking confirmed — ${apt.client.name}`,
@@ -1207,7 +1239,9 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer le rendez-vous' : 'Manage appointment'} →</a>
           `, undefined, fr ? 'fr' : 'en'),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Reminder: You have an appointment for ${apt.service.name} in 3 days at ${aptDate(apt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `📅 Rappel : votre rendez-vous pour ${apt.service.name} est dans 3 jours à ${aptDate(apt, 'HH:mm')}.`
+          : `📅 Reminder: You have an appointment for ${apt.service.name} in 3 days at ${aptDate(apt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_72H', 'SENT');
         break;
       }
@@ -1228,7 +1262,9 @@ ${aptDetails(apt)}
 <a href="${manageUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer le rendez-vous' : 'Manage appointment'} →</a>
           `, undefined, fr ? 'fr' : 'en'),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${aptDate(apt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `⏰ Rappel : votre rendez-vous pour ${apt.service.name} est demain à ${aptDate(apt, 'HH:mm')}.`
+          : `⏰ Reminder: You have an appointment for ${apt.service.name} tomorrow at ${aptDate(apt, 'h:mm a')}.`);
         await this.logNotification(apt.id, 'EMAIL', 'REMINDER_24H', 'SENT');
         break;
       }
@@ -1249,7 +1285,9 @@ ${aptDetails(apt)}
           });
           await this.logNotification(apt.id, 'SMS', 'REMINDER_2H', 'SENT');
         }
-        await this.addInAppMessage(apt.businessId, apt.clientId, `🔔 Reminder: Your appointment for ${apt.service.name} is in 2 hours.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `🔔 Rappel : votre rendez-vous pour ${apt.service.name} est dans 2 heures.`
+          : `🔔 Reminder: Your appointment for ${apt.service.name} is in 2 hours.`);
         break;
       }
 
@@ -1259,16 +1297,16 @@ ${aptDetails(apt)}
           await this.logNotification(apt.id, 'EMAIL', 'FOLLOW_UP', 'SKIPPED', 'disabled_by_business');
           break;
         }
-        const bookUrl = `${webUrl}/book/${apt.business.slug ?? ''}`;
+        const bookUrl = `${webUrl}/book/${apt.business.slug ?? ''}${fr ? '?lang=fr' : ''}`;
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Thanks for visiting ${apt.business.name}!`,
+          subject: fr ? `Merci de votre visite chez ${apt.business.name}!` : `Thanks for visiting ${apt.business.name}!`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Thanks for your visit!</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, we hope you enjoyed your ${esc(apt.service.name)} with ${esc(apt.staff.user.name)}. It was great to see you!</p>
-<p style="margin:0 0 20px;color:#374151;font-size:14px">Ready to book your next appointment? You can do it in seconds online.</p>
-<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Book your next visit →</a>
-          `),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Merci de votre visite!' : 'Thanks for your visit!'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, nous espérons que vous avez apprécié votre service ${esc(apt.service.name)} avec ${esc(apt.staff.user.name)}. Ce fut un plaisir de vous voir!` : `Hi ${clientFirstName}, we hope you enjoyed your ${esc(apt.service.name)} with ${esc(apt.staff.user.name)}. It was great to see you!`}</p>
+<p style="margin:0 0 20px;color:#374151;font-size:14px">${fr ? 'Prêt pour votre prochain rendez-vous? Réservez-le en ligne en quelques secondes.' : 'Ready to book your next appointment? You can do it in seconds online.'}</p>
+<a href="${bookUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réserver votre prochaine visite' : 'Book your next visit'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
         });
         await this.logNotification(apt.id, 'EMAIL', 'FOLLOW_UP', 'SENT');
         break;
@@ -1292,7 +1330,9 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">${f
           `, undefined, fr ? 'fr' : 'en'),
           attachments: [{ filename: 'cancellation.ics', content: Buffer.from(cancelIcs).toString('base64'), content_type: 'text/calendar; method=CANCEL' }],
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `❌ Rendez-vous annulé : ${apt.service.name}, le ${aptDate(apt, 'yyyy-MM-dd')}${apt.cancelReason ? ' (Motif : ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`
+          : `❌ Appointment cancelled: ${apt.service.name} on ${aptDate(apt, 'MMMM d, yyyy')}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking cancelled — ${apt.client.name}`,
@@ -1310,16 +1350,18 @@ ${apt.cancelReason ? `<p style="margin:8px 0 0;color:#6B7280;font-size:13px">${f
         }
         if (apt.client.email) await this.email.send({
           to: apt.client.email,
-          subject: `Your appointment was cancelled by ${apt.business.name}`,
+          subject: fr ? `Votre rendez-vous a été annulé par ${apt.business.name}` : `Your appointment was cancelled by ${apt.business.name}`,
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">Appointment cancelled by business</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${clientFirstName}, ${esc(apt.business.name)} has cancelled your appointment. We apologise for the inconvenience.</p>
+<h2 style="margin:0 0 4px;color:#EF4444;font-size:20px;font-weight:700">${fr ? 'Rendez-vous annulé par l’entreprise' : 'Appointment cancelled by business'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${clientFirstName}, ${esc(apt.business.name)} a annulé votre rendez-vous. Nous sommes désolés des inconvénients.` : `Hi ${clientFirstName}, ${esc(apt.business.name)} has cancelled your appointment. We apologise for the inconvenience.`}</p>
 ${aptDetails(apt)}
-${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>Reason:</strong> ${esc(apt.cancelReason)}</p></div>` : ''}
-<a href="${webUrl}/book" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Rebook a new appointment →</a>
-          `),
+${apt.cancelReason ? `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin:16px 0"><p style="margin:0;font-size:13px;color:#991B1B"><strong>${fr ? 'Motif' : 'Reason'}:</strong> ${esc(apt.cancelReason)}</p></div>` : ''}
+<a href="${webUrl}/book/${apt.business.slug}${fr ? '?lang=fr' : ''}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Prendre un nouveau rendez-vous' : 'Rebook a new appointment'} →</a>
+          `, undefined, fr ? 'fr' : 'en'),
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `❌ Your appointment for ${apt.service.name} was cancelled by ${apt.business.name}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `❌ Votre rendez-vous pour ${apt.service.name} a été annulé par ${apt.business.name}${apt.cancelReason ? ' (Motif : ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`
+          : `❌ Your appointment for ${apt.service.name} was cancelled by ${apt.business.name}${apt.cancelReason ? ' (Reason: ' + apt.cancelReason.replace(/[<>]/g, '') + ')' : ''}.`);
         await this.logNotification(apt.id, 'EMAIL', 'CANCELLATION', 'SENT');
         break;
       }
@@ -1350,7 +1392,9 @@ ${aptDetails(apt)}
           `, undefined, fr ? 'fr' : 'en'),
           attachments: [{ filename: 'appointment.ics', content: Buffer.from(reschedIcs).toString('base64'), content_type: 'text/calendar; method=REQUEST' }],
         });
-        await this.addInAppMessage(apt.businessId, apt.clientId, `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
+        await this.addInAppMessage(apt.businessId, apt.clientId, fr
+          ? `📅 Rendez-vous reporté : ${apt.service.name} est maintenant prévu le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')}.`
+          : `📅 Appointment rescheduled: ${apt.service.name} is now on ${aptDate(apt, 'MMMM d, yyyy')} at ${aptDate(apt, 'h:mm a')}.`);
         await this.notifyStaffAndOwners(apt.businessId, apt.staff.user.id, {
           kind: 'BOOKING_UPDATE',
           title: `Booking rescheduled — ${apt.client.name}`,

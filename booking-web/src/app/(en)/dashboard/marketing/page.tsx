@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Megaphone, Send, Tag, Ticket, Gift, Package, BadgeCheck, ChevronRight, type LucideIcon } from "lucide-react";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 const CARDS: { href: string; label: string; desc: string; icon: LucideIcon }[] = [
   { href: "/dashboard/marketing/campaigns", label: "Campaigns",   desc: "Email and SMS blasts to your client list.",                  icon: Send },
@@ -13,6 +14,15 @@ const CARDS: { href: string; label: string; desc: string; icon: LucideIcon }[] =
 ];
 
 export default function MarketingHub() {
+  const { french } = useDashboardLocale();
+  const cards = french ? [
+    { href: "/dashboard/marketing/campaigns", label: "Campagnes", desc: "Envois de courriels et de textos à votre clientèle.", icon: Send },
+    { href: "/dashboard/offers", label: "Offres", desc: "Promotions saisonnières et de reconquête pour remplir votre agenda.", icon: Tag },
+    { href: "/dashboard/promo-codes", label: "Codes promo", desc: "Codes de réduction appliqués au paiement.", icon: Ticket },
+    { href: "/dashboard/gift-cards", label: "Cartes-cadeaux", desc: "Vendez et échangez des cartes-cadeaux pour vos services.", icon: Gift },
+    { href: "/dashboard/packages", label: "Forfaits", desc: "Regroupez plusieurs séances à prix fixe.", icon: Package },
+    { href: "/dashboard/memberships", label: "Abonnements", desc: "Des plans récurrents qui fidélisent la clientèle.", icon: BadgeCheck },
+  ] : CARDS;
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
@@ -20,11 +30,11 @@ export default function MarketingHub() {
           <Megaphone className="w-5 h-5 text-violet-600" />
           <h1 className="text-xl font-bold text-gray-900">Marketing</h1>
         </div>
-        <p className="text-sm text-gray-500 mt-1">Grow revenue and retention — campaigns, offers, gift cards, packages, and memberships.</p>
+        <p className="text-sm text-gray-500 mt-1">{french ? "Augmentez vos revenus et la fidélisation grâce aux campagnes, offres, cartes-cadeaux, forfaits et abonnements." : "Grow revenue and retention — campaigns, offers, gift cards, packages, and memberships."}</p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        {CARDS.map(({ href, label, desc, icon: Icon }) => (
+        {cards.map(({ href, label, desc, icon: Icon }) => (
           <Link key={href} href={href}
             className="flex items-start justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:border-violet-200 hover:bg-violet-50/40 transition-colors">
             <div className="flex items-start gap-3">

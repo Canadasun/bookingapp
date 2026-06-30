@@ -2,17 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Gift, Plus, Ban, Copy, Check, Ticket } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { api, type GiftCard, type GiftCardStatus } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
-import { formatPrice } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 export default function GiftCardsPage() {
   const [cards, setCards] = useState<GiftCard[]>([]);
@@ -23,15 +22,16 @@ export default function GiftCardsPage() {
   const [cardToVoid, setCardToVoid] = useState<GiftCard | null>(null);
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
+  const { french, formatCurrency, formatDate } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
     setLoadError("");
     setLoading(true);
     try { setCards(await api.giftCards.list(bizId)); }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
   useEffect(() => { load(); }, [load]);
 
   async function doVoidCard() {
@@ -52,23 +52,23 @@ export default function GiftCardsPage() {
     <div className="max-w-3xl mx-auto">
       <ConfirmDialog
         open={cardToVoid !== null}
-        title={`Void gift card ${cardToVoid?.code}?`}
-        description="Its remaining balance can no longer be used."
-        confirmLabel="Void card"
+        title={french ? `Annuler la carte-cadeau ${cardToVoid?.code}?` : `Void gift card ${cardToVoid?.code}?`}
+        description={french ? "Son solde restant ne pourra plus être utilisé." : "Its remaining balance can no longer be used."}
+        confirmLabel={french ? "Annuler la carte" : "Void card"}
         variant="destructive"
         onConfirm={doVoidCard}
         onCancel={() => setCardToVoid(null)}
       />
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Gift cards</h2>
-          <p className="text-sm text-gray-500">Sell or comp gift cards, then redeem them at checkout.</p>
-          {outstanding > 0 && <p className="text-xs text-gray-400 mt-1">{formatPrice(outstanding)} outstanding across active cards</p>}
+          <h2 className="text-xl font-bold text-gray-900">{french ? "Cartes-cadeaux" : "Gift cards"}</h2>
+          <p className="text-sm text-gray-500">{french ? "Vendez ou offrez des cartes-cadeaux, puis échangez-les au paiement." : "Sell or comp gift cards, then redeem them at checkout."}</p>
+          {outstanding > 0 && <p className="text-xs text-gray-400 mt-1">{formatCurrency(outstanding)} {french ? "à utiliser sur les cartes actives" : "outstanding across active cards"}</p>}
         </div>
         {!mode && (
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" onClick={() => setMode("redeem")}><Ticket className="w-4 h-4 mr-1.5" /> Redeem</Button>
-            <Button onClick={() => setMode("issue")}><Plus className="w-4 h-4 mr-1.5" /> Issue</Button>
+            <Button variant="outline" onClick={() => setMode("redeem")}><Ticket className="w-4 h-4 mr-1.5" /> {french ? "Échanger" : "Redeem"}</Button>
+            <Button onClick={() => setMode("issue")}><Plus className="w-4 h-4 mr-1.5" /> {french ? "Émettre" : "Issue"}</Button>
           </div>
         )}
       </div>
@@ -82,7 +82,7 @@ export default function GiftCardsPage() {
           <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
         </div>
       ) : loading ? <LoadingSpinner /> : cards.length === 0 && !mode ? (
-        <EmptyState title="No gift cards yet" description="Issue your first gift card to get started." />
+        <EmptyState title={french ? "Aucune carte-cadeau" : "No gift cards yet"} description={french ? "Émettez votre première carte-cadeau pour commencer." : "Issue your first gift card to get started."} />
       ) : (
         <div className="space-y-3 mt-4">
           {cards.map((c) => (
@@ -99,17 +99,17 @@ export default function GiftCardsPage() {
                       <StatusPill status={c.status} />
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      {c.recipientName ? `For ${c.recipientName}` : "No recipient"}
+                      {c.recipientName ? `${french ? "Pour" : "For"} ${c.recipientName}` : (french ? "Aucun destinataire" : "No recipient")}
                       {c.recipientEmail ? ` · ${c.recipientEmail}` : ""}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Issued {format(new Date(c.createdAt), "MMM d, yyyy")}
-                      {c.expiresAt ? ` · expires ${format(new Date(c.expiresAt), "MMM d, yyyy")}` : ""}
+                      {french ? "Émise le" : "Issued"} {formatDate(c.createdAt, { year: "numeric", month: "short", day: "numeric" })}
+                      {c.expiresAt ? ` · ${french ? "expire le" : "expires"} ${formatDate(c.expiresAt, { year: "numeric", month: "short", day: "numeric" })}` : ""}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-lg font-bold text-gray-900">{formatPrice(c.balanceCents)}</p>
-                    <p className="text-xs text-gray-400">of {formatPrice(c.initialCents)}</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(c.balanceCents)}</p>
+                    <p className="text-xs text-gray-400">{french ? "sur" : "of"} {formatCurrency(c.initialCents)}</p>
                     {c.status === "ACTIVE" && (
                       <button onClick={() => setCardToVoid(c)} className="text-xs text-gray-400 hover:text-red-600 inline-flex items-center gap-1 mt-1.5">
                         <Ban className="w-3 h-3" /> Void
@@ -140,11 +140,13 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
   const [recipientName, setRecipientName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [recipientLocale, setRecipientLocale] = useState<"en" | "fr">("en");
   const [saving, setSaving] = useState(false);
+  const { french } = useDashboardLocale();
 
   async function submit() {
     const dollars = parseFloat(amount);
-    if (!dollars || dollars < 1) { toast.error("Enter an amount of at least $1"); return; }
+    if (!dollars || dollars < 1) { toast.error(french ? "Entrez un montant d’au moins 1 $" : "Enter an amount of at least $1"); return; }
     setSaving(true);
     try {
       const card = await api.giftCards.issue(bizId, {
@@ -152,8 +154,9 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
         recipientName: recipientName || undefined,
         recipientEmail: recipientEmail || undefined,
         message: message || undefined,
+        locale: recipientLocale,
       });
-      toast.success(`Issued ${card.code}${card.recipientEmail ? " — emailed to recipient" : ""}`);
+      toast.success(french ? `${card.code} émise${card.recipientEmail ? " — envoyée au destinataire" : ""}` : `Issued ${card.code}${card.recipientEmail ? " — emailed to recipient" : ""}`);
       onDone();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     finally { setSaving(false); }
@@ -163,7 +166,7 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
     <Card className="border-violet-200">
       <CardContent className="py-5 space-y-3">
         <div>
-          <label htmlFor="gc-issue-amount" className="text-xs font-medium text-gray-500">Amount ($)</label>
+          <label htmlFor="gc-issue-amount" className="text-xs font-medium text-gray-500">{french ? "Montant ($)" : "Amount ($)"}</label>
           <Input id="gc-issue-amount" type="number" min={1} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -173,10 +176,18 @@ function IssueForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => v
         <textarea rows={2} value={message} onChange={(e) => setMessage(e.target.value)}
           className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-violet-400"
           placeholder="Gift message (optional)" />
+        <div>
+          <label htmlFor="gc-recipient-language" className="text-xs font-medium text-gray-500">{french ? "Langue du destinataire" : "Recipient language"}</label>
+          <select id="gc-recipient-language" value={recipientLocale} onChange={(e) => setRecipientLocale(e.target.value as "en" | "fr")}
+            className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+          </select>
+        </div>
         <p className="text-[11px] text-gray-400">If you add a recipient email we&apos;ll send them the code automatically.</p>
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} loading={saving}>Issue gift card</Button>
+          <Button variant="outline" onClick={onCancel} disabled={saving}>{french ? "Annuler" : "Cancel"}</Button>
+          <Button onClick={submit} loading={saving}>{french ? "Émettre la carte-cadeau" : "Issue gift card"}</Button>
         </div>
       </CardContent>
     </Card>
@@ -189,6 +200,7 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
   const [checking, setChecking] = useState(false);
   const [bal, setBal] = useState<{ balanceCents: number; status: GiftCardStatus } | null>(null);
   const [saving, setSaving] = useState(false);
+  const { french, formatCurrency } = useDashboardLocale();
 
   async function check() {
     if (!code.trim()) return;
@@ -205,7 +217,7 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
     setSaving(true);
     try {
       const r = await api.giftCards.redeem(bizId, { code: code.trim(), amountCents: Math.round(dollars * 100) });
-      toast.success(`Redeemed ${formatPrice(r.redeemedCents)} — ${formatPrice(r.balanceCents)} left`);
+      toast.success(french ? `${formatCurrency(r.redeemedCents)} échangés — solde de ${formatCurrency(r.balanceCents)}` : `Redeemed ${formatCurrency(r.redeemedCents)} — ${formatCurrency(r.balanceCents)} left`);
       onDone();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Redeem failed"); }
     finally { setSaving(false); }
@@ -216,21 +228,21 @@ function RedeemForm({ bizId, onDone, onCancel }: { bizId: string; onDone: () => 
       <CardContent className="py-5 space-y-3">
         <div className="flex gap-2">
           <Input placeholder="GIFT-XXXX-XXXX-XXXX-XXXX" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="font-mono" />
-          <Button variant="outline" onClick={check} loading={checking}>Check</Button>
+          <Button variant="outline" onClick={check} loading={checking}>{french ? "Vérifier" : "Check"}</Button>
         </div>
         {bal && (
           <p className="text-sm text-gray-600">
-            Balance: <strong className="text-gray-900">{formatPrice(bal.balanceCents)}</strong>
+            {french ? "Solde" : "Balance"}: <strong className="text-gray-900">{formatCurrency(bal.balanceCents)}</strong>
             <span className="text-gray-400"> · {bal.status}</span>
           </p>
         )}
         <div>
-          <label htmlFor="gc-redeem-amount" className="text-xs font-medium text-gray-500">Amount to redeem ($)</label>
+          <label htmlFor="gc-redeem-amount" className="text-xs font-medium text-gray-500">{french ? "Montant à échanger ($)" : "Amount to redeem ($)"}</label>
           <Input id="gc-redeem-amount" type="number" min={0} step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} loading={saving}>Redeem</Button>
+          <Button variant="outline" onClick={onCancel} disabled={saving}>{french ? "Annuler" : "Cancel"}</Button>
+          <Button onClick={submit} loading={saving}>{french ? "Échanger" : "Redeem"}</Button>
         </div>
       </CardContent>
     </Card>

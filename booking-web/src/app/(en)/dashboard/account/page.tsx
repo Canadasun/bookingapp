@@ -13,6 +13,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 type Me = {
   id: string; email: string; name: string; phone?: string | null;
@@ -32,6 +33,7 @@ export default function AccountPage() {
   const [pauseConfirm, setPauseConfirm] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [delConfirm, setDelConfirm] = useState("");
+  const { french } = useDashboardLocale();
 
   function loadAccount() {
     setLoadError("");
@@ -110,7 +112,7 @@ export default function AccountPage() {
   if (loadError) return (
     <div className="text-center py-20">
       <p className="text-red-500 mb-3">{loadError}</p>
-      <button onClick={loadAccount} className="text-violet-600 hover:underline text-sm">Try again</button>
+      <button onClick={loadAccount} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Try again"}</button>
     </div>
   );
   if (!me) return null;
@@ -131,11 +133,11 @@ export default function AccountPage() {
         onCancel={() => setPauseConfirm(false)}
       />
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Your account</h2>
+        <h2 className="text-xl font-bold text-gray-900">{french ? "Votre compte" : "Your account"}</h2>
         <p className="text-sm text-gray-500 capitalize">{me.role.toLowerCase()}</p>
         {dirty && (
           <p className="mt-2 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
-            Unsaved profile changes
+            {french ? "Modifications du profil non enregistrées" : "Unsaved profile changes"}
           </p>
         )}
       </div>
@@ -144,7 +146,7 @@ export default function AccountPage() {
       <Card>
         <CardContent className="space-y-5 py-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Profile photo</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{french ? "Photo de profil" : "Profile photo"}</label>
             <ImageUpload
               value={form.avatarUrl}
               kind="AVATAR"
@@ -152,29 +154,29 @@ export default function AccountPage() {
               alt={`${form.name || "Your"} profile photo`}
               onChange={(url) => { setDirty(true); setForm((p) => ({ ...p, avatarUrl: url })); }}
             />
-            <p className="mt-2 text-xs text-gray-400">Click Save changes after uploading or removing a photo.</p>
+            <p className="mt-2 text-xs text-gray-400">{french ? "Cliquez sur Enregistrer les modifications après avoir téléversé ou retiré une photo." : "Click Save changes after uploading or removing a photo."}</p>
           </div>
 
           <div>
-            <label htmlFor="account-name" className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
-            <Input id="account-name" value={form.name} onChange={(e) => { setDirty(true); setForm((p) => ({ ...p, name: e.target.value })); }} placeholder="Your name" />
+            <label htmlFor="account-name" className="block text-sm font-medium text-gray-700 mb-1">{french ? "Nom complet" : "Full name"}</label>
+            <Input id="account-name" value={form.name} onChange={(e) => { setDirty(true); setForm((p) => ({ ...p, name: e.target.value })); }} placeholder={french ? "Votre nom" : "Your name"} />
           </div>
 
           <div>
-            <label htmlFor="account-phone" className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <label htmlFor="account-phone" className="block text-sm font-medium text-gray-700 mb-1">{french ? "Téléphone" : "Phone"}</label>
             <Input id="account-phone" type="tel" value={form.phone} onChange={(e) => { setDirty(true); setForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) })); }} placeholder="+1 (416) 555-0123" />
           </div>
 
           <div>
-            <p id="account-email-label" className="block text-sm font-medium text-gray-700 mb-1">Email</p>
+            <p id="account-email-label" className="block text-sm font-medium text-gray-700 mb-1">{french ? "Courriel" : "Email"}</p>
             <div role="textbox" aria-labelledby="account-email-label" aria-readonly="true" className="flex items-center gap-2 px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-500">
               <Mail className="w-4 h-4 shrink-0" /> {me.email}
             </div>
-            <p className="text-xs text-gray-400 mt-1">Your sign-in email can&apos;t be changed here.</p>
+            <p className="text-xs text-gray-400 mt-1">{french ? "Votre courriel de connexion ne peut pas être modifié ici." : "Your sign-in email can't be changed here."}</p>
           </div>
 
           <div className="flex justify-end">
-            <Button loading={saving} disabled={!dirty} onClick={save}>Save changes</Button>
+            <Button loading={saving} disabled={!dirty} onClick={save}>{french ? "Enregistrer les modifications" : "Save changes"}</Button>
           </div>
         </CardContent>
       </Card>
@@ -188,8 +190,8 @@ export default function AccountPage() {
               <Building2 className="w-4 h-4 text-violet-600" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900">Business profile</p>
-              <p className="text-xs text-gray-500">Set your store name, logo, contact info and timezone.</p>
+              <p className="text-sm font-semibold text-gray-900">{french ? "Profil de l’entreprise" : "Business profile"}</p>
+              <p className="text-xs text-gray-500">{french ? "Définissez le nom, le logo, les coordonnées et le fuseau horaire." : "Set your store name, logo, contact info and timezone."}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
           </Link>
@@ -200,8 +202,8 @@ export default function AccountPage() {
             <Lock className="w-4 h-4 text-violet-600" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900">Password</p>
-            <p className="text-xs text-gray-500">Change the password you use to sign in.</p>
+            <p className="text-sm font-semibold text-gray-900">{french ? "Mot de passe" : "Password"}</p>
+            <p className="text-xs text-gray-500">{french ? "Modifiez le mot de passe utilisé pour ouvrir une session." : "Change the password you use to sign in."}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
         </Link>
@@ -211,8 +213,8 @@ export default function AccountPage() {
             <Lock className="w-4 h-4 text-violet-600" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900">Security &amp; two-factor</p>
-            <p className="text-xs text-gray-500">Protect your sign-in with an extra verification step.</p>
+            <p className="text-sm font-semibold text-gray-900">{french ? "Sécurité et authentification à deux facteurs" : "Security & two-factor"}</p>
+            <p className="text-xs text-gray-500">{french ? "Protégez votre connexion avec une étape de vérification supplémentaire." : "Protect your sign-in with an extra verification step."}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
         </Link>
@@ -223,8 +225,8 @@ export default function AccountPage() {
               <SettingsIcon className="w-4 h-4 text-violet-600" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900">All settings</p>
-              <p className="text-xs text-gray-500">Booking policies, payments, security &amp; two-factor, billing.</p>
+              <p className="text-sm font-semibold text-gray-900">{french ? "Tous les paramètres" : "All settings"}</p>
+              <p className="text-xs text-gray-500">{french ? "Politiques de réservation, paiements, sécurité, authentification et facturation." : "Booking policies, payments, security & two-factor, billing."}</p>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
           </Link>
@@ -233,9 +235,9 @@ export default function AccountPage() {
 
       {isOwner && bizError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p className="font-semibold text-red-800">Could not load business controls.</p>
+          <p className="font-semibold text-red-800">{french ? "Impossible de charger les contrôles de l’entreprise." : "Could not load business controls."}</p>
           <p className="mt-1 text-xs">{bizError}</p>
-          <button type="button" onClick={loadAccount} className="mt-2 text-xs font-semibold underline underline-offset-2">Retry</button>
+          <button type="button" onClick={loadAccount} className="mt-2 text-xs font-semibold underline underline-offset-2">{french ? "Réessayer" : "Retry"}</button>
         </div>
       )}
 
@@ -275,7 +277,7 @@ export default function AccountPage() {
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-red-800">Delete this business permanently</p>
+                  <p className="text-sm font-medium text-red-800">{french ? "Supprimer définitivement cette entreprise" : "Delete this business permanently"}</p>
                   <p className="text-xs text-red-700/80 mt-1 max-w-md">
                     This erases your business and <strong>everything in it</strong> — clients, bookings, staff, services, payments and your login. This cannot be undone.
                   </p>

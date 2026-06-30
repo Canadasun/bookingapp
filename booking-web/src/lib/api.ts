@@ -746,7 +746,7 @@ export const api = {
 
   waitlist: {
     // Public — clients join when no slot fits.
-    join: (businessId: string, data: { name: string; email: string; phone?: string; serviceId?: string; staffId?: string; desiredDate?: string; notes?: string }) =>
+    join: (businessId: string, data: { name: string; email: string; phone?: string; serviceId?: string; staffId?: string; desiredDate?: string; notes?: string; locale?: "en" | "fr" }) =>
       req<{ id: string }>(`/businesses/${businessId}/waitlist`, { method: "POST", body: JSON.stringify(data) }, null),
     list: (businessId: string) =>
       req<Array<{ id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; status: "WAITING" | "NOTIFIED" | "CONVERTED" | "CANCELLED"; createdAt: string }>>(`/businesses/${businessId}/waitlist`),
@@ -793,7 +793,7 @@ export const api = {
   giftCards: {
     list: (businessId: string) =>
       req<GiftCard[]>(`/businesses/${businessId}/gift-cards`),
-    issue: (businessId: string, data: { amountCents: number; recipientName?: string; recipientEmail?: string; purchaserName?: string; message?: string; expiresAt?: string }) =>
+    issue: (businessId: string, data: { amountCents: number; recipientName?: string; recipientEmail?: string; purchaserName?: string; message?: string; expiresAt?: string; locale?: "en" | "fr" }) =>
       req<GiftCard>(`/businesses/${businessId}/gift-cards`, { method: "POST", body: JSON.stringify(data) }),
     redeem: (businessId: string, data: { code: string; amountCents: number; appointmentId?: string }) =>
       req<{ redeemedCents: number; balanceCents: number; status: GiftCardStatus }>(`/businesses/${businessId}/gift-cards/redeem`, { method: "POST", body: JSON.stringify(data) }),

@@ -26,7 +26,7 @@ export function SecurityContent({ dict, altHref }: { dict: Dictionary["security"
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-6 py-16">
         <div className="mb-10 flex items-center justify-between gap-4">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href={locale === "fr" ? "/fr" : "/"} className="inline-flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-icon.png" alt="Pulse" className="w-8 h-8 object-contain" />
             <span className="text-2xl font-bold text-slate-900 tracking-tight">Pulse Appointments</span>
@@ -74,9 +74,19 @@ export function SecurityContent({ dict, altHref }: { dict: Dictionary["security"
 
         <p className="text-xs text-slate-400 mt-8 text-center">
           {dict.footer.lastReviewed} ·{" "}
-          <Link href="/privacy" className="hover:underline">{dict.footer.privacy}</Link>{" "}·{" "}
-          <Link href="/canadian-privacy" className="hover:underline">{dict.footer.canadianPrivacy}</Link>{" "}·{" "}
-          <Link href="/terms" className="hover:underline">{dict.footer.terms}</Link>
+          {locale === "fr" ? (
+            <>
+              <Link href="/fr" className="hover:underline">Accueil</Link>{" "}·{" "}
+              <Link href="/fr/pricing" className="hover:underline">Tarifs</Link>{" "}·{" "}
+              <Link href="/fr/features" className="hover:underline">Fonctionnalités</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/privacy" className="hover:underline">{dict.footer.privacy}</Link>{" "}·{" "}
+              <Link href="/canadian-privacy" className="hover:underline">{dict.footer.canadianPrivacy}</Link>{" "}·{" "}
+              <Link href="/terms" className="hover:underline">{dict.footer.terms}</Link>
+            </>
+          )}
         </p>
       </div>
     </div>

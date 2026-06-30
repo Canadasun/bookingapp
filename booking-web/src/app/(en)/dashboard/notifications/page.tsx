@@ -13,20 +13,12 @@ import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 type Filter = "all" | "unread" | NotificationKind;
 type View = "inbox" | "deliveries" | "templates" | "devices";
 type DeliveryStatus = "ALL" | NotificationDelivery["status"];
 type DeliveryChannel = "ALL" | NotificationDelivery["channel"];
-
-const FILTERS: Array<{ id: Filter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "unread", label: "Unread" },
-  { id: "BOOKING_NEW", label: "New bookings" },
-  { id: "BOOKING_UPDATE", label: "Booking updates" },
-  { id: "PAYMENT", label: "Payments" },
-  { id: "SYSTEM", label: "System" },
-];
 
 function iconFor(kind: NotificationKind) {
   if (kind === "BOOKING_NEW") return CalendarClock;
@@ -66,7 +58,16 @@ export default function NotificationsPage() {
   const [devices, setDevices] = useState<DeviceToken[]>([]);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [preview, setPreview] = useState<{ title: string; desc: string; body: string } | null>(null);
-  const [bizName, setBizName] = useState("your business");
+  const { french } = useDashboardLocale();
+  const [bizName, setBizName] = useState(french ? "votre entreprise" : "your business");
+  const filters: Array<{ id: Filter; label: string }> = [
+    { id: "all", label: french ? "Tous" : "All" },
+    { id: "unread", label: french ? "Non lus" : "Unread" },
+    { id: "BOOKING_NEW", label: french ? "Nouvelles réservations" : "New bookings" },
+    { id: "BOOKING_UPDATE", label: french ? "Mises à jour" : "Booking updates" },
+    { id: "PAYMENT", label: french ? "Paiements" : "Payments" },
+    { id: "SYSTEM", label: french ? "Système" : "System" },
+  ];
 
   useEffect(() => {
     if (user?.businessId) api.business.get(user.businessId).then((b) => setBizName(b.name)).catch(() => {});
@@ -85,16 +86,16 @@ export default function NotificationsPage() {
     business: bizName,
     staff: bizName,
     time: "Sat, Jun 14 at 2:30 PM",
-    reason: "We're sorry for the inconvenience.",
+    reason: french ? "Nous sommes désolés pour le désagrément." : "We're sorry for the inconvenience.",
   };
   const renderTemplate = (body: string) => body.replace(/\{\{(\w+)\}\}/g, (_, k) => sample[k] ?? `{{${k}}}`);
 
   const load = useCallback(async () => {
     setLoadError(""); setLoading(true);
     try { setItems(await api.notifications.list()); }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load notifications"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des notifications" : "Failed to load notifications")); }
     finally { setLoading(false); }
-  }, []);
+  }, [french]);
 
   const loadDeliveries = useCallback(async () => {
     setLogsLoading(true);
@@ -138,9 +139,9 @@ export default function NotificationsPage() {
     try {
       await api.notifications.clear();
       setItems([]);
-      toast.success("Notification history cleared");
+      toast.success(french ? "Historique des notifications effacé" : "Notification history cleared");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not clear notification history");
+      toast.error(e instanceof Error ? e.message : (french ? "Impossible d’effacer l’historique des notifications" : "Could not clear notification history"));
     }
   }
 
@@ -156,23 +157,23 @@ export default function NotificationsPage() {
     <div className="max-w-5xl mx-auto space-y-5">
       <ConfirmDialog
         open={showClearHistory}
-        title="Clear notification history?"
-        description="All notifications will be permanently removed. This cannot be undone."
-        confirmLabel="Clear history"
+        title={french ? "Effacer l’historique des notifications?" : "Clear notification history?"}
+        description={french ? "Toutes les notifications seront supprimées définitivement. Cette action est irréversible." : "All notifications will be permanently removed. This cannot be undone."}
+        confirmLabel={french ? "Effacer l’historique" : "Clear history"}
         variant="destructive"
         onConfirm={() => { setShowClearHistory(false); clearHistory(); }}
         onCancel={() => setShowClearHistory(false)}
       />
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Notifications</h2>
+          <h2 className="text-xl font-bold text-gray-900">{french ? "Notifications" : "Notifications"}</h2>
           <p className="text-sm text-gray-500">
-            {unread > 0 ? `${unread} unread` : "Inbox is clear"} · {failedDeliveries} failed delivery{failedDeliveries === 1 ? "" : "ies"}
+            {unread > 0 ? `${unread} ${french ? "non lues" : "unread"}` : (french ? "Boîte de réception vide" : "Inbox is clear")} · {failedDeliveries} {french ? "échec de livraison" : "failed delivery"}{failedDeliveries === 1 ? "" : french ? "s" : "ies"}
           </p>
         </div>
         <div className="flex gap-2">
-          {unread > 0 && <Button variant="outline" size="sm" onClick={markAll}><CheckCheck className="w-4 h-4 mr-1.5" /> Mark all read</Button>}
-          {items.length > 0 && <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7" onClick={() => setShowClearHistory(true)}><Trash2 className="w-4 h-4 mr-1.5" /> Clear history</Button>}
+          {unread > 0 && <Button variant="outline" size="sm" onClick={markAll}><CheckCheck className="w-4 h-4 mr-1.5" /> {french ? "Tout marquer comme lu" : "Mark all read"}</Button>}
+          {items.length > 0 && <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-7" onClick={() => setShowClearHistory(true)}><Trash2 className="w-4 h-4 mr-1.5" /> {french ? "Effacer l’historique" : "Clear history"}</Button>}
         </div>
       </div>
 
@@ -182,14 +183,16 @@ export default function NotificationsPage() {
             <button key={id} onClick={() => setView(id)}
               className={cn("px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
                 view === id ? "bg-violet-600 text-white" : "text-gray-500 hover:bg-gray-50")}>
-              {id === "inbox" ? "Inbox" : id === "deliveries" ? "Delivery logs" : id === "templates" ? "Templates" : "Devices"}
+              {french
+                ? (id === "inbox" ? "Boîte de réception" : id === "deliveries" ? "Journaux d’envoi" : id === "templates" ? "Modèles" : "Appareils")
+                : (id === "inbox" ? "Inbox" : id === "deliveries" ? "Delivery logs" : id === "templates" ? "Templates" : "Devices")}
             </button>
           ))}
         </div>
 
         {view === "inbox" && (
           <div className="flex flex-wrap gap-2">
-            {FILTERS.map((f) => (
+            {filters.map((f) => (
               <button key={f.id} onClick={() => setFilter(f.id)}
                 className={cn("rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
                   filter === f.id ? "border-violet-200 bg-violet-50 text-violet-700" : "border-gray-100 bg-white text-gray-500 hover:bg-gray-50")}>
@@ -201,7 +204,7 @@ export default function NotificationsPage() {
 
         {view === "deliveries" && (
           <Button variant="outline" size="sm" onClick={loadDeliveries} disabled={logsLoading}>
-            Refresh
+            {french ? "Actualiser" : "Refresh"}
           </Button>
         )}
       </div>
@@ -210,10 +213,10 @@ export default function NotificationsPage() {
         loading ? <LoadingSpinner /> : loadError ? (
           <div className="text-center py-16">
             <p className="text-red-500 mb-3">{loadError}</p>
-            <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+            <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
           </div>
         ) : visible.length === 0 ? (
-          <EmptyState title="No matching notifications" description="New bookings, payments, and system updates will show here." />
+          <EmptyState title={french ? "Aucune notification correspondante" : "No matching notifications"} description={french ? "Les nouvelles réservations, les paiements et les mises à jour système apparaîtront ici." : "New bookings, payments, and system updates will show here."} />
         ) : (
           <div className="space-y-2">
             {visible.map((n) => {
@@ -234,7 +237,7 @@ export default function NotificationsPage() {
                         {!n.read && <span className={cn("w-2 h-2 rounded-full shrink-0", urgentMessage ? "bg-red-600" : "bg-violet-500")} />}
                       </div>
                       {n.body && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{n.body}</p>}
-                      <p className="text-xs text-gray-400 mt-1.5">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
+                  <p className="text-xs text-gray-400 mt-1.5">{formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}</p>
                     </div>
                   </div>
                 </button>
@@ -251,7 +254,7 @@ export default function NotificationsPage() {
                 <Input
                   value={deliverySearch}
                   onChange={(e) => setDeliverySearch(e.target.value)}
-                  placeholder="Search recipient, type, or error"
+                  placeholder={french ? "Rechercher un destinataire, un type ou une erreur" : "Search recipient, type, or error"}
                   className="pl-9"
                 />
               </div>
@@ -277,11 +280,11 @@ export default function NotificationsPage() {
           </div>
 
           {logsLoading ? <LoadingSpinner /> : deliveries.length === 0 ? (
-            <EmptyState title="No delivery logs found" description="Email, SMS, and push attempts matching these filters will appear here." />
+          <EmptyState title={french ? "Aucun journal d’envoi" : "No delivery logs found"} description={french ? "Les tentatives par courriel, SMS et notification poussée correspondant à ces filtres apparaîtront ici." : "Email, SMS, and push attempts matching these filters will appear here."} />
           ) : (
             <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
               <div className="hidden grid-cols-[1.1fr_1fr_1fr_auto] gap-3 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500 md:grid">
-                <span>Type</span><span>Recipient</span><span>When</span><span>Status</span>
+                <span>{french ? "Type" : "Type"}</span><span>{french ? "Destinataire" : "Recipient"}</span><span>{french ? "Quand" : "When"}</span><span>{french ? "État" : "Status"}</span>
               </div>
               <div className="divide-y divide-gray-50">
                 {deliveries.map((d) => (
@@ -308,9 +311,9 @@ export default function NotificationsPage() {
                           variant="ghost"
                           size="sm"
                           className="mt-1 h-7 px-2 text-xs text-gray-500"
-                          onClick={() => toast.info(d.retryReason ?? "Retry is not available for this delivery.")}
+                          onClick={() => toast.info(d.retryReason ?? (french ? "La nouvelle tentative n’est pas disponible pour cet envoi." : "Retry is not available for this delivery."))}
                         >
-                          Retry unavailable
+                          {french ? "Nouvelle tentative indisponible" : "Retry unavailable"}
                         </Button>
                       )}
                     </div>
@@ -323,12 +326,12 @@ export default function NotificationsPage() {
       ) : view === "templates" ? (
         <div className="grid gap-3 md:grid-cols-2">
           {[
-            ["Booking confirmation", "Sent when an appointment is confirmed.", "Hi {{client}}, your {{service}} appointment at {{business}} is confirmed for {{time}}."],
-            ["Pending request", "Sent when approval is required.", "We received your booking request and will notify you once {{business}} approves it."],
-            ["Reminder", "Sent before upcoming appointments.", "Reminder: {{service}} with {{staff}} is coming up at {{time}}."],
-            ["Cancellation", "Sent when an appointment is cancelled.", "Your appointment for {{service}} has been cancelled. {{reason}}"],
-            ["Reschedule", "Sent when a booking time changes.", "Your {{service}} appointment has moved to {{time}}."],
-            ["Review request", "Sent after completed appointments.", "Thanks for visiting {{business}}. How was your appointment?"],
+            [french ? "Confirmation de réservation" : "Booking confirmation", french ? "Envoyé lorsqu’un rendez-vous est confirmé." : "Sent when an appointment is confirmed.", french ? "Bonjour {{client}}, votre rendez-vous {{service}} chez {{business}} est confirmé pour {{time}}." : "Hi {{client}}, your {{service}} appointment at {{business}} is confirmed for {{time}}."],
+            [french ? "Demande en attente" : "Pending request", french ? "Envoyé lorsqu’une approbation est requise." : "Sent when approval is required.", french ? "Nous avons reçu votre demande de réservation et vous aviserons une fois que {{business}} l’aura approuvée." : "We received your booking request and will notify you once {{business}} approves it."],
+            [french ? "Rappel" : "Reminder", french ? "Envoyé avant les rendez-vous à venir." : "Sent before upcoming appointments.", french ? "Rappel : le rendez-vous {{service}} avec {{staff}} approche à {{time}}." : "Reminder: {{service}} with {{staff}} is coming up at {{time}}."],
+            [french ? "Annulation" : "Cancellation", french ? "Envoyé lorsqu’un rendez-vous est annulé." : "Sent when an appointment is cancelled.", french ? "Votre rendez-vous pour {{service}} a été annulé. {{reason}}" : "Your appointment for {{service}} has been cancelled. {{reason}}"],
+            [french ? "Replanification" : "Reschedule", french ? "Envoyé lorsqu’une heure de réservation change." : "Sent when a booking time changes.", french ? "Votre rendez-vous {{service}} a été déplacé à {{time}}." : "Your {{service}} appointment has moved to {{time}}."],
+            [french ? "Demande d’avis" : "Review request", french ? "Envoyé après les rendez-vous terminés." : "Sent after completed appointments.", french ? "Merci de votre visite chez {{business}}. Comment s’est passé votre rendez-vous ?" : "Thanks for visiting {{business}}. How was your appointment?"],
           ].map(([title, desc, body]) => (
             <div key={title} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2">
@@ -338,7 +341,7 @@ export default function NotificationsPage() {
               <p className="mt-1 text-xs text-gray-400">{desc}</p>
               <p className="mt-3 rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">{body}</p>
               <Button size="sm" variant="outline" className="mt-3" onClick={() => setPreview({ title, desc, body })}>
-                Preview template
+                {french ? "Aperçu du modèle" : "Preview template"}
               </Button>
             </div>
           ))}
@@ -346,11 +349,11 @@ export default function NotificationsPage() {
       ) : (
         <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
           <div className="border-b border-gray-50 px-4 py-3">
-            <h3 className="text-sm font-semibold text-gray-900">Push devices</h3>
-            <p className="text-xs text-gray-400">Devices registered from the mobile app for your account.</p>
+            <h3 className="text-sm font-semibold text-gray-900">{french ? "Appareils de notification poussée" : "Push devices"}</h3>
+            <p className="text-xs text-gray-400">{french ? "Appareils inscrits depuis l’application mobile pour votre compte." : "Devices registered from the mobile app for your account."}</p>
           </div>
           {devicesLoading ? <LoadingSpinner /> : devices.length === 0 ? (
-            <EmptyState title="No registered push devices" description="Sign in to the mobile app and allow notifications to register a device." />
+            <EmptyState title={french ? "Aucun appareil poussé inscrit" : "No registered push devices"} description={french ? "Connectez-vous à l’application mobile et autorisez les notifications pour enregistrer un appareil." : "Sign in to the mobile app and allow notifications to register a device."} />
           ) : (
             <div className="divide-y divide-gray-50">
               {devices.map((d) => (
@@ -361,16 +364,16 @@ export default function NotificationsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800">{d.platform}</p>
-                      <p className="text-xs text-gray-400">Updated {formatDistanceToNow(new Date(d.updatedAt), { addSuffix: true })}</p>
+                      <p className="text-xs text-gray-400">{french ? "Mis à jour" : "Updated"} {formatDistanceToNow(new Date(d.updatedAt), { addSuffix: true })}</p>
                     </div>
                   </div>
                   <Button size="sm" variant={d.enabled ? "outline" : "secondary"} onClick={async () => {
                     try {
                       await api.devices.setEnabled(d.id, !d.enabled);
                       setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, enabled: !x.enabled } : x));
-                    } catch { toast.error("Failed to update device"); }
+                    } catch { toast.error(french ? "Échec de la mise à jour de l’appareil" : "Failed to update device"); }
                   }}>
-                    {d.enabled ? "Disable" : "Enable"}
+                    {d.enabled ? (french ? "Désactiver" : "Disable") : (french ? "Activer" : "Enable")}
                   </Button>
                 </div>
               ))}
@@ -393,7 +396,7 @@ export default function NotificationsPage() {
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Preview — what the client sees</p>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{french ? "Aperçu — ce que le client voit" : "Preview — what the client sees"}</p>
                 {/* Email-style preview card */}
                 <div className="rounded-xl border border-gray-100 overflow-hidden">
                   <div className="bg-[#E9A23C] px-4 py-2.5"><p className="text-white text-sm font-bold">{bizName}</p></div>
@@ -403,11 +406,11 @@ export default function NotificationsPage() {
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Template</p>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">{french ? "Modèle" : "Template"}</p>
                 <p className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600 font-mono">{preview.body}</p>
-                <p className="text-[11px] text-gray-400 mt-1.5">Tokens like <code className="text-violet-600">{"{{client}}"}</code> are filled in automatically when sent. Custom editing is coming soon.</p>
+                <p className="text-[11px] text-gray-400 mt-1.5">{french ? <>Les jetons comme <code className="text-violet-600">{"{{client}}"}</code> sont remplis automatiquement à l’envoi. La modification personnalisée arrive bientôt.</> : <>Tokens like <code className="text-violet-600">{"{{client}}"}</code> are filled in automatically when sent. Custom editing is coming soon.</>}</p>
               </div>
-              <Button className="w-full" onClick={() => setPreview(null)}>Close</Button>
+              <Button className="w-full" onClick={() => setPreview(null)}>{french ? "Fermer" : "Close"}</Button>
             </div>
           </div>
         </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Pencil, Trash2, Tag } from "lucide-react";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
@@ -12,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 interface Offer { id: string; title: string; description: string; discount?: string; expiresAt?: string; active: boolean }
 const EMPTY = { title: "", description: "", discount: "", expiresAt: "" };
@@ -28,6 +28,7 @@ export default function OffersPage() {
 
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
+  const { french, formatDate } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) {
@@ -37,9 +38,9 @@ export default function OffersPage() {
     setLoadError("");
     setLoading(true);
     try { setOffers(await api.offers.list(bizId)); }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load offers"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des offres" : "Failed to load offers")); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
   useEffect(() => { load(); }, [load]);
 
   function openCreate() { setEditing(null); setForm(EMPTY); setShowModal(true); }
@@ -50,7 +51,7 @@ export default function OffersPage() {
   }
 
   async function save() {
-    if (!form.title || !form.description) { toast.error("Title and description required"); return; }
+    if (!form.title || !form.description) { toast.error(french ? "Le titre et la description sont requis" : "Title and description required"); return; }
     if (!bizId) return;
     setSaving(true);
     try {
@@ -58,9 +59,9 @@ export default function OffersPage() {
       if (form.expiresAt) data.expiresAt = new Date(form.expiresAt).toISOString();
       if (editing) await api.offers.update(bizId, editing.id, data);
       else await api.offers.create(bizId, data);
-      toast.success(editing ? "Offer updated" : "Offer created");
+      toast.success(editing ? (french ? "Offre mise à jour" : "Offer updated") : (french ? "Offre créée" : "Offer created"));
       setShowModal(false); load();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : (french ? "Échec" : "Failed")); }
     finally { setSaving(false); }
   }
 
@@ -74,28 +75,28 @@ export default function OffersPage() {
     <div className="max-w-3xl mx-auto">
       <ConfirmDialog
         open={offerToDelete !== null}
-        title={`Remove "${offerToDelete?.title}"?`}
-        description="This offer will be removed from the client portal."
-        confirmLabel="Remove"
+        title={french ? `Retirer « ${offerToDelete?.title} »?` : `Remove "${offerToDelete?.title}"?`}
+        description={french ? "Cette offre sera retirée du portail client." : "This offer will be removed from the client portal."}
+        confirmLabel={french ? "Retirer" : "Remove"}
         variant="destructive"
         onConfirm={doRemove}
         onCancel={() => setOfferToDelete(null)}
       />
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Offers &amp; Promotions</h2>
-          <p className="text-sm text-gray-600 mt-0.5">Visible to clients in their portal</p>
+          <h2 className="text-xl font-bold text-gray-900">{french ? "Offres et promotions" : "Offers & Promotions"}</h2>
+          <p className="text-sm text-gray-600 mt-0.5">{french ? "Visibles par les clients dans leur portail" : "Visible to clients in their portal"}</p>
         </div>
-        <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4" />New offer</Button>
+        <Button size="sm" onClick={openCreate} className="gap-1.5"><Plus className="w-4 h-4" />{french ? "Nouvelle offre" : "New offer"}</Button>
       </div>
 
       {loadError ? (
         <div className="text-center py-20">
           <p className="text-red-500 mb-3">{loadError}</p>
-          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+          <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
         </div>
       ) : loading ? <LoadingSpinner /> : offers.length === 0 ? (
-        <EmptyState title="No offers yet" description="Create your first promotion — clients will see it in their portal." />
+        <EmptyState title={french ? "Aucune offre" : "No offers yet"} description={french ? "Créez votre première promotion; les clients la verront dans leur portail." : "Create your first promotion — clients will see it in their portal."} />
       ) : (
         <div className="space-y-3">
           {offers.map((o) => (
@@ -115,7 +116,7 @@ export default function OffersPage() {
                   </div>
                   <p className="text-sm text-gray-500 mt-0.5">{o.description}</p>
                   {o.expiresAt && (
-                    <p className="text-xs text-amber-600 mt-1">Expires {format(new Date(o.expiresAt), "MMM d, yyyy")}</p>
+                    <p className="text-xs text-amber-600 mt-1">{french ? "Expire le" : "Expires"} {formatDate(o.expiresAt, { year: "numeric", month: "short", day: "numeric" })}</p>
                   )}
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -143,7 +144,7 @@ export default function OffersPage() {
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" onClick={() => setShowModal(false)} />
           <Card className="relative w-full max-w-md z-10">
-            <CardHeader><CardTitle id="offer-modal-title">{editing ? "Edit offer" : "New offer"}</CardTitle></CardHeader>
+            <CardHeader><CardTitle id="offer-modal-title">{editing ? (french ? "Modifier l’offre" : "Edit offer") : (french ? "Nouvelle offre" : "New offer")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {[
                 { k: "title",       label: "Title *",              type: "text",     ph: "e.g. Halloween Special" },
@@ -159,8 +160,8 @@ export default function OffersPage() {
                 </div>
               ))}
               <div className="flex gap-3 pt-2">
-                <Button variant="secondary" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
-                <Button className="flex-1" loading={saving} onClick={save}>{editing ? "Save" : "Create"}</Button>
+                <Button variant="secondary" className="flex-1" onClick={() => setShowModal(false)}>{french ? "Annuler" : "Cancel"}</Button>
+                <Button className="flex-1" loading={saving} onClick={save}>{editing ? (french ? "Enregistrer" : "Save") : (french ? "Créer" : "Create")}</Button>
               </div>
             </CardContent>
           </Card>

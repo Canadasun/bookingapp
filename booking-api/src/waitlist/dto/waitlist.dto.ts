@@ -8,5 +8,6 @@ export const JoinWaitlistSchema = z.object({
   staffId: z.string().optional(),
   desiredDate: z.string().datetime().optional(),
   notes: z.string().max(2000).optional(),
+  locale: z.enum(['en', 'fr']).default('en'),
 });
-export type JoinWaitlistDto = z.infer<typeof JoinWaitlistSchema>;
+export type JoinWaitlistDto = z.input<typeof JoinWaitlistSchema>;

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JoinWaitlistDto } from './dto/waitlist.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class WaitlistService {
@@ -25,7 +26,8 @@ export class WaitlistService {
         staffId: dto.staffId,
         desiredDate: dto.desiredDate ? new Date(dto.desiredDate) : undefined,
         notes: dto.notes,
-      },
+        locale: dto.locale ?? 'en',
+      } as Prisma.WaitlistEntryUncheckedCreateInput & { locale: 'en' | 'fr' },
     });
   }
 

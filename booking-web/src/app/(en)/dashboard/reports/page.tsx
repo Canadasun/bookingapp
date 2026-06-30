@@ -8,6 +8,7 @@ import { useLocationScope } from "@/lib/location-scope";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 function pct(n: number, d: number) { return d === 0 ? 0 : Math.round((n / d) * 100); }
 
@@ -36,6 +37,7 @@ export default function ReportsPage() {
   const [gated, setGated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const { french, formatCurrency } = useDashboardLocale();
 
   // When a single branch is focused, scope the appointment/revenue metrics to it.
   const { selectedIds: scopedIds, locations: scopeLocs } = useLocationScope();
@@ -50,22 +52,20 @@ export default function ReportsPage() {
       const res = await api.get<{ gated: boolean } | ReportData>(`/businesses/${bizId}/reports${scopedLocationId ? `?locationId=${encodeURIComponent(scopedLocationId)}` : ""}`);
       if (res.gated) { setGated(true); }
       else { setData(res as ReportData); setGated(false); }
-    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load reports"); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des rapports" : "Failed to load reports")); }
     finally { setLoading(false); }
-  }, [bizId, scopedLocationId]);
+  }, [bizId, scopedLocationId, french]);
 
   useEffect(() => { load(); }, [load]);
 
-  const money = useCallback((cents: number) =>
-    new Intl.NumberFormat("en-CA", { style: "currency", currency: data?.currency ?? "CAD", maximumFractionDigits: 0 }).format(cents / 100),
-    [data?.currency]);
+  const money = useCallback((cents: number) => formatCurrency(cents, (data?.currency ?? "CAD") as "CAD" | "USD"), [data?.currency, formatCurrency]);
 
   if (loading) return <LoadingSpinner />;
 
   if (loadError) return (
     <div className="text-center py-20">
       <p className="text-red-500 mb-3">{loadError}</p>
-      <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">Retry</button>
+      <button onClick={() => { setLoadError(""); load(); }} className="text-violet-600 hover:underline text-sm">{french ? "Réessayer" : "Retry"}</button>
     </div>
   );
 
@@ -74,20 +74,20 @@ export default function ReportsPage() {
       <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
         <Lock className="w-7 h-7 text-violet-600" />
       </div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Analytics &amp; Reports</h2>
-      <p className="text-sm text-gray-500 mb-2">Upgrade to <strong>Basic ($19/mo)</strong> or higher to unlock:</p>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">{french ? "Analytique et rapports" : "Analytics & Reports"}</h2>
+      <p className="text-sm text-gray-500 mb-2">{french ? <>Passez à <strong>Basic (19 $/mois)</strong> ou plus pour déverrouiller :</> : <>Upgrade to <strong>Basic ($19/mo)</strong> or higher to unlock:</>}</p>
       <ul className="text-sm text-gray-500 mb-6 space-y-1 text-left inline-block">
-        <li>• Revenue trends (last 12 months)</li>
-        <li>• Revenue Protected by Pulse</li>
-        <li>• Top services &amp; provider performance</li>
-        <li>• Top clients by spend</li>
-        <li>• No-show &amp; cancellation rates</li>
+        <li>• {french ? "Tendances des revenus (12 derniers mois)" : "Revenue trends (last 12 months)"}</li>
+        <li>• {french ? "Revenus protégés par Pulse" : "Revenue Protected by Pulse"}</li>
+        <li>• {french ? "Meilleurs services et performance des professionnels" : "Top services & provider performance"}</li>
+        <li>• {french ? "Meilleurs clients par dépenses" : "Top clients by spend"}</li>
+        <li>• {french ? "Taux d’absences et d’annulations" : "No-show & cancellation rates"}</li>
       </ul>
       <div className="flex flex-col gap-3">
         <a href="/dashboard/settings#billing" className="inline-block bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
-          Upgrade to Basic — $19/mo →
+          {french ? "Passer à Basic — 19 $/mois →" : "Upgrade to Basic — $19/mo →"}
         </a>
-        <a href="/pricing" className="text-sm text-gray-400 hover:text-gray-600">Compare all plans</a>
+        <a href="/pricing" className="text-sm text-gray-400 hover:text-gray-600">{french ? "Comparer tous les forfaits" : "Compare all plans"}</a>
       </div>
     </div>
   );
@@ -101,26 +101,26 @@ export default function ReportsPage() {
     <div className="max-w-5xl mx-auto min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-gray-900">Reports</h2>
-          <p className="text-sm text-gray-500">All-time performance · last 12 months revenue</p>
+          <h2 className="text-xl font-bold text-gray-900">{french ? "Rapports" : "Reports"}</h2>
+          <p className="text-sm text-gray-500">{french ? "Rendement global · revenus des 12 derniers mois" : "All-time performance · last 12 months revenue"}</p>
           {data?.locationScoped && scopedLocationName && (
             <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
-              Showing {scopedLocationName} · appointments &amp; revenue only
+              {french ? <>Affichage de {scopedLocationName} · rendez-vous et revenus uniquement</> : <>Showing {scopedLocationName} · appointments &amp; revenue only</>}
             </span>
           )}
         </div>
         <Button variant="secondary" size="sm" onClick={load} className="gap-1.5">
-          <RefreshCw className="w-4 h-4" /> Refresh
+          <RefreshCw className="w-4 h-4" /> {french ? "Actualiser" : "Refresh"}
         </Button>
       </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
-          { label: "Collected revenue (12 mo)", value: money(r.collectedCents), icon: TrendingUp, tone: "emerald" },
-          { label: "Completed appointments", value: `${r.outcomes.completed}`, sub: `${pct(r.outcomes.completed, r.outcomes.total)}% of ${r.outcomes.total}`, icon: CalendarCheck, tone: "violet" },
-          { label: "New clients (30d)", value: `${r.newClients30d}`, sub: r.locationScoped ? "business-wide" : undefined, icon: Users, tone: "amber" },
-          { label: "No-show rate", value: `${pct(r.outcomes.noShow, r.outcomes.total)}%`, sub: `${r.outcomes.noShow} no-shows`, icon: XCircle, tone: "red" },
+          { label: french ? "Revenus collectés (12 mois)" : "Collected revenue (12 mo)", value: money(r.collectedCents), icon: TrendingUp, tone: "emerald" },
+          { label: french ? "Rendez-vous terminés" : "Completed appointments", value: `${r.outcomes.completed}`, sub: `${pct(r.outcomes.completed, r.outcomes.total)}% ${french ? "de" : "of"} ${r.outcomes.total}`, icon: CalendarCheck, tone: "violet" },
+          { label: french ? "Nouveaux clients (30 j)" : "New clients (30d)", value: `${r.newClients30d}`, sub: r.locationScoped ? (french ? "entreprise entière" : "business-wide") : undefined, icon: Users, tone: "amber" },
+          { label: french ? "Taux d’absences" : "No-show rate", value: `${pct(r.outcomes.noShow, r.outcomes.total)}%`, sub: `${r.outcomes.noShow} ${french ? "absences" : "no-shows"}`, icon: XCircle, tone: "red" },
         ].map((k) => {
           const Icon = k.icon;
           const tone: Record<string, string> = {
@@ -150,9 +150,9 @@ export default function ReportsPage() {
               <ShieldCheck className="w-5 h-5 text-green-700" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-green-900">Revenue Protected by Pulse</p>
+              <p className="text-sm font-semibold text-green-900">{french ? "Revenus protégés par Pulse" : "Revenue Protected by Pulse"}</p>
               <p className="text-xs text-green-700 mt-0.5">
-                Deposits + no-show fees + late-cancel fees — money you would have lost without protection.
+                {french ? "Acomptes + frais d’absence + frais d’annulation tardive — de l’argent que vous auriez perdu sans protection." : "Deposits + no-show fees + late-cancel fees — money you would have lost without protection."}
               </p>
             </div>
           </div>
@@ -160,15 +160,13 @@ export default function ReportsPage() {
         </div>
         {r.revenueProtectedCents > 0 ? (
           <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-green-200">
-            <div className="text-xs text-green-700"><span className="font-semibold">{money(r.depositsCollectedCents)}</span> deposits</div>
-            <div className="text-xs text-green-700"><span className="font-semibold">{money(r.noShowFeesCents)}</span> no-show fees</div>
-            <div className="text-xs text-green-700"><span className="font-semibold">{money(r.cancelFeesCents)}</span> late-cancel fees</div>
+            <div className="text-xs text-green-700"><span className="font-semibold">{money(r.depositsCollectedCents)}</span> {french ? "acomptes" : "deposits"}</div>
+            <div className="text-xs text-green-700"><span className="font-semibold">{money(r.noShowFeesCents)}</span> {french ? "frais d’absence" : "no-show fees"}</div>
+            <div className="text-xs text-green-700"><span className="font-semibold">{money(r.cancelFeesCents)}</span> {french ? "frais d’annulation tardive" : "late-cancel fees"}</div>
           </div>
         ) : (
           <p className="text-xs text-green-700 mt-3">
-            Enable deposits or no-show fees in{" "}
-            <a href="/dashboard/settings?tab=booking" className="underline font-medium">Booking Policies</a>{" "}
-            to start protecting your revenue.
+            {french ? <>Activez les acomptes ou les frais d’absence dans <a href="/dashboard/settings?tab=booking" className="underline font-medium">Politiques de réservation</a> pour commencer à protéger vos revenus.</> : <>Enable deposits or no-show fees in{" "}<a href="/dashboard/settings?tab=booking" className="underline font-medium">Booking Policies</a>{" "}to start protecting your revenue.</>}
           </p>
         )}
       </div>
@@ -176,7 +174,7 @@ export default function ReportsPage() {
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Revenue by month */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <p className="text-sm font-semibold text-gray-900 mb-4">Collected revenue · last 12 months</p>
+          <p className="text-sm font-semibold text-gray-900 mb-4">{french ? "Revenus collectés · 12 derniers mois" : "Collected revenue · last 12 months"}</p>
           <div className="flex items-end justify-between gap-1.5 h-40">
             {r.byMonth.map((m) => (
               <div key={m.label} className="flex-1 flex flex-col items-center justify-end gap-1 h-full min-w-0">
@@ -195,13 +193,13 @@ export default function ReportsPage() {
 
         {/* Booking outcomes */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <p className="text-sm font-semibold text-gray-900 mb-4">Booking outcomes (all time)</p>
+          <p className="text-sm font-semibold text-gray-900 mb-4">{french ? "Résultats des réservations (historique)" : "Booking outcomes (all time)"}</p>
           <div className="space-y-3">
             {[
-              { label: "Completed", n: r.outcomes.completed, color: "bg-emerald-500", icon: CalendarCheck },
-              { label: "Cancelled", n: r.outcomes.cancelled, color: "bg-gray-400", icon: XCircle },
-              { label: "No-show", n: r.outcomes.noShow, color: "bg-red-400", icon: XCircle },
-              { label: "Pending / Confirmed", n: r.outcomes.pending + r.outcomes.confirmed, color: "bg-violet-400", icon: CalendarCheck },
+              { label: french ? "Terminés" : "Completed", n: r.outcomes.completed, color: "bg-emerald-500", icon: CalendarCheck },
+              { label: french ? "Annulés" : "Cancelled", n: r.outcomes.cancelled, color: "bg-gray-400", icon: XCircle },
+              { label: french ? "Absences" : "No-show", n: r.outcomes.noShow, color: "bg-red-400", icon: XCircle },
+              { label: french ? "En attente / confirmés" : "Pending / Confirmed", n: r.outcomes.pending + r.outcomes.confirmed, color: "bg-violet-400", icon: CalendarCheck },
             ].map((row) => (
               <div key={row.label}>
                 <div className="flex items-center justify-between text-xs mb-1">
@@ -218,9 +216,9 @@ export default function ReportsPage() {
 
         {/* Top services */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <p className="text-sm font-semibold text-gray-900 mb-3">Top services (by completed bookings)</p>
+          <p className="text-sm font-semibold text-gray-900 mb-3">{french ? "Meilleurs services (réservations terminées)" : "Top services (by completed bookings)"}</p>
           {r.topServices.length === 0 ? (
-            <p className="text-xs text-gray-400">No completed appointments yet.</p>
+            <p className="text-xs text-gray-400">{french ? "Aucun rendez-vous terminé pour l’instant." : "No completed appointments yet."}</p>
           ) : (
             <div className="space-y-2.5">
               {r.topServices.map((s) => (
@@ -244,30 +242,30 @@ export default function ReportsPage() {
         {/* Top clients + busiest staff */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
           <p className="text-sm font-semibold text-gray-900 mb-3">
-            Top clients by spend
-            {r.locationScoped && <span className="ml-1.5 text-xs font-normal text-gray-400">(business-wide)</span>}
+            {french ? "Meilleurs clients par dépenses" : "Top clients by spend"}
+            {r.locationScoped && <span className="ml-1.5 text-xs font-normal text-gray-400">{french ? "(entreprise entière)" : "(business-wide)"}</span>}
           </p>
           {r.topClients.length === 0 ? (
-            <p className="text-xs text-gray-400">No revenue recorded yet.</p>
+            <p className="text-xs text-gray-400">{french ? "Aucun revenu enregistré pour l’instant." : "No revenue recorded yet."}</p>
           ) : (
             <div className="space-y-2 mb-5">
               {r.topClients.map((c) => (
                 <div key={c.id} className="flex items-center justify-between text-sm">
                   <span className="text-gray-700 truncate">{c.name}</span>
                   <span className="text-gray-500 shrink-0 ml-2">
-                    {money(c.totalSpentCents)} · {c.totalVisits} visit{c.totalVisits === 1 ? "" : "s"}
+                    {money(c.totalSpentCents)} · {c.totalVisits} {french ? `visite${c.totalVisits === 1 ? "" : "s"}` : `visit${c.totalVisits === 1 ? "" : "s"}`}
                   </span>
                 </div>
               ))}
             </div>
           )}
 
-          <p className="text-sm font-semibold text-gray-900 mb-3">Busiest providers</p>
+          <p className="text-sm font-semibold text-gray-900 mb-3">{french ? "Professionnels les plus occupés" : "Busiest providers"}</p>
           <div className="space-y-2">
             {r.topStaff.map((s) => (
               <div key={s.name} className="flex items-center justify-between text-sm">
                 <span className="text-gray-700 truncate">{s.name}</span>
-                <span className="text-gray-500 shrink-0 ml-2">{s.count} booking{s.count === 1 ? "" : "s"}</span>
+                <span className="text-gray-500 shrink-0 ml-2">{s.count} {french ? `réservation${s.count === 1 ? "" : "s"}` : `booking${s.count === 1 ? "" : "s"}`}</span>
               </div>
             ))}
           </div>

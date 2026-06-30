@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { format, addMinutes, startOfDay, isBefore, isAfter } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { parseISO } from "date-fns";
+import { frCA } from "date-fns/locale";
 import { Search, Check, Clock, User, ChevronRight, CheckCircle2, Plus, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -13,16 +14,13 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import "react-day-picker/style.css";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 function fmtDuration(mins: number) {
   const h = Math.floor(mins / 60), m = mins % 60;
   if (h > 0 && m > 0) return `${h}h ${m}m`;
   return h > 0 ? `${h}h` : `${m}m`;
 }
-function fmtPrice(cents: number, currency: "CAD" | "USD" = "CAD") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
-}
-
 type Step = "client" | "services" | "staff" | "datetime" | "confirm";
 type BookingSlot = Slot & { staffId?: string; staffName?: string };
 
@@ -60,17 +58,18 @@ export default function CheckoutPage() {
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const [bizIdError, setBizIdError] = useState("");
+  const { french, formatCurrency, formatDate } = useDashboardLocale();
 
   useEffect(() => {
     if (!bizId) {
-      setBizIdError("No business account is linked to your account. Please contact support.");
+      setBizIdError(french ? "Aucune entreprise n’est liée à votre compte. Communiquez avec le soutien." : "No business account is linked to your account. Please contact support.");
       return;
     }
     api.business.get(bizId).then(setBiz).catch(() => {});
     api.services.listAll(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
     api.staff.listAll(bizId).then((all) => setAllStaffList(all.filter((st) => st.active))).catch(() => {});
     api.locations.list(bizId).then((locs) => setLocations(locs.filter((l) => l.active))).catch(() => {});
-  }, [bizId]);
+  }, [bizId, french]);
 
   // "Book again" deep-link from the Clients page (?client=<id>): pre-select that
   // client and skip straight to choosing services — no duplicate contact created.
@@ -129,7 +128,7 @@ export default function CheckoutPage() {
         return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
       }));
       setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
-    } catch { toast.error("Failed to load times"); }
+    } catch { toast.error(french ? "Échec du chargement des heures" : "Failed to load times"); }
     finally { setLoadingSlots(false); }
   }
 
@@ -143,7 +142,7 @@ export default function CheckoutPage() {
   async function createOrGetClient(): Promise<Client | null> {
     if (!bizId) return null;
     if (selectedClient) return selectedClient;
-    toast.error("Select a client from the list first");
+    toast.error(french ? "Sélectionnez d’abord un client dans la liste" : "Select a client from the list first");
     return null;
   }
 
@@ -161,12 +160,12 @@ export default function CheckoutPage() {
     const customStartsAt = customStartsAtValue();
     const customStartsAtDate = customStartsAt ? new Date(customStartsAt) : null;
     if (customStartsAt && Number.isNaN(customStartsAtDate?.getTime())) {
-      toast.error("Enter a valid custom date and time");
+      toast.error(french ? "Entrez une date et une heure personnalisées valides" : "Enter a valid custom date and time");
       return;
     }
     const startsAt = customStartsAtDate ? customStartsAtDate.toISOString() : selectedSlot?.startsAt;
     if (!startsAt) {
-      toast.error("Choose an available time or enter a custom owner time");
+      toast.error(french ? "Choisissez une heure disponible ou entrez une heure personnalisée" : "Choose an available time or enter a custom owner time");
       return;
     }
     setSubmitting(true);
@@ -178,7 +177,7 @@ export default function CheckoutPage() {
         : selectedStaff && selectedStaff !== "any"
           ? selectedStaff.id
           : selectedSlot?.staffId;
-      if (!staffId) { toast.error("Choose a provider before booking"); return; }
+      if (!staffId) { toast.error(french ? "Choisissez un professionnel avant de réserver" : "Choose a provider before booking"); return; }
       const common = {
         staffId, serviceId: selectedServices[0].id,
         additionalServiceIds: selectedServices.slice(1).map((s) => s.id),
@@ -192,15 +191,15 @@ export default function CheckoutPage() {
         const res = await api.appointments.createRecurring(bizId, { ...common, frequency: recurring.frequency, count: recurring.count });
         setBooked(res.created[0] ?? null);
         toast.success(
-          `Booked ${res.created.length} of ${recurring.count} appointments${res.skipped.length ? ` — ${res.skipped.length} skipped (conflicts)` : ""}`,
+          french ? `${res.created.length} rendez-vous sur ${recurring.count} réservés${res.skipped.length ? ` — ${res.skipped.length} ignorés (conflits)` : ""}` : `Booked ${res.created.length} of ${recurring.count} appointments${res.skipped.length ? ` — ${res.skipped.length} skipped (conflicts)` : ""}`,
         );
       } else {
         const apt = await api.appointments.createManual(bizId, common);
         setBooked(apt);
-        toast.success("Appointment booked & confirmed!");
+        toast.success(french ? "Rendez-vous réservé et confirmé!" : "Appointment booked & confirmed!");
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Booking failed");
+      toast.error(e instanceof Error ? e.message : (french ? "Échec de la réservation" : "Booking failed"));
     } finally { setSubmitting(false); }
   }
 
@@ -244,19 +243,19 @@ export default function CheckoutPage() {
         <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
           <CheckCircle2 className="w-8 h-8 text-emerald-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking confirmed!</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{french ? "Réservation confirmée!" : "Booking confirmed!"}</h2>
         <p className="text-gray-500 mb-1">
           {selectedClient?.name ?? ""} — {selectedServices.map(s => s.name).join(" + ")}
         </p>
         <p className="text-xs text-gray-500 font-mono mb-6">#{booked.id.slice(-8).toUpperCase()}</p>
         <div className="bg-gray-50 rounded-xl p-4 text-left text-sm space-y-1.5 mb-6">
-          {(selectedDate || customStartsAt) && <p className="text-gray-700"><span className="text-gray-500">Date: </span>{format(customStartsAt ? new Date(customStartsAt) : selectedDate!, "EEE, MMM d, yyyy")}</p>}
-          {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-500">Time: </span>{customStartsAt ? format(new Date(customStartsAt), "h:mm a") : format(parseISO(selectedSlot!.startsAtLocal), "h:mm a")}</p>}
-          <p className="text-gray-700"><span className="text-gray-500">Provider: </span>{providerText(customStartsAt ? customStaff?.user.name : selectedSlot?.staffName)}</p>
-          <p className="text-gray-700"><span className="text-gray-500">Duration: </span>{fmtDuration(totalMins)}</p>
-          <p className="font-semibold text-violet-700"><span className="text-gray-500">Total: </span>{fmtPrice(totalCents, biz?.currency ?? "CAD")}</p>
+          {(selectedDate || customStartsAt) && <p className="text-gray-700"><span className="text-gray-500">Date: </span>{formatDate(customStartsAt ? new Date(customStartsAt) : selectedDate!, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</p>}
+          {(selectedSlot || customStartsAt) && <p className="text-gray-700"><span className="text-gray-500">{french ? "Heure" : "Time"}: </span>{formatDate(customStartsAt ? new Date(customStartsAt) : parseISO(selectedSlot!.startsAtLocal), { hour: "numeric", minute: "2-digit" })}</p>}
+          <p className="text-gray-700"><span className="text-gray-500">{french ? "Professionnel" : "Provider"}: </span>{providerText(customStartsAt ? customStaff?.user.name : selectedSlot?.staffName)}</p>
+          <p className="text-gray-700"><span className="text-gray-500">{french ? "Durée" : "Duration"}: </span>{fmtDuration(totalMins)}</p>
+          <p className="font-semibold text-violet-700"><span className="text-gray-500">Total: </span>{formatCurrency(totalCents, biz?.currency ?? "CAD")}</p>
         </div>
-        <Button onClick={reset} className="w-full">New booking</Button>
+        <Button onClick={reset} className="w-full">{french ? "Nouvelle réservation" : "New booking"}</Button>
       </div>
     </div>
   );
@@ -264,14 +263,14 @@ export default function CheckoutPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">New booking</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Book an appointment for a client from your services</p>
+        <h2 className="text-xl font-bold text-gray-900">{french ? "Nouvelle réservation" : "New booking"}</h2>
+        <p className="text-sm text-gray-500 mt-0.5">{french ? "Réservez un rendez-vous pour un client à partir de vos services" : "Book an appointment for a client from your services"}</p>
       </div>
 
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-7 overflow-x-auto pb-1">
         {STEPS.map((s, i) => {
-          const labels: Record<Step, string> = { client: "Client", services: "Services", staff: "Staff", datetime: "Date & Time", confirm: "Confirm" };
+          const labels: Record<Step, string> = french ? { client: "Client", services: "Services", staff: "Équipe", datetime: "Date et heure", confirm: "Confirmer" } : { client: "Client", services: "Services", staff: "Staff", datetime: "Date & Time", confirm: "Confirm" };
           const done = STEPS.indexOf(step) > i;
           const cur  = step === s;
           return (
@@ -298,20 +297,20 @@ export default function CheckoutPage() {
         {/* ── Client ─────────────────────────────────────────────────── */}
         {step === "client" && (
           <div className="p-4 sm:p-6">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Who is this booking for?</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-4">{french ? "Pour qui est cette réservation?" : "Who is this booking for?"}</h3>
 
             <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   className="pl-9"
-                  placeholder="Search by name, email or phone…"
+                  placeholder={french ? "Rechercher par nom, courriel ou téléphone…" : "Search by name, email or phone…"}
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
                   autoFocus
                 />
               </div>
 
-              {searching && <p className="text-sm text-gray-500 text-center py-4">Searching…</p>}
+              {searching && <p className="text-sm text-gray-500 text-center py-4">{french ? "Recherche…" : "Searching…"}</p>}
 
               {clientResults.length > 0 && (
                 <div className="space-y-1 mb-3 max-h-60 overflow-y-auto">
@@ -332,7 +331,7 @@ export default function CheckoutPage() {
               )}
 
               {clientSearch && clientResults.length === 0 && !searching && (
-                <p className="text-sm text-gray-500 text-center py-3">No clients found</p>
+                <p className="text-sm text-gray-500 text-center py-3">{french ? "Aucun client trouvé" : "No clients found"}</p>
               )}
 
               <button
@@ -347,10 +346,10 @@ export default function CheckoutPage() {
         {step === "services" && (
           <div className="p-4 sm:p-6">
             <button onClick={() => setStep("client")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
-              ← Back
+              ← {french ? "Retour" : "Back"}
             </button>
             <h3 className="text-base font-semibold text-gray-900 mb-4">
-              Choose services for <span className="text-violet-700">{selectedClient?.name ?? ""}</span>
+              {french ? "Choisir les services pour" : "Choose services for"} <span className="text-violet-700">{selectedClient?.name ?? ""}</span>
             </h3>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {allServices.map((svc) => {
@@ -366,7 +365,7 @@ export default function CheckoutPage() {
                       <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(svc.durationMinutes)}</p>
                     </div>
                     <div className="text-right shrink-0 mr-2">
-                      <p className={cn("font-bold text-sm", sel ? "text-violet-600" : "text-gray-700")}>{fmtPrice(svc.priceCents, biz?.currency ?? "CAD")}</p>
+                      <p className={cn("font-bold text-sm", sel ? "text-violet-600" : "text-gray-700")}>{formatCurrency(svc.priceCents, biz?.currency ?? "CAD")}</p>
                     </div>
                     <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0",
                       sel ? "border-violet-600 bg-violet-600" : "border-gray-300")}>
@@ -382,12 +381,12 @@ export default function CheckoutPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold text-violet-700">
                   <Clock className="w-3.5 h-3.5" />{fmtDuration(totalMins)}
                 </div>
-                <span className="text-sm font-bold text-violet-700">{fmtPrice(totalCents, biz?.currency ?? "CAD")}</span>
+                <span className="text-sm font-bold text-violet-700">{formatCurrency(totalCents, biz?.currency ?? "CAD")}</span>
               </div>
             )}
 
             <Button className="w-full mt-5" disabled={selectedServices.length === 0} onClick={() => { if (showStaffStep) { setStep("staff"); } else { setSelectedStaff(allStaffList[0] ?? "any"); setStep("datetime"); } }}>
-              Continue — {selectedServices.length} service{selectedServices.length !== 1 ? "s" : ""}
+              {french ? "Continuer" : "Continue"} — {selectedServices.length} {french ? `service${selectedServices.length !== 1 ? "s" : ""}` : `service${selectedServices.length !== 1 ? "s" : ""}`}
             </Button>
           </div>
         )}
@@ -396,9 +395,9 @@ export default function CheckoutPage() {
         {step === "staff" && (
           <div className="p-4 sm:p-6">
             <button onClick={() => setStep("services")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
-              ← Back
+              ← {french ? "Retour" : "Back"}
             </button>
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Choose a provider</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-4">{french ? "Choisir un professionnel" : "Choose a provider"}</h3>
             {staffList.length === 0 && (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 No provider is assigned to every selected service yet. You can still use <span className="font-semibold">Custom owner time</span> on the next step with any active provider.
@@ -412,8 +411,8 @@ export default function CheckoutPage() {
                   selectedStaff === "any" ? "border-violet-300 bg-violet-50" : "border-gray-100 hover:border-violet-200 hover:bg-gray-50")}>
                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg shrink-0">✨</div>
                 <div className="flex-1">
-                  <p className="font-semibold text-sm text-gray-900">Any available</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Best availability</p>
+                  <p className="font-semibold text-sm text-gray-900">{french ? "Toute personne disponible" : "Any available"}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{french ? "Meilleure disponibilité" : "Best availability"}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-500" />
               </button>
@@ -463,11 +462,12 @@ export default function CheckoutPage() {
         {step === "datetime" && (
           <div className="p-4 sm:p-6">
             <button onClick={() => setStep(showStaffStep ? "staff" : "services")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
-              ← Back
+              ← {french ? "Retour" : "Back"}
             </button>
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Pick a date &amp; time</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-4">{french ? "Choisir une date et une heure" : "Pick a date & time"}</h3>
             <DayPicker
               mode="single"
+              locale={french ? frCA : undefined}
               selected={selectedDate}
               onSelect={pickDate}
               disabled={(date) => isBefore(date, today) || isAfter(startOfDay(date), startOfDay(advanceLimit))}
@@ -477,9 +477,9 @@ export default function CheckoutPage() {
               <div className="mt-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">{format(selectedDate, "EEEE, MMMM d")}</p>
                 {loadingSlots ? (
-                  <p className="text-sm text-gray-500 text-center py-4">Loading times…</p>
+                  <p className="text-sm text-gray-500 text-center py-4">{french ? "Chargement des heures…" : "Loading times…"}</p>
                 ) : slots.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-6">No availability on this date</p>
+                  <p className="text-sm text-gray-500 text-center py-6">{french ? "Aucune disponibilité à cette date" : "No availability on this date"}</p>
                 ) : (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                     {slots.map((sl, idx) => (
@@ -498,12 +498,12 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-semibold text-amber-900">Custom owner time</p>
-              <p className="mt-1 text-xs text-amber-700">Book any date and time directly. This overrides availability and double-book conflicts, then syncs like other confirmed bookings.</p>
+              <p className="text-sm font-semibold text-amber-900">{french ? "Heure personnalisée" : "Custom owner time"}</p>
+              <p className="mt-1 text-xs text-amber-700">{french ? "Réservez directement à toute date et heure. Cette option remplace la disponibilité et les conflits de double réservation." : "Book any date and time directly. This overrides availability and double-book conflicts, then syncs like other confirmed bookings."}</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 {selectedStaff === "any" && (
                   <div className="sm:col-span-3">
-                    <label htmlFor="custom-provider" className="mb-1 block text-xs font-semibold text-amber-900">Provider</label>
+                    <label htmlFor="custom-provider" className="mb-1 block text-xs font-semibold text-amber-900">{french ? "Professionnel" : "Provider"}</label>
                     <select
                       id="custom-provider"
                       value={customStaffId}
@@ -526,7 +526,7 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="custom-time" className="mb-1 block text-xs font-semibold text-amber-900">Time</label>
+                  <label htmlFor="custom-time" className="mb-1 block text-xs font-semibold text-amber-900">{french ? "Heure" : "Time"}</label>
                   <Input
                     id="custom-time"
                     type="time"
@@ -536,7 +536,7 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-amber-900">Quick times</label>
+                  <label className="mb-1 block text-xs font-semibold text-amber-900">{french ? "Heures rapides" : "Quick times"}</label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {["09:00", "12:00", "15:00", "18:00"].map((t) => (
                       <button
@@ -567,20 +567,20 @@ export default function CheckoutPage() {
         {step === "confirm" && (
           <div className="p-4 sm:p-6">
             <button onClick={() => setStep("datetime")} className="flex items-center gap-1 text-sm text-gray-400 hover:text-violet-600 mb-4 transition-colors">
-              ← Back
+              ← {french ? "Retour" : "Back"}
             </button>
-            <h3 className="text-base font-semibold text-gray-900 mb-5">Confirm booking</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-5">{french ? "Confirmer la réservation" : "Confirm booking"}</h3>
 
             <div className="space-y-3 text-sm mb-6">
               {[
                 { label: "Client", value: selectedClient?.name ?? "", icon: User },
                 { label: "Services", value: selectedServices.map(s => s.name).join(", "), icon: Check },
-                { label: "Duration", value: fmtDuration(totalMins), icon: Clock },
-                { label: "Provider", value: providerText(customStartsAt ? customStaff?.user.name : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName), icon: Check },
+                { label: french ? "Durée" : "Duration", value: fmtDuration(totalMins), icon: Clock },
+                { label: french ? "Professionnel" : "Provider", value: providerText(customStartsAt ? customStaff?.user.name : selectedStaff !== "any" && selectedStaff ? selectedStaff.user.name : selectedSlot?.staffName), icon: Check },
                 { label: "Date", value: customStartsAt ? format(new Date(customStartsAt), "EEE, MMM d, yyyy") : selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "—", icon: Check },
-                { label: "Time", value: customStartsAt ? format(new Date(customStartsAt), "h:mm a") : selectedSlot ? format(parseISO(selectedSlot.startsAtLocal), "h:mm a") : "—", icon: Check },
-                { label: "Calendar", value: customStartsAt || overrideCalendar ? "Owner override" : "Available slot", icon: Check },
-                { label: "Total", value: fmtPrice(totalCents, biz?.currency ?? "CAD"), icon: Check },
+                { label: french ? "Heure" : "Time", value: customStartsAt ? formatDate(new Date(customStartsAt), { hour: "numeric", minute: "2-digit" }) : selectedSlot ? formatDate(parseISO(selectedSlot.startsAtLocal), { hour: "numeric", minute: "2-digit" }) : "—", icon: Check },
+                { label: "Calendrier", value: customStartsAt || overrideCalendar ? (french ? "Remplacement manuel" : "Owner override") : (french ? "Plage disponible" : "Available slot"), icon: Check },
+                { label: "Total", value: formatCurrency(totalCents, biz?.currency ?? "CAD"), icon: Check },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between py-2.5 border-b border-gray-50 last:border-0">
                   <span className="text-gray-500">{label}</span>
@@ -591,7 +591,7 @@ export default function CheckoutPage() {
 
             {selectedServices[0]?.locationMode === "VIRTUAL" && (
               <div className="mb-5">
-                <label htmlFor="checkout-meeting-url" className="block text-sm font-medium text-gray-700 mb-1">Meeting link (optional)</label>
+                <label htmlFor="checkout-meeting-url" className="block text-sm font-medium text-gray-700 mb-1">{french ? "Lien de rencontre (facultatif)" : "Meeting link (optional)"}</label>
                 <Input
                   id="checkout-meeting-url"
                   type="url"
@@ -599,7 +599,7 @@ export default function CheckoutPage() {
                   value={meetingUrl}
                   onChange={(e) => setMeetingUrl(e.target.value)}
                 />
-                <p className="mt-1 text-xs text-gray-500">Leave blank to use the service&apos;s default meeting link.</p>
+                <p className="mt-1 text-xs text-gray-500">{french ? "Laissez vide pour utiliser le lien par défaut du service." : "Leave blank to use the service's default meeting link."}</p>
               </div>
             )}
 
@@ -607,7 +607,7 @@ export default function CheckoutPage() {
             <div className="mb-5 rounded-xl border border-gray-100 p-3">
               <label className="flex items-center justify-between gap-3 cursor-pointer">
                 <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                  <Repeat className="w-4 h-4 text-violet-600" /> Repeat this appointment
+                  <Repeat className="w-4 h-4 text-violet-600" /> {french ? "Répéter ce rendez-vous" : "Repeat this appointment"}
                 </span>
                 <input type="checkbox" className="h-4 w-4 accent-violet-600"
                   checked={recurring.enabled}
@@ -616,19 +616,19 @@ export default function CheckoutPage() {
               {recurring.enabled && (
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="recurring-frequency" className="block text-xs font-medium text-gray-500 mb-1">Frequency</label>
+                    <label htmlFor="recurring-frequency" className="block text-xs font-medium text-gray-500 mb-1">{french ? "Fréquence" : "Frequency"}</label>
                     <select id="recurring-frequency" value={recurring.frequency}
                       onChange={(e) => setRecurring((p) => ({ ...p, frequency: e.target.value as typeof p.frequency }))}
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
-                      <option value="WEEKLY">Weekly</option>
-                      <option value="BIWEEKLY">Every 2 weeks</option>
-                      <option value="THREE_WEEKS">Every 3 weeks</option>
-                      <option value="EIGHT_WEEKS">Every 8 weeks</option>
-                      <option value="MONTHLY">Monthly</option>
+                      <option value="WEEKLY">{french ? "Chaque semaine" : "Weekly"}</option>
+                      <option value="BIWEEKLY">{french ? "Toutes les 2 semaines" : "Every 2 weeks"}</option>
+                      <option value="THREE_WEEKS">{french ? "Toutes les 3 semaines" : "Every 3 weeks"}</option>
+                      <option value="EIGHT_WEEKS">{french ? "Toutes les 8 semaines" : "Every 8 weeks"}</option>
+                      <option value="MONTHLY">{french ? "Chaque mois" : "Monthly"}</option>
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="recurring-count" className="block text-xs font-medium text-gray-500 mb-1">Occurrences</label>
+                    <label htmlFor="recurring-count" className="block text-xs font-medium text-gray-500 mb-1">{french ? "Occurrences" : "Occurrences"}</label>
                     <select id="recurring-count" value={recurring.count}
                       onChange={(e) => setRecurring((p) => ({ ...p, count: Number(e.target.value) }))}
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
@@ -641,7 +641,7 @@ export default function CheckoutPage() {
             </div>
 
             <Button className="w-full" loading={submitting} onClick={confirm}>
-              <CheckCircle2 className="w-4 h-4 mr-2" /> {recurring.enabled ? `Book ${recurring.count} appointments` : "Confirm booking"}
+              <CheckCircle2 className="w-4 h-4 mr-2" /> {recurring.enabled ? (french ? `Réserver ${recurring.count} rendez-vous` : `Book ${recurring.count} appointments`) : (french ? "Confirmer la réservation" : "Confirm booking")}
             </Button>
           </div>
         )}

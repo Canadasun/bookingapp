@@ -8,6 +8,7 @@ import { api, type Business } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useDashboardLocale } from "@/lib/dashboard-locale";
 
 type NotifSettings = NonNullable<Business["notificationSettings"]>;
 
@@ -33,10 +34,10 @@ const PLAN_TIERS = [
   { id: "UNLIMITED", label: "Unlimited", lines: ["All Pro features", "Across all locations", "Multi-location inbox"] },
 ] as const;
 
-function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ enabled, onChange, french }: { enabled: boolean; onChange: (v: boolean) => void; french: boolean }) {
   return (
     <div className="inline-flex shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-1">
-      {([{ label: "On", value: true }, { label: "Off", value: false }] as const).map((opt) => (
+      {([{ label: french ? "Activé" : "On", value: true }, { label: french ? "Désactivé" : "Off", value: false }] as const).map((opt) => (
         <button key={opt.label} type="button" onClick={() => onChange(opt.value)}
           aria-pressed={enabled === opt.value}
           className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
@@ -63,20 +64,34 @@ export default function RemindersPage() {
   const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const { french } = useDashboardLocale();
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
     setLoadError(""); setLoading(true);
     try { setBiz(await api.business.get(bizId)); }
-    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load"); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId]);
+  }, [bizId, french]);
   useEffect(() => { load(); }, [load]);
 
   const plan = biz?.plan ?? "FREE";
   const isPaid = biz?.capabilities?.deposits ?? (plan === "BASIC" || plan === "PRO" || plan === "UNLIMITED");
   const isPro  = biz?.capabilities?.sms      ?? (plan === "PRO" || plan === "UNLIMITED");
   const settings = (biz?.notificationSettings ?? {}) as NotifSettings;
+  const emailToggles: ReadonlyArray<{ key: keyof NotifSettings; label: string; desc: string; tier: "FREE" | "BASIC" | "PRO" }> = french ? [
+    { key: "emailConfirmation", label: "Confirmation de réservation", desc: "Envoyée immédiatement après une nouvelle réservation", tier: "FREE" },
+    { key: "emailReminder72h", label: "Rappel de 72 heures", desc: "Envoyé 3 jours avant le rendez-vous (Pro seulement)", tier: "PRO" },
+    { key: "emailReminder24h", label: "Rappel de 24 heures", desc: "Envoyé la veille du rendez-vous", tier: "BASIC" },
+    { key: "emailFollowUp", label: "Suivi après la visite", desc: "Courriel de remerciement envoyé 24 h après le rendez-vous", tier: "BASIC" },
+    { key: "emailCancellation", label: "Avis d’annulation", desc: "Envoyé lorsqu’une réservation est annulée", tier: "FREE" },
+    { key: "emailReschedule", label: "Avis de report", desc: "Envoyé lorsqu’un rendez-vous change d’heure", tier: "FREE" },
+    { key: "emailStaffCancellation", label: "Annulation par l’entreprise", desc: "Courriel spécial lorsque l’entreprise annule le rendez-vous", tier: "FREE" },
+  ] : EMAIL_TOGGLES;
+  const smsToggles: ReadonlyArray<{ key: keyof NotifSettings; label: string; desc: string }> = french ? [
+    { key: "smsConfirmation", label: "Texto de confirmation", desc: "Envoyé immédiatement après la confirmation" },
+    { key: "smsReminder2h", label: "Rappel texto de 2 heures", desc: "Envoyé 2 heures avant le rendez-vous par Twilio" },
+  ] : SMS_TOGGLES;
 
   // Save a single toggle immediately (optimistic), so this page has no "unsaved
   // changes" friction — unlike the old Settings tab it lived in.
@@ -86,7 +101,7 @@ export default function RemindersPage() {
     try {
       await api.business.update(bizId, { notificationSettings: next });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save");
+      toast.error(e instanceof Error ? e.message : (french ? "Impossible d’enregistrer" : "Could not save"));
       load(); // revert to server truth
     }
   }
@@ -96,9 +111,9 @@ export default function RemindersPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <Bell className="w-5 h-5 text-violet-600" />
-          <h1 className="text-xl font-bold text-gray-900">Reminders &amp; notifications</h1>
+          <h1 className="text-xl font-bold text-gray-900">{french ? "Rappels et notifications" : "Reminders & notifications"}</h1>
         </div>
-        <p className="text-sm text-gray-500 mt-1">Choose what emails and SMS messages are sent to your clients.</p>
+        <p className="text-sm text-gray-500 mt-1">{french ? "Choisissez les courriels et textos envoyés à vos clients." : "Choose what emails and SMS messages are sent to your clients."}</p>
       </div>
 
       {loading ? (
@@ -118,8 +133,8 @@ export default function RemindersPage() {
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Email notifications</p>
-            {EMAIL_TOGGLES.map(({ key, label, desc, tier }) => {
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{french ? "Notifications par courriel" : "Email notifications"}</p>
+            {emailToggles.map(({ key, label, desc, tier }) => {
               const allowed = tier === "FREE" || (tier === "BASIC" && isPaid) || (tier === "PRO" && isPro);
               const enabled = settings[key] !== false;
               const badgeLabel = tier === "PRO" ? "Pro" : tier === "BASIC" ? "Basic+" : null;
@@ -136,15 +151,15 @@ export default function RemindersPage() {
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                   </div>
-                  {allowed ? <Toggle enabled={enabled} onChange={(v) => nf(key, v)} /> : <UpgradeButton label={tier === "PRO" ? "Upgrade to Pro" : "Basic+"} />}
+                  {allowed ? <Toggle enabled={enabled} onChange={(v) => nf(key, v)} french={french} /> : <UpgradeButton label={tier === "PRO" ? (french ? "Passer à Pro" : "Upgrade to Pro") : "Basic+"} />}
                 </div>
               );
             })}
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">SMS notifications (Pro+)</p>
-            {SMS_TOGGLES.map(({ key, label, desc }) => {
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{french ? "Notifications par texto (Pro+)" : "SMS notifications (Pro+)"}</p>
+            {smsToggles.map(({ key, label, desc }) => {
               const enabled = settings[key] !== false;
               return (
                 <div key={key} className="flex flex-col gap-3 py-3 border-b border-gray-50 last:border-0 sm:flex-row sm:items-start sm:justify-between">
@@ -152,15 +167,15 @@ export default function RemindersPage() {
                     <p className="text-sm font-medium text-gray-700">{label}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
                   </div>
-                  {isPro ? <Toggle enabled={enabled} onChange={(v) => nf(key, v)} /> : <UpgradeButton label="Upgrade to Pro" />}
+                  {isPro ? <Toggle enabled={enabled} onChange={(v) => nf(key, v)} french={french} /> : <UpgradeButton label={french ? "Passer à Pro" : "Upgrade to Pro"} />}
                 </div>
               );
             })}
           </div>
 
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-            <p className="text-xs font-semibold text-blue-800 mb-1">Email provider: Resend · SMS provider: Twilio</p>
-            <p className="text-xs text-blue-600">Confirmations, cancellations, and reschedules are always sent on every plan. Reminders, follow-ups, and SMS messages follow the plan gating shown above. All appointment emails include a calendar (.ics) attachment as a backup.</p>
+            <p className="text-xs font-semibold text-blue-800 mb-1">{french ? "Fournisseur de courriel : Resend · Fournisseur de textos : Twilio" : "Email provider: Resend · SMS provider: Twilio"}</p>
+            <p className="text-xs text-blue-600">{french ? "Les confirmations, annulations et reports sont toujours envoyés. Les rappels, suivis et textos dépendent du forfait indiqué ci-dessus. Tous les courriels de rendez-vous comprennent une pièce jointe de calendrier (.ics)." : "Confirmations, cancellations, and reschedules are always sent on every plan. Reminders, follow-ups, and SMS messages follow the plan gating shown above. All appointment emails include a calendar (.ics) attachment as a backup."}</p>
           </div>
         </div>
       )}
