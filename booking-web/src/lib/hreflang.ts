@@ -65,6 +65,11 @@ export const LOCALIZED_PATHS = new Set<string>([
   "/compare/pulse-vs-jane-app",
   "/compare/pulse-vs-vagaro",
   "/compare/pulse-vs-glossgenius",
+  "/accessibility",
+  "/changelog",
+  "/referrals",
+  "/status",
+  "/trust",
 ]);
 
 export type Locale = "en" | "fr";

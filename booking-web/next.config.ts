@@ -156,7 +156,7 @@ const nextConfig: NextConfig = {
         ],
       })),
       // Marketing / legal pages: no Stripe, no framing.
-      ...["/", "/pricing", "/contact", "/faq", "/terms", "/privacy", "/accessibility", "/status"].map((source) => ({
+      ...["/", "/pricing", "/contact", "/faq", "/terms", "/privacy", "/accessibility", "/status", "/changelog", "/referrals", "/trust"].map((source) => ({
         source,
         headers: [
           { key: "Content-Security-Policy", value: authCsp },
