@@ -22,6 +22,20 @@ export const LOCALIZED_PATHS = new Set<string>([
   "/features/intake-forms",
   "/features/multi-location",
   "/features/reviews",
+  "/for/salons",
+  "/for/barbers",
+  "/for/lash-techs",
+  "/for/estheticians",
+  "/for/massage-therapists",
+  "/for/pet-groomers",
+  "/for/consultants",
+  "/for/wellness",
+  "/for/mobile-services",
+  "/for/personal-trainers",
+  "/for/hair-stylists",
+  "/for/nail-techs",
+  "/for/spas",
+  "/for/yoga-studios",
 ]);
 
 export type Locale = "en" | "fr";
