@@ -237,9 +237,9 @@ export function FeatureLandingPage({
               <Link href={locale === "fr" ? "/fr/pricing" : "/pricing"} className="hover:text-violet-600 transition-colors">{footer.pricing}</Link>
               {locale === "fr" ? (
                 <>
-                  <Link href="/fr/features" className="hover:text-violet-600 transition-colors">Fonctionnalités</Link>
-                  <Link href="/fr/security" className="hover:text-violet-600 transition-colors">Sécurité</Link>
-                  <Link href="mailto:support@pulseappointments.com?subject=Demande%20de%20soutien" className="hover:text-violet-600 transition-colors">{footer.support}</Link>
+                  <Link href="/fr/terms" className="hover:text-violet-600 transition-colors">{footer.terms}</Link>
+                  <Link href="/fr/privacy" className="hover:text-violet-600 transition-colors">{footer.privacy}</Link>
+                  <Link href="/fr/support" className="hover:text-violet-600 transition-colors">{footer.support}</Link>
                 </>
               ) : (
                 <>

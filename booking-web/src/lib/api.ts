@@ -746,10 +746,10 @@ export const api = {
 
   waitlist: {
     // Public — clients join when no slot fits.
-    join: (businessId: string, data: { name: string; email: string; phone?: string; serviceId?: string; staffId?: string; desiredDate?: string; notes?: string; locale?: "en" | "fr" }) =>
+    join: (businessId: string, data: { name: string; email: string; phone?: string; serviceId?: string; staffId?: string; locationId?: string; desiredDate?: string; notes?: string; locale?: "en" | "fr" }) =>
       req<{ id: string }>(`/businesses/${businessId}/waitlist`, { method: "POST", body: JSON.stringify(data) }, null),
-    list: (businessId: string) =>
-      req<Array<{ id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; status: "WAITING" | "NOTIFIED" | "CONVERTED" | "CANCELLED"; createdAt: string }>>(`/businesses/${businessId}/waitlist`),
+    list: (businessId: string, locationIds?: string[]) =>
+      req<Array<{ id: string; name: string; email: string; phone?: string | null; serviceId?: string | null; desiredDate?: string | null; notes?: string | null; status: "WAITING" | "NOTIFIED" | "CONVERTED" | "CANCELLED"; createdAt: string }>>(`/businesses/${businessId}/waitlist${locationIds?.length ? `?locationIds=${encodeURIComponent(locationIds.join(","))}` : ""}`),
     remove: (businessId: string, id: string) =>
       req<void>(`/businesses/${businessId}/waitlist/${id}`, { method: "DELETE" }),
   },
@@ -832,19 +832,25 @@ export const api = {
     reactivate: (id: string) => req<Business>(`/businesses/${id}/reactivate`, { method: "POST" }),
     remove: (id: string, confirmation: string) =>
       req<{ deleted: boolean }>(`/businesses/${id}`, { method: "DELETE", body: JSON.stringify({ confirmation }) }),
-    getHours: (id: string) =>
-      req<{ hours: { id: string; dayOfWeek: number; startTime: string; endTime: string }[]; closures: { id: string; startsAt: string; endsAt: string; reason?: string }[] }>(`/businesses/${id}/hours`),
-    setHours: (id: string, hours: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
-      req<{ hours: { id: string; dayOfWeek: number; startTime: string; endTime: string }[]; closures: { id: string; startsAt: string; endsAt: string; reason?: string }[] }>(`/businesses/${id}/hours`, { method: "POST", body: JSON.stringify({ hours }) }),
-    addClosure: (id: string, data: { startsAt: string; endsAt: string; reason?: string }) =>
-      req<{ id: string; startsAt: string; endsAt: string; reason?: string }>(`/businesses/${id}/closures`, { method: "POST", body: JSON.stringify(data) }),
+    getHours: (id: string, locationId?: string) =>
+      req<{ hours: { id: string; dayOfWeek: number; startTime: string; endTime: string }[]; closures: { id: string; startsAt: string; endsAt: string; reason?: string }[] }>(`/businesses/${id}/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
+    setHours: (id: string, hours: { dayOfWeek: number; startTime: string; endTime: string }[], locationId?: string) =>
+      req<{ hours: { id: string; dayOfWeek: number; startTime: string; endTime: string }[]; closures: { id: string; startsAt: string; endsAt: string; reason?: string }[] }>(`/businesses/${id}/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`, { method: "POST", body: JSON.stringify({ hours }) }),
+    addClosure: (id: string, data: { startsAt: string; endsAt: string; reason?: string }, locationId?: string) =>
+      req<{ id: string; startsAt: string; endsAt: string; reason?: string }>(`/businesses/${id}/closures${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`, { method: "POST", body: JSON.stringify(data) }),
     removeClosure: (id: string, closureId: string) =>
       req<{ ok: boolean }>(`/businesses/${id}/closures/${closureId}`, { method: "DELETE" }),
   },
 
   services: {
-    list: (businessId: string) => req<Service[]>(`/businesses/${businessId}/services`),
-    listAll: (businessId: string) => req<Service[]>(`/businesses/${businessId}/services/all`),
+    list: (businessId: string, locationIds?: string[]) => {
+      const q = locationIds?.length ? `?locationIds=${encodeURIComponent(locationIds.join(","))}` : "";
+      return req<Service[]>(`/businesses/${businessId}/services${q}`);
+    },
+    listAll: (businessId: string, locationIds?: string[]) => {
+      const q = locationIds?.length ? `?locationIds=${encodeURIComponent(locationIds.join(","))}` : "";
+      return req<Service[]>(`/businesses/${businessId}/services/all${q}`);
+    },
     get: (businessId: string, id: string) => req<Service>(`/businesses/${businessId}/services/${id}`),
     create: (businessId: string, data: Omit<Partial<Service>, "id" | "businessId" | "createdAt" | "updatedAt">) =>
       req<Service>(`/businesses/${businessId}/services`, { method: "POST", body: JSON.stringify(data) }),
@@ -984,11 +990,12 @@ export const api = {
   },
 
   clients: {
-    list: (businessId: string, search?: string, page = 1, limit = 25) => {
+    list: (businessId: string, search?: string, page = 1, limit = 25, locationIds?: string[]) => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       params.set("page", String(page));
       params.set("limit", String(limit));
+      if (locationIds?.length) params.set("locationIds", locationIds.join(","));
       return req<{ data: ClientWithStats[]; total: number; page: number; pages: number }>(
         `/businesses/${businessId}/clients?${params.toString()}`
       );
@@ -1095,12 +1102,13 @@ export const api = {
   },
 
   messages: {
-    threads: (businessId: string, filters?: { unread?: boolean; archived?: boolean; search?: string; channel?: string }) => {
+    threads: (businessId: string, filters?: { unread?: boolean; archived?: boolean; search?: string; channel?: string; locationIds?: string[] }) => {
       const q = new URLSearchParams();
       if (filters?.unread) q.set("unread", "true");
       if (filters?.archived) q.set("archived", "true");
       if (filters?.search) q.set("search", filters.search);
       if (filters?.channel) q.set("channel", filters.channel);
+      if (filters?.locationIds?.length) q.set("locationIds", filters.locationIds.join(","));
       return req<Array<{ clientId: string; client: { id: string; name: string; email?: string | null }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; archived: boolean; createdAt: string }>>(`/businesses/${businessId}/messages?${q.toString()}`);
     },
     thread: (businessId: string, clientId: string, appointmentId?: string, token?: string) => {

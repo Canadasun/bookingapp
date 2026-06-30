@@ -24,6 +24,7 @@ export const LOCALIZED_PATHS = new Set<string>([
   "/terms",
   "/privacy",
   "/canadian-privacy",
+  "/quebec-compliance",
   "/features",
   "/features/online-booking",
   "/features/deposits",

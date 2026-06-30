@@ -277,7 +277,7 @@ export class MessagesService {
     return { unreadMessages, unreadThreads: unreadGroups.length };
   }
 
-  async getBusinessThreads(businessId: string, user?: BusinessUser, filters: { unreadOnly?: boolean; archived?: boolean; search?: string; channel?: string } = {}) {
+  async getBusinessThreads(businessId: string, user?: BusinessUser, filters: { unreadOnly?: boolean; archived?: boolean; search?: string; channel?: string; locationIds?: string[] } = {}) {
     const userId = user?.id;
     const states = userId
       ? await this.prisma.messageThreadState.findMany({ where: { businessId, userId } })
@@ -286,6 +286,9 @@ export class MessagesService {
     const accessWhere = await this.threadAccessWhere(businessId, user);
     const where: Prisma.MessageWhereInput = {
       ...accessWhere,
+      ...(filters.locationIds?.length ? {
+        client: { appointments: { some: { businessId, locationId: { in: filters.locationIds } } } },
+      } : {}),
       ...(filters.channel ? { channel: filters.channel } : {}),
       ...(filters.search ? { OR: [
         { content: { contains: filters.search, mode: 'insensitive' } },

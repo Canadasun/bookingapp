@@ -489,29 +489,38 @@ export class BusinessesService {
     return { deleted: true };
   }
 
-  async getHours(businessId: string) {
+  private async assertLocation(businessId: string, locationId?: string) {
+    if (!locationId) return;
+    await this.prisma.location.findFirstOrThrow({ where: { id: locationId, businessId }, select: { id: true } });
+  }
+
+  async getHours(businessId: string, locationId?: string) {
+    await this.assertLocation(businessId, locationId);
     const [hours, closures] = await Promise.all([
-      this.prisma.businessHours.findMany({ where: { businessId }, orderBy: { dayOfWeek: 'asc' } }),
-      this.prisma.businessClosure.findMany({ where: { businessId }, orderBy: { startsAt: 'asc' } }),
+      (this.prisma.businessHours as any).findMany({ where: { businessId, locationId: locationId ?? null }, orderBy: { dayOfWeek: 'asc' } }),
+      (this.prisma.businessClosure as any).findMany({ where: { businessId, locationId: locationId ?? null }, orderBy: { startsAt: 'asc' } }),
     ]);
     return { hours, closures };
   }
 
-  async setHours(businessId: string, rules: { dayOfWeek: number; startTime: string; endTime: string }[]) {
-    await this.prisma.businessHours.deleteMany({ where: { businessId } });
+  async setHours(businessId: string, rules: { dayOfWeek: number; startTime: string; endTime: string }[], locationId?: string) {
+    await this.assertLocation(businessId, locationId);
+    await (this.prisma.businessHours as any).deleteMany({ where: { businessId, locationId: locationId ?? null } });
     if (rules.length > 0) {
       await this.prisma.businessHours.createMany({
-        data: rules.map((r) => ({ businessId, dayOfWeek: r.dayOfWeek, startTime: r.startTime, endTime: r.endTime })),
+        data: rules.map((r) => ({ businessId, locationId: locationId ?? null, dayOfWeek: r.dayOfWeek, startTime: r.startTime, endTime: r.endTime })),
         skipDuplicates: true,
       });
     }
-    return this.getHours(businessId);
+    return this.getHours(businessId, locationId);
   }
 
-  async addClosure(businessId: string, body: { startsAt: string; endsAt: string; reason?: string }) {
-    const closure = await this.prisma.businessClosure.create({
+  async addClosure(businessId: string, body: { startsAt: string; endsAt: string; reason?: string }, locationId?: string) {
+    await this.assertLocation(businessId, locationId);
+    const closure = await (this.prisma.businessClosure as any).create({
       data: {
         businessId,
+        locationId: locationId ?? null,
         startsAt: new Date(body.startsAt),
         endsAt: new Date(body.endsAt),
         reason: body.reason ?? null,

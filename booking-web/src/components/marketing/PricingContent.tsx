@@ -134,6 +134,36 @@ export function PricingContent({
           })}
         </div>
 
+        {/* Enterprise is a sales-led requirements assessment, not a self-serve
+            entitlement. This avoids promising controls before technical and
+            contractual validation for a specific organization. */}
+        <section className="mb-16 rounded-3xl border border-violet-200 bg-violet-950 p-8 text-white shadow-xl sm:p-10">
+          <div className="flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-300">Enterprise</p>
+              <h2 className="mt-2 text-2xl font-bold">
+                {locale === "fr" ? "Plus de 5 emplacements ou exigences d’approvisionnement?" : "More than 5 locations or procurement requirements?"}
+              </h2>
+              <p className="mt-3 leading-7 text-violet-100">
+                {locale === "fr"
+                  ? "Parlez-nous de votre déploiement, de la gestion des identités, de la facturation, des rapports, du domaine personnalisé et des besoins de niveau de service. Nous confirmerons par écrit la portée, la faisabilité, le prix et l’échéancier avant tout engagement."
+                  : "Tell us about rollout, identity management, billing, reporting, custom-domain, and service-level requirements. We will confirm scope, feasibility, pricing, and timing in writing before any commitment."}
+              </p>
+              <p className="mt-3 text-xs leading-5 text-violet-300">
+                {locale === "fr"
+                  ? "Offre sur mesure soumise à une évaluation technique et contractuelle; aucune fonction non confirmée n’est incluse automatiquement."
+                  : "Custom offering subject to technical and contractual review; unconfirmed features are not automatically included."}
+              </p>
+            </div>
+            <Link
+              href={`mailto:hello@pulseappointments.com?subject=${locale === "fr" ? "Évaluation%20Enterprise%20Pulse" : "Pulse%20Enterprise%20assessment"}`}
+              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-bold text-violet-800 hover:bg-violet-50"
+            >
+              {locale === "fr" ? "Discuter avec nous" : "Talk to us"}
+            </Link>
+          </div>
+        </section>
+
         {/* Feature table */}
         <div className="overflow-x-auto rounded-3xl border border-[#E9DDCB] bg-white shadow-sm">
           <table className="w-full text-sm">
@@ -191,7 +221,7 @@ export function PricingContent({
           </Link>
           <p className="mt-4 text-xs text-white/40">
             {dict.ctaSection.questions}{" "}
-            <Link href={locale === "fr" ? "mailto:support@pulseappointments.com?subject=Demande%20de%20soutien" : "/support"} className="underline hover:text-white/70 transition-colors">
+            <Link href={locale === "fr" ? "/fr/support" : "/support"} className="underline hover:text-white/70 transition-colors">
               {dict.ctaSection.supportLink}
             </Link>
           </p>
@@ -206,9 +236,9 @@ export function PricingContent({
             <Link href={locale === "fr" ? "/fr" : "/"} className="hover:text-indigo-600 transition-colors">{dict.footer.home}</Link>
             {locale === "fr" ? (
               <>
-                <Link href="/fr/features" className="hover:text-indigo-600 transition-colors">Fonctionnalités</Link>
-                <Link href="/fr/security" className="hover:text-indigo-600 transition-colors">Sécurité</Link>
-                <Link href="mailto:support@pulseappointments.com?subject=Demande%20de%20soutien" className="hover:text-indigo-600 transition-colors">{dict.footer.support}</Link>
+                <Link href="/fr/terms" className="hover:text-indigo-600 transition-colors">{dict.footer.terms}</Link>
+                <Link href="/fr/privacy" className="hover:text-indigo-600 transition-colors">{dict.footer.privacy}</Link>
+                <Link href="/fr/support" className="hover:text-indigo-600 transition-colors">{dict.footer.support}</Link>
               </>
             ) : (
               <>

@@ -106,10 +106,20 @@ export class AvailabilityService {
         },
       }),
       // Business-level hours — used as fallback when staff has no custom rules.
-      this.prisma.businessHours.findMany({ where: { businessId } }),
+      (this.prisma.businessHours as any).findMany({
+        where: {
+          businessId,
+          ...(staff.locationId ? { OR: [{ locationId: staff.locationId }, { locationId: null }] } : { locationId: null }),
+        },
+      }),
       // Business closures (holidays/vacation) block slots for everyone.
-      this.prisma.businessClosure.findMany({
-        where: { businessId, startsAt: { lt: rangeEnd }, endsAt: { gt: rangeStart } },
+      (this.prisma.businessClosure as any).findMany({
+        where: {
+          businessId,
+          ...(staff.locationId ? { OR: [{ locationId: staff.locationId }, { locationId: null }] } : { locationId: null }),
+          startsAt: { lt: rangeEnd },
+          endsAt: { gt: rangeStart },
+        },
       }),
     ]);
 
@@ -145,16 +155,22 @@ export class AvailabilityService {
     // Business closures block all booking slots regardless of individual schedule.
     effectiveTimeOffs = [
       ...effectiveTimeOffs,
-      ...bizClosures.map((c) => ({ id: `closure-${c.id}`, staffId, reason: c.reason ?? null, createdAt: c.createdAt, startsAt: c.startsAt, endsAt: c.endsAt } as TimeOff)),
+      ...bizClosures.map((c: { id: string; reason: string | null; createdAt: Date; startsAt: Date; endsAt: Date }) => ({ id: `closure-${c.id}`, staffId, reason: c.reason ?? null, createdAt: c.createdAt, startsAt: c.startsAt, endsAt: c.endsAt } as TimeOff)),
     ];
 
     // Rule priority: staff-specific rules > business hours > hardcoded 9-5 default.
     // This lets a sole proprietor set business hours once; when they hire staff,
     // each provider can override with their own schedule without touching the default.
+    const typedBizHours = bizHours as Array<{
+      id: string; locationId: string | null; dayOfWeek: number; startTime: string; endTime: string;
+    }>;
+    const branchHours = staff.locationId && typedBizHours.some((hour) => hour.locationId === staff.locationId)
+      ? typedBizHours.filter((hour) => hour.locationId === staff.locationId)
+      : typedBizHours.filter((hour) => hour.locationId === null);
     const effectiveRules: AvailabilityRule[] = rules.length > 0
       ? rules
-      : bizHours.length > 0
-        ? bizHours.map((h) => ({ id: `biz-${h.id}`, staffId, dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }))
+      : branchHours.length > 0
+        ? branchHours.map((h) => ({ id: `biz-${h.id}`, staffId, dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }))
         : [1, 2, 3, 4, 5].map((d) => ({
             id: `default-${staffId}-${d}`, staffId, dayOfWeek: d, startTime: '09:00', endTime: '17:00',
           }));

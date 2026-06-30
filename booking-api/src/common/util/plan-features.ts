@@ -9,7 +9,8 @@ export function isProPlan(plan: PlanTier | undefined | null) {
   return featuresUnlocked() || plan === 'PRO' || plan === 'UNLIMITED';
 }
 
-// UNLIMITED is the only tier that can manage multiple locations.
+// UNLIMITED-specific checks. Multi-location itself starts at PRO (2 locations);
+// UNLIMITED raises that limit to 5.
 export function isUnlimitedPlan(plan: PlanTier | undefined | null) {
   return featuresUnlocked() || plan === 'UNLIMITED';
 }

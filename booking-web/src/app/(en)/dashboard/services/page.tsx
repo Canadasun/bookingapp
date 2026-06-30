@@ -17,6 +17,7 @@ import { formatPrice, cn } from "@/lib/utils";
 import { OwnerOnly } from "@/components/OwnerOnly";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { useLocationScope } from "@/lib/location-scope";
 
 const COLORS = [
   "#E9A23C","#EFAA44","#8b5cf6","#ec4899","#f43f5e",
@@ -401,6 +402,8 @@ export default function ServicesPage() {
   const bizId = user?.businessId ?? "";
   const { dictionary } = useDashboardLocale();
   const t = dictionary.services;
+  const { selectedIds: scopedLocationIds, locations } = useLocationScope();
+  const locationFilter = locations.length && scopedLocationIds.length < locations.length ? scopedLocationIds : undefined;
 
   const load = useCallback(async () => {
     if (!bizId) return;
@@ -408,7 +411,7 @@ export default function ServicesPage() {
     setLoading(true);
     try {
       const [svcs, cats, res] = await Promise.all([
-        api.services.listAll(bizId),
+        api.services.listAll(bizId, locationFilter),
         api.serviceCategories.listAll(bizId),
         api.resources.list(bizId).catch(() => [] as Resource[]),
       ]);
@@ -417,7 +420,7 @@ export default function ServicesPage() {
       setResources(res);
     } catch (e) { setLoadError(e instanceof Error ? e.message : t.loadFailed); }
     finally { setLoading(false); }
-  }, [bizId, t.loadFailed]);
+  }, [bizId, t.loadFailed, locationFilter?.join(",")]);
 
   useEffect(() => { load(); }, [load]);
 

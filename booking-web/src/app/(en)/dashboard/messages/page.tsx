@@ -11,6 +11,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { useEvents } from "@/lib/hooks";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { useLocationScope } from "@/lib/location-scope";
 
 interface Thread { clientId: string; client: { id: string; name: string; email?: string | null }; lastMessage: string; fromClient: boolean; read: boolean; unreadCount: number; archived?: boolean; createdAt: string }
 interface Message { id: string; content: string; fromClient: boolean; read: boolean; createdAt: string }
@@ -33,6 +34,8 @@ export default function MessagesPage() {
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const { french } = useDashboardLocale();
+  const { selectedIds: scopedLocationIds, locations } = useLocationScope();
+  const locationFilter = locations.length && scopedLocationIds.length < locations.length ? scopedLocationIds : undefined;
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -46,12 +49,13 @@ export default function MessagesPage() {
     }
     setLoadError("");
     try {
-      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: debouncedSearch.trim() || undefined, channel: channel !== "ALL" ? channel : undefined });
+      const threadData = await api.messages.threads(bizId, { unread: filter === "unread", archived: filter === "archived", search: debouncedSearch.trim() || undefined, channel: channel !== "ALL" ? channel : undefined, locationIds: locationFilter });
       setThreads(threadData);
+      setSelected((current) => current && threadData.some((thread) => thread.clientId === current.clientId) ? current : null);
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des messages" : "Failed to load messages")); }
     finally { setLoading(false); }
-  }, [bizId, filter, channel, debouncedSearch, french]);
+  }, [bizId, filter, channel, debouncedSearch, french, locationFilter?.join(",")]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 

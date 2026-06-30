@@ -168,7 +168,7 @@ export function IndustryPage({
             <Link href={canadianPrivacyHref} className="hover:text-violet-600">{fr ? "Vie privée au Canada" : "Canadian Privacy"}</Link>
             <Link href={privacyHref} className="hover:text-violet-600">{fr ? "Confidentialité" : "Privacy"}</Link>
             <Link href={termsHref} className="hover:text-violet-600">{fr ? "Conditions" : "Terms"}</Link>
-            <Link href="/support" className="hover:text-violet-600">{fr ? "Soutien" : "Support"}</Link>
+            <Link href={fr ? "/fr/support" : "/support"} className="hover:text-violet-600">{fr ? "Soutien" : "Support"}</Link>
           </div>
         </div>
       </footer>

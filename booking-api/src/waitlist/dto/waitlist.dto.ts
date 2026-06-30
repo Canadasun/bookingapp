@@ -6,6 +6,7 @@ export const JoinWaitlistSchema = z.object({
   phone: z.string().max(30).optional(),
   serviceId: z.string().optional(),
   staffId: z.string().optional(),
+  locationId: z.string().optional(),
   desiredDate: z.string().datetime().optional(),
   notes: z.string().max(2000).optional(),
   locale: z.enum(['en', 'fr']).default('en'),

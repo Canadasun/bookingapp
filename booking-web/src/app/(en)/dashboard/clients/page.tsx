@@ -15,6 +15,7 @@ import { ClientMergeModal } from "@/components/ClientMergeModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatPrice, cn, formatPhoneInput, formatPhoneDisplay } from "@/lib/utils";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { useLocationScope } from "@/lib/location-scope";
 
 const DAY_MS = 86_400_000;
 
@@ -149,6 +150,8 @@ export default function ClientsPage() {
 
   const bizId = currentUser?.businessId ?? "";
   const isOwner = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  const { selectedIds: scopedLocationIds, locations } = useLocationScope();
+  const locationFilter = locations.length && scopedLocationIds.length < locations.length ? scopedLocationIds : undefined;
 
   const load = useCallback(async (q?: string, pg = 1, append = false) => {
     if (!currentUser) return;
@@ -164,7 +167,7 @@ export default function ClientsPage() {
     }
     if (!append) { setLoadError(""); setLoading(true); } else setLoadingMore(true);
     try {
-      const res = await api.clients.list(bizId, q, pg);
+      const res = await api.clients.list(bizId, q, pg, 25, locationFilter);
       setClients((prev) => append ? [...prev, ...res.data] : res.data);
       setPage(res.page);
       setTotalPages(res.pages);
@@ -172,7 +175,7 @@ export default function ClientsPage() {
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : t.toasts.loadFailed); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [bizId, isOwner, currentUser, t]);
+  }, [bizId, isOwner, currentUser, t, locationFilter?.join(",")]);
 
   useEffect(() => { load(); }, [load]);
 

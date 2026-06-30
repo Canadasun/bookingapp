@@ -63,7 +63,7 @@ export function ReviewsContent({ locale }: { locale: "en" | "fr" }) {
               <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800">
                 {fr ? "Commencer à recueillir des avis" : "Start collecting reviews"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-              <Link href="/trust" className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+              <Link href={fr ? "/fr/trust" : "/trust"} className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
                 {fr ? "Centre de confiance" : "Trust center"}
               </Link>
             </div>

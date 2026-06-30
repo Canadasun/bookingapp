@@ -372,6 +372,7 @@ enum WaitlistStatus {
 model WaitlistEntry {
   id          String         @id @default(cuid())
   businessId  String
+  locationId  String?
   name        String
   email       String
   phone       String?
@@ -385,8 +386,10 @@ model WaitlistEntry {
   updatedAt   DateTime       @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([businessId, status])
+  @@index([locationId])
 }
 
 model User {
@@ -693,6 +696,9 @@ model Location {
   business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   staff        Staff[]
   appointments Appointment[]
+  businessHours BusinessHours[]
+  businessClosures BusinessClosure[]
+  waitlist WaitlistEntry[]
 
   @@index([businessId])
 }
@@ -804,14 +810,17 @@ model TimeOff {
 model BusinessHours {
   id         String @id @default(cuid())
   businessId String
+  locationId String?
   dayOfWeek  Int    // 0 = Sunday … 6 = Saturday
   startTime  String // "HH:mm" in business timezone
   endTime    String // "HH:mm" in business timezone
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
-  @@unique([businessId, dayOfWeek])
+  @@unique([businessId, locationId, dayOfWeek])
   @@index([businessId])
+  @@index([locationId])
 }
 
 // Date ranges when the business is closed (holidays, vacation, etc.).
@@ -820,14 +829,17 @@ model BusinessHours {
 model BusinessClosure {
   id         String   @id @default(cuid())
   businessId String
+  locationId String?
   startsAt   DateTime
   endsAt     DateTime
   reason     String?
   createdAt  DateTime @default(now())
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+  @@index([locationId])
   @@index([startsAt, endsAt])
 }
 

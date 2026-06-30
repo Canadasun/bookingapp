@@ -8,6 +8,7 @@ export function CanadianPrivacyContent({ locale }: { locale: "en" | "fr" }) {
   const securityHref = fr ? "/fr/security" : "/security";
   const privacyHref = fr ? "/fr/privacy" : "/privacy";
   const termsHref = fr ? "/fr/terms" : "/terms";
+  const quebecHref = fr ? "/fr/quebec-compliance" : "/quebec-compliance";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -28,6 +29,9 @@ export function CanadianPrivacyContent({ locale }: { locale: "en" | "fr" }) {
               ? "Pulse est conçu pour les entreprises de services canadiennes. Cette page explique comment nous traitons les données en vertu des lois fédérales et provinciales canadiennes sur la vie privée, nos obligations en matière de LCAP et ce que vous devez savoir si votre pratique traite des renseignements sur la santé."
               : "Pulse is built for Canadian service businesses. This page explains how we handle data under Canada's federal and provincial privacy laws, our CASL obligations, and what you should know if your practice handles health information."}
           </p>
+          <Link href={quebecHref} className="mt-4 inline-flex text-sm font-semibold text-violet-700 hover:underline">
+            {fr ? "Consulter le guide de préparation pour le Québec →" : "View the Quebec readiness guide →"}
+          </Link>
         </div>
 
         <div className="space-y-6">

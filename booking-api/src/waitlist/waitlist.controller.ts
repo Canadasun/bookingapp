@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WaitlistService } from './waitlist.service';
@@ -32,9 +32,9 @@ export class WaitlistController {
   @Get()
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  list(@Param('businessId') businessId: string, @CurrentUser() user: AuthUser) {
+  list(@Param('businessId') businessId: string, @CurrentUser() user: AuthUser, @Query('locationIds') locationIds?: string) {
     assertOwns(user, businessId);
-    return this.svc.list(businessId);
+    return this.svc.list(businessId, locationIds?.split(',').filter(Boolean).slice(0, 5));
   }
 
   @Delete(':id')

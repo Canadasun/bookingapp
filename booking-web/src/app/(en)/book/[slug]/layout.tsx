@@ -40,7 +40,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: `${SITE_URL}/book/${slug}` },
-    openGraph: { title, description, ...(ogImages.length ? { images: ogImages } : {}) },
+    openGraph: {
+      title,
+      description,
+      locale: "en_CA",
+      alternateLocale: ["fr_CA"],
+      ...(ogImages.length ? { images: ogImages } : {}),
+    },
     twitter: { title, description, card: ogImages.length ? "summary_large_image" : "summary" },
   };
 }
@@ -72,11 +78,20 @@ export default async function BookLayout({
     ? {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
+        inLanguage: ["en-CA", "fr-CA"],
         name: biz.name,
         ...(biz.websiteUrl ? { url: biz.websiteUrl } : {}),
         ...(biz.address ? { address: biz.address } : {}),
         ...(biz.phone ? { telephone: biz.phone } : {}),
         sameAs: [`${SITE_URL}/book/${slug}`],
+        potentialAction: {
+          "@type": "ReserveAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${SITE_URL}/book/${slug}{?lang}`,
+            inLanguage: ["en-CA", "fr-CA"],
+          },
+        },
         ...(biz.logoUrl ? { image: biz.logoUrl } : {}),
         ...(openingHours.length ? { openingHoursSpecification: openingHours } : {}),
         ...(biz.averageRating != null && biz.reviewCount

@@ -53,12 +53,19 @@ export class ClientsController {
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('locationIds') locationIds?: string,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('Access denied to this business resource');
     }
     const paging = pagination(page, limit);
-    return this.clientService.findAll(businessId, search?.slice(0, 100), paging.page, paging.limit);
+    return this.clientService.findAll(
+      businessId,
+      search?.slice(0, 100),
+      paging.page,
+      paging.limit,
+      locationIds?.split(',').filter(Boolean).slice(0, 5),
+    );
   }
 
   // CSV export — before :id so the literal path isn't consumed as a param

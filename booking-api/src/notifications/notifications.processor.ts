@@ -755,16 +755,17 @@ export class NotificationProcessor extends WorkerHost {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user || !job.data.resetToken) return;
       this.currentBusinessId = user.businessId;
-      const link = `${baseUrl}/verify-email?token=${job.data.resetToken}`;
+      const fr = user.locale === 'fr';
+      const link = `${baseUrl}/verify-email?token=${job.data.resetToken}${fr ? '&lang=fr' : ''}`;
       await this.email.send({
         to: user.email,
-        subject: 'Verify your email for Pulse',
+        subject: fr ? 'Vérifiez votre adresse courriel pour Pulse' : 'Verify your email for Pulse',
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Confirm your email</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, please confirm this is your email address so you can view your bookings and messages.</p>
-<a href="${link}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Verify email →</a>
-<p style="margin:16px 0 0;color:#9CA3AF;font-size:12px">This link expires in 7 days. If you didn't create a Pulse account, you can ignore this email.</p>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Confirmez votre adresse courriel' : 'Confirm your email'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(user.name)}, confirmez votre adresse courriel pour consulter vos réservations et vos messages.` : `Hi ${esc(user.name)}, please confirm this is your email address so you can view your bookings and messages.`}</p>
+<a href="${link}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Vérifier mon adresse courriel' : 'Verify email'} →</a>
+<p style="margin:16px 0 0;color:#9CA3AF;font-size:12px">${fr ? "Ce lien expire dans 7 jours. Si vous n’avez pas créé de compte Pulse, ignorez ce courriel." : "This link expires in 7 days. If you didn't create a Pulse account, you can ignore this email."}</p>
+`, undefined, fr ? 'fr' : 'en'),
       });
       return;
     }
@@ -777,20 +778,21 @@ export class NotificationProcessor extends WorkerHost {
       });
       if (!user) return;
       this.currentBusinessId = user.businessId;
-      const bizName = user.business?.name ?? 'your business';
+      const fr = user.locale === 'fr';
+      const bizName = user.business?.name ?? (fr ? 'votre entreprise' : 'your business');
       await this.email.send({
         to: user.email,
-        subject: `Welcome to Pulse, ${user.name.split(' ')[0]}! 🎉`,
+        subject: fr ? `Bienvenue sur Pulse, ${user.name.split(' ')[0]}! 🎉` : `Welcome to Pulse, ${user.name.split(' ')[0]}! 🎉`,
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Welcome aboard! 🎉</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, your account for <strong>${esc(bizName)}</strong> is ready. Here's how to get set up:</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Bienvenue! 🎉' : 'Welcome aboard! 🎉'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(user.name)}, votre compte pour <strong>${esc(bizName)}</strong> est prêt. Voici comment commencer :` : `Hi ${esc(user.name)}, your account for <strong>${esc(bizName)}</strong> is ready. Here's how to get set up:`}</p>
 <ol style="margin:0 0 16px;padding-left:20px;color:#374151;font-size:14px;line-height:1.7">
-  <li>Add your services and prices</li>
-  <li>Add your team and their availability</li>
-  <li>Share your booking link and take your first appointment</li>
+  <li>${fr ? 'Ajoutez vos services et vos prix' : 'Add your services and prices'}</li>
+  <li>${fr ? 'Ajoutez votre équipe et ses disponibilités' : 'Add your team and their availability'}</li>
+  <li>${fr ? 'Partagez votre lien de réservation et recevez votre premier rendez-vous' : 'Share your booking link and take your first appointment'}</li>
 </ol>
-<a href="${baseUrl}/dashboard" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Open your dashboard →</a>
-`),
+<a href="${baseUrl}/dashboard" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Ouvrir votre tableau de bord' : 'Open your dashboard'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       });
       return;
     }
@@ -800,15 +802,16 @@ export class NotificationProcessor extends WorkerHost {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user || !job.data.resetToken) return;
       this.currentBusinessId = user.businessId;
-      const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}`;
+      const fr = user.locale === 'fr';
+      const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}${fr ? '&lang=fr' : ''}`;
       await this.email.send({
         to: user.email,
-        subject: 'Reset your Pulse password',
+        subject: fr ? 'Réinitialisez votre mot de passe Pulse' : 'Reset your Pulse password',
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Reset your password</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, we received a request to reset your password. This link expires in 15 minutes. If you didn't ask for this, you can safely ignore this email.</p>
-<a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset password →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Réinitialisez votre mot de passe' : 'Reset your password'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(user.name)}, nous avons reçu une demande de réinitialisation de votre mot de passe. Ce lien expire dans 15 minutes. Si vous n’avez pas fait cette demande, ignorez ce courriel.` : `Hi ${esc(user.name)}, we received a request to reset your password. This link expires in 15 minutes. If you didn't ask for this, you can safely ignore this email.`}</p>
+<a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réinitialiser le mot de passe' : 'Reset password'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       });
       return;
     }
@@ -818,19 +821,20 @@ export class NotificationProcessor extends WorkerHost {
       const user = await this.prisma.user.findUnique({ where: { id: job.data.userId! } });
       if (!user) return;
       this.currentBusinessId = user.businessId;
-      const resetUrl = job.data.resetToken ? `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}` : `${baseUrl}/forgot-password`;
-      const device = esc((job.data.userAgent || 'an unrecognized device').slice(0, 120));
+      const fr = user.locale === 'fr';
+      const resetUrl = job.data.resetToken ? `${baseUrl}/reset-password?token=${encodeURIComponent(job.data.resetToken)}${fr ? '&lang=fr' : ''}` : `${baseUrl}/forgot-password${fr ? '?lang=fr' : ''}`;
+      const device = esc((job.data.userAgent || (fr ? 'un appareil non reconnu' : 'an unrecognized device')).slice(0, 120));
       const ip = job.data.ip ? ` (IP ${esc(job.data.ip)})` : '';
       await this.email.send({
         to: user.email,
-        subject: '🔐 New sign-in to your Pulse account',
+        subject: fr ? '🔐 Nouvelle connexion à votre compte Pulse' : '🔐 New sign-in to your Pulse account',
         html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">New sign-in detected</h2>
-<p style="margin:0 0 12px;color:#6B7280;font-size:14px">Hi ${esc(user.name)}, your Pulse account was just signed into from a device we haven't seen before:</p>
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Nouvelle connexion détectée' : 'New sign-in detected'}</h2>
+<p style="margin:0 0 12px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(user.name)}, une connexion à votre compte Pulse vient d’être effectuée à partir d’un nouvel appareil :` : `Hi ${esc(user.name)}, your Pulse account was just signed into from a device we haven't seen before:`}</p>
 <p style="margin:0 0 16px;color:#374151;font-size:13px;background:#F8F9FA;border-radius:10px;padding:12px">${device}${ip}</p>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px"><strong>If this was you</strong>, you can ignore this email. <strong>If it wasn't</strong>, reset your password right away to secure your account.</p>
-<a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reset my password →</a>
-`),
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? '<strong>Si c’était vous</strong>, ignorez ce courriel. <strong>Sinon</strong>, réinitialisez immédiatement votre mot de passe pour protéger votre compte.' : "<strong>If this was you</strong>, you can ignore this email. <strong>If it wasn't</strong>, reset your password right away to secure your account."}</p>
+<a href="${resetUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réinitialiser mon mot de passe' : 'Reset my password'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       });
       return;
     }
@@ -1002,17 +1006,18 @@ ${aptDetails(apt)}
     if (job.name === 'connect-approved') {
       const businessId = job.data.businessId!;
       this.currentBusinessId = businessId;
-      const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+      const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
       const dashUrl = `${baseUrl}/dashboard/settings`;
       for (const o of owners) {
+        const fr = o.locale === 'fr';
         await this.email.send({
           to: o.email,
-          subject: 'Your Stripe account is verified — you can now accept payments 🎉',
+          subject: fr ? 'Votre compte Stripe est vérifié — vous pouvez maintenant accepter des paiements 🎉' : 'Your Stripe account is verified — you can now accept payments 🎉',
           html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">Payments are live! 🎉</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, your Stripe account has been verified by Stripe. You can now accept deposits and card-on-file payments from clients — and payouts will be sent to your connected bank account on your Stripe payout schedule.</p>
-<a href="${dashUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Go to settings →</a>
-`),
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${fr ? 'Les paiements sont activés! 🎉' : 'Payments are live! 🎉'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? `Bonjour ${esc(o.name)}, votre compte Stripe a été vérifié. Vous pouvez maintenant accepter les dépôts et les paiements par carte enregistrée; les versements seront déposés dans votre compte bancaire selon votre calendrier Stripe.` : `Hi ${esc(o.name)}, your Stripe account has been verified by Stripe. You can now accept deposits and card-on-file payments from clients — and payouts will be sent to your connected bank account on your Stripe payout schedule.`}</p>
+<a href="${dashUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Accéder aux paramètres' : 'Go to settings'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
         }).catch(() => {});
       }
       return;
@@ -1447,25 +1452,29 @@ ${aptDetails(apt)}
       case 'late-cancel-request': {
         const ownerEmail = apt.business.email || this.configService.get<string>('ADMIN_ALERT_EMAIL');
         const dashUrl = `${webUrl}/dashboard/appointments`;
+        const owner = await this.prisma.user.findFirst({ where: { businessId: apt.businessId, role: 'OWNER' }, select: { locale: true } });
+        const ownerFr = owner?.locale === 'fr';
         if (ownerEmail) {
           await this.email.send({
             to: ownerEmail,
-            subject: `Late cancellation request — ${apt.client.name}`,
+            subject: ownerFr ? `Demande d’annulation tardive — ${apt.client.name}` : `Late cancellation request — ${apt.client.name}`,
             html: emailWrap(`
-<h2 style="margin:0 0 4px;color:#D97706;font-size:20px;font-weight:700">Late cancellation request</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${esc(apt.client.name)} asked to cancel <strong>after</strong> your ${policyWindowLabel(apt.business.cancellationWindowMinutes ?? ((apt.business.cancellationWindowHours ?? 0) * 60))} cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.</p>
+<h2 style="margin:0 0 4px;color:#D97706;font-size:20px;font-weight:700">${ownerFr ? 'Demande d’annulation tardive' : 'Late cancellation request'}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${ownerFr ? `${esc(apt.client.name)} a demandé une annulation <strong>après</strong> votre délai de ${policyWindowLabel(apt.business.cancellationWindowMinutes ?? ((apt.business.cancellationWindowHours ?? 0) * 60))}. L’annulation en ligne a été bloquée et le client a été invité à communiquer avec vous. Vous décidez d’annuler le rendez-vous et de facturer ou non les frais.` : `${esc(apt.client.name)} asked to cancel <strong>after</strong> your ${policyWindowLabel(apt.business.cancellationWindowMinutes ?? ((apt.business.cancellationWindowHours ?? 0) * 60))} cancellation window, so the online cancel was blocked and they were asked to contact you. You decide whether to cancel and/or charge the fee.`}</p>
 ${aptDetails(apt)}
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
   <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:110px">Client</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(apt.client.name)} (${esc(apt.client.email)}${apt.client.phone ? ', ' + esc(apt.client.phone) : ''})</td></tr>
 </table>
-<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Review in dashboard →</a>
-            `),
+<a href="${dashUrl}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${ownerFr ? 'Examiner dans le tableau de bord' : 'Review in dashboard'} →</a>
+            `, undefined, ownerFr ? 'fr' : 'en'),
           });
         }
         await this.notifyOwners(apt.businessId, {
           kind: 'BOOKING_UPDATE',
-          title: `Late cancellation request — ${apt.client.name}`,
-          body: `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')} — client wants to cancel past the window`,
+          title: ownerFr ? `Demande d’annulation tardive — ${apt.client.name}` : `Late cancellation request — ${apt.client.name}`,
+          body: ownerFr
+            ? `${apt.service.name}, le ${aptDate(apt, 'yyyy-MM-dd')} à ${aptDate(apt, 'HH:mm')} — le client veut annuler après le délai`
+            : `${apt.service.name} on ${aptDate(apt, 'MMM d')} at ${aptDate(apt, 'h:mm a')} — client wants to cancel past the window`,
           linkUrl: '/dashboard/appointments',
         });
         break;

@@ -11,6 +11,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { useLocationScope } from "@/lib/location-scope";
 
 type Entry = {
   id: string; name: string; email: string; phone?: string | null; serviceId?: string | null;
@@ -25,15 +26,17 @@ export default function WaitlistPage() {
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
   const { french, formatDate } = useDashboardLocale();
+  const { selectedIds: scopedLocationIds, locations } = useLocationScope();
+  const locationFilter = locations.length && scopedLocationIds.length < locations.length ? scopedLocationIds : undefined;
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
     setLoadError("");
     setLoading(true);
-    try { setEntries(await api.waitlist.list(bizId)); }
+    try { setEntries(await api.waitlist.list(bizId, locationFilter)); }
     catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId, french]);
+  }, [bizId, french, locationFilter?.join(",")]);
   useEffect(() => { load(); }, [load]);
 
   async function remove() {

@@ -104,10 +104,10 @@ export function AboutContent({ locale }: { locale: "en" | "fr" }) {
             )}
           </div>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/trust" className="inline-flex items-center justify-center bg-violet-600 text-white font-semibold px-5 py-3 rounded-xl hover:bg-violet-700 transition-colors">
+            <Link href={fr ? "/fr/trust" : "/trust"} className="inline-flex items-center justify-center bg-violet-600 text-white font-semibold px-5 py-3 rounded-xl hover:bg-violet-700 transition-colors">
               {fr ? "Voir le centre de confiance" : "View trust center"}
             </Link>
-            <Link href="/changelog" className="inline-flex items-center justify-center bg-white border border-[#E9DDCB] text-slate-700 font-semibold px-5 py-3 rounded-xl hover:border-violet-300 transition-colors">
+            <Link href={fr ? "/fr/changelog" : "/changelog"} className="inline-flex items-center justify-center bg-white border border-[#E9DDCB] text-slate-700 font-semibold px-5 py-3 rounded-xl hover:border-violet-300 transition-colors">
               {fr ? "Voir le journal des modifications" : "View changelog"}
             </Link>
           </div>

@@ -77,8 +77,9 @@ export function SecurityContent({ dict, altHref }: { dict: Dictionary["security"
           {locale === "fr" ? (
             <>
               <Link href="/fr" className="hover:underline">Accueil</Link>{" "}·{" "}
-              <Link href="/fr/pricing" className="hover:underline">Tarifs</Link>{" "}·{" "}
-              <Link href="/fr/features" className="hover:underline">Fonctionnalités</Link>
+              <Link href="/fr/privacy" className="hover:underline">{dict.footer.privacy}</Link>{" "}·{" "}
+              <Link href="/fr/canadian-privacy" className="hover:underline">{dict.footer.canadianPrivacy}</Link>{" "}·{" "}
+              <Link href="/fr/terms" className="hover:underline">{dict.footer.terms}</Link>
             </>
           ) : (
             <>

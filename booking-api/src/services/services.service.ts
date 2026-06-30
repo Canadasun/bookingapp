@@ -20,9 +20,18 @@ export class ServicesService {
 
   // ── Services ────────────────────────────────────────────────────────────────
 
-  findAll(businessId: string, includeInactive = false) {
+  findAll(businessId: string, includeInactive = false, locationIds?: string[]) {
     return this.prisma.service.findMany({
-      where: { businessId, ...(includeInactive ? {} : { active: true }) },
+      where: {
+        businessId,
+        ...(includeInactive ? {} : { active: true }),
+        // Service availability is configured through staff/service assignments.
+        // A service is available at a branch when an active provider assigned to
+        // that branch offers it.
+        ...(locationIds?.length ? {
+          staffServices: { some: { staff: { active: true, locationId: { in: locationIds } } } },
+        } : {}),
+      },
       include: { category: { select: { id: true, name: true, color: true, sortOrder: true } } },
       orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { name: 'asc' }],
     });

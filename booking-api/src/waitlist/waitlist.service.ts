@@ -8,6 +8,10 @@ export class WaitlistService {
   constructor(private prisma: PrismaService) {}
 
   async join(businessId: string, dto: JoinWaitlistDto) {
+    if (dto.locationId) {
+      const location = await this.prisma.location.findFirst({ where: { id: dto.locationId, businessId, active: true }, select: { id: true } });
+      if (!location) throw new BadRequestException('Selected location is not available');
+    }
     if (dto.serviceId) {
       const service = await this.prisma.service.findFirst({ where: { id: dto.serviceId, businessId, active: true }, select: { id: true } });
       if (!service) throw new BadRequestException('Selected service is not available');
@@ -19,6 +23,7 @@ export class WaitlistService {
     return this.prisma.waitlistEntry.create({
       data: {
         businessId,
+        locationId: dto.locationId,
         name: dto.name,
         email: dto.email,
         phone: dto.phone,
@@ -31,9 +36,9 @@ export class WaitlistService {
     });
   }
 
-  list(businessId: string) {
+  list(businessId: string, locationIds?: string[]) {
     return this.prisma.waitlistEntry.findMany({
-      where: { businessId, status: { in: ['WAITING', 'NOTIFIED'] } },
+      where: { businessId, status: { in: ['WAITING', 'NOTIFIED'] }, ...(locationIds?.length ? { locationId: { in: locationIds } } : {}) } as Prisma.WaitlistEntryWhereInput,
       orderBy: { createdAt: 'asc' },
       take: 500, // bound the result set
     });

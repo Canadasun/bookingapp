@@ -24,10 +24,11 @@ function clientFields(businessId: string, dto: CreateClientDto) {
 export class ClientsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(businessId: string, search?: string, page = 1, limit = 25) {
+  async findAll(businessId: string, search?: string, page = 1, limit = 25, locationIds?: string[]) {
     const skip = (page - 1) * limit;
     const where = {
       businessId,
+      ...(locationIds?.length ? { appointments: { some: { locationId: { in: locationIds } } } } : {}),
       ...(search
         ? {
             OR: [
@@ -43,9 +44,9 @@ export class ClientsService {
       this.prisma.client.findMany({
         where,
         include: {
-          _count: { select: { appointments: true } },
+          _count: { select: { appointments: locationIds?.length ? { where: { locationId: { in: locationIds } } } : true } },
           appointments: {
-            where: { status: 'COMPLETED' },
+            where: { status: 'COMPLETED', ...(locationIds?.length ? { locationId: { in: locationIds } } : {}) },
             select: { startsAt: true },
             orderBy: { startsAt: 'desc' },
             take: 1, // Only need the last visit date
@@ -68,6 +69,7 @@ export class ClientsService {
         where: {
           clientId: { in: clients.map(c => c.id) },
           status: { in: ['SUCCEEDED', 'PARTIALLY_REFUNDED', 'REFUNDED'] },
+          ...(locationIds?.length ? { appointment: { locationId: { in: locationIds } } } : {}),
         },
         _sum: { amountCents: true, refundedCents: true },
       });

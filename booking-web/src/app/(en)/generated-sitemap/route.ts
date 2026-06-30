@@ -26,82 +26,38 @@ const RAW_PUBLIC_API_URL = (
 const PUBLIC_API_URL = /^https?:\/\//i.test(RAW_PUBLIC_API_URL) ? RAW_PUBLIC_API_URL : `https://${RAW_PUBLIC_API_URL}`;
 const API_CANDIDATES = Array.from(new Set([API_URL, PUBLIC_API_URL]));
 
+type RouteConfig = Pick<SitemapRoute, "changeFrequency" | "priority">;
+
+// LOCALIZED_PATHS owns bilingual route discovery. This object only overrides
+// ranking/crawl hints; adding a translated page never requires a second sitemap
+// edit. Non-localized public utility routes are listed separately below.
+const DEFAULT_ROUTE: RouteConfig = { changeFrequency: "monthly", priority: 0.7 };
+const ROUTE_OVERRIDES: Record<string, RouteConfig> = {
+  "/": { changeFrequency: "weekly", priority: 1 },
+  "/pricing": { changeFrequency: "monthly", priority: 0.9 },
+  "/blog": { changeFrequency: "weekly", priority: 0.8 },
+  "/changelog": { changeFrequency: "weekly", priority: 0.5 },
+  "/terms": { changeFrequency: "yearly", priority: 0.3 },
+  "/privacy": { changeFrequency: "yearly", priority: 0.3 },
+  "/canadian-privacy": { changeFrequency: "yearly", priority: 0.5 },
+  "/security": { changeFrequency: "yearly", priority: 0.5 },
+};
+const ENGLISH_ONLY_ROUTES: Record<string, RouteConfig> = {
+  "/register": { changeFrequency: "monthly", priority: 0.8 },
+  "/login": { changeFrequency: "monthly", priority: 0.6 },
+  "/book": { changeFrequency: "daily", priority: 0.7 },
+};
+
 const staticRoutes: SitemapRoute[] = [
-  ["/", "weekly", 1.0],
-  ["/pricing", "monthly", 0.9],
-  ["/demo", "monthly", 0.8],
-  ["/reviews", "monthly", 0.7],
-  ["/referrals", "monthly", 0.7],
-  ["/register", "monthly", 0.8],
-  ["/login", "monthly", 0.6],
-  ["/book", "daily", 0.7],
-  ["/support", "monthly", 0.6],
-  ["/contact", "monthly", 0.6],
-  ["/faq", "monthly", 0.7],
-  ["/about", "monthly", 0.6],
-  ["/trust", "monthly", 0.6],
-  ["/terms", "yearly", 0.3],
-  ["/privacy", "yearly", 0.3],
-  ["/accessibility", "yearly", 0.3],
-  ["/status", "monthly", 0.3],
-  ["/security", "yearly", 0.5],
-  ["/canadian-privacy", "yearly", 0.5],
-  ["/changelog", "weekly", 0.5],
-  ["/compare", "monthly", 0.7],
-  ["/compare/pulse-vs-square-appointments", "monthly", 0.8],
-  ["/compare/pulse-vs-calendly", "monthly", 0.8],
-  ["/compare/pulse-vs-acuity-scheduling", "monthly", 0.8],
-  ["/compare/pulse-vs-jane-app", "monthly", 0.8],
-  ["/compare/pulse-vs-vagaro", "monthly", 0.8],
-  ["/compare/pulse-vs-glossgenius", "monthly", 0.8],
-  ["/features", "monthly", 0.8],
-  ["/for", "monthly", 0.7],
-  ["/for/salons", "monthly", 0.8],
-  ["/for/barbers", "monthly", 0.8],
-  ["/for/lash-techs", "monthly", 0.8],
-  ["/for/estheticians", "monthly", 0.8],
-  ["/for/massage-therapists", "monthly", 0.8],
-  ["/for/pet-groomers", "monthly", 0.8],
-  ["/for/consultants", "monthly", 0.8],
-  ["/for/wellness", "monthly", 0.8],
-  ["/for/mobile-services", "monthly", 0.8],
-  ["/for/personal-trainers", "monthly", 0.8],
-  ["/for/hair-stylists", "monthly", 0.8],
-  ["/for/nail-techs", "monthly", 0.8],
-  ["/for/spas", "monthly", 0.8],
-  ["/for/yoga-studios", "monthly", 0.8],
-  ["/for/toronto", "monthly", 0.9],
-  ["/for/vancouver", "monthly", 0.9],
-  ["/for/calgary", "monthly", 0.9],
-  ["/for/ottawa", "monthly", 0.9],
-  ["/for/edmonton", "monthly", 0.9],
-  ["/for/winnipeg", "monthly", 0.9],
-  ["/for/montreal", "monthly", 0.9],
-  ["/for/quebec-city", "monthly", 0.9],
-  ["/for/laval", "monthly", 0.9],
-  ["/for/gatineau", "monthly", 0.9],
-  ["/features/online-booking", "monthly", 0.8],
-  ["/features/deposits", "monthly", 0.8],
-  ["/features/no-show-protection", "monthly", 0.8],
-  ["/features/sms-reminders", "monthly", 0.8],
-  ["/features/client-management", "monthly", 0.8],
-  ["/features/intake-forms", "monthly", 0.8],
-  ["/features/multi-location", "monthly", 0.8],
-  ["/features/reviews", "monthly", 0.8],
-  ["/blog", "weekly", 0.8],
-  ["/blog/how-to-reduce-no-shows-canadian-service-businesses", "monthly", 0.7],
-  ["/blog/best-appointment-booking-software-canada-2026", "monthly", 0.7],
-  ["/blog/how-to-take-appointment-deposits-canada", "monthly", 0.7],
-  ["/blog/salon-cancellation-policy-canada", "monthly", 0.7],
-].flatMap(([path, changeFrequency, priority]) => {
-  const logicalPath = path as string;
+  ...Array.from(LOCALIZED_PATHS, (path) => [path, ROUTE_OVERRIDES[path] ?? DEFAULT_ROUTE] as const),
+  ...Object.entries(ENGLISH_ONLY_ROUTES),
+].flatMap(([logicalPath, config]) => {
   const suffix = logicalPath === "/" ? "" : logicalPath;
   const en = `${SITE_URL}${suffix}`;
   const fr = `${SITE_URL}/fr${suffix}`;
   const base = {
     lastModified: CONTENT_DATE,
-    changeFrequency: changeFrequency as SitemapRoute["changeFrequency"],
-    priority: priority as number,
+    ...config,
   };
   if (!LOCALIZED_PATHS.has(logicalPath)) return [{ ...base, url: en }];
   const alternates = { en, fr };

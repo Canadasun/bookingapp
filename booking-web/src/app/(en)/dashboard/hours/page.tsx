@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { useLocationScope } from "@/lib/location-scope";
 
 // Seven entries, Sunday-first; display labels come from the dictionary (hours.days).
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -54,12 +55,14 @@ export default function HoursPage() {
   const [closureForm, setClosureForm] = useState({ startsAt: "", endsAt: "", reason: "" });
   const [closureSaving, setClosureSaving] = useState(false);
   const [loadedAt] = useState(() => Date.now());
+  const { selectedIds: scopedLocationIds } = useLocationScope();
+  const locationId = scopedLocationIds.length === 1 ? scopedLocationIds[0] : undefined;
 
   const load = useCallback(async () => {
     if (!bizId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const data = await api.business.getHours(bizId);
+      const data = await api.business.getHours(bizId, locationId);
       const nextRules = defaultRules().map((fallback) => {
         const stored = data.hours.find((item: { dayOfWeek: number }) => item.dayOfWeek === fallback.dayOfWeek);
         return stored
@@ -74,7 +77,7 @@ export default function HoursPage() {
     } finally {
       setLoading(false);
     }
-  }, [bizId, t.toasts.loadFailed]);
+  }, [bizId, locationId, t.toasts.loadFailed]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -113,7 +116,7 @@ export default function HoursPage() {
     try {
       await api.business.setHours(bizId, rules
         .filter((rule) => rule.enabled)
-        .map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })));
+        .map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })), locationId);
       setSavedRules(rules);
       toast.success(t.toasts.hoursSaved);
     } catch (error) {
@@ -138,7 +141,7 @@ export default function HoursPage() {
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         reason: closureForm.reason.trim() || undefined,
-      });
+      }, locationId);
       setClosures((current) => [...current, closure]);
       setClosureForm({ startsAt: "", endsAt: "", reason: "" });
       toast.success(t.toasts.closureAdded);

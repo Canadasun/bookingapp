@@ -422,6 +422,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         email: wl.email.trim(),
         serviceId: selectedServices[0]?.id,
         staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : undefined,
+        locationId: selectedLocationId || undefined,
         desiredDate: selectedDate ? selectedDate.toISOString() : undefined,
         locale,
       });
@@ -443,6 +444,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         phone: form.phone.trim() ? normalizePhoneE164(form.phone.trim()) : undefined,
         serviceId: selectedServices[0]?.id,
         staffId: selectedStaff && selectedStaff !== "any" ? selectedStaff.id : selectedSlot?.staffId,
+        locationId: selectedLocationId || undefined,
         desiredDate: selectedSlot?.startsAt ?? (selectedDate ? selectedDate.toISOString() : undefined),
         notes: [form.notes.trim(), selectedSlot ? `Preferred slot: ${selectedSlot.startsAt}` : null].filter(Boolean).join(" | ") || undefined,
         locale,

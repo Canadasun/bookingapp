@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ServicesService } from './services.service';
 import {
@@ -19,11 +19,11 @@ export class ServicesController {
   constructor(private serviceService: ServicesService) {}
 
   @Get()
-  async findAll(@Param('businessId') businessId: string) {
+  async findAll(@Param('businessId') businessId: string, @Query('locationIds') locationIds?: string) {
     // Public booking endpoint: expose locationMode (drives the flow) but never
     // the default virtualMeetingUrl — the link is delivered to the client in
     // their confirmation/reminders, not leaked to anyone browsing the page.
-    const services = await this.serviceService.findAll(businessId);
+    const services = await this.serviceService.findAll(businessId, false, locationIds?.split(',').filter(Boolean).slice(0, 5));
     return services.map((s) => ({ ...s, virtualMeetingUrl: undefined }));
   }
 
@@ -33,11 +33,12 @@ export class ServicesController {
   findAllAdmin(
     @Param('businessId') businessId: string,
     @CurrentUser() user: { role: string; businessId: string | null },
+    @Query('locationIds') locationIds?: string,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
-    return this.serviceService.findAll(businessId, true);
+    return this.serviceService.findAll(businessId, true, locationIds?.split(',').filter(Boolean).slice(0, 5));
   }
 
   @Get(':id')

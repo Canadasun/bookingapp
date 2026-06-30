@@ -153,13 +153,20 @@ export class BusinessMessagesController {
     @Query('archived') archived?: string,
     @Query('search') search?: string,
     @Query('channel') channel?: string,
+    @Query('locationIds') locationIds?: string,
   ) {
     if (user.role !== 'ADMIN' && user.businessId !== businessId) {
       throw new ForbiddenException('You do not have access to this business');
     }
     const VALID_CHANNELS = ['IN_APP', 'SMS'];
     const safeChannel = channel && VALID_CHANNELS.includes(channel) ? channel : undefined;
-    return this.svc.getBusinessThreads(businessId, user, { unreadOnly: unread === 'true', archived: archived === 'true', search: search?.slice(0, 100), channel: safeChannel });
+    return this.svc.getBusinessThreads(businessId, user, {
+      unreadOnly: unread === 'true',
+      archived: archived === 'true',
+      search: search?.slice(0, 100),
+      channel: safeChannel,
+      locationIds: locationIds?.split(',').filter(Boolean).slice(0, 5),
+    });
   }
 
   @Get('unread-count')

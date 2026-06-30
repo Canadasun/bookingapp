@@ -9,9 +9,11 @@ type Consent = "accepted" | "necessary";
 interface CookieConsentProps {
   clarityId?: string;
   gaMeasurementId?: string;
+  locale?: "en" | "fr";
 }
 
-export function CookieConsent({ clarityId, gaMeasurementId }: CookieConsentProps) {
+export function CookieConsent({ clarityId, gaMeasurementId, locale = "en" }: CookieConsentProps) {
+  const fr = locale === "fr";
   const [consent, setConsent] = useState<Consent | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -66,11 +68,11 @@ export function CookieConsent({ clarityId, gaMeasurementId }: CookieConsentProps
           aria-labelledby="cookie-consent-title"
           className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-xl px-4 py-4 sm:px-6 flex flex-col sm:flex-row items-start sm:items-center gap-4"
         >
-          <span id="cookie-consent-title" className="sr-only">Cookie preferences</span>
+          <span id="cookie-consent-title" className="sr-only">{fr ? "Préférences relatives aux témoins" : "Cookie preferences"}</span>
           <p className="text-sm text-gray-700 flex-1 leading-relaxed">
-            We use analytics cookies to improve your experience. See our{" "}
-            <a href="/privacy" className="text-violet-600 underline hover:text-violet-700">
-              privacy policy
+            {fr ? "Nous utilisons des témoins analytiques pour améliorer votre expérience. Consultez notre " : "We use analytics cookies to improve your experience. See our "}
+            <a href={fr ? "/fr/privacy" : "/privacy"} className="text-violet-600 underline hover:text-violet-700">
+              {fr ? "politique de confidentialité" : "privacy policy"}
             </a>
             .
           </p>
@@ -79,13 +81,13 @@ export function CookieConsent({ clarityId, gaMeasurementId }: CookieConsentProps
               onClick={necessary}
               className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Necessary only
+              {fr ? "Nécessaires seulement" : "Necessary only"}
             </button>
             <button
               onClick={accept}
               className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
             >
-              Accept all
+              {fr ? "Tout accepter" : "Accept all"}
             </button>
           </div>
         </div>

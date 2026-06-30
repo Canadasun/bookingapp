@@ -172,9 +172,9 @@ export class BusinessesController {
 
   @Get(':id/hours')
   @UseGuards(JwtAuthGuard)
-  getHours(@Param('id') id: string, @CurrentUser() user: User) {
+  getHours(@Param('id') id: string, @CurrentUser() user: User, @Query('locationId') locationId?: string) {
     this.assertTenantAccess(user, id);
-    return this.businessService.getHours(id);
+    return this.businessService.getHours(id, locationId);
   }
 
   // Upserts all 7 days in one call. Pass enabled days only; omitted days are deleted.
@@ -185,9 +185,10 @@ export class BusinessesController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(HoursSchema)) body: z.infer<typeof HoursSchema>,
     @CurrentUser() user: User,
+    @Query('locationId') locationId?: string,
   ) {
     this.assertTenantAccess(user, id);
-    return this.businessService.setHours(id, body.hours);
+    return this.businessService.setHours(id, body.hours, locationId);
   }
 
   // ── Business closures ───────────────────────────────────────────────────────
@@ -199,9 +200,10 @@ export class BusinessesController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(ClosureSchema)) body: z.infer<typeof ClosureSchema>,
     @CurrentUser() user: User,
+    @Query('locationId') locationId?: string,
   ) {
     this.assertTenantAccess(user, id);
-    return this.businessService.addClosure(id, body);
+    return this.businessService.addClosure(id, body, locationId);
   }
 
   @Delete(':id/closures/:closureId')
