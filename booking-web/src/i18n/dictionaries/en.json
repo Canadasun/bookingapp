@@ -189,7 +189,7 @@
       "terms": "Terms", "privacy": "Privacy", "industries": "Industries", "compare": "Compare",
       "pricing": "Pricing", "demo": "Demo", "reviews": "Reviews", "referrals": "Referrals",
       "changelog": "Changelog", "security": "Security", "canadianPrivacy": "Canadian Privacy",
-      "support": "Support", "status": "Status"
+      "support": "Support", "contact": "Contact", "faq": "FAQ", "status": "Status"
     },
     "jsonLd": {
       "appDescription": "Online booking software for Canadian service businesses. Automated reminders, deposits, and no-show protection.",

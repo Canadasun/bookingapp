@@ -189,7 +189,7 @@
       "terms": "Conditions", "privacy": "Confidentialité", "industries": "Secteurs", "compare": "Comparer",
       "pricing": "Tarification", "demo": "Démo", "reviews": "Avis", "referrals": "Parrainage",
       "changelog": "Nouveautés", "security": "Sécurité", "canadianPrivacy": "Confidentialité (Canada)",
-      "support": "Assistance", "status": "État du service"
+      "support": "Assistance", "contact": "Nous joindre", "faq": "FAQ", "status": "État du service"
     },
     "jsonLd": {
       "appDescription": "Logiciel de réservation en ligne pour les entreprises de services canadiennes. Rappels automatisés, dépôts et protection contre les rendez-vous manqués.",

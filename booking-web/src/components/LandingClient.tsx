@@ -151,7 +151,7 @@ type FooterT = {
   getStarted: string; signIn: string; dashboard: string; book: string;
   terms: string; privacy: string; industries: string; compare: string; pricing: string;
   demo: string; reviews: string; referrals: string; changelog: string; security: string;
-  canadianPrivacy: string; support: string; status: string;
+  canadianPrivacy: string; support: string; contact: string; faq: string; status: string;
 };
 
 // Footer links adapt to the session too.
@@ -177,6 +177,8 @@ export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: 
       <Link href={locale === "fr" ? "/fr/security" : "/security"} className="hover:text-indigo-600 transition-colors">{t.security}</Link>
       <Link href={locale === "fr" ? "/fr/canadian-privacy" : "/canadian-privacy"} className="hover:text-indigo-600 transition-colors">{t.canadianPrivacy}</Link>
       <Link href="/support" className="hover:text-indigo-600 transition-colors">{t.support}</Link>
+      <Link href={locale === "fr" ? "/fr/contact" : "/contact"} className="hover:text-indigo-600 transition-colors">{t.contact}</Link>
+      <Link href={locale === "fr" ? "/fr/faq" : "/faq"} className="hover:text-indigo-600 transition-colors">{t.faq}</Link>
       <Link href="/status" className="hover:text-indigo-600 transition-colors">{t.status}</Link>
     </>
   );
