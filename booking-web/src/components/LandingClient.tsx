@@ -168,7 +168,7 @@ export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: 
   const publicLinks = (
     <>
       <Link href={locale === "fr" ? "/fr/for" : "/for"} className="hover:text-indigo-600 transition-colors">{t.industries}</Link>
-      <Link href="/compare" className="hover:text-indigo-600 transition-colors">{t.compare}</Link>
+      <Link href={locale === "fr" ? "/fr/compare" : "/compare"} className="hover:text-indigo-600 transition-colors">{t.compare}</Link>
       <Link href={locale === "fr" ? "/fr/pricing" : "/pricing"} className="hover:text-indigo-600 transition-colors">{t.pricing}</Link>
       <Link href="/demo" className="hover:text-indigo-600 transition-colors">{t.demo}</Link>
       <Link href="/reviews" className="hover:text-indigo-600 transition-colors">{t.reviews}</Link>

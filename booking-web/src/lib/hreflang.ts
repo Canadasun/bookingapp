@@ -47,6 +47,13 @@ export const LOCALIZED_PATHS = new Set<string>([
   "/for/quebec-city",
   "/for/laval",
   "/for/gatineau",
+  "/compare",
+  "/compare/pulse-vs-square-appointments",
+  "/compare/pulse-vs-calendly",
+  "/compare/pulse-vs-acuity-scheduling",
+  "/compare/pulse-vs-jane-app",
+  "/compare/pulse-vs-vagaro",
+  "/compare/pulse-vs-glossgenius",
 ]);
 
 export type Locale = "en" | "fr";
