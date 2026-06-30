@@ -7,7 +7,8 @@ import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getUser } from "@/lib/auth";
+import { getUser, invalidateCurrentUser } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { safeNextPath } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +53,17 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
     router.push(home);
   }
 
+  async function finishLogin() {
+    const locale = fr ? "fr" : "en";
+    // Persist before navigation so the dashboard paints in the language the
+    // user explicitly chose on the login page. The server copy is authoritative
+    // across devices and also drives staff-facing transactional messages.
+    localStorage.setItem("pulse_dashboard_locale", locale);
+    await api.users.updateMe({ locale }).catch(() => undefined);
+    invalidateCurrentUser();
+    go();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !password) return;
@@ -76,7 +88,7 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
         setChallenge({ id: data.challengeId, method: data.method ?? "EMAIL", isAdmin: data.isAdmin });
         return;
       }
-      go();
+      await finishLogin();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : (fr ? "Échec de la connexion" : "Login failed"));
     } finally {
@@ -100,7 +112,7 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
         const body = await readJson<{ message?: string }>(res);
         throw new Error(body?.message ?? (fr ? "Code invalide ou expiré" : "Invalid or expired code"));
       }
-      go();
+      await finishLogin();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : (fr ? "Échec de la vérification" : "Verification failed"));
     } finally {
@@ -216,7 +228,7 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
       {/* Social sign-in */}
       <div className="space-y-2">
         <a
-          href="/api/auth/google"
+          href={`/api/auth/google${fr ? "?lang=fr" : ""}`}
           className="flex items-center justify-center gap-3 w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
         >
           <svg className="w-4 h-4 flex-none" viewBox="0 0 24 24" aria-hidden="true">
@@ -229,7 +241,7 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
         </a>
         {process.env.NEXT_PUBLIC_APPLE_CLIENT_ID && (
           <a
-            href="/api/auth/apple"
+            href={`/api/auth/apple${fr ? "?lang=fr" : ""}`}
             className="flex items-center justify-center gap-3 w-full rounded-lg border border-slate-900 bg-black px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
           >
             <svg className="w-4 h-4 flex-none" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

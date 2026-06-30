@@ -5,6 +5,8 @@ import {
   clearSSOStateCookie,
   clearPKCECookie,
   parseStateIntent,
+  parseStateLocale,
+  persistSSOLocale,
   roleHome,
   APP_URL,
   type SSOTokens,
@@ -33,6 +35,7 @@ export async function GET(req: NextRequest) {
   }
 
   const intent = parseStateIntent(cookieState);
+  const locale = parseStateLocale(cookieState);
   const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : intent === "register" ? "/my/register" : "/login");
 
   const codeVerifier = req.cookies.get("pulse_pkce_verifier")?.value;
@@ -59,6 +62,7 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await upstream.json() as SSOTokens;
+  await persistSSOLocale(API, data.accessToken, locale);
   let destination: string;
   if (intent === "owner" && !(data.user.role === "OWNER" && data.user.businessId)) {
     destination = "/register/complete";

@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
 
   const raw = req.nextUrl.searchParams.get("intent");
   const intent: SSOIntent = raw === "owner" ? "owner" : raw === "register" ? "register" : "client";
-  const state = encodeState(intent);
+  const locale = req.nextUrl.searchParams.get("lang") === "fr" ? "fr" : "en";
+  const state = encodeState(intent, locale);
   const redirectUri = `${APP_URL()}/api/auth/google/callback`;
   const codeVerifier = generateCodeVerifier();
 

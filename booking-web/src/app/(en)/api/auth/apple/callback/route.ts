@@ -5,6 +5,8 @@ import {
   clearAppleSSOStateCookie,
   clearSSONonceCookie,
   parseStateIntent,
+  parseStateLocale,
+  persistSSOLocale,
   roleHome,
   APP_URL,
   type SSOTokens,
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   const intent = parseStateIntent(cookieState);
+  const locale = parseStateLocale(cookieState);
   const errRedirect = makeErrRedirect(intent === "owner" ? "/register" : intent === "register" ? "/my/register" : "/login");
   const rawNonce = req.cookies.get("pulse_sso_nonce")?.value;
 
@@ -79,6 +82,7 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await upstream.json() as SSOTokens;
+  await persistSSOLocale(API, data.accessToken, locale);
   let destination: string;
   if (intent === "owner" && !(data.user.role === "OWNER" && data.user.businessId)) {
     destination = "/register/complete";

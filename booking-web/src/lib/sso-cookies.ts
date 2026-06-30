@@ -33,9 +33,10 @@ const appleSameSite = (): "none" | "lax" => (secure() ? "none" : "lax");
 
 // "register" = client self-registration (allowCreate true, routes to /my/dashboard)
 export type SSOIntent = "owner" | "client" | "register";
+export type SSOLocale = "en" | "fr";
 
-export function encodeState(intent: SSOIntent): string {
-  return `${randomBytes(16).toString("hex")}:${intent}`;
+export function encodeState(intent: SSOIntent, locale: SSOLocale = "en"): string {
+  return `${randomBytes(16).toString("hex")}:${intent}:${locale}`;
 }
 
 // Apple nonce helpers — nonce is hashed before sending to Apple;
@@ -81,6 +82,21 @@ export function parseStateIntent(state: string): SSOIntent {
   if (seg === "owner")    return "owner";
   if (seg === "register") return "register";
   return "client";
+}
+
+export function parseStateLocale(state: string): SSOLocale {
+  return state.split(":")[2] === "fr" ? "fr" : "en";
+}
+
+export async function persistSSOLocale(api: string, accessToken: string, locale: SSOLocale) {
+  await fetch(`${api}/users/me`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ locale }),
+  }).catch(() => undefined);
 }
 
 // Google state cookie — SameSite=Lax is fine (Google redirects via GET).

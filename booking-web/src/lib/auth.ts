@@ -19,6 +19,7 @@ export interface SessionUser {
   twoFactorEnabled?: boolean; // not in cookie; available from useCurrentUser()
   twoFactorMethod?: "EMAIL" | "SMS";
   mustResetPassword?: boolean; // not in cookie; enforced server-side by API
+  locale?: "en" | "fr";
 }
 
 // Module-level cache so the /api/auth/me fetch happens once per page-load.
