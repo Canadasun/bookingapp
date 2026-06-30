@@ -10,6 +10,10 @@ const DateOnlySchema = z.string()
 export const GetSlotsSchema = z.object({
   staffId: z.string().min(1),
   serviceId: z.string().min(1),
+  // Which branch the client is booking at. When the provider serves multiple
+  // branches with different hours/timezone, slots are anchored to this location.
+  // Omitted/unknown falls back to the provider's primary (home) branch.
+  locationId: z.string().min(1).optional(),
   additionalServiceIds: z.preprocess((value) => {
     if (typeof value === 'string') return value.split(',').map((v) => v.trim()).filter(Boolean);
     return value;

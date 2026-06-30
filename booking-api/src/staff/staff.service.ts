@@ -31,7 +31,11 @@ export class StaffService {
     await this.ensureOwnerProvider(businessId);
     return this.prisma.staff.findMany({
       where: { businessId, active: true },
-      include: { user: { select: { name: true, role: true } }, staffServices: true },
+      include: {
+        user: { select: { name: true, role: true } },
+        staffServices: true,
+        staffLocations: { select: { locationId: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -42,6 +46,7 @@ export class StaffService {
       include: {
         user: { select: { name: true, email: true, role: true } },
         staffServices: { include: { service: true } },
+        staffLocations: { select: { locationId: true } },
         availabilityRules: true,
       },
     });
@@ -110,28 +115,59 @@ export class StaffService {
     return { staff: await this.findOne(staff.id, businessId), tempPassword };
   }
 
-  async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null }, businessId: string) {
+  async update(id: string, dto: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null; locationIds?: string[] }, businessId: string) {
     const staff = await this.findOne(id, businessId);
-    if (dto.locationId && businessId) {
-      const location = await this.prisma.location.findFirst({
-        where: { id: dto.locationId, businessId, active: true },
-        select: { id: true },
-      });
-      if (!location) throw new NotFoundException('Active location not found');
+
+    // Resolve the full set of branches this provider should serve. `locationIds`
+    // (multi-location) takes precedence; a legacy single `locationId` maps to a
+    // one-element set. `undefined` means "leave branch assignment untouched".
+    let nextLocationIds: string[] | undefined;
+    if (dto.locationIds !== undefined) {
+      nextLocationIds = [...new Set(dto.locationIds)];
+    } else if (dto.locationId !== undefined) {
+      nextLocationIds = dto.locationId ? [dto.locationId] : [];
     }
-    const updated = await this.prisma.staff.update({
-      where: { id: staff.id, businessId: staff.businessId },
-      data: {
-        ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
-        ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
-        ...(dto.active !== undefined ? { active: dto.active } : {}),
-        ...(dto.permissions !== undefined ? { permissions: dto.permissions } : {}),
-        ...(dto.locationId !== undefined ? { locationId: dto.locationId } : {}),
-      },
-      include: {
-        user: { select: { name: true, email: true, role: true } },
-        staffServices: { include: { service: { select: { id: true, name: true, active: true } } } },
-      },
+    if (nextLocationIds && nextLocationIds.length) {
+      const valid = await this.prisma.location.count({
+        where: { id: { in: nextLocationIds }, businessId, active: true },
+      });
+      if (valid !== nextLocationIds.length) throw new NotFoundException('One or more active locations not found');
+    }
+
+    // Keep Staff.locationId as the primary/home branch: prefer the existing
+    // primary if it's still in the set, otherwise the first selected branch.
+    const nextPrimary = nextLocationIds === undefined
+      ? undefined
+      : nextLocationIds.includes(staff.locationId ?? '')
+        ? staff.locationId
+        : (nextLocationIds[0] ?? null);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.staff.update({
+        where: { id: staff.id, businessId: staff.businessId },
+        data: {
+          ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
+          ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+          ...(dto.active !== undefined ? { active: dto.active } : {}),
+          ...(dto.permissions !== undefined ? { permissions: dto.permissions } : {}),
+          ...(nextPrimary !== undefined ? { locationId: nextPrimary } : {}),
+        },
+        include: {
+          user: { select: { name: true, email: true, role: true } },
+          staffServices: { include: { service: { select: { id: true, name: true, active: true } } } },
+          staffLocations: { select: { locationId: true } },
+        },
+      });
+      if (nextLocationIds !== undefined) {
+        await tx.staffLocation.deleteMany({ where: { staffId: staff.id } });
+        if (nextLocationIds.length) {
+          await tx.staffLocation.createMany({
+            data: nextLocationIds.map((locationId) => ({ staffId: staff.id, locationId })),
+          });
+        }
+        u.staffLocations = nextLocationIds.map((locationId) => ({ locationId }));
+      }
+      return u;
     });
     if (dto.avatarUrl !== undefined && staff.avatarUrl && staff.avatarUrl !== dto.avatarUrl) {
       await deleteUploadByUrl(this.prisma, staff.avatarUrl);
@@ -210,6 +246,7 @@ export class StaffService {
       include: {
         user: { select: { id: true, name: true, email: true, phone: true, role: true } },
         staffServices: { include: { service: { select: { id: true, name: true, active: true } } } },
+        staffLocations: { select: { locationId: true } },
         availabilityRules: true,
       },
       orderBy: { createdAt: 'asc' },

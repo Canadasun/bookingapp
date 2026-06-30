@@ -113,6 +113,9 @@ function mockPrisma(options: { conflictExists?: boolean; bufferConflict?: boolea
     staff: {
       findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true }),
     },
+    staffLocation: {
+      count: jest.fn().mockResolvedValue(0),
+    },
     location: {
       findFirst: jest.fn().mockResolvedValue({ id: 'location-a' }),
       count: jest.fn().mockResolvedValue(2),

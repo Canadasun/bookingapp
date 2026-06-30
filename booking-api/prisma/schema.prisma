@@ -537,7 +537,10 @@ model Staff {
   avatarUrl   String?
   active      Boolean  @default(true)
   permissions String[] @default([]) // extra access for staff: VIEW_MONEY, MANAGE_SERVICES, MANAGE_STAFF
-  locationId  String? // which location this provider works at (multi-location)
+  // Primary/home branch. Kept for backward compatibility and as the default
+  // location (timezone, fallback scheduling). The full set of branches a
+  // provider works at lives in `staffLocations` (many-to-many).
+  locationId  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -545,12 +548,27 @@ model Staff {
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   business          Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
   staffServices     StaffService[]
+  staffLocations    StaffLocation[]
   availabilityRules AvailabilityRule[]
   timeOffs          TimeOff[]
   appointments      Appointment[]
   tasks             StaffTask[]
 
   @@index([businessId])
+  @@index([locationId])
+}
+
+// A provider can work at multiple branches. This join is the source of truth
+// for "which locations does this staff member serve"; Staff.locationId remains
+// the primary/home branch (default timezone, single-location fallback).
+model StaffLocation {
+  staffId    String
+  locationId String
+
+  staff    Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, locationId])
   @@index([locationId])
 }
 
@@ -695,6 +713,7 @@ model Location {
 
   business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   staff        Staff[]
+  staffLocations StaffLocation[]
   appointments Appointment[]
   businessHours BusinessHours[]
   businessClosures BusinessClosure[]
