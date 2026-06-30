@@ -12,6 +12,8 @@ export const LOCALIZED_PATHS = new Set<string>([
   "/demo",
   "/reviews",
   "/support",
+  "/contact",
+  "/faq",
   "/blog",
   "/blog/how-to-reduce-no-shows-canadian-service-businesses",
   "/blog/best-appointment-booking-software-canada-2026",

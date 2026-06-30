@@ -36,6 +36,8 @@ const staticRoutes: SitemapRoute[] = [
   ["/login", "monthly", 0.6],
   ["/book", "daily", 0.7],
   ["/support", "monthly", 0.6],
+  ["/contact", "monthly", 0.6],
+  ["/faq", "monthly", 0.7],
   ["/about", "monthly", 0.6],
   ["/trust", "monthly", 0.6],
   ["/terms", "yearly", 0.3],

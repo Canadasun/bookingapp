@@ -28,12 +28,6 @@ const nextConfig: NextConfig = {
         destination: "https://www.pulseappointments.com/:path*",
         permanent: true,
       },
-      // /contact is a well-known alias; forward permanently to the support page.
-      {
-        source: "/contact",
-        destination: "/support",
-        permanent: true,
-      },
       // Legacy favicon path — browsers request /favicon.ico directly.
       {
         source: "/favicon.ico",
@@ -162,7 +156,7 @@ const nextConfig: NextConfig = {
         ],
       })),
       // Marketing / legal pages: no Stripe, no framing.
-      ...["/", "/pricing", "/terms", "/privacy", "/accessibility", "/status"].map((source) => ({
+      ...["/", "/pricing", "/contact", "/faq", "/terms", "/privacy", "/accessibility", "/status"].map((source) => ({
         source,
         headers: [
           { key: "Content-Security-Policy", value: authCsp },
