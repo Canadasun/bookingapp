@@ -1324,9 +1324,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                       {isFrench
                         ? "En confirmant, vous acceptez que votre nom, vos coordonnées et les renseignements sur votre rendez-vous soient recueillis et conservés par cette entreprise et traités par "
                         : "By confirming, your name, contact details, and appointment information are collected and stored by this business and processed by "}
-	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">Pulse</a>{" "}
+	                      <a href={isFrench ? "/fr/privacy" : "/privacy"} target="_blank" rel="noopener noreferrer" className="underline bk-link">Pulse</a>{" "}
                       {isFrench ? " à titre de plateforme de réservation. Consultez la " : "as its booking platform. View Pulse's "}
-	                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline bk-link">{isFrench ? "politique de confidentialité" : "Privacy Policy"}</a>
+	                      <a href={isFrench ? "/fr/privacy" : "/privacy"} target="_blank" rel="noopener noreferrer" className="underline bk-link">{isFrench ? "politique de confidentialité" : "Privacy Policy"}</a>
                       {isFrench ? " de Pulse." : "."}
                     </p>
                   </div>

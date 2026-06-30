@@ -161,8 +161,8 @@ export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: 
   const home = homeFor(user);
   const legalLinks = (
     <>
-      <Link href="/terms" className="hover:text-indigo-600 transition-colors">{t.terms}</Link>
-      <Link href="/privacy" className="hover:text-indigo-600 transition-colors">{t.privacy}</Link>
+      <Link href={locale === "fr" ? "/fr/terms" : "/terms"} className="hover:text-indigo-600 transition-colors">{t.terms}</Link>
+      <Link href={locale === "fr" ? "/fr/privacy" : "/privacy"} className="hover:text-indigo-600 transition-colors">{t.privacy}</Link>
     </>
   );
   const publicLinks = (
@@ -175,7 +175,7 @@ export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: 
       <Link href="/referrals" className="hover:text-indigo-600 transition-colors">{t.referrals}</Link>
       <Link href="/changelog" className="hover:text-indigo-600 transition-colors">{t.changelog}</Link>
       <Link href={locale === "fr" ? "/fr/security" : "/security"} className="hover:text-indigo-600 transition-colors">{t.security}</Link>
-      <Link href="/canadian-privacy" className="hover:text-indigo-600 transition-colors">{t.canadianPrivacy}</Link>
+      <Link href={locale === "fr" ? "/fr/canadian-privacy" : "/canadian-privacy"} className="hover:text-indigo-600 transition-colors">{t.canadianPrivacy}</Link>
       <Link href="/support" className="hover:text-indigo-600 transition-colors">{t.support}</Link>
       <Link href="/status" className="hover:text-indigo-600 transition-colors">{t.status}</Link>
     </>
