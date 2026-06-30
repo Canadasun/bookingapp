@@ -8,6 +8,15 @@ const SITE = "https://www.pulseappointments.com";
 // no per-page edits required.
 export const LOCALIZED_PATHS = new Set<string>([
   "/",
+  "/about",
+  "/demo",
+  "/reviews",
+  "/support",
+  "/blog",
+  "/blog/how-to-reduce-no-shows-canadian-service-businesses",
+  "/blog/best-appointment-booking-software-canada-2026",
+  "/blog/how-to-take-appointment-deposits-canada",
+  "/blog/salon-cancellation-policy-canada",
   "/security",
   "/pricing",
   "/terms",
