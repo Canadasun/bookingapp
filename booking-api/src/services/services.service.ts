@@ -26,10 +26,15 @@ export class ServicesService {
         businessId,
         ...(includeInactive ? {} : { active: true }),
         // Service availability is configured through staff/service assignments.
-        // A service is available at a branch when an active provider assigned to
-        // that branch offers it.
+        // A service is available at a branch when an active provider who serves
+        // that branch offers it. A provider serves a branch via the StaffLocation
+        // junction (multi-location); the singular locationId is the fallback for
+        // any provider not yet backfilled into the junction.
         ...(locationIds?.length ? {
-          staffServices: { some: { staff: { active: true, locationId: { in: locationIds } } } },
+          staffServices: { some: { staff: { active: true, OR: [
+            { staffLocations: { some: { locationId: { in: locationIds } } } },
+            { locationId: { in: locationIds } },
+          ] } } },
         } : {}),
       },
       include: { category: { select: { id: true, name: true, color: true, sortOrder: true } } },

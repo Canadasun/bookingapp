@@ -30,13 +30,17 @@ export default function StaffPage() {
   // When a single branch is focused in the location switcher, show only its providers.
   const { selectedIds: scopedIds, locations: scopeLocs } = useLocationScope();
   const scopedLocationId = scopeLocs.length > 1 && scopedIds.length === 1 ? scopedIds[0] : undefined;
-  const visibleStaff = scopedLocationId ? staff.filter((s) => s.locationId === scopedLocationId) : staff;
+  // A provider belongs to the focused branch if it's in their multi-location set
+  // (staffLocations) or is their primary/home branch.
+  const visibleStaff = scopedLocationId
+    ? staff.filter((s) => (s.staffLocations?.length ? s.staffLocations.some((sl) => sl.locationId === scopedLocationId) : s.locationId === scopedLocationId))
+    : staff;
   const scopedLocationName = scopedLocationId ? (scopeLocs.find((l) => l.id === scopedLocationId)?.name ?? null) : null;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<StaffMember | null>(null);
-  const [form, setForm] = useState<{ name: string; email: string; bio: string; avatarUrl: string; permissions: string[]; locationId: string }>({ name: "", email: "", bio: "", avatarUrl: "", permissions: [], locationId: "" });
+  const [form, setForm] = useState<{ name: string; email: string; bio: string; avatarUrl: string; permissions: string[]; locationIds: string[] }>({ name: "", email: "", bio: "", avatarUrl: "", permissions: [], locationIds: [] });
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   // One-time temp password to surface to the owner after inviting a staff member.
@@ -71,10 +75,12 @@ export default function StaffPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"", permissions:[], locationId:"" }); setSelectedServiceIds([]); setShowModal(true); }
+  function openCreate() { setEditing(null); setForm({ name:"", email:"", bio:"", avatarUrl:"", permissions:[], locationIds:[] }); setSelectedServiceIds([]); setShowModal(true); }
   function openEdit(s: StaffMember) {
     setEditing(s);
-    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "", permissions: s.permissions ?? [], locationId: s.locationId ?? "" });
+    // Prefer the full branch set; fall back to the legacy single primary branch.
+    const ids = s.staffLocations?.length ? s.staffLocations.map((sl) => sl.locationId) : (s.locationId ? [s.locationId] : []);
+    setForm({ name: s.user.name, email: s.user.email ?? "", bio: s.bio ?? "", avatarUrl: s.avatarUrl ?? "", permissions: s.permissions ?? [], locationIds: ids });
     setSelectedServiceIds(s.staffServices.map((ss) => ss.serviceId));
     setShowModal(true);
   }
@@ -90,13 +96,13 @@ export default function StaffPage() {
           name: form.name, email: form.email, bio: form.bio || undefined, serviceIds: selectedServiceIds,
         });
         // Invite can't carry an avatar/permissions — set them right after on the new staff record.
-        if ((form.avatarUrl || form.permissions.length || form.locationId) && res.staff?.id) {
-          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions, locationId: form.locationId || null }).catch(() => {});
+        if ((form.avatarUrl || form.permissions.length || form.locationIds.length) && res.staff?.id) {
+          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions, locationIds: form.locationIds }).catch(() => {});
         }
         setInvited({ email: form.email, password: res.tempPassword });
         toast.success(t.toasts.invited);
       } else {
-        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "", permissions: form.permissions, locationId: form.locationId || null });
+        await api.staff.update(bizId, editing.id, { bio: form.bio || undefined, avatarUrl: form.avatarUrl || "", permissions: form.permissions, locationIds: form.locationIds });
         await api.staff.assignServices(bizId, editing.id, selectedServiceIds);
         toast.success(t.toasts.updated);
       }
@@ -233,7 +239,13 @@ export default function StaffPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900">{s.user.name}</p>
                     {!s.active && <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{t.inactive}</span>}
-                    {s.locationId && (() => { const loc = locations.find((l) => l.id === s.locationId); return loc ? <span className="inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full"><MapPin className="w-3 h-3"/>{loc.name}</span> : null; })()}
+                    {(() => {
+                      const branchIds = s.staffLocations?.length ? s.staffLocations.map((sl) => sl.locationId) : (s.locationId ? [s.locationId] : []);
+                      return branchIds
+                        .map((id) => locations.find((l) => l.id === id))
+                        .filter((l): l is Location => !!l)
+                        .map((loc) => <span key={loc.id} className="inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full"><MapPin className="w-3 h-3"/>{loc.name}</span>);
+                    })()}
                   </div>
                   {s.user.email && <p className="text-xs text-gray-500">{s.user.email}</p>}
                   {s.staffServices.length > 0 && (
@@ -304,13 +316,21 @@ export default function StaffPage() {
               </div>
               {locations.filter((l) => l.active).length > 0 && (
                 <div>
-                  <label htmlFor="staff-location" className="block text-sm font-medium text-gray-700 mb-1.5">{t.modal.location}</label>
-                  <select id="staff-location" value={form.locationId} onChange={(e) => setForm((p) => ({ ...p, locationId: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
-                    <option value="">{t.modal.locationAny}</option>
-                    {locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-600">{t.modal.locationHint}</p>
+                  <span className="block text-sm font-medium text-gray-700 mb-1.5">{t.modal.location}</span>
+                  <div className="space-y-1.5 rounded-xl border border-gray-200 p-2">
+                    {locations.filter((l) => l.active).map((l) => {
+                      const checked = form.locationIds.includes(l.id);
+                      return (
+                        <label key={l.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-violet-50">
+                          <input type="checkbox" checked={checked}
+                            onChange={() => setForm((p) => ({ ...p, locationIds: checked ? p.locationIds.filter((id) => id !== l.id) : [...p.locationIds, l.id] }))}
+                            className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500" />
+                          <span className="inline-flex items-center gap-1 text-sm text-gray-800"><MapPin className="w-3.5 h-3.5 text-indigo-500"/>{l.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-600">{form.locationIds.length === 0 ? t.modal.locationAny : t.modal.locationHint}</p>
                 </div>
               )}
               <div>

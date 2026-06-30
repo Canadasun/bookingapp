@@ -73,11 +73,33 @@ export class AvailabilityService {
       if (offered !== selectedServices.length) throw new NotFoundException('Staff does not offer this service');
     }
 
+    // Resolve which branch these slots are for. A provider can serve multiple
+    // branches (StaffLocation); when the caller asks for a specific branch the
+    // provider actually serves, anchor hours + timezone to THAT branch. Otherwise
+    // fall back to the provider's primary/home branch.
+    let effectiveLocationId = staff.locationId;
+    let effectiveLocationTimezone = staff.location?.timezone ?? null;
+    if (dto.locationId && dto.locationId !== staff.locationId) {
+      const serves = await this.prisma.staffLocation.count({
+        where: { staffId: staff.id, locationId: dto.locationId },
+      });
+      if (serves > 0) {
+        const requested = await this.prisma.location.findFirst({
+          where: { id: dto.locationId, businessId: staff.businessId },
+          select: { timezone: true },
+        });
+        if (requested) {
+          effectiveLocationId = dto.locationId;
+          effectiveLocationTimezone = requested.timezone ?? null;
+        }
+      }
+    }
+
     // Location timezone takes precedence over business timezone so that
     // providers at different branches have their schedule windows interpreted
     // in the correct local time (e.g. a Vancouver location open 9–5 should
     // generate slots anchored to America/Vancouver, not the business HQ).
-    const businessTimezone = staff.location?.timezone ?? staff.business.timezone;
+    const businessTimezone = effectiveLocationTimezone ?? staff.business.timezone;
 
     // Parse dates in the requested timezone
     const rangeStart = fromZonedTime(`${startDate}T00:00:00`, timezone);
@@ -109,14 +131,14 @@ export class AvailabilityService {
       (this.prisma.businessHours as any).findMany({
         where: {
           businessId,
-          ...(staff.locationId ? { OR: [{ locationId: staff.locationId }, { locationId: null }] } : { locationId: null }),
+          ...(effectiveLocationId ? { OR: [{ locationId: effectiveLocationId }, { locationId: null }] } : { locationId: null }),
         },
       }),
       // Business closures (holidays/vacation) block slots for everyone.
       (this.prisma.businessClosure as any).findMany({
         where: {
           businessId,
-          ...(staff.locationId ? { OR: [{ locationId: staff.locationId }, { locationId: null }] } : { locationId: null }),
+          ...(effectiveLocationId ? { OR: [{ locationId: effectiveLocationId }, { locationId: null }] } : { locationId: null }),
           startsAt: { lt: rangeEnd },
           endsAt: { gt: rangeStart },
         },
@@ -164,8 +186,8 @@ export class AvailabilityService {
     const typedBizHours = bizHours as Array<{
       id: string; locationId: string | null; dayOfWeek: number; startTime: string; endTime: string;
     }>;
-    const branchHours = staff.locationId && typedBizHours.some((hour) => hour.locationId === staff.locationId)
-      ? typedBizHours.filter((hour) => hour.locationId === staff.locationId)
+    const branchHours = effectiveLocationId && typedBizHours.some((hour) => hour.locationId === effectiveLocationId)
+      ? typedBizHours.filter((hour) => hour.locationId === effectiveLocationId)
       : typedBizHours.filter((hour) => hour.locationId === null);
     const effectiveRules: AvailabilityRule[] = rules.length > 0
       ? rules

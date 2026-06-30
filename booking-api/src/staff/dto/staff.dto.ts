@@ -19,7 +19,11 @@ export const UpdateStaffSchema = z.object({
   avatarUrl: avatarUrlSchema,
   active: z.boolean().optional(),
   permissions: z.array(z.enum(STAFF_PERMISSIONS)).max(10).optional(),
+  // Primary/home branch (kept for backward compatibility).
   locationId: z.string().nullable().optional(),
+  // Full set of branches this provider works at (multi-location). When present,
+  // it is the source of truth and the primary is derived from it.
+  locationIds: z.array(z.string().min(1)).max(50).optional(),
 });
 export type UpdateStaffDto = z.infer<typeof UpdateStaffSchema>;
 

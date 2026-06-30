@@ -25,7 +25,9 @@ describe('tenant reference validation', () => {
   it('rejects moving staff to another tenant location', async () => {
     const prisma = {
       staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }), update: jest.fn() },
-      location: { findFirst: jest.fn().mockResolvedValue(null) },
+      // A foreign/inactive location is not counted within this business, so the
+      // count of valid locations (0) won't match the requested set → rejected.
+      location: { findFirst: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0) },
     };
     const service = new StaffService(prisma as any);
 

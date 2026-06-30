@@ -291,8 +291,17 @@ export class BookingsService {
         select: { id: true },
       });
       if (!location) throw new NotFoundException('Location not found');
-      if (staff.locationId !== dto.locationId) {
-        const activeLocationCount = staff.locationId
+      // A provider serves the chosen branch if it's in their StaffLocation set
+      // (multi-location) or matches their primary/home branch (legacy fallback).
+      const servesLocation = staff.locationId === dto.locationId
+        || (await this.prisma.staffLocation.count({ where: { staffId: staff.id, locationId: dto.locationId } })) > 0;
+      if (!servesLocation) {
+        // Allow only when this provider has no branch assignment at all AND the
+        // business is effectively single-location — otherwise reject the mismatch.
+        const hasAnyBranch = staff.locationId
+          ? true
+          : (await this.prisma.staffLocation.count({ where: { staffId: staff.id } })) > 0;
+        const activeLocationCount = hasAnyBranch
           ? 2
           : await this.prisma.location.count({ where: { businessId, active: true } });
         if (activeLocationCount > 1) {

@@ -241,14 +241,29 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     });
   }, [bizId]);
 
+  // A provider serves the chosen branch if it's in their multi-location set
+  // (staffLocations) or matches their primary/home branch. A provider with no
+  // branch assignment at all only serves a single-location business.
+  function staffServesLocation(staff: StaffMember, locationId: string): boolean {
+    if (!locationId) return true;
+    const branchIds = staff.staffLocations?.length
+      ? staff.staffLocations.map((sl) => sl.locationId)
+      : (staff.locationId ? [staff.locationId] : []);
+    if (branchIds.length === 0) return (biz?.locations?.length ?? 0) <= 1;
+    return branchIds.includes(locationId);
+  }
+
   // Service-filtered providers for the picker: a provider with no explicit service
   // assignments offers everything (sole-proprietor) — otherwise match assignments.
   useEffect(() => {
     if (selectedServices.length === 0) { setStaffList([]); return; }
     setStaffList(activeStaff.filter((st) =>
       (st.staffServices.length === 0 || selectedServices.every((svc) => st.staffServices.some((ss) => ss.serviceId === svc.id))) &&
-      (!selectedLocationId || st.locationId === selectedLocationId),
+      staffServesLocation(st, selectedLocationId),
     ));
+    // staffServesLocation is a stable pure helper over biz/staff; re-running on
+    // these inputs is sufficient.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStaff, selectedServices, selectedLocationId]);
 
   // Reschedule prefill
@@ -284,7 +299,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       const additionalServiceIds = selectedServices.slice(1).map((svc) => svc.id);
       const staffTargets = selectedStaff && selectedStaff !== "any" ? [selectedStaff] : staffList;
       const rows = await Promise.all(staffTargets.map(async (staff) => {
-        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, additionalServiceIds, startDate: d, endDate: d, timezone: tz });
+        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, additionalServiceIds, startDate: d, endDate: d, timezone: tz, locationId: selectedLocationId || undefined });
         return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
       }));
       setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
@@ -570,7 +585,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const locationRequired = (biz?.locations?.length ?? 0) > 1;
   const visibleServices = selectedLocationId
     ? allServices.filter((service) => activeStaff.some((staff) =>
-        (staff.locationId === selectedLocationId || ((biz?.locations?.length ?? 0) === 1 && !staff.locationId)) &&
+        staffServesLocation(staff, selectedLocationId) &&
         (staff.staffServices.length === 0 || staff.staffServices.some((assignment) => assignment.serviceId === service.id)),
       ))
     : allServices;

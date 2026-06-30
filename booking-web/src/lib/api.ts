@@ -191,6 +191,8 @@ export interface AvailabilityRule {
 export interface StaffMember {
   id: string; userId: string; businessId: string;
   bio?: string; avatarUrl?: string; active: boolean; permissions?: string[]; locationId?: string | null;
+  // All branches this provider works at (multi-location). locationId is the primary/home branch.
+  staffLocations?: { locationId: string }[];
   createdAt: string; updatedAt: string;
   user: { name: string; email?: string; phone?: string; role?: string };
   staffServices: StaffService[];
@@ -936,7 +938,7 @@ export const api = {
     // Owner-only: creates the staff login + returns a one-time temp password.
     invite: (businessId: string, data: { name: string; email: string; bio?: string; serviceIds?: string[] }) =>
       req<{ staff: StaffMember; tempPassword: string }>(`/businesses/${businessId}/staff/invite`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null }) =>
+    update: (businessId: string, id: string, data: { bio?: string; avatarUrl?: string; active?: boolean; permissions?: string[]; locationId?: string | null; locationIds?: string[] }) =>
       req<StaffMember>(`/businesses/${businessId}/staff/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     // force=true moves the provider's bookings to the owner, then deletes them.
     remove: (businessId: string, id: string, force?: boolean) =>
@@ -952,10 +954,11 @@ export const api = {
   },
 
   availability: {
-    getSlots: (params: { staffId: string; serviceId: string; additionalServiceIds?: string[]; startDate: string; endDate: string; timezone?: string; enforceNotice?: boolean }) => {
-      const { enforceNotice, additionalServiceIds, ...rest } = params;
+    getSlots: (params: { staffId: string; serviceId: string; additionalServiceIds?: string[]; startDate: string; endDate: string; timezone?: string; enforceNotice?: boolean; locationId?: string }) => {
+      const { enforceNotice, additionalServiceIds, locationId, ...rest } = params;
       const q = new URLSearchParams(rest as Record<string, string>);
       if (additionalServiceIds?.length) q.set("additionalServiceIds", additionalServiceIds.join(","));
+      if (locationId) q.set("locationId", locationId);
       if (enforceNotice === false) q.set("enforceNotice", "false");
       return req<Slot[]>(`/availability/slots?${q.toString()}`);
     },
