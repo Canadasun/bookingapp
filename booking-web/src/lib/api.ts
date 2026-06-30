@@ -1068,7 +1068,7 @@ export const api = {
       req<Appointment>(`/businesses/${businessId}/bookings/manual`, { method: "POST", body: JSON.stringify(data) }),
     // Owner-initiated recurring series. Returns the created occurrences + any
     // dates skipped due to conflicts.
-    createRecurring: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean; meetingUrl?: string; frequency: "WEEKLY" | "BIWEEKLY" | "THREE_WEEKS" | "EIGHT_WEEKS" | "MONTHLY"; count: number }) =>
+    createRecurring: (businessId: string, data: { staffId: string; serviceId: string; additionalServiceIds?: string[]; clientId: string; startsAt: string; notes?: string; allowOverride?: boolean; locationId?: string; meetingUrl?: string; frequency: "WEEKLY" | "BIWEEKLY" | "THREE_WEEKS" | "EIGHT_WEEKS" | "MONTHLY"; count: number }) =>
       req<{ groupId: string; created: { id: string; startsAt: string }[]; skipped: string[] }>(`/businesses/${businessId}/bookings/recurring`, { method: "POST", body: JSON.stringify(data) }),
     confirm: (businessId: string, id: string) =>
       req<Appointment>(`/businesses/${businessId}/bookings/${id}/confirm`, { method: "PATCH" }),

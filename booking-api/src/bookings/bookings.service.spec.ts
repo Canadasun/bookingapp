@@ -79,6 +79,7 @@ function mockPrisma(options: { conflictExists?: boolean; bufferConflict?: boolea
       update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CONFIRMED' })),
     },
     business: { findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }) },
+    location: { findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }) },
     availabilityRule: { findMany: jest.fn().mockResolvedValue([{ dayOfWeek: 0, startTime: '00:00', endTime: '23:59' }]) },
     businessHours: { findMany: jest.fn().mockResolvedValue([]) },
     timeOff: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -196,7 +197,7 @@ async function buildService(prismaOverrides = {}, conflictExists = false) {
       },
     ],
   }).compile();
-  return { svc: module.get<BookingsService>(BookingsService), prisma };
+  return { svc: module.get<BookingsService>(BookingsService), prisma, availability: module.get(AvailabilityService) };
 }
 
 describe('BookingsService', () => {
@@ -268,6 +269,27 @@ describe('BookingsService', () => {
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(prisma.location.count).toHaveBeenCalledWith({ where: { businessId: 'biz1', active: true } });
+    });
+
+    // Regression (BUG-1): a multi-branch provider booked at a NON-primary branch
+    // must be validated against THAT branch's hours/timezone, not their primary.
+    it('validates availability against the booked branch, not the provider primary', async () => {
+      const { svc, availability } = await buildService({
+        staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true, locationId: 'location-primary' }) },
+        staffLocation: { count: jest.fn().mockResolvedValue(1) }, // serves the requested branch
+      });
+
+      await svc.create('biz1', {
+        staffId: 'staff1',
+        serviceId: 'svc1',
+        clientId: 'client1',
+        startsAt: SLOT_START.toISOString(),
+        locationId: 'location-b',
+      });
+
+      expect(availability.getAvailableSlots).toHaveBeenCalledWith(
+        expect.objectContaining({ locationId: 'location-b' }),
+      );
     });
 
     it('throws ConflictException when slot is taken', async () => {

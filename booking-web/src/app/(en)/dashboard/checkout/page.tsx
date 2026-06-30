@@ -31,6 +31,7 @@ export default function CheckoutPage() {
   const [allStaffList, setAllStaffList]   = useState<StaffMember[]>([]);
   const [staffList, setStaffList]         = useState<StaffMember[]>([]);
   const [locations, setLocations]         = useState<{ id: string; name: string }[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
   const [slots, setSlots]                 = useState<BookingSlot[]>([]);
 
   const [clientSearch, setClientSearch]   = useState("");
@@ -68,8 +69,22 @@ export default function CheckoutPage() {
     api.business.get(bizId).then(setBiz).catch(() => {});
     api.services.listAll(bizId).then((s) => setAllServices(s.filter((x) => x.active))).catch(() => {});
     api.staff.listAll(bizId).then((all) => setAllStaffList(all.filter((st) => st.active))).catch(() => {});
-    api.locations.list(bizId).then((locs) => setLocations(locs.filter((l) => l.active))).catch(() => {});
+    api.locations.list(bizId).then((locs) => {
+      const active = locs.filter((l) => l.active);
+      setLocations(active);
+      // Auto-select the only branch so single-location shops never see a picker.
+      if (active.length === 1) setSelectedLocationId(active[0].id);
+    }).catch(() => {});
   }, [bizId, french]);
+
+  // A provider serves the chosen branch if it's in their multi-location set or is
+  // their primary/home branch; an unassigned provider only serves a one-branch shop.
+  const staffServesLocation = useCallback((st: StaffMember, locationId: string): boolean => {
+    if (!locationId) return true;
+    const branchIds = st.staffLocations?.length ? st.staffLocations.map((sl) => sl.locationId) : (st.locationId ? [st.locationId] : []);
+    if (branchIds.length === 0) return locations.length <= 1;
+    return branchIds.includes(locationId);
+  }, [locations]);
 
   // "Book again" deep-link from the Clients page (?client=<id>): pre-select that
   // client and skip straight to choosing services — no duplicate contact created.
@@ -87,10 +102,13 @@ export default function CheckoutPage() {
     api.staff.listAll(bizId).then((all) => {
       const ids = selectedServices.map((s) => s.id);
       // A provider with no explicit service assignments offers everything
-      // (sole-proprietor model) — otherwise match the assigned services.
-      setStaffList(all.filter((st) => st.active && (st.staffServices.length === 0 || ids.every((id) => st.staffServices.some((ss) => ss.serviceId === id)))));
+      // (sole-proprietor model) — otherwise match the assigned services. Also
+      // limit to providers who serve the chosen branch.
+      setStaffList(all.filter((st) => st.active
+        && (st.staffServices.length === 0 || ids.every((id) => st.staffServices.some((ss) => ss.serviceId === id)))
+        && staffServesLocation(st, selectedLocationId)));
     }).catch(() => {});
-  }, [bizId, selectedServices]);
+  }, [bizId, selectedServices, selectedLocationId, staffServesLocation]);
 
   useEffect(() => {
     if (selectedStaff !== "any") {
@@ -124,7 +142,7 @@ export default function CheckoutPage() {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const additionalServiceIds = selectedServices.slice(1).map((svc) => svc.id);
       const rows = await Promise.all(targets.map(async (staff) => {
-        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, additionalServiceIds, startDate: d, endDate: d, timezone: tz, enforceNotice: false });
+        const staffSlots = await api.availability.getSlots({ staffId: staff.id, serviceId, additionalServiceIds, startDate: d, endDate: d, timezone: tz, enforceNotice: false, locationId: selectedLocationId || undefined });
         return staffSlots.map((slot) => ({ ...slot, staffId: staff.id, staffName: staff.user.name }));
       }));
       setSlots(rows.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
@@ -183,6 +201,7 @@ export default function CheckoutPage() {
         additionalServiceIds: selectedServices.slice(1).map((s) => s.id),
         clientId: client.id, startsAt,
         allowOverride: overrideCalendar || !!customStartsAt,
+        ...(selectedLocationId ? { locationId: selectedLocationId } : {}),
         ...(selectedServices[0].locationMode === "VIRTUAL" && meetingUrl.trim()
           ? { meetingUrl: meetingUrl.trim() }
           : {}),
@@ -351,6 +370,17 @@ export default function CheckoutPage() {
             <h3 className="text-base font-semibold text-gray-900 mb-4">
               {french ? "Choisir les services pour" : "Choose services for"} <span className="text-violet-700">{selectedClient?.name ?? ""}</span>
             </h3>
+            {locations.length > 1 && (
+              <div className="mb-4">
+                <label htmlFor="checkout-location" className="block text-xs font-medium text-gray-700 mb-1.5">{french ? "Emplacement" : "Location"}</label>
+                <select id="checkout-location" value={selectedLocationId}
+                  onChange={(e) => { setSelectedLocationId(e.target.value); setSelectedStaff(null); setSelectedSlot(null); setSlots([]); }}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <option value="" disabled>{french ? "Choisir un emplacement…" : "Choose a location…"}</option>
+                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+            )}
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {allServices.map((svc) => {
                 const sel = selectedServices.some((s) => s.id === svc.id);
@@ -385,7 +415,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <Button className="w-full mt-5" disabled={selectedServices.length === 0} onClick={() => { if (showStaffStep) { setStep("staff"); } else { setSelectedStaff(allStaffList[0] ?? "any"); setStep("datetime"); } }}>
+            <Button className="w-full mt-5" disabled={selectedServices.length === 0 || (locations.length > 1 && !selectedLocationId)} onClick={() => { if (showStaffStep) { setStep("staff"); } else { setSelectedStaff(allStaffList[0] ?? "any"); setStep("datetime"); } }}>
               {french ? "Continuer" : "Continue"} — {selectedServices.length} {french ? `service${selectedServices.length !== 1 ? "s" : ""}` : `service${selectedServices.length !== 1 ? "s" : ""}`}
             </Button>
           </div>

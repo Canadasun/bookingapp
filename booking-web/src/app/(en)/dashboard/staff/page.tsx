@@ -51,7 +51,7 @@ export default function StaffPage() {
 
   const { user } = useCurrentUser();
   const bizId = user?.businessId ?? "";
-  const { dictionary } = useDashboardLocale();
+  const { dictionary, french } = useDashboardLocale();
   const t = dictionary.staff;
 
   const load = useCallback(async () => {
@@ -88,6 +88,13 @@ export default function StaffPage() {
   async function save() {
     if (!form.name || !form.email) { toast.error(t.toasts.nameEmailRequired); return; }
     if (!bizId) return;
+    // Warn (don't block) when a provider is left with no branch in a
+    // multi-location business — they won't appear in any booking flow.
+    if (locations.filter((l) => l.active).length > 1 && form.locationIds.length === 0) {
+      toast.warning(french
+        ? "Ce professionnel n’est affecté à aucun emplacement et n’apparaîtra pas dans les réservations."
+        : "This provider isn't assigned to any location and won't appear in bookings.");
+    }
     setSaving(true);
     try {
       if (!editing) {
@@ -95,9 +102,17 @@ export default function StaffPage() {
         const res = await api.staff.invite(bizId, {
           name: form.name, email: form.email, bio: form.bio || undefined, serviceIds: selectedServiceIds,
         });
-        // Invite can't carry an avatar/permissions — set them right after on the new staff record.
+        // Invite can't carry an avatar/permissions/locations — set them right
+        // after on the new staff record. Surface failures instead of swallowing
+        // them, so the owner knows the branch/permissions didn't stick.
         if ((form.avatarUrl || form.permissions.length || form.locationIds.length) && res.staff?.id) {
-          await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions, locationIds: form.locationIds }).catch(() => {});
+          try {
+            await api.staff.update(bizId, res.staff.id, { avatarUrl: form.avatarUrl || undefined, permissions: form.permissions, locationIds: form.locationIds });
+          } catch {
+            toast.warning(french
+              ? "Invitation envoyée, mais l’affectation aux emplacements/permissions a échoué — modifiez le professionnel pour réessayer."
+              : "Invite sent, but assigning locations/permissions failed — edit the provider to retry.");
+          }
         }
         setInvited({ email: form.email, password: res.tempPassword });
         toast.success(t.toasts.invited);
