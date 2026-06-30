@@ -72,7 +72,7 @@ export function CityLandingPage({
             <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
             <span className="text-base font-bold text-slate-900 tracking-tight">Pulse Booking</span>
           </Link>
-          <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
+          <Link href={`/register${fr ? "?lang=fr" : ""}`} className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
             {fr ? "Commencer gratuitement" : "Get started free"}
           </Link>
         </div>
@@ -94,7 +94,7 @@ export function CityLandingPage({
             ? `Pulse aide ${primaryAudience} à ${city} à prendre des réservations en ligne, à percevoir des acomptes, à envoyer des rappels et à protéger leurs revenus grâce à une tarification pensée pour le Canada.`
             : `Pulse helps ${primaryAudience} in ${city} take bookings online, collect deposits, send reminders, and protect revenue with Canada-first pricing.`}
         </p>
-        <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">
+        <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">
           {fr ? "Commencer gratuitement" : "Get started free"}
         </Link>
         <p className="mt-4 text-sm text-slate-400">{fr ? "Aucune carte de crédit requise · Annulez à tout moment · Prix en CAD" : "No credit card required · Cancel anytime · CAD pricing"}</p>
@@ -139,7 +139,7 @@ export function CityLandingPage({
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-2xl font-bold text-white mb-3">{fr ? `Commencez à prendre des réservations à ${city} dès aujourd’hui` : `Start taking ${city} bookings today`}</h2>
           <p className="text-white/60 mb-8">{fr ? "Créez votre compte gratuit en 2 minutes. Aucune carte de crédit requise." : "Create your free account in 2 minutes. No credit card required."}</p>
-          <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
+          <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
             {fr ? "Commencer gratuitement" : "Get started free"}
           </Link>
         </div>

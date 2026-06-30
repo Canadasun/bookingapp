@@ -58,7 +58,7 @@ export function FeaturesContent({ dict, locale }: { dict: Dictionary["features"]
           <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">{dict.h1}</h1>
           <p className="mt-5 text-lg leading-8 text-slate-600">{dict.intro}</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/register" className="inline-flex items-center justify-center rounded-lg bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800">
+            <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="inline-flex items-center justify-center rounded-lg bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800">
               {dict.startFree}
             </Link>
             <Link href={locale === "fr" ? "/fr/pricing" : "/demo"} className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">

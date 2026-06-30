@@ -25,6 +25,9 @@ export const RegisterSchema = z.object({
   marketingConsent: z.boolean().default(false),
   trackingConsent: z.boolean().default(false),
   consentVersion: z.string().trim().min(1).max(40).default('2026-06-13'),
+  // Communication language for this user's account (drives staff-facing
+  // notifications). Captured at signup from the marketing/locale funnel.
+  locale: z.enum(['en', 'fr']).default('en'),
 });
 
 export const LoginSchema = z.object({

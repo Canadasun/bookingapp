@@ -48,8 +48,8 @@ export function IndustryPage({
           </Link>
           <div className="flex items-center gap-4">
             <Link href={pricingHref} className="text-sm text-slate-600 hover:text-violet-600 hidden sm:block">{fr ? "Tarifs" : "Pricing"}</Link>
-            <Link href="/login" className="text-sm text-slate-600 hover:text-violet-600 hidden sm:block">{fr ? "Se connecter" : "Sign in"}</Link>
-            <Link href="/register" className="text-sm font-semibold bg-violet-600 text-white rounded-lg px-4 py-1.5 hover:bg-violet-700 transition-colors">{fr ? "Commencer gratuitement" : "Get started free"}</Link>
+            <Link href={`/login${fr ? "?lang=fr" : ""}`} className="text-sm text-slate-600 hover:text-violet-600 hidden sm:block">{fr ? "Se connecter" : "Sign in"}</Link>
+            <Link href={`/register${fr ? "?lang=fr" : ""}`} className="text-sm font-semibold bg-violet-600 text-white rounded-lg px-4 py-1.5 hover:bg-violet-700 transition-colors">{fr ? "Commencer gratuitement" : "Get started free"}</Link>
           </div>
         </div>
       </nav>
@@ -61,7 +61,7 @@ export function IndustryPage({
           <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4 leading-tight">{headline}</h1>
           <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">{subheadline}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold text-base rounded-xl px-6 py-3.5 hover:bg-violet-700 transition-colors">
+            <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold text-base rounded-xl px-6 py-3.5 hover:bg-violet-700 transition-colors">
               {cta}
             </Link>
             <Link href={pricingHref} className="inline-flex items-center justify-center bg-white border border-slate-200 text-slate-700 font-semibold text-base rounded-xl px-6 py-3.5 hover:border-violet-300 transition-colors">
@@ -152,7 +152,7 @@ export function IndustryPage({
           <p className="text-sm font-semibold uppercase tracking-wider text-violet-200 mb-2"><span aria-hidden="true">🇨🇦</span> {fr ? "Conçu pour le Canada" : "Built for Canada"}</p>
           <h2 className="text-2xl font-bold mb-3">{fr ? "Prix en CAD. TPS/TVH intégrées. Conforme à la LPRPDE." : "Prices in CAD. GST/HST built in. PIPEDA-aware."}</h2>
           <p className="text-violet-100 text-base mb-6 max-w-xl mx-auto">{fr ? "Aucune surprise de conversion de devises. Champs de taxes inclus. Pratiques de confidentialité alignées sur le droit canadien." : "No currency conversion surprises. Tax fields included. Privacy practices aligned with Canadian law."}</p>
-          <Link href="/register" className="inline-block bg-white text-violet-700 font-semibold text-base rounded-xl px-6 py-3 hover:bg-violet-50 transition-colors">
+          <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-block bg-white text-violet-700 font-semibold text-base rounded-xl px-6 py-3 hover:bg-violet-50 transition-colors">
             {fr ? "Commencez gratuitement aujourd’hui →" : "Start free today →"}
           </Link>
         </div>

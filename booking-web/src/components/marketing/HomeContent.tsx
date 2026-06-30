@@ -87,7 +87,7 @@ export function HomeContent({
           </div>
           <div className="flex items-center gap-3">
             <LanguageToggle locale={locale} enHref="/" frHref="/fr" label={h.toggleLabel} />
-            <LandingAuthCta t={h.authCta} />
+            <LandingAuthCta t={h.authCta} locale={locale} />
           </div>
         </div>
       </nav>
@@ -116,7 +116,7 @@ export function HomeContent({
           <p className="animate-fade-up-d2 text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">{h.hero.subtitle}</p>
 
           <div className="animate-fade-up-d3">
-            <LandingHeroCta t={h.heroCta} />
+            <LandingHeroCta t={h.heroCta} locale={locale} />
           </div>
         </div>
 
@@ -380,7 +380,7 @@ export function HomeContent({
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-amber-500/30">
             <ArrowRight className="w-5 h-5 text-white" />
           </div>
-          <LandingBottomCta t={h.bottomCta} />
+          <LandingBottomCta t={h.bottomCta} locale={locale} />
         </div>
       </section>
 

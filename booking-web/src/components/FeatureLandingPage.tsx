@@ -109,7 +109,7 @@ export function FeatureLandingPage({
           </Link>
           <div className="flex items-center gap-3">
             <LanguageToggle locale={locale} enHref={enHref} frHref={frHref} label={ui.toggleLabel} />
-            <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
+            <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
               {ui.getStartedFree}
             </Link>
           </div>
@@ -128,7 +128,7 @@ export function FeatureLandingPage({
           </span>
         </h1>
         <p className="text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">{description}</p>
-        <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">
+        <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="inline-flex items-center justify-center gap-2 bg-violet-600 text-white font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-200">
           {ui.getStartedFree}
         </Link>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2">
@@ -222,7 +222,7 @@ export function FeatureLandingPage({
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-2xl font-bold text-white mb-3">{ctaTitle}</h2>
           <p className="text-white/60 mb-8">{ctaText}</p>
-          <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
+          <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
             {ui.getStartedFree}
           </Link>
         </div>

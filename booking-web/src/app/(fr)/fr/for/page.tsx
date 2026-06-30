@@ -71,7 +71,7 @@ export default function ForPageFr() {
           ))}
         </div>
         <div className="mt-8 text-center">
-          <Link href="/register" className="inline-block bg-violet-600 text-white font-semibold text-sm rounded-xl px-6 py-3 hover:bg-violet-700 transition-colors">
+          <Link href="/register?lang=fr" className="inline-block bg-violet-600 text-white font-semibold text-sm rounded-xl px-6 py-3 hover:bg-violet-700 transition-colors">
             Commencer gratuitement — tous les secteurs →
           </Link>
         </div>

@@ -121,7 +121,7 @@ export function ComparePage({
           <div className="flex items-center gap-4">
             <Link href={pricingHref} className="text-sm text-slate-600 hover:text-violet-600 hidden sm:block">{fr ? "Tarifs" : "Pricing"}</Link>
             <Link href="/migrate" className="text-sm text-slate-600 hover:text-violet-600 hidden sm:block">{fr ? "Migration gratuite" : "Free Migration"}</Link>
-            <Link href="/register" className="text-sm font-semibold bg-violet-600 text-white rounded-lg px-4 py-1.5 hover:bg-violet-700 transition-colors">
+            <Link href={`/register${fr ? "?lang=fr" : ""}`} className="text-sm font-semibold bg-violet-600 text-white rounded-lg px-4 py-1.5 hover:bg-violet-700 transition-colors">
               {fr ? "Essayer gratuitement →" : "Try free →"}
             </Link>
           </div>
@@ -154,7 +154,7 @@ export function ComparePage({
           <p className="text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">{summary}</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Link
-              href="/register"
+              href={`/register${fr ? "?lang=fr" : ""}`}
               className="inline-flex items-center gap-2 bg-violet-600 text-white font-semibold text-sm rounded-xl px-6 py-2.5 hover:bg-violet-700 transition-colors"
             >
               {fr ? "Commencez gratuitement — sans carte de crédit" : "Start free — no credit card"}
@@ -266,7 +266,7 @@ export function ComparePage({
             {fr ? "Forfait gratuit sans limite de temps. Prix en CAD. Aucune carte de crédit requise." : "Free plan with no time limit. CAD pricing. No credit card required."}
           </p>
           <Link
-            href="/register"
+            href={`/register${fr ? "?lang=fr" : ""}`}
             className="inline-flex items-center gap-2 bg-violet-600 text-white font-semibold text-base rounded-xl px-8 py-3.5 hover:bg-violet-700 transition-colors"
           >
             {fr ? "Commencer gratuitement →" : "Get started free →"}

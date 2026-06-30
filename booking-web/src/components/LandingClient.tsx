@@ -14,7 +14,7 @@ function homeFor(user: SessionUser | null): string | null {
 type HeroCtaT = { getStarted: string; signIn: string; dashboard: string; book: string };
 
 // Hero CTA: logged-in users see a way into the app instead of sign-in / sign-up.
-export function LandingHeroCta({ t }: { t: HeroCtaT }) {
+export function LandingHeroCta({ t, locale = "en" }: { t: HeroCtaT; locale?: "en" | "fr" }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
@@ -32,10 +32,10 @@ export function LandingHeroCta({ t }: { t: HeroCtaT }) {
   }
   return (
     <div className="flex flex-col sm:flex-row items-center gap-4">
-      <Link href="/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 text-white text-base font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-xl shadow-violet-200">
+      <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 text-white text-base font-semibold px-8 py-4 rounded-xl hover:bg-violet-700 transition-colors shadow-xl shadow-violet-200">
         <Sparkles className="w-5 h-5" /> {t.getStarted}
       </Link>
-      <Link href="/login" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/90 text-slate-800 text-base font-semibold px-8 py-4 rounded-xl border border-[#E9DDCB] hover:bg-violet-50 transition-colors">
+      <Link href={`/login${locale === "fr" ? "?lang=fr" : ""}`} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/90 text-slate-800 text-base font-semibold px-8 py-4 rounded-xl border border-[#E9DDCB] hover:bg-violet-50 transition-colors">
         {t.signIn} <ArrowRight className="w-4 h-4" />
       </Link>
     </div>
@@ -48,7 +48,7 @@ type BottomCtaT = {
 };
 
 // Bottom band: prospects get the marketing CTA; logged-in users get a "jump back in".
-export function LandingBottomCta({ t }: { t: BottomCtaT }) {
+export function LandingBottomCta({ t, locale = "en" }: { t: BottomCtaT; locale?: "en" | "fr" }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
   const home = homeFor(user);
@@ -71,10 +71,10 @@ export function LandingBottomCta({ t }: { t: BottomCtaT }) {
       <h2 className="text-3xl font-bold text-white mb-4">{t.title}</h2>
       <p className="text-white/60 mb-8">{t.subtitle}</p>
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
+        <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors">
           <Sparkles className="w-5 h-5" /> {t.getStarted}
         </Link>
-        <Link href="/login" className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
+        <Link href={`/login${locale === "fr" ? "?lang=fr" : ""}`} className="inline-flex items-center gap-2 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-colors">
           {t.signIn} <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
@@ -194,8 +194,8 @@ export function LandingFooterLinks({ t, locale = "en" }: { t: FooterT; locale?: 
   }
   return (
     <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-      <Link href="/register" className="hover:text-indigo-600 transition-colors">{t.getStarted}</Link>
-      <Link href="/login" className="hover:text-indigo-600 transition-colors">{t.signIn}</Link>
+      <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="hover:text-indigo-600 transition-colors">{t.getStarted}</Link>
+      <Link href={`/login${locale === "fr" ? "?lang=fr" : ""}`} className="hover:text-indigo-600 transition-colors">{t.signIn}</Link>
       {legalLinks}
       {publicLinks}
     </div>
@@ -206,7 +206,7 @@ type AuthCtaT = { signIn: string; getStarted: string; greeting: string; dashboar
 
 // Nav CTA that adapts to the session: a logged-in owner/staff/client sees a quick
 // link into their dashboard instead of Sign in / Get started.
-export function LandingAuthCta({ t }: { t: AuthCtaT }) {
+export function LandingAuthCta({ t, locale = "en" }: { t: AuthCtaT; locale?: "en" | "fr" }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   useEffect(() => { setUser(getUser()); }, []);
 
@@ -224,8 +224,8 @@ export function LandingAuthCta({ t }: { t: AuthCtaT }) {
   }
   return (
     <div className="flex items-center gap-3">
-      <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-violet-700 transition-colors">{t.signIn}</Link>
-      <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">{t.getStarted}</Link>
+      <Link href={`/login${locale === "fr" ? "?lang=fr" : ""}`} className="text-sm font-medium text-slate-700 hover:text-violet-700 transition-colors">{t.signIn}</Link>
+      <Link href={`/register${locale === "fr" ? "?lang=fr" : ""}`} className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">{t.getStarted}</Link>
     </div>
   );
 }

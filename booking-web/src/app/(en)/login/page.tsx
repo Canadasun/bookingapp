@@ -11,6 +11,8 @@ import { getUser } from "@/lib/auth";
 import { safeNextPath } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { LanguageToggle } from "@/components/marketing/LanguageToggle";
+import { useAuthLocale } from "@/lib/useAuthLocale";
 
 async function readJson<T>(res: Response): Promise<T | null> {
   const text = await res.text();
@@ -22,7 +24,7 @@ async function readJson<T>(res: Response): Promise<T | null> {
   }
 }
 
-function LoginForm() {
+function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/";
@@ -66,7 +68,7 @@ function LoginForm() {
           setUnverified(true);
           return;
         }
-        throw new Error(body?.message ?? "Invalid credentials");
+        throw new Error(body?.message ?? (fr ? "Identifiants invalides" : "Invalid credentials"));
       }
       setUnverified(false);
       const data = await readJson<{ twoFactorRequired?: boolean; challengeId?: string; method?: string; isAdmin?: boolean }>(res);
@@ -76,7 +78,7 @@ function LoginForm() {
       }
       go();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Login failed");
+      toast.error(err instanceof Error ? err.message : (fr ? "Échec de la connexion" : "Login failed"));
     } finally {
       setLoading(false);
     }
@@ -96,11 +98,11 @@ function LoginForm() {
       });
       if (!res.ok) {
         const body = await readJson<{ message?: string }>(res);
-        throw new Error(body?.message ?? "Invalid or expired code");
+        throw new Error(body?.message ?? (fr ? "Code invalide ou expiré" : "Invalid or expired code"));
       }
       go();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Verification failed");
+      toast.error(err instanceof Error ? err.message : (fr ? "Échec de la vérification" : "Verification failed"));
     } finally {
       setLoading(false);
     }
@@ -114,9 +116,9 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      toast.success("Verification email sent — check your inbox.");
+      toast.success(fr ? "Courriel de vérification envoyé — vérifiez votre boîte de réception." : "Verification email sent — check your inbox.");
     } catch {
-      toast.error("Could not send verification email. Please try again.");
+      toast.error(fr ? "Impossible d’envoyer le courriel de vérification. Veuillez réessayer." : "Could not send verification email. Please try again.");
     } finally {
       setResendLoading(false);
     }
@@ -126,14 +128,16 @@ function LoginForm() {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-gray-700">
-          Your email address hasn&apos;t been verified yet. We&apos;ve sent a new link to <strong>{email}</strong>.
+          {fr
+            ? <>Votre adresse courriel n’a pas encore été vérifiée. Nous avons envoyé un nouveau lien à <strong>{email}</strong>.</>
+            : <>Your email address hasn&apos;t been verified yet. We&apos;ve sent a new link to <strong>{email}</strong>.</>}
         </p>
-        <p className="text-xs text-gray-500">Didn&apos;t receive it?</p>
+        <p className="text-xs text-gray-500">{fr ? "Vous ne l’avez pas reçu?" : "Didn't receive it?"}</p>
         <Button onClick={handleResend} loading={resendLoading} variant="outline" className="w-full">
-          Resend verification email
+          {fr ? "Renvoyer le courriel de vérification" : "Resend verification email"}
         </Button>
         <button type="button" onClick={() => setUnverified(false)} className="text-xs text-violet-600 hover:underline">
-          Back to login
+          {fr ? "Retour à la connexion" : "Back to login"}
         </button>
       </div>
     );
@@ -144,17 +148,17 @@ function LoginForm() {
       <form onSubmit={handleVerify} className="space-y-4">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">
-            {recoveryMode ? "Enter a recovery code" : "Enter your verification code"}
+            {recoveryMode ? (fr ? "Saisissez un code de récupération" : "Enter a recovery code") : (fr ? "Saisissez votre code de vérification" : "Enter your verification code")}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             {recoveryMode
-              ? "Enter one of the one-time recovery codes you saved when you turned on two-factor sign-in."
-              : `We sent a 6-digit code to your ${challenge.method === "SMS" ? "phone" : "email"}. It expires in 10 minutes.`}
+              ? (fr ? "Saisissez l’un des codes de récupération à usage unique que vous avez enregistrés lors de l’activation de la connexion à deux facteurs." : "Enter one of the one-time recovery codes you saved when you turned on two-factor sign-in.")
+              : (fr ? `Nous avons envoyé un code à 6 chiffres à votre ${challenge.method === "SMS" ? "téléphone" : "courriel"}. Il expire dans 10 minutes.` : `We sent a 6-digit code to your ${challenge.method === "SMS" ? "phone" : "email"}. It expires in 10 minutes.`)}
           </p>
         </div>
         {recoveryMode ? (
           <Input
-            aria-label="Recovery code"
+            aria-label={fr ? "Code de récupération" : "Recovery code"}
             autoComplete="off"
             placeholder="xxxxx-xxxxx"
             value={recovery}
@@ -165,7 +169,7 @@ function LoginForm() {
           />
         ) : (
           <Input
-            aria-label="Verification code"
+            aria-label={fr ? "Code de vérification" : "Verification code"}
             inputMode="numeric"
             autoComplete="one-time-code"
             placeholder="123456"
@@ -179,23 +183,23 @@ function LoginForm() {
         {!challenge.isAdmin && (
           <label className="flex items-center gap-2 text-xs text-slate-600 select-none cursor-pointer">
             <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="rounded border-slate-300" />
-            Remember this device for 30 days (skip codes here)
+            {fr ? "Se souvenir de cet appareil pendant 30 jours (ignorer les codes ici)" : "Remember this device for 30 days (skip codes here)"}
           </label>
         )}
-        <Button type="submit" loading={loading} className="w-full" size="lg">Verify &amp; sign in</Button>
+        <Button type="submit" loading={loading} className="w-full" size="lg">{fr ? "Vérifier et se connecter" : "Verify & sign in"}</Button>
         <button
           type="button"
           onClick={() => setRecoveryMode((m) => !m)}
           className="w-full text-center text-xs text-violet-600 hover:underline font-medium"
         >
-          {recoveryMode ? "Use the code we sent instead" : "Lost access? Use a recovery code"}
+          {recoveryMode ? (fr ? "Utiliser plutôt le code que nous avons envoyé" : "Use the code we sent instead") : (fr ? "Accès perdu? Utilisez un code de récupération" : "Lost access? Use a recovery code")}
         </button>
         <button
           type="button"
           onClick={() => { setChallenge(null); setCode(""); setRecovery(""); setRecoveryMode(false); }}
           className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
         >
-          ← Back to sign in
+          {fr ? "← Retour à la connexion" : "← Back to sign in"}
         </button>
       </form>
     );
@@ -221,7 +225,7 @@ function LoginForm() {
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
-          Continue with Google
+          {fr ? "Continuer avec Google" : "Continue with Google"}
         </a>
         {process.env.NEXT_PUBLIC_APPLE_CLIENT_ID && (
           <a
@@ -231,70 +235,89 @@ function LoginForm() {
             <svg className="w-4 h-4 flex-none" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.42.07 2.4.83 3.23.85.97-.13 1.9-.89 3.13-.95 2.03.05 3.52.9 4.45 2.28-1.95 1.23-1.58 3.95.32 4.91-.48 1.37-1.11 2.74-3.13 3.77zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
             </svg>
-            Continue with Apple
+            {fr ? "Continuer avec Apple" : "Continue with Apple"}
           </a>
         )}
       </div>
 
       <div className="relative flex items-center">
         <div className="flex-1 border-t border-slate-200" />
-        <span className="mx-3 text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
+        <span className="mx-3 text-xs font-medium uppercase tracking-wide text-slate-400">{fr ? "ou" : "or"}</span>
         <div className="flex-1 border-t border-slate-200" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-          <Input id="login-email" type="email" placeholder="you@example.com" value={email}
+          <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-1.5">{fr ? "Courriel" : "Email"}</label>
+          <Input id="login-email" type="email" placeholder={fr ? "vous@exemple.com" : "you@example.com"} value={email}
             onChange={(e) => setEmail(e.target.value)} required autoFocus />
         </div>
         <div>
-          <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+          <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1.5">{fr ? "Mot de passe" : "Password"}</label>
           <div className="relative">
             <Input id="login-password" type={showPw ? "text" : "password"} placeholder="••••••••" value={password}
               onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
             <button type="button" onClick={() => setShowPw((p) => !p)}
-              aria-label={showPw ? "Hide password" : "Show password"}
+              aria-label={showPw ? (fr ? "Masquer le mot de passe" : "Hide password") : (fr ? "Afficher le mot de passe" : "Show password")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
           <div className="flex justify-end mt-1.5">
-            <Link href="/forgot-password" className="text-xs text-violet-600 hover:underline font-medium">Forgot password?</Link>
+            <Link href={`/forgot-password${langSuffix}`} className="text-xs text-violet-600 hover:underline font-medium">{fr ? "Mot de passe oublié?" : "Forgot password?"}</Link>
           </div>
         </div>
-        <Button type="submit" loading={loading} className="w-full" size="lg">Sign in</Button>
+        <Button type="submit" loading={loading} className="w-full" size="lg">{fr ? "Se connecter" : "Sign in"}</Button>
       </form>
     </div>
   );
 }
 
-export default function LoginPage() {
+function LoginPageInner() {
+  const searchParams = useSearchParams();
+  const fr = useAuthLocale();
+  const langSuffix = fr ? "?lang=fr" : "";
+  const home = fr ? "/fr" : "/";
+
+  const enParams = new URLSearchParams(searchParams.toString()); enParams.delete("lang");
+  const frParams = new URLSearchParams(searchParams.toString()); frParams.set("lang", "fr");
+  const enHref = `/login${enParams.toString() ? `?${enParams}` : ""}`;
+  const frHref = `/login?${frParams}`;
+
   return (
     <main id="main-content" className="min-h-screen flex flex-col items-center justify-center brand-shell px-4">
       <div className="w-full max-w-sm">
+        <div className="flex justify-center mb-4">
+          <LanguageToggle locale={fr ? "fr" : "en"} enHref={enHref} frHref={frHref} label={fr ? "Langue" : "Language"} />
+        </div>
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block">
+          <Link href={home} className="inline-block">
             <Image src="/logo.png" alt="Pulse Booking" width={80} height={80} className="w-20 h-auto mx-auto" />
           </Link>
-          <p className="text-slate-600 mt-3 text-sm">Sign in to your dashboard</p>
-          <Link href="/" className="mt-2 inline-block text-xs font-medium text-slate-500 hover:text-violet-600 hover:underline">
-            Back to homepage
+          <p className="text-slate-600 mt-3 text-sm">{fr ? "Connectez-vous à votre tableau de bord" : "Sign in to your dashboard"}</p>
+          <Link href={home} className="mt-2 inline-block text-xs font-medium text-slate-500 hover:text-violet-600 hover:underline">
+            {fr ? "Retour à l’accueil" : "Back to homepage"}
           </Link>
         </div>
 
         <Card>
           <CardContent className="pt-6">
-            <Suspense>
-              <LoginForm />
-            </Suspense>
+            <LoginForm fr={fr} langSuffix={langSuffix} />
 
             <p className="text-center text-xs text-gray-500 mt-6">
-              <Link href="/register" className="text-violet-600 hover:underline font-medium transition-colors">Create business account</Link>
+              <Link href={`/register${langSuffix}`} className="text-violet-600 hover:underline font-medium transition-colors">{fr ? "Créer un compte d’entreprise" : "Create business account"}</Link>
             </p>
           </CardContent>
         </Card>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageInner />
+    </Suspense>
   );
 }

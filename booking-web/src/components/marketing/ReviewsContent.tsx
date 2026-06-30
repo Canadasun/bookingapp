@@ -60,7 +60,7 @@ export function ReviewsContent({ locale }: { locale: "en" | "fr" }) {
                 : "Pulse helps service businesses collect and publish review signals from real clients instead of relying on placeholder testimonials."}
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/register" className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800">
+              <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-800">
                 {fr ? "Commencer à recueillir des avis" : "Start collecting reviews"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="/trust" className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">

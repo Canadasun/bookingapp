@@ -55,7 +55,7 @@ export function PricingContent({
           <div className="flex items-center gap-3">
             <LanguageToggle locale={locale} enHref="/pricing" frHref="/fr/pricing" label={dict.toggleLabel} />
             <Link
-              href="/register"
+              href={`/register${locale === "fr" ? "?lang=fr" : ""}`}
               className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors"
             >
               {dict.nav.cta}
@@ -184,7 +184,7 @@ export function PricingContent({
           <h2 className="text-2xl font-bold text-white mb-3">{dict.ctaSection.title}</h2>
           <p className="text-white/60 mb-8">{dict.ctaSection.subtitle}</p>
           <Link
-            href="/register"
+            href={`/register${locale === "fr" ? "?lang=fr" : ""}`}
             className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-8 py-4 rounded-xl hover:bg-violet-50 transition-colors"
           >
             <Sparkles className="h-5 w-5" /> {dict.ctaSection.button}

@@ -151,6 +151,7 @@ describe('AuthService.register', () => {
       consentVersion: 'v1',
       marketingConsent: false,
       trackingConsent: false,
+      locale: 'en',
     });
     // Demo data seeding is fire-and-forget (void); flush microtasks so the
     // createOwnerDemoData chain completes before assertions run.

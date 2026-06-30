@@ -46,7 +46,7 @@ export function AboutContent({ locale }: { locale: "en" | "fr" }) {
             <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
             <span className="text-base font-bold text-slate-900 tracking-tight">Pulse Booking</span>
           </Link>
-          <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
+          <Link href={`/register${fr ? "?lang=fr" : ""}`} className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
             {fr ? "Commencer gratuitement" : "Get started free"}
           </Link>
         </div>

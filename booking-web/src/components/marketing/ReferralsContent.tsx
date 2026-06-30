@@ -63,7 +63,7 @@ export function ReferralsContent({ locale }: { locale: "en" | "fr" }) {
             <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="h-8 w-8 object-contain" />
             <span className="text-base font-bold tracking-tight">Pulse Appointments</span>
           </Link>
-          <Link href="/register" className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+          <Link href={`/register${fr ? "?lang=fr" : ""}`} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
             {fr ? "Commencer gratuitement" : "Start free"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>

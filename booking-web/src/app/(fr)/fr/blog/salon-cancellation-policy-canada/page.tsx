@@ -50,7 +50,7 @@ export default function SalonCancellationPolicyPostFr() {
             <Image src="/logo-icon.png" alt="Pulse" width={32} height={32} className="w-8 h-8 object-contain" />
             <span className="text-base font-bold text-slate-900 tracking-tight">Pulse Booking</span>
           </Link>
-          <Link href="/register" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
+          <Link href="/register?lang=fr" className="text-sm font-medium bg-violet-600 text-white px-4 py-2 rounded-xl hover:bg-violet-700 shadow-md shadow-violet-200 transition-colors">
             Commencer gratuitement
           </Link>
         </div>
@@ -121,7 +121,7 @@ export default function SalonCancellationPolicyPostFr() {
         <div className="mt-12 rounded-2xl bg-[#19212B] p-8 text-center">
           <h2 className="text-xl font-bold text-white mb-2">Rendez votre politique plus facile à appliquer</h2>
           <p className="text-white/60 mb-6 text-sm">Utilisez les acomptes, les rappels et la carte en dossier dans Pulse.</p>
-          <Link href="/register" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-6 py-3 rounded-xl hover:bg-violet-50 transition-colors">
+          <Link href="/register?lang=fr" className="inline-flex items-center gap-2 bg-white text-violet-600 font-semibold px-6 py-3 rounded-xl hover:bg-violet-50 transition-colors">
             Commencer gratuitement avec Pulse →
           </Link>
         </div>

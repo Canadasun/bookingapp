@@ -91,6 +91,7 @@ export class AuthService {
           passwordHash,
           role: dto.role,
           businessId,
+          locale: dto.locale,
         },
       });
 
