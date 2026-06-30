@@ -1,5 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Languages } from "lucide-react";
+
+// Remember the visitor's explicit language choice so the logged-in dashboard
+// (which has its own EN/FR toggle keyed on this same value) opens in the same
+// language after sign-in, instead of always defaulting to English.
+function rememberLocale(locale: "en" | "fr") {
+  try { localStorage.setItem("pulse_dashboard_locale", locale); } catch {}
+}
 
 // A two-option EN / FR segmented control. The site defaults to English at the
 // canonical URLs; this toggle lets a visitor deliberately switch to the French
@@ -34,6 +43,7 @@ export function LanguageToggle({
       <Link
         href={enHref}
         hrefLang="en-CA"
+        onClick={() => rememberLocale("en")}
         aria-current={locale === "en" ? "true" : undefined}
         className={`${base} ${locale === "en" ? active : inactive}`}
       >
@@ -42,6 +52,7 @@ export function LanguageToggle({
       <Link
         href={frHref}
         hrefLang="fr-CA"
+        onClick={() => rememberLocale("fr")}
         aria-current={locale === "fr" ? "true" : undefined}
         className={`${base} ${locale === "fr" ? active : inactive}`}
       >
