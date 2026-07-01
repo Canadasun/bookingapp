@@ -10,6 +10,7 @@ import {
   MessageSquare, Menu as MenuIcon, CalendarPlus, Bell, CheckSquare, Scissors,
   DollarSign, BarChart3, FileText, Search, Megaphone, Settings as SettingsIcon,
   ShieldCheck, LifeBuoy, Globe, MapPin, Check,
+  AlertTriangle, Sparkles, Clock,
 } from "lucide-react";
 import { api, type Business, type Location, type SearchGroup } from "@/lib/api";
 import { clearSession, useCurrentUser, type SessionUser } from "@/lib/auth";
@@ -405,6 +406,85 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
       </div>
     </div>
   );
+}
+
+// Billing / plan status bar. Shows (in priority order) a past-due card warning,
+// a complimentary-plan expiry countdown, or a scheduled-cancellation nudge —
+// mirroring the lifecycle emails so owners see the same signals in-app.
+function BillingBanner({ biz }: { biz: Business | null }) {
+  const { french } = useDashboardLocale();
+  const [sub, setSub] = useState<{ status: string | null; cancelAtPeriodEnd: boolean; currentPeriodEnd: string | null } | null>(null);
+
+  useEffect(() => {
+    api.subscriptions
+      .get()
+      .then((s) => setSub({ status: s.status, cancelAtPeriodEnd: s.cancelAtPeriodEnd, currentPeriodEnd: s.currentPeriodEnd }))
+      .catch(() => {});
+  }, []);
+
+  if (!biz) return null;
+  const billingHref = "/dashboard/settings?tab=billing";
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(french ? "fr-CA" : "en-CA", { dateStyle: "medium" });
+
+  // 1) Payment past due — highest priority.
+  if (sub?.status === "PAST_DUE") {
+    return (
+      <div className="flex items-center justify-between gap-3 bg-red-50 border-b border-red-200 px-4 py-2.5 text-sm text-red-800">
+        <span className="flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          {french
+            ? "Votre dernier paiement a échoué. Mettez à jour votre carte pour ne pas perdre vos fonctionnalités payantes."
+            : "Your last payment failed. Update your card to avoid losing your paid features."}
+        </span>
+        <Link href={billingHref} className="font-medium underline underline-offset-2 hover:text-red-900 shrink-0">
+          {french ? "Mettre à jour la carte" : "Update card"}
+        </Link>
+      </div>
+    );
+  }
+
+  // 2) Complimentary-plan countdown — turns urgent (red) in the final 3 days.
+  const compIso = biz.complimentaryPlanExpiresAt;
+  if (compIso && new Date(compIso).getTime() > Date.now()) {
+    const daysLeft = Math.ceil((new Date(compIso).getTime() - Date.now()) / 86_400_000);
+    const urgent = daysLeft <= 3;
+    const tone = urgent
+      ? "bg-red-50 border-red-200 text-red-800"
+      : "bg-amber-50 border-amber-200 text-amber-800";
+    const dayWord = french ? (daysLeft > 1 ? "jours" : "jour") : (daysLeft > 1 ? "days" : "day");
+    return (
+      <div className={cn("flex items-center justify-between gap-3 border-b px-4 py-2.5 text-sm", tone)}>
+        <span className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 shrink-0" />
+          {french
+            ? `Accès ${biz.plan} gratuit — ${daysLeft} ${dayWord} restant${daysLeft > 1 ? "s" : ""} (jusqu’au ${fmtDate(compIso)}). Abonnez-vous pour le conserver.`
+            : `Complimentary ${biz.plan} access — ${daysLeft} ${dayWord} left (until ${fmtDate(compIso)}). Subscribe to keep it.`}
+        </span>
+        <Link href={billingHref} className={cn("font-medium underline underline-offset-2 shrink-0", urgent ? "hover:text-red-900" : "hover:text-amber-900")}>
+          {french ? "Choisir un forfait" : "Choose a plan"}
+        </Link>
+      </div>
+    );
+  }
+
+  // 3) Scheduled cancellation — reactivation nudge.
+  if (sub?.cancelAtPeriodEnd && sub.status && sub.status !== "CANCELED") {
+    return (
+      <div className="flex items-center justify-between gap-3 bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-800">
+        <span className="flex items-center gap-2">
+          <Clock className="w-4 h-4 shrink-0" />
+          {french
+            ? `Votre forfait est programmé pour être annulé${sub.currentPeriodEnd ? ` le ${fmtDate(sub.currentPeriodEnd)}` : ""}. Vous conservez l’accès jusque-là.`
+            : `Your plan is set to cancel${sub.currentPeriodEnd ? ` on ${fmtDate(sub.currentPeriodEnd)}` : ""}. You keep access until then.`}
+        </span>
+        <Link href={billingHref} className="font-medium underline underline-offset-2 hover:text-amber-900 shrink-0">
+          {french ? "Réactiver" : "Reactivate"}
+        </Link>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function TwoFactorRecommendation({ user }: { user: SessionUser | null }) {
@@ -936,6 +1016,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <PendingCheckoutClaim enabled={!!user?.businessId} />
         <EmailVerificationBanner user={user} />
+        <BillingBanner biz={biz} />
         <TwoFactorRecommendation user={user} />
         <main id="main-content" className="flex-1 min-w-0 overflow-x-hidden p-3 sm:p-5 xl:p-6">{children}</main>
       </div>

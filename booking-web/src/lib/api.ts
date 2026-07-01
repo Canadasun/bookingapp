@@ -126,6 +126,7 @@ export interface Business {
   currency: "CAD" | "USD";
   plan: "FREE" | "BASIC" | "PRO" | "UNLIMITED";
   planExpiresAt?: string;
+  complimentaryPlanExpiresAt?: string | null;
   suspended?: boolean;
   verificationStatus?: VerificationStatus;
   capabilities?: {
