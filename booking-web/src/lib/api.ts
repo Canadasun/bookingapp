@@ -139,6 +139,7 @@ export interface Business {
   taxProvince?: string | null;
   locations?: {
     id: string;
+    slug?: string | null;
     name: string;
     address?: string | null;
     phone?: string | null;
@@ -150,6 +151,7 @@ export interface Business {
     cancellationPolicy?: string | null;
     requireDeposit?: boolean | null;
     depositPercent?: number | null;
+    hours?: { dayOfWeek: number; startTime: string; endTime: string }[];
   }[];
   suspectedDuplicateOfId?: string | null;
   stripeConnectOnboarded?: boolean;

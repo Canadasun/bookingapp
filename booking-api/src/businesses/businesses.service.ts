@@ -326,12 +326,13 @@ export class BusinessesService {
     // A deactivated business is hidden from the public — its booking page reads
     // as "not found" so no new bookings can come in while it's paused.
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    const [locations, reviewAgg, hours] = await Promise.all([
+    const [locations, reviewAgg, allHours] = await Promise.all([
       this.prisma.location.findMany({
         where: { businessId: business.id, active: true },
         orderBy: { name: 'asc' },
         select: {
           id: true,
+          slug: true,
           name: true,
           address: true,
           phone: true,
@@ -353,23 +354,47 @@ export class BusinessesService {
       this.prisma.businessHours.findMany({
         where: { businessId: business.id },
         orderBy: { dayOfWeek: 'asc' },
-        select: { dayOfWeek: true, startTime: true, endTime: true },
+        select: { dayOfWeek: true, startTime: true, endTime: true, locationId: true },
       }),
     ]);
     const reviewCount = reviewAgg._count;
     const averageRating = reviewCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null;
-    return { ...this.publicBusiness(business), locations, reviewCount, averageRating, hours };
+    return {
+      ...this.publicBusiness(business),
+      locations: this.attachLocationHours(locations, allHours),
+      reviewCount,
+      averageRating,
+      hours: allHours.map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })),
+    };
+  }
+
+  // Attach each branch's own opening hours to the public location payload. A
+  // branch uses its own rows (BusinessHours.locationId === branch.id) or falls
+  // back to the business-level hours (locationId === null) when it has none —
+  // this feeds the per-location booking page's LocalBusiness schema.
+  private attachLocationHours<T extends { id: string }>(
+    locations: T[],
+    allHours: { dayOfWeek: number; startTime: string; endTime: string; locationId: string | null }[],
+  ): (T & { hours: { dayOfWeek: number; startTime: string; endTime: string }[] })[] {
+    const strip = (h: { dayOfWeek: number; startTime: string; endTime: string }) =>
+      ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime });
+    const businessLevel = allHours.filter((h) => h.locationId === null).map(strip);
+    return locations.map((loc) => {
+      const own = allHours.filter((h) => h.locationId === loc.id).map(strip);
+      return { ...loc, hours: own.length ? own : businessLevel };
+    });
   }
 
   async findPublicById(id: string) {
     const business = await this.findOne(id);
     if (business.suspended) throw new NotFoundException('This business is not currently accepting online bookings');
-    const [locations, reviewAgg] = await Promise.all([
+    const [locations, reviewAgg, allHours] = await Promise.all([
       this.prisma.location.findMany({
         where: { businessId: business.id, active: true },
         orderBy: { name: 'asc' },
         select: {
           id: true,
+          slug: true,
           name: true,
           address: true,
           phone: true,
@@ -388,21 +413,49 @@ export class BusinessesService {
         _avg: { rating: true },
         _count: true,
       }),
+      this.prisma.businessHours.findMany({
+        where: { businessId: business.id },
+        orderBy: { dayOfWeek: 'asc' },
+        select: { dayOfWeek: true, startTime: true, endTime: true, locationId: true },
+      }),
     ]);
     const reviewCount = reviewAgg._count;
     const averageRating = reviewCount > 0 ? Number((reviewAgg._avg.rating ?? 0).toFixed(1)) : null;
-    return { ...this.publicBusiness(business), locations, reviewCount, averageRating };
+    return {
+      ...this.publicBusiness(business),
+      locations: this.attachLocationHours(locations, allHours),
+      reviewCount,
+      averageRating,
+      hours: allHours.map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime })),
+    };
   }
 
-  // Sitemap: public slugs for all active, non-suspended businesses.
-  // Rate-limited at the controller layer; no auth required.
-  async getPublicSlugs(): Promise<{ slug: string; updatedAt: Date }[]> {
-    return this.prisma.business.findMany({
+  // Sitemap: public slugs for all active, non-suspended businesses, plus each
+  // business's branch slugs — but only for businesses with 2+ active locations,
+  // so single-location businesses don't get a duplicate per-branch URL competing
+  // with their /book/{slug} root. Rate-limited at the controller; no auth.
+  async getPublicSlugs(): Promise<{ slug: string; updatedAt: Date; locations: { slug: string }[] }[]> {
+    const businesses = await this.prisma.business.findMany({
       where: { suspended: false },
-      select: { slug: true, updatedAt: true },
+      select: {
+        slug: true,
+        updatedAt: true,
+        locations: {
+          where: { active: true, slug: { not: null } },
+          select: { slug: true },
+          orderBy: { name: 'asc' },
+        },
+      },
       orderBy: { updatedAt: 'desc' },
       take: 10_000,
     });
+    return businesses.map((b) => ({
+      slug: b.slug,
+      updatedAt: b.updatedAt,
+      // Prisma types slug as string|null from the relation filter; it's non-null
+      // by the where clause. Only expose branch URLs for multi-location businesses.
+      locations: b.locations.length >= 2 ? b.locations.map((l) => ({ slug: l.slug as string })) : [],
+    }));
   }
 
   // Owner pauses their business: keeps all data, hides the public booking page,

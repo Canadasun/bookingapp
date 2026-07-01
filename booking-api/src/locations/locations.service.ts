@@ -1,12 +1,31 @@
-import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { featuresUnlocked } from '../common/util/plan';
 import { isProPlan, isUnlimitedPlan } from '../common/util/plan-features';
+import { uniqueLocationSlug } from '../common/util/slug';
 import { PlanTier } from '@prisma/client';
 
 @Injectable()
-export class LocationsService {
+export class LocationsService implements OnModuleInit {
+  private readonly logger = new Logger(LocationsService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  // Backfill slugs for locations created before per-location URLs existed.
+  // Idempotent and self-healing: runs on every boot but only touches null-slug
+  // rows, so it costs nothing once the fleet is migrated.
+  async onModuleInit() {
+    const pending = await this.prisma.location.findMany({
+      where: { slug: null },
+      select: { id: true, businessId: true, name: true },
+    });
+    if (pending.length === 0) return;
+    for (const loc of pending) {
+      const slug = await uniqueLocationSlug(this.prisma, loc.businessId, loc.name);
+      await this.prisma.location.update({ where: { id: loc.id }, data: { slug } });
+    }
+    this.logger.log(`Backfilled slugs for ${pending.length} location(s)`);
+  }
 
   private locationLimit(plan: PlanTier) {
     return isUnlimitedPlan(plan) ? 5 : isProPlan(plan) ? 2 : 1;
@@ -44,10 +63,12 @@ export class LocationsService {
     // bypasses the subscription limit.
     await this.assertCanActivate(businessId);
 
+    const name = data.name.trim();
     return this.prisma.location.create({
       data: {
         businessId,
-        name: data.name.trim(),
+        name,
+        slug: await uniqueLocationSlug(this.prisma, businessId, name),
         address: data.address?.trim() || null,
         phone: data.phone?.trim() || null,
         timezone: data.timezone?.trim() || null,
