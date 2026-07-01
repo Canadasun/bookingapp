@@ -13,6 +13,7 @@ import {
   LandingSolutions,
 } from "@/components/LandingClient";
 import { LanguageToggle } from "./LanguageToggle";
+import { CanadaBrandBackdrop } from "./CanadaBrandBackdrop";
 import { HomeVideoProof } from "./HomeVideoProof";
 
 // Icons/colours live in code, paired by index with the dictionary copy so the
@@ -111,26 +112,49 @@ export function HomeContent({
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden">
+        <CanadaBrandBackdrop />
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-          <div className="animate-blob absolute -top-32 -left-28 w-[540px] h-[540px] rounded-full bg-amber-300/30 blur-3xl" />
-          <div className="animate-blob-alt absolute -top-10 right-[-10rem] w-[440px] h-[440px] rounded-full bg-teal-400/20 blur-3xl" />
-          <div className="animate-blob absolute bottom-8 left-1/2 -translate-x-1/2 w-[380px] h-[380px] rounded-full bg-orange-300/15 blur-3xl" />
+          <div className="animate-blob absolute -top-32 -left-28 w-[540px] h-[540px] rounded-full bg-amber-300/18 blur-3xl" />
+          <div className="animate-blob-alt absolute -top-10 right-[-10rem] w-[440px] h-[440px] rounded-full bg-teal-400/14 blur-3xl" />
+          <div className="animate-blob absolute bottom-8 left-1/2 -translate-x-1/2 w-[380px] h-[380px] rounded-full bg-orange-300/10 blur-3xl" />
         </div>
 
         <div className="relative max-w-3xl mx-auto px-6 pt-20 pb-8 text-center">
-          <div className="animate-fade-up inline-flex items-center gap-2 bg-white/90 border border-[#E9DDCB] text-sm font-semibold text-ink px-4 py-1.5 rounded-full mb-8 shadow-sm">
-            <CheckCircle2 className="w-4 h-4 text-violet-600" />
-            {h.hero.badge}
+          <div className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-[#E9DDCB] bg-white/92 px-4 py-1.5 text-sm font-medium text-ink shadow-sm backdrop-blur-sm mb-5">
+            <span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-1.5 py-1">
+              <Image src="/logo-icon.png" alt="" width={16} height={16} className="h-4 w-4 object-contain" />
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#D80621]" />
+              {locale === "fr" ? "SaaS d’abord canadien" : "Canada-first SaaS"}
+            </span>
           </div>
 
-          <h1 className="animate-fade-up-d1 text-5xl sm:text-6xl font-extrabold text-ink tracking-tight leading-[1.08] mb-6">
+          <h1 className="animate-fade-up-d1 text-5xl sm:text-6xl font-semibold text-ink tracking-tight leading-[1.06] mb-6">
             {h.hero.headlinePre}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D80621] via-orange-500 to-amber-500">
               {h.hero.headlineHighlight}
             </span>
           </h1>
 
-          <p className="animate-fade-up-d2 text-lg text-slate-500 max-w-xl mx-auto mb-10 leading-relaxed">{h.hero.subtitle}</p>
+          <p className="animate-fade-up-d2 text-lg text-slate-600 max-w-xl mx-auto mb-10 leading-relaxed">
+            {h.hero.subtitle}
+          </p>
+
+          <div className="animate-fade-up-d2 mb-10 flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-slate-600">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#E9DDCB] bg-white/80 px-3 py-1 shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#D80621]" />
+              {locale === "fr" ? "Conçu pour les entreprises de services canadiennes" : "Built for Canadian service businesses"}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#E9DDCB] bg-white/80 px-3 py-1 shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {locale === "fr" ? "Bilingue EN/FR" : "Bilingual EN/FR"}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#E9DDCB] bg-white/80 px-3 py-1 shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              {locale === "fr" ? "Tarification en CAD" : "CAD pricing"}
+            </span>
+          </div>
 
           <div className="animate-fade-up-d3">
             <LandingHeroCta t={h.heroCta} locale={locale} />
@@ -413,8 +437,15 @@ export function HomeContent({
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
           <div className="absolute -top-20 left-1/4 w-64 h-64 rounded-full bg-amber-500/20 blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-56 h-56 rounded-full bg-teal-400/15 blur-3xl" />
+          <div className="absolute inset-0 opacity-35">
+            <CanadaBrandBackdrop />
+          </div>
         </div>
         <div className="relative max-w-3xl mx-auto px-6 text-center">
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-4 py-1.5 text-xs font-medium tracking-[0.14em] text-white/80 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#D80621]" />
+            {locale === "fr" ? "Plateforme SaaS d’abord canadienne" : "Canada-first SaaS platform"}
+          </p>
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-amber-500/30">
             <ArrowRight className="w-5 h-5 text-white" />
           </div>
