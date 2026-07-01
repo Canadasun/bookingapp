@@ -35,8 +35,8 @@ const appleSameSite = (): "none" | "lax" => (secure() ? "none" : "lax");
 export type SSOIntent = "owner" | "client" | "register";
 export type SSOLocale = "en" | "fr";
 
-export function encodeState(intent: SSOIntent, locale: SSOLocale = "en"): string {
-  return `${randomBytes(16).toString("hex")}:${intent}:${locale}`;
+export function encodeState(intent: SSOIntent, locale?: SSOLocale): string {
+  return `${randomBytes(16).toString("hex")}:${intent}:${locale ?? "keep"}`;
 }
 
 // Apple nonce helpers — nonce is hashed before sending to Apple;
@@ -84,8 +84,9 @@ export function parseStateIntent(state: string): SSOIntent {
   return "client";
 }
 
-export function parseStateLocale(state: string): SSOLocale {
-  return state.split(":")[2] === "fr" ? "fr" : "en";
+export function parseStateLocale(state: string): SSOLocale | null {
+  const locale = state.split(":")[2];
+  return locale === "fr" || locale === "en" ? locale : null;
 }
 
 export async function persistSSOLocale(api: string, accessToken: string, locale: SSOLocale) {

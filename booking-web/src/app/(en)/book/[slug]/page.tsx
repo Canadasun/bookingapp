@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense, use } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, addMinutes, parseISO, isBefore, isAfter } from "date-fns";
 import { frCA } from "date-fns/locale";
@@ -134,13 +134,14 @@ function CartBar({ services, onClear, locale = "en" }: { services: Service[]; on
 }
 
 export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?: "slug" | "id" }) {
+  const router = useRouter();
   const searchParams  = useSearchParams();
   const locale: "en" | "fr" = searchParams.get("lang") === "fr" ? "fr" : "en";
   const isFrench = locale === "fr";
   const dateLocale = isFrench ? { locale: frCA } : undefined;
   const languageHref = (() => {
     const query = new URLSearchParams(searchParams.toString());
-    if (isFrench) query.delete("lang"); else query.set("lang", "fr");
+    query.set("lang", isFrench ? "en" : "fr");
     const suffix = query.toString();
     return suffix ? `?${suffix}` : "?";
   })();
@@ -210,6 +211,16 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     : null;
   const [revStats, setRevStats]             = useState<{ average: number; count: number; reviews: { id: string; clientName: string; rating: number; comment?: string | null }[] } | null>(null);
 
+  useEffect(() => {
+    if (!biz || searchParams.has("lang")) return;
+    const branch = biz.locations?.find((location) => location.id === selectedLocationId);
+    const defaultLocale = branch?.defaultLocale ?? biz.defaultLocale ?? "en";
+    if (defaultLocale !== "fr") return;
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("lang", "fr");
+    router.replace(`${window.location.pathname}?${query.toString()}`, { scroll: false });
+  }, [biz, router, searchParams, selectedLocationId]);
+
   // Load business by slug
   useEffect(() => {
     const loadBusiness = isBusinessIdRef ? api.business.getPublicById(slug) : api.business.getBySlug(slug);
@@ -226,20 +237,35 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       });
   }, [slug, isBusinessIdRef, isFrench]);
 
-  // Load catalogue in parallel once bizId is known.
-  // Three separate requests but issued simultaneously so they don't waterfall.
+  // Reviews and providers do not change when the selected branch changes.
   useEffect(() => {
     if (!bizId) { setActiveStaff([]); return; }
     Promise.all([
-      api.services.list(bizId).catch(() => [] as Service[]),
       api.reviews.list(bizId).catch(() => null),
       api.staff.list(bizId).catch(() => [] as StaffMember[]),
-    ]).then(([services, reviews, staff]) => {
-      setAllServices(services.filter((x) => x.active));
+    ]).then(([reviews, staff]) => {
       setRevStats(reviews);
       setActiveStaff(staff);
     });
   }, [bizId]);
+
+  // The service menu is branch-specific: the API applies enablement and price
+  // overrides when exactly one location is supplied.
+  useEffect(() => {
+    if (!bizId) { setAllServices([]); return; }
+    api.services.list(bizId, selectedLocationId ? [selectedLocationId] : undefined)
+      .then((services) => {
+        const active = services.filter((service) => service.active);
+        setAllServices(active);
+        setSelectedServices((selected) => selected
+          .map((service) => active.find((candidate) => candidate.id === service.id))
+          .filter((service): service is Service => !!service));
+      })
+      .catch(() => {
+        setAllServices([]);
+        setSelectedServices([]);
+      });
+  }, [bizId, selectedLocationId]);
 
   // A provider serves the chosen branch if it's in their multi-location set
   // (staffLocations) or matches their primary/home branch. A provider with no
@@ -577,6 +603,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const subtotalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
   const totalCents  = Math.max(0, subtotalCents - (promoResult?.discountCents ?? 0));
   const selectedLocation = biz?.locations?.find((location) => location.id === selectedLocationId);
+  const effectiveTaxRate = selectedLocation?.taxRatePercent ?? biz?.taxRatePercent ?? 0;
   const policy      = selectedLocation?.cancellationPolicy ?? biz?.cancellationPolicy ?? (isFrench ? "Les rendez-vous annulés dans les 24 heures peuvent faire l’objet de frais d’annulation." : "Appointments cancelled within 24 hours may be subject to a cancellation fee.");
 
   // Sole-proprietor first: the provider step + per-person names only appear once
@@ -774,19 +801,19 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
                 </div>
               ))}
               <hr className="border-gray-200" />
-              {(biz?.taxRatePercent ?? 0) > 0 && (
+              {effectiveTaxRate > 0 && (
                 <>
                   <div className="flex justify-between text-gray-500 text-xs">
                     <span>{isFrench ? "Sous-total" : "Subtotal"}</span><span>{fmtPrice(totalCents, biz?.currency as "CAD" | "USD", locale)}</span>
                   </div>
                   <div className="flex justify-between text-gray-500 text-xs">
-                    <span>{isFrench ? "Taxe" : "Tax"} ({biz!.taxRatePercent}%)</span><span>{fmtPrice(Math.round(totalCents * (biz!.taxRatePercent! / 100)), biz?.currency as "CAD" | "USD", locale)}</span>
+                    <span>{isFrench ? "Taxe" : "Tax"} ({effectiveTaxRate}%)</span><span>{fmtPrice(Math.round(totalCents * (effectiveTaxRate / 100)), biz?.currency as "CAD" | "USD", locale)}</span>
                   </div>
                 </>
               )}
               <div className="flex justify-between font-semibold">
                 <span>Total</span>
-                <span className="bk-brand-text">{fmtPrice(totalCents + Math.round(totalCents * ((biz?.taxRatePercent ?? 0) / 100)), biz?.currency as "CAD" | "USD", locale)}</span>
+                <span className="bk-brand-text">{fmtPrice(totalCents + Math.round(totalCents * (effectiveTaxRate / 100)), biz?.currency as "CAD" | "USD", locale)}</span>
               </div>
               <div className="flex justify-between text-gray-500 text-xs pt-1">
                 <span>{isFrench ? "Durée" : "Duration"}</span><span>{fmtDuration(totalMins)}</span>

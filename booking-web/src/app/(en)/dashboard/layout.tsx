@@ -484,10 +484,10 @@ function LocationPicker({
     location.name.toLowerCase().includes(query.trim().toLowerCase())
   );
   const label = allSelected
-    ? `All locations (${locations.length})`
+    ? (french ? `Tous les emplacements (${locations.length})` : `All locations (${locations.length})`)
     : selectedIds.length === 1
-      ? locations.find((location) => location.id === selectedIds[0])?.name ?? "Location"
-      : `${selectedIds.length} locations`;
+      ? locations.find((location) => location.id === selectedIds[0])?.name ?? (french ? "Emplacement" : "Location")
+      : (french ? `${selectedIds.length} emplacements` : `${selectedIds.length} locations`);
 
   useEffect(() => {
     if (!open) return;
@@ -572,7 +572,9 @@ function LocationPicker({
             ))}
           </div>
           <div className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
-            Dashboard data updates to the selected {selectedIds.length === 1 ? "location" : "locations"}.
+            {french
+              ? `Les données du tableau de bord correspondent ${selectedIds.length === 1 ? "à l’emplacement sélectionné" : "aux emplacements sélectionnés"}.`
+              : `Dashboard data updates to the selected ${selectedIds.length === 1 ? "location" : "locations"}.`}
           </div>
         </div>
       )}

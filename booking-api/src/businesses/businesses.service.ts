@@ -111,7 +111,7 @@ export class BusinessesService {
     return where;
   }
 
-  async dashboardOverview(id: string, user: DashboardUser, locationId?: string) {
+  async dashboardOverview(id: string, user: DashboardUser, locationIds?: string[]) {
     const business = await this.prisma.business.findUnique({
       where: { id },
       select: { id: true, timezone: true, verificationStatus: true, stripeConnectOnboarded: true },
@@ -128,8 +128,8 @@ export class BusinessesService {
     // Optional multi-location scope: when the owner focuses one branch, every
     // appointment-derived metric below filters to it (revenue too, via the
     // appointment relation). No locationId = unchanged business-wide behavior.
-    if (locationId) scopedAppointments.locationId = locationId;
-    const revenueLocationFilter = locationId ? { appointment: { locationId } } : {};
+    if (locationIds?.length) scopedAppointments.locationId = { in: locationIds };
+    const revenueLocationFilter = locationIds?.length ? { appointment: { locationId: { in: locationIds } } } : {};
     const appointmentInclude = {
       client: true,
       service: true,
@@ -292,6 +292,7 @@ export class BusinessesService {
       slug: business.slug,
       phone: business.phone,
       timezone: business.timezone,
+      defaultLocale: business.defaultLocale,
       address: business.address,
       logoUrl: business.logoUrl,
       websiteUrl: business.websiteUrl,
@@ -329,7 +330,20 @@ export class BusinessesService {
       this.prisma.location.findMany({
         where: { businessId: business.id, active: true },
         orderBy: { name: 'asc' },
-        select: { id: true, name: true, address: true },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          phone: true,
+          timezone: true,
+          defaultLocale: true,
+          taxProvince: true,
+          taxRatePercent: true,
+          requireDeposit: true,
+          depositPercent: true,
+          cancellationWindowMinutes: true,
+          cancellationPolicy: true,
+        },
       }),
       this.prisma.review.aggregate({
         where: { businessId: business.id, published: true },
@@ -354,7 +368,20 @@ export class BusinessesService {
       this.prisma.location.findMany({
         where: { businessId: business.id, active: true },
         orderBy: { name: 'asc' },
-        select: { id: true, name: true, address: true },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          phone: true,
+          timezone: true,
+          defaultLocale: true,
+          taxProvince: true,
+          taxRatePercent: true,
+          requireDeposit: true,
+          depositPercent: true,
+          cancellationWindowMinutes: true,
+          cancellationPolicy: true,
+        },
       }),
       this.prisma.review.aggregate({
         where: { businessId: business.id, published: true },

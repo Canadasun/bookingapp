@@ -7,11 +7,16 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 
-const VERIFY_DEST = { href: "/dashboard", label: "Go to your dashboard" };
-
 export default function VerifyEmailPage() {
   const router = useRouter();
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
+  const [fr, setFr] = useState(false);
+
+  useEffect(() => {
+    try {
+      setFr(localStorage.getItem("pulse_dashboard_locale") === "fr");
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token");
@@ -20,7 +25,7 @@ export default function VerifyEmailPage() {
       .then(() => {
         setState("ok");
         // Auto-return (middleware sends them via sign-in if needed).
-        setTimeout(() => router.push(VERIFY_DEST.href), 2500);
+        setTimeout(() => router.push("/dashboard"), 2500);
       })
       .catch(() => setState("error"));
   }, [router]);
@@ -32,26 +37,26 @@ export default function VerifyEmailPage() {
           {state === "loading" && (
             <>
               <Loader2 className="w-10 h-10 text-violet-600 mx-auto animate-spin" />
-              <p className="text-sm text-slate-500 mt-4">Verifying your email…</p>
+              <p className="text-sm text-slate-500 mt-4">{fr ? "Vérification du courriel…" : "Verifying your email…"}</p>
             </>
           )}
           {state === "ok" && (
             <>
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
-              <h1 className="text-lg font-bold text-slate-900 mt-4">Email verified</h1>
-              <p className="text-sm text-slate-500 mt-1">Taking you to your account… you can also continue below.</p>
-              <Link href={VERIFY_DEST.href} className="inline-block mt-6 bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
-                {VERIFY_DEST.label}
+              <h1 className="text-lg font-bold text-slate-900 mt-4">{fr ? "Courriel vérifié" : "Email verified"}</h1>
+              <p className="text-sm text-slate-500 mt-1">{fr ? "Nous vous redirigeons vers votre compte… vous pouvez aussi continuer ci-dessous." : "Taking you to your account… you can also continue below."}</p>
+              <Link href="/dashboard" className="inline-block mt-6 bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 transition-colors">
+                {fr ? "Aller au tableau de bord" : "Go to your dashboard"}
               </Link>
             </>
           )}
           {state === "error" && (
             <>
               <XCircle className="w-12 h-12 text-red-500 mx-auto" />
-              <h1 className="text-lg font-bold text-slate-900 mt-4">Link invalid or expired</h1>
-              <p className="text-sm text-slate-500 mt-1">Sign in and resend a fresh verification link from your dashboard.</p>
+              <h1 className="text-lg font-bold text-slate-900 mt-4">{fr ? "Lien invalide ou expiré" : "Link invalid or expired"}</h1>
+              <p className="text-sm text-slate-500 mt-1">{fr ? "Connectez-vous et renvoyez un nouveau lien de vérification depuis votre tableau de bord." : "Sign in and resend a fresh verification link from your dashboard."}</p>
               <Link href="/login" className="inline-block mt-6 text-sm font-semibold text-violet-600 hover:underline">
-                Sign in
+                {fr ? "Se connecter" : "Sign in"}
               </Link>
             </>
           )}

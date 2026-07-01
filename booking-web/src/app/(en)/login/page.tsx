@@ -55,11 +55,20 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
 
   async function finishLogin() {
     const locale = fr ? "fr" : "en";
-    // Persist before navigation so the dashboard paints in the language the
-    // user explicitly chose on the login page. The server copy is authoritative
-    // across devices and also drives staff-facing transactional messages.
-    localStorage.setItem("pulse_dashboard_locale", locale);
-    await api.users.updateMe({ locale }).catch(() => undefined);
+    const remembered = localStorage.getItem("pulse_dashboard_locale");
+    const explicitChoice = searchParams.has("lang") || remembered === "en" || remembered === "fr";
+    if (explicitChoice) {
+      // Only an explicit choice may replace the server preference. Merely
+      // visiting the canonical English login page on a new device must not
+      // overwrite an existing French account preference.
+      localStorage.setItem("pulse_dashboard_locale", locale);
+      await api.users.updateMe({ locale }).catch(() => undefined);
+    } else {
+      const profile = await api.users.me().catch(() => null);
+      if (profile?.locale === "en" || profile?.locale === "fr") {
+        localStorage.setItem("pulse_dashboard_locale", profile.locale);
+      }
+    }
     invalidateCurrentUser();
     go();
   }

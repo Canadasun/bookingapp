@@ -2,6 +2,37 @@ const BASE = "/proxy";
 
 let refreshPromise: Promise<boolean> | null = null;
 
+function preferredUiLocale() {
+  if (typeof window === "undefined") return "en";
+  try {
+    return localStorage.getItem("pulse_dashboard_locale") === "fr" ? "fr" : "en";
+  } catch {
+    return "en";
+  }
+}
+
+function localizeErrorMessage(message: string) {
+  if (preferredUiLocale() !== "fr") return message;
+  const map: Record<string, string> = {
+    "Session expired": "Session expirée",
+    "Password reset required": "Réinitialisation du mot de passe requise",
+    "Invalid credentials": "Identifiants invalides",
+    "Login did not return a user session": "La connexion n’a pas renvoyé de session utilisateur",
+    "Login failed": "Échec de la connexion",
+    "Verification failed": "Échec de la vérification",
+    "Could not send verification email. Please try again.": "Impossible d’envoyer le courriel de vérification. Réessayez.",
+    "Could not resend": "Impossible de renvoyer",
+    "Could not change password": "Impossible de modifier le mot de passe",
+    "New password must be at least 8 characters": "Le nouveau mot de passe doit contenir au moins 8 caractères",
+    "New passwords do not match": "Les nouveaux mots de passe ne correspondent pas",
+    "Failed to load messages": "Échec du chargement des messages",
+    "Failed to send": "Échec de l’envoi",
+    "Failed to load appointment details": "Échec du chargement des détails du rendez-vous",
+    "Appointment not found": "Rendez-vous introuvable",
+  };
+  return map[message] ?? message;
+}
+
 async function tryRefresh(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = fetch("/api/auth/refresh", { method: "POST" })
@@ -43,7 +74,7 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
       document.cookie = "booking_user=; Max-Age=0; path=/";
       window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
     }
-    throw new Error("Session expired");
+    throw new Error(localizeErrorMessage("Session expired"));
   }
 
   // The API returns 403 PASSWORD_RESET_REQUIRED when the user has a forced
@@ -55,11 +86,11 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
     const code = nested?.code ?? body.code;
     if (code === "PASSWORD_RESET_REQUIRED" && typeof window !== "undefined") {
       window.location.replace("/change-password");
-      throw new Error("Password reset required");
+      throw new Error(localizeErrorMessage("Password reset required"));
     }
     const raw = nested?.message ?? body.message;
     const msg = typeof raw === "string" ? raw : res.statusText;
-    throw new Error(msg);
+    throw new Error(localizeErrorMessage(msg));
   }
 
   if (!res.ok) {
@@ -72,7 +103,7 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
       raw = (raw as Record<string, unknown>).message;
     }
     const msg = Array.isArray(raw) ? raw.join(", ") : typeof raw === "string" ? raw : res.statusText;
-    throw new Error(msg);
+    throw new Error(localizeErrorMessage(msg));
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -82,6 +113,7 @@ async function req<T>(path: string, init?: RequestInit, token?: string | null): 
 
 export interface Business {
   id: string; name: string; slug: string; timezone: string;
+  defaultLocale?: "en" | "fr";
   email: string; phone?: string; address?: string; logoUrl?: string;
   websiteUrl?: string; instagramUrl?: string; facebookUrl?: string; tiktokUrl?: string; postVisitMessage?: string;
   bookingPageSettings: Record<string, unknown>;
@@ -104,7 +136,20 @@ export interface Business {
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
   taxProvince?: string | null;
-  locations?: { id: string; name: string; address?: string | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null; requireDeposit?: boolean | null; depositPercent?: number | null }[];
+  locations?: {
+    id: string;
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    timezone?: string | null;
+    defaultLocale?: "en" | "fr" | null;
+    taxProvince?: string | null;
+    taxRatePercent?: number | null;
+    cancellationWindowMinutes?: number | null;
+    cancellationPolicy?: string | null;
+    requireDeposit?: boolean | null;
+    depositPercent?: number | null;
+  }[];
   suspectedDuplicateOfId?: string | null;
   stripeConnectOnboarded?: boolean;
   demoSeeded?: boolean;
@@ -135,7 +180,7 @@ export interface ServiceCategory {
 
 export interface Resource { id: string; businessId: string; name: string; active: boolean; createdAt: string; updatedAt: string }
 
-export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; active: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null; createdAt: string; updatedAt: string }
+export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; defaultLocale?: "en" | "fr" | null; active: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null; createdAt: string; updatedAt: string }
 
 export interface InvoiceLineItem { description: string; quantity: number; unitCents: number; amountCents: number }
 export interface Invoice {
@@ -226,7 +271,7 @@ export interface Appointment {
   service: Service;
   staff: StaffMember;
   business: Business;
-  location?: { id: string; name: string; address?: string | null } | null;
+  location?: { id: string; name: string; address?: string | null; defaultLocale?: "en" | "fr" | null } | null;
   // Delivery mode snapshot + virtual link / mobile address for this appointment.
   locationMode?: ServiceLocationMode | null;
   meetingUrl?: string | null;
@@ -824,8 +869,8 @@ export const api = {
 
   business: {
     get: (id: string) => req<Business>(`/businesses/${id}`),
-    dashboardOverview: (id: string, locationId?: string) =>
-      req<DashboardOverview>(`/businesses/${id}/dashboard-overview${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
+    dashboardOverview: (id: string, locationIds?: string[]) =>
+      req<DashboardOverview>(`/businesses/${id}/dashboard-overview${locationIds?.length ? `?locationIds=${encodeURIComponent(locationIds.join(","))}` : ""}`),
     getBySlug: (slug: string) => req<Business>(`/businesses/slug/${slug}`),
     getPublicById: (id: string) => req<Business>(`/businesses/public/${id}`, undefined, null),
     update: (id: string, data: Partial<Omit<Business, "id" | "createdAt" | "updatedAt" | "plan" | "planExpiresAt" | "suspended" | "verificationStatus" | "stripeConnectOnboarded" | "capabilities" | "suspectedDuplicateOfId">>) =>
@@ -879,9 +924,9 @@ export const api = {
 
   locations: {
     list: (businessId: string) => req<Location[]>(`/businesses/${businessId}/locations`),
-    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null }) =>
+    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; defaultLocale?: "en" | "fr" | null; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null }) =>
       req<Location>(`/businesses/${businessId}/locations`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null }) =>
+    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; defaultLocale?: "en" | "fr" | null; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null }) =>
       req<Location>(`/businesses/${businessId}/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     remove: (businessId: string, id: string) =>
       req<{ ok: boolean }>(`/businesses/${businessId}/locations/${id}`, { method: "DELETE" }),

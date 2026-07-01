@@ -31,8 +31,8 @@ const TIMEZONES = [
   ["America/St_Johns", "Newfoundland — St. John's (NT)"],
 ] as const;
 
-type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean; taxProvince: string; taxRatePercent: string; depositMode: "" | "on" | "off"; depositPercent: string; cancellationWindowMinutes: string; cancellationPolicy: string };
-const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true, taxProvince: "", taxRatePercent: "", depositMode: "", depositPercent: "", cancellationWindowMinutes: "", cancellationPolicy: "" };
+type LocForm = { name: string; address: string; phone: string; timezone: string; defaultLocale: "" | "en" | "fr"; active: boolean; taxProvince: string; taxRatePercent: string; depositMode: "" | "on" | "off"; depositPercent: string; cancellationWindowMinutes: string; cancellationPolicy: string };
+const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", defaultLocale: "", active: true, taxProvince: "", taxRatePercent: "", depositMode: "", depositPercent: "", cancellationWindowMinutes: "", cancellationPolicy: "" };
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -79,7 +79,7 @@ export default function LocationsPage() {
   function openCreate() { setEditingId(null); setForm(emptyForm); setModalOpen(true); }
   function openEdit(l: Location) {
     setEditingId(l.id);
-    setForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", active: l.active,
+    setForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", defaultLocale: l.defaultLocale ?? "", active: l.active,
       taxProvince: l.taxProvince ?? "", taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
       depositMode: l.requireDeposit == null ? "" : l.requireDeposit ? "on" : "off",
       depositPercent: l.depositPercent != null ? String(l.depositPercent) : "",
@@ -115,6 +115,7 @@ export default function LocationsPage() {
           address: form.address.trim() || undefined,
           phone: form.phone.trim() || undefined,
           timezone: form.timezone.trim() || undefined,
+          defaultLocale: form.defaultLocale || null,
           active: form.active,
           taxProvince,
           taxRatePercent,
@@ -130,6 +131,7 @@ export default function LocationsPage() {
           address: form.address.trim() || undefined,
           phone: form.phone.trim() || undefined,
           timezone: form.timezone.trim() || undefined,
+          defaultLocale: form.defaultLocale || null,
           taxProvince,
           taxRatePercent,
           requireDeposit,
@@ -276,6 +278,16 @@ export default function LocationsPage() {
                   {TIMEZONES.map(([tz, label]) => <option key={tz} value={tz}>{label}</option>)}
                 </select>
                 <p className="mt-1 text-xs text-gray-400">{french ? "La génération des créneaux utilise ce fuseau horaire pour le personnel de cet emplacement." : "Slot generation uses this timezone for staff at this location."}</p>
+              </div>
+              <div>
+                <label htmlFor="loc-default-locale" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Langue de réservation par défaut" : "Default booking language"}</label>
+                <select id="loc-default-locale" value={form.defaultLocale}
+                  onChange={(e) => setForm((p) => ({ ...p, defaultLocale: e.target.value as LocForm["defaultLocale"] }))}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <option value="">{french ? "Paramètre de l’entreprise" : "Business default"}</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                </select>
               </div>
               <div>
                 <label htmlFor="loc-tax" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Province (taxe)" : "Tax province"}</label>

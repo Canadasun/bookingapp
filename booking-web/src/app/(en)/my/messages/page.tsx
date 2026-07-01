@@ -15,12 +15,19 @@ import { cn } from "@/lib/utils";
 export default function ClientMessagesPage() {
   const router = useRouter();
   const user = getUser();
+  const [french, setFrench] = useState(false);
   const [threads, setThreads] = useState<Array<{ businessId: string; businessName: string; clientId: string; messages: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }> }>>([]);
   const [selected, setSelected] = useState<typeof threads[0] | null>(null);
   const [reply, setReply]   = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      setFrench(localStorage.getItem("pulse_dashboard_locale") === "fr");
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (!user || user.role !== "CLIENT") { router.replace("/my/login"); return; }
@@ -35,7 +42,7 @@ export default function ClientMessagesPage() {
         if (updated) setSelected(updated);
       }
     }
-    catch { toast.error("Failed to load messages"); }
+    catch { toast.error(french ? "Échec du chargement des messages" : "Failed to load messages"); }
     finally { setLoading(false); }
   }, [selected]);
 
@@ -53,7 +60,7 @@ export default function ClientMessagesPage() {
       setReply("");
       await load();
       setTimeout(() => scrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 50);
-    } catch { toast.error("Failed to send"); }
+    } catch { toast.error(french ? "Échec de l’envoi" : "Failed to send"); }
     finally { setSending(false); }
   }
 
@@ -66,7 +73,7 @@ export default function ClientMessagesPage() {
           <Link href="/my/dashboard" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <h1 className="text-sm font-bold text-gray-900">{selected ? selected.businessName : "Messages"}</h1>
+          <h1 className="text-sm font-bold text-gray-900">{selected ? selected.businessName : (french ? "Messages" : "Messages")}</h1>
         </div>
       </header>
 
@@ -74,8 +81,8 @@ export default function ClientMessagesPage() {
         <main id="main-content" className="max-w-2xl mx-auto px-5 py-6 space-y-3">
           {threads.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
-              <p className="font-medium">No messages yet</p>
-              <p className="text-sm mt-1">Book an appointment and message the salon</p>
+              <p className="font-medium">{french ? "Aucun message pour le moment" : "No messages yet"}</p>
+              <p className="text-sm mt-1">{french ? "Prenez un rendez-vous et écrivez au salon" : "Book an appointment and message the salon"}</p>
             </div>
           ) : threads.map((t) => (
             <button key={t.clientId} onClick={() => setSelected(t)}
@@ -107,11 +114,11 @@ export default function ClientMessagesPage() {
               </div>
             ))}
             {selected.messages.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No messages yet</p>
+              <p className="text-sm text-gray-400 text-center py-8">{french ? "Aucun message pour le moment" : "No messages yet"}</p>
             )}
           </div>
           <div className="p-4 border-t border-gray-100 bg-white flex gap-2">
-            <Input placeholder="Message…" value={reply} onChange={(e) => setReply(e.target.value)}
+            <Input placeholder={french ? "Message…" : "Message…"} value={reply} onChange={(e) => setReply(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} className="flex-1" />
             <Button size="sm" onClick={send} loading={sending} disabled={!reply.trim()}>
               <Send className="w-4 h-4" />
