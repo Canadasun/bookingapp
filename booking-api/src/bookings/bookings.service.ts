@@ -1077,12 +1077,18 @@ export class BookingsService {
   // Auto-fill: when a slot opens (cancellation), notify the oldest waiting
   // entry for this exact slot first. Day-level and general service waitlist
   // entries still work as a fallback.
-  private async notifyWaitlist(appointment: { businessId: string; serviceId: string; staffId: string; startsAt: Date; endsAt: Date }) {
+  private async notifyWaitlist(appointment: { businessId: string; serviceId: string; staffId: string; startsAt: Date; endsAt: Date; locationId?: string | null }) {
     const dayStart = new Date(appointment.startsAt);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
-    const baseWhere = { businessId: appointment.businessId, status: 'WAITING' as const };
+    // Multi-location: only notify people who waitlisted for THIS branch (or who
+    // didn't specify a branch). Don't offer a Vancouver opening to someone
+    // waiting for the Toronto branch.
+    const locationWhere = appointment.locationId
+      ? { OR: [{ locationId: appointment.locationId }, { locationId: null }] }
+      : {};
+    const baseWhere = { businessId: appointment.businessId, status: 'WAITING' as const, ...locationWhere };
     const candidates = [
       { serviceId: appointment.serviceId, staffId: appointment.staffId, desiredDate: appointment.startsAt },
       { serviceId: appointment.serviceId, staffId: null, desiredDate: appointment.startsAt },
@@ -1320,13 +1326,20 @@ export class BookingsService {
   }
 
   private async assertStartsAtAvailable(staffId: string, serviceId: string, startsAt: Date, endsAt: Date, timezone: string, locationId?: string | null) {
-    const day = formatInTimeZone(startsAt, timezone, 'yyyy-MM-dd');
+    // Branch hours are stored in the BRANCH's local time, so all local-time
+    // arithmetic here must use the branch timezone (a Vancouver branch of a
+    // Toronto business is evaluated in PT). Fall back to the business timezone.
+    const branch = locationId
+      ? await this.prisma.location.findFirst({ where: { id: locationId }, select: { timezone: true } })
+      : null;
+    const tz = branch?.timezone ?? timezone;
+    const day = formatInTimeZone(startsAt, tz, 'yyyy-MM-dd');
     const slots = await this.availability.getAvailableSlots({
       staffId,
       serviceId,
       startDate: day,
       endDate: day,
-      timezone,
+      timezone: tz,
       // Anchor the slot set to the branch being booked so a multi-branch
       // provider is validated against that branch's hours/timezone.
       ...(locationId ? { locationId } : {}),
@@ -1334,15 +1347,15 @@ export class BookingsService {
     if (!slots.some((slot) => slot.startsAt.getTime() === startsAt.getTime())) {
       throw new BadRequestException('This time is outside the business availability. Please choose another slot.');
     }
-    const localStartDay = formatInTimeZone(startsAt, timezone, 'yyyy-MM-dd');
-    const localEndDay = formatInTimeZone(endsAt, timezone, 'yyyy-MM-dd');
+    const localStartDay = formatInTimeZone(startsAt, tz, 'yyyy-MM-dd');
+    const localEndDay = formatInTimeZone(endsAt, tz, 'yyyy-MM-dd');
     if (localStartDay !== localEndDay) {
       throw new BadRequestException('This appointment must fit within one business day.');
     }
 
-    const dayOfWeek = Number(formatInTimeZone(startsAt, timezone, 'i')) % 7;
-    const localStart = formatInTimeZone(startsAt, timezone, 'HH:mm');
-    const localEnd = formatInTimeZone(endsAt, timezone, 'HH:mm');
+    const dayOfWeek = Number(formatInTimeZone(startsAt, tz, 'i')) % 7;
+    const localStart = formatInTimeZone(startsAt, tz, 'HH:mm');
+    const localEnd = formatInTimeZone(endsAt, tz, 'HH:mm');
     const staff = await this.prisma.staff.findFirst({ where: { id: staffId }, select: { businessId: true } });
     const [rules, bizHours] = await Promise.all([
       this.prisma.availabilityRule.findMany({ where: { staffId, dayOfWeek } }),

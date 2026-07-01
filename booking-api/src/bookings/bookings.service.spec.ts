@@ -655,6 +655,29 @@ describe('BookingsService', () => {
       expect(waitlistUpdate).toHaveBeenCalledWith({ where: { id: 'wait1', businessId: 'biz1' }, data: { status: 'NOTIFIED' } });
     });
 
+    // Regression (BUG-6): a branch opening must only match waitlist entries for
+    // that branch (or with no branch preference) — never another branch's queue.
+    it('scopes waitlist matching to the cancelled appointment branch', async () => {
+      const waitlistFindFirst = jest.fn().mockResolvedValue({ id: 'wait1' });
+      const { svc } = await buildService({
+        appointment: {
+          findMany: jest.fn().mockResolvedValue([makeAppointment()]),
+          findUnique: jest.fn().mockResolvedValue(makeAppointment({ locationId: 'location-a' })),
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({ locationId: 'location-a' })),
+          update: jest.fn().mockResolvedValue(makeAppointment({ status: 'CANCELLED', locationId: 'location-a' })),
+        },
+        waitlistEntry: { findFirst: waitlistFindFirst, update: jest.fn().mockResolvedValue({}) },
+      });
+
+      await svc.updateStatus('apt1', { status: 'CANCELLED' }, 'biz1', true);
+
+      expect(waitlistFindFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ locationId: 'location-a' }, { locationId: null }],
+        }),
+      }));
+    });
+
     it('cancels reminders when status set to CANCELLED', async () => {
       const cancelReminders = jest.fn();
       const sendCancellation = jest.fn();
