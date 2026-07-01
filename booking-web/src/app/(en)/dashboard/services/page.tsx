@@ -6,7 +6,7 @@ import {
   FolderPlus, ChevronDown, ChevronRight, Tag, X, Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, Service, ServiceCategory, Resource, ServiceLocationMode } from "@/lib/api";
+import { api, Service, ServiceCategory, Resource, ServiceLocationMode, Location } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,9 +91,33 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
     } : { ...EMPTY_SVC, priceType: preferredPriceType() }
   );
   const [saving, setSaving] = useState(false);
-  const { dictionary } = useDashboardLocale();
+  const { dictionary, french } = useDashboardLocale();
   const t = dictionary.services.form;
   const f = (k: keyof ServiceFormState, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
+
+  // Per-location overrides (Phase A2): shown only for multi-location businesses.
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [overrides, setOverrides] = useState<{ locationId: string; enabled: boolean; price: string }[]>([]);
+  useEffect(() => {
+    if (!bizId) return;
+    api.locations.list(bizId).then((locs) => {
+      const active = locs.filter((l) => l.active);
+      setLocations(active);
+      const base = active.map((l) => ({ locationId: l.id, enabled: true, price: "" }));
+      if (editing) {
+        api.services.locationOverrides(bizId, editing.id).then((rows) => {
+          setOverrides(base.map((b) => {
+            const row = rows.find((r) => r.locationId === b.locationId);
+            return row ? { locationId: b.locationId, enabled: row.enabled, price: row.priceCents != null ? String(row.priceCents / 100) : "" } : b;
+          }));
+        }).catch(() => setOverrides(base));
+      } else {
+        setOverrides(base);
+      }
+    }).catch(() => {});
+  }, [bizId, editing]);
+  const setOverride = (locationId: string, patch: Partial<{ enabled: boolean; price: string }>) =>
+    setOverrides((p) => p.map((o) => o.locationId === locationId ? { ...o, ...patch } : o));
 
   async function save() {
     if (!form.name || !form.priceCents) { toast.error(t.nameAndPriceRequired); return; }
@@ -118,8 +142,16 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
         sortOrder: editing?.sortOrder ?? 0,
         categoryId: form.categoryId || null,
       };
-      if (editing) await api.services.update(bizId, editing.id, data);
-      else await api.services.create(bizId, data);
+      const saved = editing ? await api.services.update(bizId, editing.id, data) : await api.services.create(bizId, data);
+      // Persist per-location overrides when this is a multi-location business.
+      if (locations.length > 1) {
+        const payload = overrides.map((o) => ({
+          locationId: o.locationId,
+          enabled: o.enabled,
+          priceCents: o.price.trim() === "" ? null : Math.round(Number(o.price) * 100),
+        }));
+        await api.services.setLocationOverrides(bizId, saved.id, payload).catch(() => {});
+      }
       window.localStorage.setItem("pulse.preferred-price-type.v1", form.priceType);
       toast.success(editing ? t.serviceUpdated : t.serviceCreated);
       onSaved();
@@ -199,6 +231,33 @@ function ServiceModal({ bizId, editing, categories, resources, onClose, onSaved 
               onChange={e => f("priceCents", e.target.value)}
               min={0} step="0.01" />
           </div>
+
+          {locations.length > 1 && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+              <p className="text-sm font-medium text-gray-700">{french ? "Par emplacement" : "Per location"}</p>
+              <p className="text-xs text-gray-500 mb-2">{french ? "Désactivez ce service à une succursale ou fixez-y un prix différent. Vide = prix de base." : "Turn this service off at a branch or set a different price there. Blank = base price."}</p>
+              <div className="space-y-2">
+                {locations.map((l) => {
+                  const o = overrides.find((x) => x.locationId === l.id);
+                  if (!o) return null;
+                  return (
+                    <div key={l.id} className="flex items-center gap-2">
+                      <button type="button" onClick={() => setOverride(l.id, { enabled: !o.enabled })}
+                        aria-label={french ? "Offert ici" : "Offered here"} aria-pressed={o.enabled}
+                        className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors", o.enabled ? "bg-violet-600" : "bg-gray-300")}>
+                        <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform", o.enabled ? "translate-x-4" : "translate-x-0.5")} />
+                      </button>
+                      <span className={cn("flex-1 truncate text-sm", o.enabled ? "text-gray-800" : "text-gray-400 line-through")}>{l.name}</span>
+                      <Input type="number" min={0} step="0.01" disabled={!o.enabled}
+                        placeholder={form.priceCents || "0.00"} value={o.price}
+                        onChange={(e) => setOverride(l.id, { price: e.target.value })}
+                        className="max-w-28" aria-label={`${l.name} ${french ? "prix" : "price"}`} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t.pricingStyle}</label>

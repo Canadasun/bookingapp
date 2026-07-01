@@ -36,6 +36,15 @@ export const CreateCategorySchema = z.object({
 
 export const UpdateCategorySchema = CreateCategorySchema.partial();
 
+export const SetLocationOverridesSchema = z.object({
+  overrides: z.array(z.object({
+    locationId: z.string().min(1),
+    enabled: z.boolean(),
+    priceCents: z.number().int().min(0).max(100_000_000).nullable(),
+  })).max(100),
+});
+export type SetLocationOverridesDto = z.infer<typeof SetLocationOverridesSchema>;
+
 export type CreateServiceDto = z.infer<typeof CreateServiceSchema>;
 export type UpdateServiceDto = z.infer<typeof UpdateServiceSchema>;
 export type CreateCategoryDto = z.infer<typeof CreateCategorySchema>;
