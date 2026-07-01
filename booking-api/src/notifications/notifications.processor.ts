@@ -990,7 +990,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number; amountDueCents?: number; amountPaidCents?: number; hostedInvoiceUrl?: string | null; nextAttempt?: string | null; periodEnd?: string | null; trialEndsAt?: string | null; expiresAt?: string | null }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number; amountDueCents?: number; amountPaidCents?: number; hostedInvoiceUrl?: string | null; nextAttempt?: string | null; periodEnd?: string | null; trialEndsAt?: string | null; expiresAt?: string | null; leadId?: string }>) {
     // Access expiry is state maintenance, not a user notification, so it must
     // still run when outbound notifications are disabled.
     if (job.name === 'expire-complimentary-plans') {
@@ -1517,6 +1517,35 @@ ${aptDetails(apt)}
     // Daily card-expiry scan → proactive "your saved card is expiring" warnings.
     if (job.name === 'card-expiry-scan') {
       await this.runCardExpiryScan();
+      return;
+    }
+
+    // Concierge migration lead from the marketing site (/migrate). Prospects have
+    // no account, so this is not appointment- or business-scoped: just alert an
+    // admin so they can reach out and run the white-glove onboarding.
+    if (job.name === 'migration-lead-alert') {
+      const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
+      if (!adminEmail) return;
+      const lead = await this.prisma.migrationLead.findUnique({ where: { id: job.data.leadId! } });
+      if (!lead) return;
+      const dashUrl = `${baseUrl}/dashboard`;
+      await this.email.send({
+        to: adminEmail,
+        subject: `New migration lead: ${lead.businessName} (from ${lead.sourcePlatform})`,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">New concierge migration lead</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">A prospect requested a free white-glove migration through the marketing site. Reach out to kick off their onboarding.</p>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;width:120px">Name</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(lead.name)}</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Email</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(lead.email)}</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Business</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(lead.businessName)}</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px">Leaving</td><td style="color:#111827;font-size:13px;font-weight:600">${esc(lead.sourcePlatform)}</td></tr>
+  <tr><td style="padding:4px 0;color:#6B7280;font-size:13px;vertical-align:top">Notes</td><td style="color:#111827;font-size:13px;white-space:pre-wrap">${lead.notes ? esc(lead.notes) : '—'}</td></tr>
+</table>
+<a href="mailto:${esc(lead.email)}" style="display:inline-block;margin-top:20px;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Reply to ${esc(firstName(lead.name))} →</a>
+<p style="margin:16px 0 0;color:#9CA3AF;font-size:12px">Triage all leads in the <a href="${dashUrl}" style="color:#E9A23C">dashboard</a>.</p>
+        `, undefined, 'en'),
+      });
       return;
     }
 

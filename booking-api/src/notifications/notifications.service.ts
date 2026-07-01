@@ -405,4 +405,25 @@ export class NotificationsService implements OnModuleInit {
       { jobId: `${appointmentId}:admin-alert`, removeOnComplete: true },
     );
   }
+
+  // Alert an admin that a concierge migration lead came in from the marketing
+  // site. Best-effort: the lead is already persisted, so a skipped email is
+  // recoverable. Skips cleanly when ADMIN_ALERT_EMAIL / Resend aren't set.
+  async sendMigrationLeadAlert(leadId: string) {
+    const adminEmail = this.configService.get<string>('ADMIN_ALERT_EMAIL');
+    if (!adminEmail) {
+      this.logger.warn('ADMIN_ALERT_EMAIL not configured — migration lead alert skipped');
+      return;
+    }
+    const key = this.configService.get<string>('RESEND_API_KEY') ?? '';
+    if (!key || key.startsWith('re_placeholder')) {
+      this.logger.warn('RESEND_API_KEY not configured — migration lead alert skipped');
+      return;
+    }
+    await this.queue.add(
+      'migration-lead-alert',
+      { leadId },
+      { jobId: `migration-lead-${leadId}`, removeOnComplete: true, attempts: 2 },
+    );
+  }
 }

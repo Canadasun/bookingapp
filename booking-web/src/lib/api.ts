@@ -570,6 +570,20 @@ export interface ServiceDueItem {
 export interface SearchHit { type: string; id: string; label: string; sublabel?: string; href: string }
 export interface SearchGroup { type: string; label: string; hits: SearchHit[] }
 
+export type MigrationLeadStatus = "NEW" | "CONTACTED" | "CONVERTED" | "CLOSED";
+
+export type MigrationLead = {
+  id: string;
+  name: string;
+  email: string;
+  businessName: string;
+  sourcePlatform: string;
+  notes: string | null;
+  status: MigrationLeadStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const api = {
   get: <T>(path: string) => req<T>(path),
   events: {
@@ -753,6 +767,11 @@ export const api = {
     reject: (id: string, note?: string) => req<{ verificationStatus: VerificationStatus }>(`/admin/verifications/${id}/reject`, { method: "POST", body: JSON.stringify({ note }) }),
     duplicates: () => req<FlaggedDuplicate[]>("/admin/verifications/duplicates"),
     dismissDuplicate: (id: string) => req<{ ok: boolean }>(`/admin/verifications/${id}/duplicate-reviewed`, { method: "POST" }),
+  },
+  migrationLeads: {
+    list: () => req<MigrationLead[]>("/admin/migration-leads"),
+    updateStatus: (id: string, status: MigrationLeadStatus) =>
+      req<MigrationLead>(`/admin/migration-leads/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   },
 
   payments: {

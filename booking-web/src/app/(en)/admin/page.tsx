@@ -32,6 +32,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Truck,
   Users,
   X,
 } from "lucide-react";
@@ -41,6 +42,8 @@ import {
   AdminBusiness,
   AdminAuditEntry,
   FlaggedDuplicate,
+  MigrationLead,
+  MigrationLeadStatus,
   PlanTier,
   VerificationStatus,
   SystemError,
@@ -52,6 +55,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 type Tab =
   | "overview"
   | "verifications"
+  | "leads"
   | "businesses"
   | "duplicates"
   | "errors"
@@ -104,6 +108,13 @@ const statusClass: Record<VerificationStatus, string> = {
   PENDING: "bg-amber-50 text-amber-700 border-amber-200",
   REJECTED: "bg-red-50 text-red-700 border-red-200",
   UNVERIFIED: "bg-gray-50 text-gray-600 border-gray-200",
+};
+
+const leadStatusClass: Record<MigrationLeadStatus, string> = {
+  NEW: "border-emerald-300 bg-emerald-50 text-emerald-800",
+  CONTACTED: "border-blue-200 bg-blue-50 text-blue-700",
+  CONVERTED: "border-violet-300 bg-violet-50 text-violet-800",
+  CLOSED: "border-gray-200 bg-gray-50 text-gray-500",
 };
 
 const planClass: Record<PlanTier, string> = {
@@ -169,6 +180,8 @@ export default function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [queue, setQueue] = useState<Pending[]>([]);
   const [duplicates, setDuplicates] = useState<FlaggedDuplicate[]>([]);
+  const [leads, setLeads] = useState<MigrationLead[]>([]);
+  const [leadBusy, setLeadBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [sysErrors, setSysErrors] = useState<SystemError[]>([]);
@@ -240,14 +253,16 @@ export default function AdminPage() {
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      const [ov, q, dups] = await Promise.all([
+      const [ov, q, dups, migLeads] = await Promise.all([
         api.admin.overview(),
         api.adminVerifications.list(),
         api.adminVerifications.duplicates(),
+        api.migrationLeads.list(),
       ]);
       setOverview(ov);
       setQueue(q);
       setDuplicates(dups);
+      setLeads(migLeads);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not load admin data");
     } finally {
@@ -383,6 +398,8 @@ export default function AdminPage() {
     return overview.planCounts.FREE + overview.planCounts.BASIC + overview.planCounts.PRO + overview.planCounts.UNLIMITED;
   }, [overview]);
 
+  const newLeadsCount = useMemo(() => leads.filter((l) => l.status === "NEW").length, [leads]);
+
   function approve(b: Pending) {
     setDialog({
       open: true, title: `Verify "${b.name}"?`,
@@ -501,6 +518,21 @@ export default function AdminPage() {
     });
   }
 
+  async function updateLeadStatus(lead: MigrationLead, status: MigrationLeadStatus) {
+    if (lead.status === status) return;
+    setLeadBusy(lead.id);
+    // Optimistic: reflect the new status immediately, roll back on failure.
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, status } : l)));
+    try {
+      await api.migrationLeads.updateStatus(lead.id, status);
+    } catch (err) {
+      setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, status: lead.status } : l)));
+      toast.error(err instanceof Error ? err.message : "Could not update lead");
+    } finally {
+      setLeadBusy(null);
+    }
+  }
+
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
     if (passwords.next.length < 8) { toast.error("Password must be at least 8 characters"); return; }
@@ -531,6 +563,7 @@ export default function AdminPage() {
   const NAV_ITEMS: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
     { id: "overview",      label: "Overview",       icon: LayoutDashboard },
     { id: "verifications", label: "Verifications",  icon: BadgeCheck,     badge: queue.length || undefined },
+    { id: "leads",         label: "Migration Leads", icon: Truck,         badge: newLeadsCount || undefined },
     { id: "businesses",    label: "Businesses",     icon: Building2 },
     { id: "duplicates",    label: "Duplicates",     icon: AlertTriangle,  badge: duplicates.length || undefined },
     { id: "errors",        label: "Errors",         icon: Activity,       badge: unresolvedCritical || undefined },
@@ -795,6 +828,7 @@ export default function AdminPage() {
                   <div className="mt-4 space-y-2">
                     {[
                       { label: "Verification queue", count: queue.length, tab: "verifications" as Tab, icon: BadgeCheck, color: "text-violet-600" },
+                      { label: "New migration leads", count: newLeadsCount, tab: "leads" as Tab, icon: Truck, color: "text-emerald-600" },
                       { label: "Flagged duplicate accounts", count: duplicates.length, tab: "duplicates" as Tab, icon: AlertTriangle, color: "text-amber-600" },
                       { label: "Unresolved critical errors", count: unresolvedCritical, tab: "errors" as Tab, icon: Activity, color: "text-red-500" },
                     ].map((item) => (
@@ -897,6 +931,83 @@ export default function AdminPage() {
                               <iframe src={b.verificationDocUrl} title={`${b.name} verification`} sandbox="allow-same-origin" className="h-80 w-full bg-white" />
                             </div>
                           )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── MIGRATION LEADS ──────────────────────────────────────────── */}
+          {tab === "leads" && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">
+                {loading
+                  ? "Loading…"
+                  : leads.length === 0
+                    ? "No migration leads yet."
+                    : `${leads.length} lead${leads.length === 1 ? "" : "s"} · ${newLeadsCount} new`}
+              </p>
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                {loading ? (
+                  <div className="space-y-3 p-5">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />)}</div>
+                ) : leads.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-50">
+                      <Truck className="h-6 w-6 text-violet-600" />
+                    </div>
+                    <p className="font-semibold text-gray-950">No leads yet</p>
+                    <p className="mt-1 text-sm text-gray-500">Concierge migration requests from the marketing site appear here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {leads.map((lead) => {
+                      const created = new Date(lead.createdAt);
+                      return (
+                        <div key={lead.id} className="p-5">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-sm font-bold text-violet-700">
+                                {initials(lead.businessName)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-semibold text-gray-950">{lead.businessName}</p>
+                                  <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                                    Leaving {lead.sourcePlatform}
+                                  </span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-gray-500">
+                                  {lead.name} ·{" "}
+                                  <a href={`mailto:${lead.email}`} className="font-medium text-violet-600 hover:underline">{lead.email}</a>
+                                </p>
+                                {lead.notes && (
+                                  <p className="mt-2 whitespace-pre-wrap rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-600">{lead.notes}</p>
+                                )}
+                                <p className="mt-2 text-xs text-gray-400" title={format(created, "PPpp")}>
+                                  Requested {formatDistanceToNow(created, { addSuffix: true })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <select
+                                value={lead.status}
+                                disabled={leadBusy === lead.id}
+                                onChange={(e) => updateLeadStatus(lead, e.target.value as MigrationLeadStatus)}
+                                aria-label={`Status for ${lead.businessName}`}
+                                className={cn(
+                                  "rounded-lg border px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-200 cursor-pointer disabled:opacity-60",
+                                  leadStatusClass[lead.status],
+                                )}
+                              >
+                                {(["NEW", "CONTACTED", "CONVERTED", "CLOSED"] as MigrationLeadStatus[]).map((s) => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
