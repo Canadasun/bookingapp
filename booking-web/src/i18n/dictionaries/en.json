@@ -116,6 +116,14 @@
       "pill": "Booking workflow automated"
     },
     "trust": ["No credit card required", "Free forever plan", "Cancel anytime"],
+    "videoProof": {
+      "eyebrow": "See Pulse in action",
+      "title": "A real booking workflow, from start to finish",
+      "body": "Watch how a service business sets availability, accepts an online booking, protects the appointment with payment tools, and keeps the client informed.",
+      "playerTitle": "Pulse Appointments product walkthrough",
+      "playLabel": "Play the Pulse Appointments product walkthrough",
+      "privacyNote": "The YouTube player loads only after you press play."
+    },
     "tour": {
       "eyebrow": "Product tour",
       "title": "See the booking flow before you commit",

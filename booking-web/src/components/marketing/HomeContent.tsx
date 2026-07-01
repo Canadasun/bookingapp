@@ -13,6 +13,7 @@ import {
   LandingSolutions,
 } from "@/components/LandingClient";
 import { LanguageToggle } from "./LanguageToggle";
+import { HomeVideoProof } from "./HomeVideoProof";
 
 // Icons/colours live in code, paired by index with the dictionary copy so the
 // page renders identically in EN and FR with only the words changing.
@@ -39,6 +40,9 @@ export function HomeContent({
 }) {
   const h = dict.home;
   const pricingHref = locale === "fr" ? "/fr/pricing" : "/pricing";
+  const homepageVideoId = process.env.HOMEPAGE_YOUTUBE_VIDEO_ID?.trim() ?? "";
+  const validVideoId = /^[A-Za-z0-9_-]{11}$/.test(homepageVideoId) ? homepageVideoId : null;
+  const videoUploadDate = process.env.HOMEPAGE_VIDEO_UPLOAD_DATE?.trim();
 
   const jsonLdOrg = {
     "@context": "https://schema.org",
@@ -70,12 +74,25 @@ export function HomeContent({
     description: h.jsonLd.appDescription,
     offers: { "@type": "Offer", price: "0", priceCurrency: "CAD", description: h.jsonLd.offerDescription },
   };
+  const jsonLdVideo = validVideoId && /^\d{4}-\d{2}-\d{2}$/.test(videoUploadDate ?? "")
+    ? {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        name: h.videoProof.title,
+        description: h.videoProof.body,
+        thumbnailUrl: `https://i.ytimg.com/vi/${validVideoId}/maxresdefault.jpg`,
+        uploadDate: videoUploadDate,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${validVideoId}`,
+        contentUrl: `https://www.youtube.com/watch?v=${validVideoId}`,
+      }
+    : null;
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdOrg) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSite) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdApp) }} />
+      {jsonLdVideo && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdVideo) }} />}
     <div className="flex flex-col min-h-screen brand-shell">
 
       {/* ── Nav ── */}
@@ -170,6 +187,27 @@ export function HomeContent({
       {/* ── Logged-in owner shortcuts (render null for public visitors) ── */}
       <LandingResources />
       <LandingSolutions />
+
+      {/* Real product proof. Kept completely out of the DOM until a valid
+          YouTube ID is configured, so a pending asset never creates a blank or
+          fabricated-proof section on the public homepage. */}
+      {validVideoId && (
+        <section className="border-y border-[#E9DDCB] bg-[#F8F5EF] py-20">
+          <div className="mx-auto grid max-w-6xl gap-10 px-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+            <div>
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-violet-600">{h.videoProof.eyebrow}</p>
+              <h2 className="mb-4 text-3xl font-bold text-ink">{h.videoProof.title}</h2>
+              <p className="leading-relaxed text-slate-500">{h.videoProof.body}</p>
+            </div>
+            <HomeVideoProof
+              videoId={validVideoId}
+              title={h.videoProof.playerTitle}
+              playLabel={h.videoProof.playLabel}
+              privacyNote={h.videoProof.privacyNote}
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── Product tour ── */}
       <section className="py-20 border-y border-[#E9DDCB] bg-white">
