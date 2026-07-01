@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Languages } from "lucide-react";
+import { CanadaMark } from "./CanadaMark";
 
 // Remember the visitor's explicit language choice so the logged-in dashboard
 // (which has its own EN/FR toggle keyed on this same value) opens in the same
@@ -30,21 +30,23 @@ export function LanguageToggle({
   label?: string;
 }) {
   const base =
-    "rounded-md px-2.5 py-1 text-sm font-semibold transition-colors";
-  const active = "bg-violet-600 text-white";
-  const inactive = "text-slate-600 hover:text-slate-900";
+    "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] sm:text-xs font-medium tracking-[0.16em] transition-all min-w-0";
+  const active = "bg-[#D80621] text-white shadow-sm";
+  const inactive = "text-slate-500 hover:text-slate-900";
   return (
     <div
       role="group"
       aria-label={label}
-      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5"
+      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/95 p-0.5 shadow-sm"
     >
-      <Languages className="ml-1 h-4 w-4 text-slate-400" aria-hidden="true" />
+      <span className="ml-1 inline-flex items-center justify-center rounded-full bg-slate-50 px-1.5 py-1">
+        <CanadaMark className="h-3.5 w-[1.05rem]" />
+      </span>
       <Link
         href={enHref}
         hrefLang="en-CA"
         onClick={() => rememberLocale("en")}
-        aria-current={locale === "en" ? "true" : undefined}
+        aria-current={locale === "en" ? "page" : undefined}
         className={`${base} ${locale === "en" ? active : inactive}`}
       >
         EN
@@ -53,7 +55,7 @@ export function LanguageToggle({
         href={frHref}
         hrefLang="fr-CA"
         onClick={() => rememberLocale("fr")}
-        aria-current={locale === "fr" ? "true" : undefined}
+        aria-current={locale === "fr" ? "page" : undefined}
         className={`${base} ${locale === "fr" ? active : inactive}`}
       >
         FR
