@@ -797,6 +797,12 @@ export class PaymentsService {
       where: { id: businessId },
       select: { plan: true, complimentaryPlanExpiresAt: true },
     });
+    // Capture the prior cancel-at-period-end flag so we can detect a *new*
+    // scheduled cancellation (false → true) and confirm it to the owner once.
+    const prevSub = await this.prisma.subscription.findUnique({
+      where: { businessId },
+      select: { cancelAtPeriodEnd: true },
+    });
     await this.prisma.subscription.upsert({ where: { businessId }, create: { businessId, ...data }, update: data });
     const activeComplimentaryGrant = !!(
       prev?.complimentaryPlanExpiresAt &&
@@ -820,6 +826,14 @@ export class PaymentsService {
     });
     if (prev && prev.plan !== resultingPlan) {
       await this.notifications.sendPlanChanged(businessId, resultingPlan).catch(() => {});
+    }
+    // A newly scheduled cancellation (cancel-at-period-end flipped on while the
+    // plan is still active) gets its own confirmation + reactivation nudge — the
+    // plan hasn't changed yet, so the plan-changed email above wouldn't fire.
+    if (sub.cancel_at_period_end && !prevSub?.cancelAtPeriodEnd && status !== 'CANCELED') {
+      await this.notifications.sendSubscriptionCancellationScheduled(businessId, {
+        accessUntil: periodEnd ? periodEnd.toISOString() : null,
+      }).catch(() => {});
     }
     this.events.emitPlanUpdate(businessId, { plan: resultingPlan, planExpiresAt: periodEnd });
     // When a referred business becomes a paying customer, grant the referrer their
@@ -857,18 +871,25 @@ export class PaymentsService {
   }
 
   private async notifySubscriptionInvoicePaid(invoice: Stripe.Invoice, eventId: string) {
-    // Receipt only for true renewals — the first invoice is already covered by
-    // the checkout/welcome flow, so we don't double up at signup.
-    if (invoice.billing_reason !== 'subscription_cycle') return;
+    // We send for the first charge (welcome receipt) and true renewals; skip any
+    // other billing reason (manual/one-off) so we never receipt the wrong thing.
+    const isFirst = invoice.billing_reason === 'subscription_create';
+    const isRenewal = invoice.billing_reason === 'subscription_cycle';
+    if (!isFirst && !isRenewal) return;
     const businessId = await this.businessIdForSubscriptionInvoice(invoice);
     if (!businessId) return;
     const periodEndUnix = invoice.lines?.data?.[0]?.period?.end ?? null;
-    await this.notifications.sendSubscriptionRenewed(businessId, {
+    const payload = {
       eventId,
       amountPaidCents: invoice.amount_paid ?? 0,
       hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
       periodEnd: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
-    }).catch(() => {});
+    };
+    if (isFirst) {
+      await this.notifications.sendFirstPaymentReceipt(businessId, payload).catch(() => {});
+      return;
+    }
+    await this.notifications.sendSubscriptionRenewed(businessId, payload).catch(() => {});
   }
 
   private membershipStatus(status: Stripe.Subscription.Status): 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' {

@@ -517,6 +517,80 @@ export class NotificationProcessor extends WorkerHost {
     await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
   }
 
+  // Welcome receipt: the first subscription charge at signup succeeded.
+  private async sendFirstPaymentReceiptEmail(
+    businessId: string,
+    d: { amountPaidCents: number; hostedInvoiceUrl: string | null; periodEnd: string | null },
+  ) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'first-payment-receipt';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const biz = await this.prisma.business.findUnique({ where: { id: businessId }, select: { plan: true } });
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
+    if (!owners.length) return;
+    const amount = this.fmtMoney(d.amountPaidCents);
+    const plan = biz?.plan ?? '';
+    const receiptUrl = d.hostedInvoiceUrl ?? `${baseUrl}/dashboard/settings?tab=billing`;
+    for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const renews = d.periodEnd ? new Date(d.periodEnd).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' }) : null;
+      const title = fr ? `Bienvenue sur Pulse ${plan} — paiement reçu` : `Welcome to Pulse ${plan} — payment received`;
+      const body = fr
+        ? `Merci! Nous avons reçu votre premier paiement de ${amount} et votre forfait ${plan} est maintenant actif${renews ? `, avec renouvellement le ${renews}` : ''}. Toutes vos fonctionnalités sont prêtes.`
+        : `Thank you — we've received your first ${amount} payment and your ${plan} plan is now active${renews ? `, renewing on ${renews}` : ''}. All your features are ready to go.`;
+      await this.email.send({
+        to: o.email,
+        subject: title,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${receiptUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Voir la facture' : 'View invoice'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
+      }).catch(() => {});
+    }
+    await this.notifyOwners(businessId, {
+      kind: 'PAYMENT',
+      title: `Payment received — Pulse ${plan} is active`,
+      body: `Your first ${amount} payment was received. Welcome aboard!`,
+      linkUrl: '/dashboard/settings?tab=billing',
+    }).catch(() => {});
+  }
+
+  // Confirmation: the owner scheduled a cancellation (cancel at period end).
+  private async sendSubscriptionCancellationScheduledEmail(businessId: string, d: { periodEnd: string | null }) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'subscription-cancellation-scheduled';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
+    if (!owners.length) return;
+    for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const until = d.periodEnd ? new Date(d.periodEnd).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' }) : null;
+      const title = fr ? 'Votre forfait Pulse est programmé pour être annulé' : 'Your Pulse plan is set to cancel';
+      const body = fr
+        ? `Votre abonnement est programmé pour prendre fin${until ? ` le ${until}` : ' à la fin de la période en cours'}. Vous conservez un accès complet jusque-là. Vous avez changé d’avis? Réactivez à tout moment avant cette date.`
+        : `Your subscription is scheduled to end${until ? ` on ${until}` : ' at the end of your current period'}. You keep full access until then. Changed your mind? You can reactivate any time before that date.`;
+      await this.email.send({
+        to: o.email,
+        subject: title,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Réactiver mon forfait' : 'Reactivate my plan'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
+      }).catch(() => {});
+    }
+    const enUntil = this.fmtDateCa(d.periodEnd);
+    await this.notifyOwners(businessId, {
+      kind: 'PAYMENT',
+      title: 'Plan scheduled to cancel',
+      body: enUntil ? `You keep access until ${enUntil}. Reactivate any time before then.` : 'Reactivate any time before your period ends.',
+      linkUrl: '/dashboard/settings?tab=billing',
+    }).catch(() => {});
+  }
+
   // ── Complimentary / influencer plan lifecycle emails ─────────────────────
   // Welcome: an influencer/VIP was just granted a complimentary plan.
   private async sendCompPlanGrantedEmail(businessId: string, plan: string, expiresAtIso: string | null) {
@@ -1237,6 +1311,22 @@ ${aptDetails(apt)}
     if (job.name === 'trial-ending') {
       await this.sendTrialEndingEmail(String(job.data.businessId ?? ''), {
         trialEndsAt: job.data.trialEndsAt ?? null,
+      });
+      return;
+    }
+
+    if (job.name === 'first-payment-receipt') {
+      await this.sendFirstPaymentReceiptEmail(String(job.data.businessId ?? ''), {
+        amountPaidCents: Number(job.data.amountPaidCents ?? 0),
+        hostedInvoiceUrl: job.data.hostedInvoiceUrl ?? null,
+        periodEnd: job.data.periodEnd ?? null,
+      });
+      return;
+    }
+
+    if (job.name === 'subscription-cancellation-scheduled') {
+      await this.sendSubscriptionCancellationScheduledEmail(String(job.data.businessId ?? ''), {
+        periodEnd: job.data.periodEnd ?? null,
       });
       return;
     }

@@ -171,7 +171,7 @@ describe('PaymentsService subscriptions', () => {
         PaymentsService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
-        { provide: NotificationsService, useValue: { sendPlanChanged: jest.fn().mockResolvedValue(undefined) } },
+        { provide: NotificationsService, useValue: { sendPlanChanged: jest.fn().mockResolvedValue(undefined), sendSubscriptionCancellationScheduled: jest.fn().mockResolvedValue(undefined) } },
       { provide: ReferralsService, useValue: { recordReferral: jest.fn().mockResolvedValue(false), claimPendingReward: jest.fn().mockResolvedValue(null) } },
       { provide: EventsGateway, useValue: { emitPlanUpdate: jest.fn() } },
       ],
@@ -420,14 +420,18 @@ describe('PaymentsService payment-link onboarding (prefill + claim)', () => {
         findUniqueOrThrow: jest.fn().mockResolvedValue({ plan: 'PRO' }),
         update: jest.fn().mockResolvedValue({}),
       },
-      subscription: { upsert: jest.fn().mockResolvedValue({}) },
+      subscription: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn().mockResolvedValue({}) },
+    };
+    const notifications = {
+      sendPlanChanged: jest.fn().mockResolvedValue(undefined),
+      sendSubscriptionCancellationScheduled: jest.fn().mockResolvedValue(undefined),
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: { get: jest.fn().mockImplementation((k: string) => env[k]) } },
-        { provide: NotificationsService, useValue: { sendPlanChanged: jest.fn().mockResolvedValue(undefined) } },
+        { provide: NotificationsService, useValue: notifications },
         { provide: ReferralsService, useValue: { recordReferral: jest.fn(), claimPendingReward: jest.fn().mockResolvedValue(null) } },
         { provide: EventsGateway, useValue: { emitPlanUpdate: jest.fn() } },
       ],
@@ -441,7 +445,7 @@ describe('PaymentsService payment-link onboarding (prefill + claim)', () => {
       subscriptions: { retrieve: jest.fn().mockResolvedValue(subscription), update: subUpdate },
     };
     (svc as unknown as { stripe: unknown }).stripe = stripe;
-    return { svc, prisma, stripe, subUpdate };
+    return { svc, prisma, stripe, subUpdate, notifications };
   }
 
   const PAID_SESSION = {
@@ -474,6 +478,16 @@ describe('PaymentsService payment-link onboarding (prefill + claim)', () => {
     // Plan comes from metadata, not the (unknown) payment-link price ID.
     expect(prisma.business.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ plan: 'PRO' }) }));
     expect(res).toEqual({ claimed: true, plan: 'PRO' });
+  });
+
+  it('confirms a newly scheduled cancellation to the owner', async () => {
+    const canceling = { ...SUB, cancel_at_period_end: true };
+    const { svc, notifications } = await buildClaim({ PRO_MONTHLY_PLAN: 'plink_pro_m' }, PAID_SESSION, canceling);
+    await svc.claimCheckoutSubscription('biz1', 'cs_test_1');
+    expect(notifications.sendSubscriptionCancellationScheduled).toHaveBeenCalledWith(
+      'biz1',
+      expect.objectContaining({ accessUntil: expect.any(String) }),
+    );
   });
 
   it('claim refuses a subscription already linked to another business', async () => {

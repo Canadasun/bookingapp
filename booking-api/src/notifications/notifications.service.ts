@@ -102,6 +102,30 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
+  // Receipt: the first subscription charge at signup succeeded (welcome receipt).
+  async sendFirstPaymentReceipt(
+    businessId: string,
+    data: { eventId: string; amountPaidCents: number; hostedInvoiceUrl: string | null; periodEnd: string | null },
+  ) {
+    await this.queue.add('first-payment-receipt', { businessId, ...data }, {
+      jobId: `first-receipt-${data.eventId}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
+  // Confirmation: the owner scheduled a cancellation (cancel at period end).
+  async sendSubscriptionCancellationScheduled(
+    businessId: string,
+    data: { accessUntil: string | null },
+  ) {
+    await this.queue.add('subscription-cancellation-scheduled', { businessId, periodEnd: data.accessUntil }, {
+      jobId: `sub-cancel-sched-${businessId}-${data.accessUntil ?? 'na'}`,
+      removeOnComplete: true,
+      attempts: 2,
+    });
+  }
+
   // Receipt: a recurring subscription renewal succeeded.
   async sendSubscriptionRenewed(
     businessId: string,
