@@ -162,6 +162,16 @@ export interface Business {
 
 export interface IntakeQuestion { id: string; label: string; required?: boolean }
 export interface IntakeAnswer { label: string; answer: string }
+export interface FeatureTourProgress {
+  tourKey: string;
+  version: number;
+  status: "IN_PROGRESS" | "COMPLETED" | "DISMISSED";
+  currentStep: number;
+  startedAt?: string;
+  completedAt?: string | null;
+  dismissedAt?: string | null;
+  updatedAt: string;
+}
 export interface NotificationSettings {
   emailConfirmation?: boolean;
   emailReminder72h?: boolean;
@@ -672,6 +682,9 @@ export const api = {
     me: () => req<{ id: string; email: string; name: string; phone?: string | null; role: string; businessId: string | null; avatarUrl?: string | null; locale?: "en" | "fr"; createdAt: string }>("/users/me"),
     updateMe: (data: { name?: string; phone?: string | null; avatarUrl?: string | null; locale?: "en" | "fr" }) =>
       req<{ id: string; email: string; name: string; phone?: string | null; role: string; businessId: string | null; avatarUrl?: string | null; locale?: "en" | "fr" }>("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
+    featureTours: () => req<FeatureTourProgress[]>("/users/me/feature-tours"),
+    updateFeatureTour: (data: Pick<FeatureTourProgress, "tourKey" | "version" | "status" | "currentStep">) =>
+      req<FeatureTourProgress>("/users/me/feature-tours", { method: "PATCH", body: JSON.stringify(data) }),
   },
 
   notifications: {

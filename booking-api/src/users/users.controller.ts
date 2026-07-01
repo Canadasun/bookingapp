@@ -47,6 +47,13 @@ const ErasureSchema = z.object({
   reason: z.string().max(1000).optional(),
 });
 
+const TourProgressSchema = z.object({
+  tourKey: z.string().regex(/^[a-z0-9-]{1,80}$/),
+  version: z.number().int().min(1).max(1000),
+  status: z.enum(['IN_PROGRESS', 'COMPLETED', 'DISMISSED']),
+  currentStep: z.number().int().min(0).max(100).default(0),
+});
+
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
@@ -73,6 +80,19 @@ export class UsersController {
   @Get('me/device-tokens')
   listDeviceTokens(@CurrentUser() user: { id: string }) {
     return this.usersService.listDeviceTokens(user.id);
+  }
+
+  @Get('me/feature-tours')
+  featureTours(@CurrentUser() user: { id: string }) {
+    return this.usersService.featureTours(user.id);
+  }
+
+  @Patch('me/feature-tours')
+  updateFeatureTour(
+    @CurrentUser() user: { id: string },
+    @Body(new ZodValidationPipe(TourProgressSchema)) data: z.infer<typeof TourProgressSchema>,
+  ) {
+    return this.usersService.updateFeatureTour(user.id, data);
   }
 
   @Post('me/device-token')

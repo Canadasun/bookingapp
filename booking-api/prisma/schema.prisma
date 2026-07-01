@@ -121,13 +121,13 @@ model Business {
   bookingApprovalMode       String  @default("MANUAL")
 
   // Subscription
-  plan          PlanTier  @default(FREE)
-  planExpiresAt DateTime?
+  plan                       PlanTier  @default(FREE)
+  planExpiresAt              DateTime?
   // Admin-granted access that does not create or modify a Stripe subscription.
   // The previous tier is restored automatically when the grant expires.
   complimentaryPlanExpiresAt DateTime?
-  complimentaryPreviousPlan PlanTier?
-  suspended     Boolean   @default(false)
+  complimentaryPreviousPlan  PlanTier?
+  suspended                  Boolean   @default(false)
 
   // Cancellation policy text shown to clients before booking
   cancellationPolicy String @default("Appointments cancelled within 24 hours of the scheduled time may be subject to a cancellation fee.")
@@ -155,15 +155,15 @@ model Business {
   duplicateReviewedAt         DateTime?
 
   // Stripe Connect Express: the business's own connected account for payouts.
-  stripeConnectAccountId   String?
-  stripeConnectOnboarded   Boolean @default(false)
+  stripeConnectAccountId String?
+  stripeConnectOnboarded Boolean @default(false)
 
   // Tax/registration number shown on invoices (GST, HST, EIN, BN, etc.)
   taxNumber String?
 
   // UX state flags (server-side so they persist across devices/browsers)
-  demoSeeded           Boolean @default(false)
-  onboardingDismissed  Boolean @default(false)
+  demoSeeded          Boolean @default(false)
+  onboardingDismissed Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -208,6 +208,7 @@ model Business {
   migrationRequests   MigrationRequest[]
   migrationBatches    MigrationImportBatch[]
   migrationRows       MigrationImportRow[]
+  featureTourProgress FeatureTourProgress[]
 
   @@index([complimentaryPlanExpiresAt])
 }
@@ -386,7 +387,7 @@ model WaitlistEntry {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([businessId, status])
@@ -414,7 +415,7 @@ model User {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  business            Business?            @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  business            Business?             @relation(fields: [businessId], references: [id], onDelete: SetNull)
   staff               Staff?
   loginEvents         LoginEvent[]
   otpChallenges       OtpChallenge[]
@@ -424,9 +425,32 @@ model User {
   dataErasureRequests DataErasureRequest[]
   refreshSessions     RefreshSession[]
   messageThreadStates MessageThreadState[]
+  featureTourProgress FeatureTourProgress[]
 
   @@index([email])
   @@index([businessId])
+}
+
+// Versioned, cross-device product-tour state. Retaining one row per version
+// allows materially changed tours to be offered without erasing prior history.
+model FeatureTourProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  businessId  String?
+  tourKey     String
+  version     Int
+  status      String    @default("IN_PROGRESS") // IN_PROGRESS | COMPLETED | DISMISSED
+  currentStep Int       @default(0)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  dismissedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId, tourKey, version])
+  @@index([businessId, tourKey, status])
 }
 
 // One row per active sign-in (device/session). Replaces the old single
@@ -663,32 +687,32 @@ model FollowUpPolicy {
 }
 
 model Service {
-  id              String   @id @default(cuid())
-  businessId      String
-  name            String
-  description     String?
-  durationMinutes Int
-  priceCents      Int
-  priceType       String   @default("FLAT") // FLAT, PER_HOUR, STARTING_AT
+  id                String   @id @default(cuid())
+  businessId        String
+  name              String
+  description       String?
+  durationMinutes   Int
+  priceCents        Int
+  priceType         String   @default("FLAT") // FLAT, PER_HOUR, STARTING_AT
   // Where this service is delivered: IN_PERSON (at the business), VIRTUAL (video
   // call via virtualMeetingUrl), CUSTOMER (provider travels to the client), or
   // PHONE (phone-only). Drives the booking flow and what reminders include.
-  locationMode      String  @default("IN_PERSON")
+  locationMode      String   @default("IN_PERSON")
   virtualMeetingUrl String? // default meeting link sent for VIRTUAL services
-  bufferBeforeMin Int      @default(0)
-  bufferAfterMin  Int      @default(0)
-  capacity        Int      @default(1) // > 1 = group/class: that many clients can book the same slot
-  color           String   @default("#E9A23C")
-  sortOrder       Int      @default(0)
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  bufferBeforeMin   Int      @default(0)
+  bufferAfterMin    Int      @default(0)
+  capacity          Int      @default(1) // > 1 = group/class: that many clients can book the same slot
+  color             String   @default("#E9A23C")
+  sortOrder         Int      @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   categoryId       String?
   resourceId       String? // optional shared room/equipment this service occupies
-  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  category         ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  resource         Resource?        @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category         ServiceCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  resource         Resource?         @relation(fields: [resourceId], references: [id], onDelete: SetNull)
   staffServices    StaffService[]
   locationServices LocationService[]
   appointments     Appointment[]
@@ -719,38 +743,38 @@ model Resource {
 // A physical location/branch. Optional — single-location businesses have none and
 // behave as before. Staff are assigned to a location; appointments record theirs.
 model Location {
-  id         String   @id @default(cuid())
-  businessId String
-  name       String
+  id                        String   @id @default(cuid())
+  businessId                String
+  name                      String
   // URL-safe branch identifier, unique within the business. Powers the public
   // per-location booking page /book/{business.slug}/{location.slug}. Generated
   // from the name on create and kept stable thereafter so indexed URLs persist.
-  slug       String?
-  address    String?
-  phone      String?
-  timezone   String?
-  defaultLocale String? // NULL = inherit the business public-booking locale
-  active     Boolean  @default(true)
+  slug                      String?
+  address                   String?
+  phone                     String?
+  timezone                  String?
+  defaultLocale             String? // NULL = inherit the business public-booking locale
+  active                    Boolean  @default(true)
   // Per-location Canadian tax. A branch in BC collects BC's rate even if HQ is in
   // ON. NULL = fall back to the business-level tax (single-province businesses).
-  taxProvince    String? // province/territory code (e.g. BC) the rate preset came from
-  taxRatePercent Float?  // combined GST/HST/PST/QST for this branch
+  taxProvince               String? // province/territory code (e.g. BC) the rate preset came from
+  taxRatePercent            Float? // combined GST/HST/PST/QST for this branch
   // Per-location deposit policy. NULL = fall back to the business deposit setting.
-  requireDeposit Boolean? // does this branch collect a booking deposit?
-  depositPercent Int?     // % of the price taken as the deposit at this branch
+  requireDeposit            Boolean? // does this branch collect a booking deposit?
+  depositPercent            Int? // % of the price taken as the deposit at this branch
   cancellationWindowMinutes Int? // NULL = fall back to the business cancellation window
-  cancellationPolicy String? @db.Text // NULL = fall back to the business policy copy
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  cancellationPolicy        String?  @db.Text // NULL = fall back to the business policy copy
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
-  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  staff        Staff[]
-  staffLocations StaffLocation[]
-  appointments Appointment[]
-  businessHours BusinessHours[]
+  business         Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff            Staff[]
+  staffLocations   StaffLocation[]
+  appointments     Appointment[]
+  businessHours    BusinessHours[]
   businessClosures BusinessClosure[]
-  waitlist WaitlistEntry[]
-  invoices Invoice[]
+  waitlist         WaitlistEntry[]
+  invoices         Invoice[]
   locationServices LocationService[]
 
   @@unique([businessId, slug])
@@ -773,17 +797,17 @@ model Invoice {
   taxRatePercent Float     @default(0)
   taxCents       Int       @default(0)
   totalCents     Int       @default(0)
-  discountCents  Int       @default(0)  // flat discount before tax
-  discountLabel  String?               // e.g. "10% loyalty discount"
-  paymentTerms   String?               // e.g. "Net 30", "Due on receipt"
-  poNumber       String?               // purchase order reference
-  billingAddress String?               // free-text bill-to address override
+  discountCents  Int       @default(0) // flat discount before tax
+  discountLabel  String? // e.g. "10% loyalty discount"
+  paymentTerms   String? // e.g. "Net 30", "Due on receipt"
+  poNumber       String? // purchase order reference
+  billingAddress String? // free-text bill-to address override
   dueAt          DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  client   Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  client   Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
   location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
@@ -792,16 +816,16 @@ model Invoice {
 }
 
 model SystemError {
-  id         String   @id @default(cuid())
-  businessId String?  // null = platform-level error
-  category   String   // PAYMENT | BOOKING | SMS | EMAIL | CALENDAR | AUTH | GENERAL
-  severity   String   @default("ERROR") // WARN | ERROR | CRITICAL
+  id         String    @id @default(cuid())
+  businessId String? // null = platform-level error
+  category   String // PAYMENT | BOOKING | SMS | EMAIL | CALENDAR | AUTH | GENERAL
+  severity   String    @default("ERROR") // WARN | ERROR | CRITICAL
   message    String
   stack      String?
-  context    Json     @default("{}") // request path, userId, etc.
-  resolved   Boolean  @default(false)
+  context    Json      @default("{}") // request path, userId, etc.
+  resolved   Boolean   @default(false)
   resolvedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([businessId])
   @@index([category])
@@ -865,14 +889,14 @@ model TimeOff {
 // Business-level operating hours (sole-proprietor default; future staff can
 // override per-provider with their own AvailabilityRule rows).
 model BusinessHours {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   businessId String
   locationId String?
-  dayOfWeek  Int    // 0 = Sunday … 6 = Saturday
+  dayOfWeek  Int // 0 = Sunday … 6 = Saturday
   startTime  String // "HH:mm" in business timezone
   endTime    String // "HH:mm" in business timezone
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@unique([businessId, locationId, dayOfWeek])
@@ -892,7 +916,7 @@ model BusinessClosure {
   reason     String?
   createdAt  DateTime @default(now())
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
@@ -978,8 +1002,8 @@ model MigrationImportBatch {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  business Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  request  MigrationRequest?     @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  business Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  request  MigrationRequest?    @relation(fields: [requestId], references: [id], onDelete: SetNull)
   rows     MigrationImportRow[]
 
   @@index([businessId, status])
@@ -987,18 +1011,18 @@ model MigrationImportBatch {
 }
 
 model MigrationImportRow {
-  id              String   @id @default(cuid())
-  businessId      String
-  batchId         String
-  rowNumber       Int
-  status          String   @default("VALID") // VALID, INVALID, DUPLICATE, IMPORTED, SKIPPED
-  raw             Json
-  normalized      Json     @default("{}")
-  errors          String[] @default([])
-  warnings        String[] @default([])
+  id                String   @id @default(cuid())
+  businessId        String
+  batchId           String
+  rowNumber         Int
+  status            String   @default("VALID") // VALID, INVALID, DUPLICATE, IMPORTED, SKIPPED
+  raw               Json
+  normalized        Json     @default("{}")
+  errors            String[] @default([])
+  warnings          String[] @default([])
   duplicateClientId String?
   importedClientId  String?
-  createdAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
 
   business        Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
   batch           MigrationImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
@@ -1413,16 +1437,16 @@ model GoogleCalendarConnection {
 // ── Promo codes ───────────────────────────────────────────────────────────────
 enum DiscountType {
   PERCENT // discountValue is 0-100 (percentage)
-  FLAT    // discountValue is cents
+  FLAT // discountValue is cents
 }
 
 model PromoCode {
   id            String       @id @default(cuid())
   businessId    String
-  code          String       // case-insensitive coupon code, e.g. "SUMMER20"
+  code          String // case-insensitive coupon code, e.g. "SUMMER20"
   discountType  DiscountType @default(PERCENT)
-  discountValue Int          // percent or flat cents
-  maxUsages     Int?         // null = unlimited
+  discountValue Int // percent or flat cents
+  maxUsages     Int? // null = unlimited
   usageCount    Int          @default(0)
   expiresAt     DateTime?
   active        Boolean      @default(true)
@@ -1450,7 +1474,7 @@ model MembershipPlan {
   businessId      String
   name            String
   description     String?
-  priceMonthly    Int      // cents per month
+  priceMonthly    Int // cents per month
   active          Boolean  @default(true)
   stripeProductId String?
   stripePriceId   String?

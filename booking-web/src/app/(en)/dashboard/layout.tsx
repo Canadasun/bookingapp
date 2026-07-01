@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
 import { LOCATIONS_CHANGED_EVENT, LocationScopeContext } from "@/lib/location-scope";
 import { DashboardLocaleContext, useDashboardLocale } from "@/lib/dashboard-locale";
+import { FeatureDiscoveryTours } from "@/components/FeatureDiscoveryTours";
 
 interface NavItem {
   href: string;
@@ -195,12 +196,21 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
     : pathname.startsWith(item.href.split("?")[0]) || childActive;
   const Icon = item.icon;
 
+  useEffect(() => {
+    const revealTarget = (event: Event) => {
+      const target = (event as CustomEvent<string>).detail;
+      if (item.children?.some((child) => child.href === target)) setOpen(true);
+    };
+    window.addEventListener("pulse:tour-target", revealTarget);
+    return () => window.removeEventListener("pulse:tour-target", revealTarget);
+  }, [item.children]);
+
   if (item.children) {
     // A group whose header has a real href (not "#") is also a destination: the
     // label navigates to that hub page, while a separate chevron toggles children.
     const hasHub = item.href !== "#";
     return (
-      <div>
+      <div data-tour-target={item.href}>
         <div
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
@@ -225,7 +235,7 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
               if (!c.href || !c.label) return null;
               const showBadge = c.href === "/dashboard/messages" && unreadMessages > 0;
               return (
-                <Link key={c.href} href={c.href} onClick={onClose}
+                <Link key={c.href} href={c.href} onClick={onClose} data-tour-target={c.href}
                   className={cn(
                     "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                     childIsActive(c.href)
@@ -248,7 +258,7 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
   }
 
   return (
-    <Link href={item.href} onClick={onClose}
+    <Link href={item.href} onClick={onClose} data-tour-target={item.href}
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
         active ? "bg-violet-100 text-violet-800 font-semibold" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
@@ -455,8 +465,10 @@ function EmailVerificationBanner({ user }: { user: SessionUser | null }) {
 function BillingBanner({ biz }: { biz: Business | null }) {
   const { french } = useDashboardLocale();
   const [sub, setSub] = useState<{ status: string | null; cancelAtPeriodEnd: boolean; currentPeriodEnd: string | null } | null>(null);
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    setNow(Date.now());
     api.subscriptions
       .get()
       .then((s) => setSub({ status: s.status, cancelAtPeriodEnd: s.cancelAtPeriodEnd, currentPeriodEnd: s.currentPeriodEnd }))
@@ -486,8 +498,8 @@ function BillingBanner({ biz }: { biz: Business | null }) {
 
   // 2) Complimentary-plan countdown — turns urgent (red) in the final 3 days.
   const compIso = biz.complimentaryPlanExpiresAt;
-  if (compIso && new Date(compIso).getTime() > Date.now()) {
-    const daysLeft = Math.ceil((new Date(compIso).getTime() - Date.now()) / 86_400_000);
+  if (compIso && now !== null && new Date(compIso).getTime() > now) {
+    const daysLeft = Math.ceil((new Date(compIso).getTime() - now) / 86_400_000);
     const urgent = daysLeft <= 3;
     const tone = urgent
       ? "bg-red-50 border-red-200 text-red-800"
@@ -718,6 +730,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [locationsLoading, setLocationsLoading] = useState(true);
   const [dashboardLocale, setDashboardLocale] = useState<"en" | "fr">("en");
+  const [tourCatalogOpen, setTourCatalogOpen] = useState(false);
   const french = dashboardLocale === "fr";
 
   useEffect(() => {
@@ -917,6 +930,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <LocationScopeContext.Provider value={locationScope}>
     <div className="dashboard-shell flex brand-shell">
       <CommandPalette open={commandOpen} nav={nav} onClose={() => setCommandOpen(false)} canSearchData={user?.role === "OWNER"} />
+      <FeatureDiscoveryTours
+        enabled={user?.role === "OWNER" && !!biz}
+        autoStart={!!biz?.onboardingDismissed}
+        french={french}
+        catalogOpen={tourCatalogOpen}
+        onCatalogClose={() => setTourCatalogOpen(false)}
+      />
 
       {/* ── Sidebar ─────────────────────────────────────────────────── */}
       <aside
@@ -969,6 +989,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
             <LifeBuoy className="w-4 h-4" /> {french ? "Aide et soutien" : "Help & Support"}
           </Link>
+          {user?.role === "OWNER" && (
+            <button type="button" onClick={() => { setOpen(false); setTourCatalogOpen(true); }}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-violet-50 hover:text-violet-700 transition-colors">
+              <Sparkles className="w-4 h-4" /> {french ? "Visites guidées" : "Product tours"}
+            </button>
+          )}
           <button onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
             <LogOut className="w-4 h-4" /> {french ? "Se déconnecter" : "Sign out"}
