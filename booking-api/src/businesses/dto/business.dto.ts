@@ -72,7 +72,7 @@ export const CreateBusinessSchema = z.object({
   allowClientCancel: z.boolean().default(true),
   bookingApprovalMode: z.enum(['AUTO', 'MANUAL']).default('MANUAL'),
   cancellationPolicy: optionalString(5000),
-  currency: z.enum(['CAD', 'USD']).default('CAD'),
+  currency: z.enum(['CAD']).default('CAD'),
   plan: z.enum(['FREE', 'BASIC', 'PRO', 'UNLIMITED']).optional(),
 });
 

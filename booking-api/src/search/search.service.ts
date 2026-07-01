@@ -62,7 +62,8 @@ export class SearchService {
     const push = (type: string, label: string, hits: SearchHit[]) => {
       if (hits.length) groups.push({ type, label, hits });
     };
-    const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+    const money = (cents: number) =>
+      new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(cents / 100);
 
     push('client', 'Clients', clients.map((c) => ({
       type: 'client',

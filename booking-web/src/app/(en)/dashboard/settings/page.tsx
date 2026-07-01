@@ -575,7 +575,7 @@ function SettingsPage() {
         noShowFeeCents: Math.max(0, Number(form.noShowFeeCents ?? 0)),
         cancellationFeeCents: Math.max(0, Number(form.cancellationFeeCents ?? 0)),
         collectCardOnFile: !!form.collectCardOnFile,
-        currency: (form.currency as "CAD" | "USD") ?? "CAD",
+        currency: "CAD",
         allowClientReschedule: form.allowClientReschedule !== false,
         allowClientCancel: form.allowClientCancel !== false,
         bookingApprovalMode: (form.bookingApprovalMode as "AUTO" | "MANUAL") ?? "MANUAL",
@@ -826,10 +826,9 @@ function SettingsPage() {
                     <Input id="set-address" value={(form.address as string) ?? ""} onChange={(e) => f("address", e.target.value)} placeholder={t.profile.addressFieldPlaceholder} />
                   </Field>
                   <Field label={t.profile.currency} htmlFor="biz-currency">
-                    <select id="biz-currency" value={(form.currency as string) ?? "CAD"} onChange={(e) => f("currency", e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                    <select id="biz-currency" value="CAD" disabled
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
                       <option value="CAD">{t.profile.currencyCad}</option>
-                      <option value="USD">{t.profile.currencyUsd}</option>
                     </select>
                   </Field>
                 </div>

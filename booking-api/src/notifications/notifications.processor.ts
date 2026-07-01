@@ -406,31 +406,41 @@ export class NotificationProcessor extends WorkerHost {
     this.currentBusinessId = businessId;
     this.currentType = 'plan-changed';
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
-    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
     if (!owners.length) return;
-    const perks: Record<string, string> = {
+    const perksEn: Record<string, string> = {
       BASIC: 'Deposits, card-on-file, client messaging replies, win-back emails and recurring follow-ups are now unlocked.',
       PRO: 'Everything in Basic, plus automatic no-show & late-cancellation charging, SMS reminders, and 2-way texting with your booked clients.',
       UNLIMITED: 'Everything in Pro is now active across all your locations. Multi-location management, full SMS reach across every branch, and Pulse branding removal are all enabled.',
       FREE: 'Your subscription was cancelled — your account is back on the Free plan. You can re-subscribe any time.',
     };
-    const title = plan === 'FREE' ? 'Your plan was cancelled' : `You're now on the ${plan} plan 🎉`;
-    const body = perks[plan] ?? `Your plan is now ${plan}.`;
+    const perksFr: Record<string, string> = {
+      BASIC: 'Les acomptes, la carte enregistrée, les réponses aux messages clients, les courriels de reconquête et les suivis récurrents sont maintenant activés.',
+      PRO: 'Tout ce qu’inclut Basic, plus la facturation automatique des absences et annulations tardives, les rappels par SMS et la messagerie texte bidirectionnelle avec vos clients.',
+      UNLIMITED: 'Tout ce qu’inclut Pro est maintenant actif dans tous vos établissements. Gestion multi-établissements, portée SMS complète sur chaque succursale et retrait de la marque Pulse sont activés.',
+      FREE: 'Votre abonnement a été annulé — votre compte est revenu au forfait gratuit. Vous pouvez vous réabonner à tout moment.',
+    };
     for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const title = plan === 'FREE'
+        ? (fr ? 'Votre forfait a été annulé' : 'Your plan was cancelled')
+        : (fr ? `Vous êtes maintenant sur le forfait ${plan} 🎉` : `You're now on the ${plan} plan 🎉`);
+      const body = (fr ? perksFr : perksEn)[plan] ?? (fr ? `Votre forfait est maintenant ${plan}.` : `Your plan is now ${plan}.`);
       await this.email.send({
         to: o.email,
         subject: title,
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)}</p>
-<a href="${baseUrl}/dashboard/settings" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Open your dashboard →</a>
-`),
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Ouvrir votre tableau de bord' : 'Open your dashboard'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
     }
+    const titleEn = plan === 'FREE' ? 'Your plan was cancelled' : `You're now on the ${plan} plan 🎉`;
     await this.notifyOwners(businessId, {
       kind: 'SYSTEM',
-      title,
-      body,
+      title: titleEn,
+      body: perksEn[plan] ?? `Your plan is now ${plan}.`,
       linkUrl: '/dashboard/settings',
     }).catch(() => {});
   }
@@ -454,28 +464,34 @@ export class NotificationProcessor extends WorkerHost {
     this.currentBusinessId = businessId;
     this.currentType = 'subscription-payment-failed';
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
-    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
     if (!owners.length) return;
     const amount = this.fmtMoney(d.amountDueCents);
-    const retryDate = this.fmtDateCa(d.nextAttempt);
-    const retryLine = retryDate
-      ? `We will automatically retry on ${retryDate}. Update your card now to avoid any interruption.`
-      : `Please update your payment method now to keep your plan active.`;
     const manageUrl = d.hostedInvoiceUrl ?? `${baseUrl}/dashboard/settings?tab=billing`;
-    const title = "Your Pulse payment did not go through";
-    const body = `We could not process your ${amount} subscription payment. ${retryLine}`;
     for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const retryDate = d.nextAttempt ? new Date(d.nextAttempt).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' }) : null;
+      const retryLine = retryDate
+        ? (fr ? `Nous réessaierons automatiquement le ${retryDate}. Mettez à jour votre carte dès maintenant pour éviter toute interruption.` : `We will automatically retry on ${retryDate}. Update your card now to avoid any interruption.`)
+        : (fr ? `Veuillez mettre à jour votre moyen de paiement dès maintenant pour garder votre forfait actif.` : `Please update your payment method now to keep your plan active.`);
+      const title = fr ? 'Votre paiement Pulse n’a pas abouti' : 'Your Pulse payment did not go through';
+      const body = fr ? `Nous n’avons pas pu traiter votre paiement d’abonnement de ${amount}. ${retryLine}` : `We could not process your ${amount} subscription payment. ${retryLine}`;
+      const pausedNote = fr ? 'Si le paiement n’est pas complété, vos fonctionnalités payantes seront suspendues.' : 'If the payment is not completed, your paid features will be paused.';
       await this.email.send({
         to: o.email,
-        subject: "⚠️ Action needed: your Pulse payment failed",
+        subject: fr ? '⚠️ Action requise : échec de votre paiement Pulse' : '⚠️ Action needed: your Pulse payment failed',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)} If the payment is not completed, your paid features will be paused.</p>
-<a href="${manageUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Update payment method →</a>
-`),
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)} ${esc(pausedNote)}</p>
+<a href="${manageUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Mettre à jour le paiement' : 'Update payment method'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
     }
-    await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
+    const retryDateEn = this.fmtDateCa(d.nextAttempt);
+    const retryLineEn = retryDateEn
+      ? `We will automatically retry on ${retryDateEn}. Update your card now to avoid any interruption.`
+      : `Please update your payment method now to keep your plan active.`;
+    await this.notifyOwners(businessId, { kind: 'PAYMENT', title: 'Your Pulse payment did not go through', body: `We could not process your ${amount} subscription payment. ${retryLineEn}`, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
   }
 
   // Receipt: a recurring subscription renewal succeeded.
@@ -487,27 +503,36 @@ export class NotificationProcessor extends WorkerHost {
     this.currentBusinessId = businessId;
     this.currentType = 'subscription-renewed';
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
-    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
     if (!owners.length) return;
     const amount = this.fmtMoney(d.amountPaidCents);
-    const renews = this.fmtDateCa(d.periodEnd);
-    const title = "Payment received — thank you";
-    const body = renews
-      ? `We have received your ${amount} Pulse subscription payment. Your plan is active and renews on ${renews}.`
-      : `We have received your ${amount} Pulse subscription payment. Your plan is active.`;
     const receiptUrl = d.hostedInvoiceUrl ?? `${baseUrl}/dashboard/settings?tab=billing`;
     for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const renews = d.periodEnd ? new Date(d.periodEnd).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' }) : null;
+      const title = fr ? 'Paiement reçu — merci' : 'Payment received — thank you';
+      const body = renews
+        ? (fr ? `Nous avons reçu votre paiement d’abonnement Pulse de ${amount}. Votre forfait est actif et se renouvelle le ${renews}.` : `We have received your ${amount} Pulse subscription payment. Your plan is active and renews on ${renews}.`)
+        : (fr ? `Nous avons reçu votre paiement d’abonnement Pulse de ${amount}. Votre forfait est actif.` : `We have received your ${amount} Pulse subscription payment. Your plan is active.`);
       await this.email.send({
         to: o.email,
-        subject: "Your Pulse payment receipt",
+        subject: fr ? 'Votre reçu de paiement Pulse' : 'Your Pulse payment receipt',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)}</p>
-<a href="${receiptUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">View invoice →</a>
-`),
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${receiptUrl}" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Voir la facture' : 'View invoice'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
     }
-    await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
+    const renewsEn = this.fmtDateCa(d.periodEnd);
+    await this.notifyOwners(businessId, {
+      kind: 'PAYMENT',
+      title: 'Payment received — thank you',
+      body: renewsEn
+        ? `We have received your ${amount} Pulse subscription payment. Your plan is active and renews on ${renewsEn}.`
+        : `We have received your ${amount} Pulse subscription payment. Your plan is active.`,
+      linkUrl: '/dashboard/settings?tab=billing',
+    }).catch(() => {});
   }
 
   // Heads-up: a free trial is about to convert to a paid charge.
@@ -516,25 +541,34 @@ export class NotificationProcessor extends WorkerHost {
     this.currentBusinessId = businessId;
     this.currentType = 'trial-ending';
     const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
-    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true } });
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
     if (!owners.length) return;
-    const ends = this.fmtDateCa(d.trialEndsAt);
-    const title = "Your Pulse trial is ending soon";
-    const body = ends
-      ? `Your free trial ends on ${ends}. To keep your paid features, make sure a valid card is on file — you will be billed automatically when the trial ends.`
-      : `Your free trial is ending soon. Add or confirm a payment method to keep your paid features without interruption.`;
     for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const ends = d.trialEndsAt ? new Date(d.trialEndsAt).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' }) : null;
+      const title = fr ? 'Votre essai Pulse se termine bientôt' : 'Your Pulse trial is ending soon';
+      const body = ends
+        ? (fr ? `Votre essai gratuit se termine le ${ends}. Pour conserver vos fonctionnalités payantes, assurez-vous d’avoir une carte valide au dossier — vous serez facturé automatiquement à la fin de l’essai.` : `Your free trial ends on ${ends}. To keep your paid features, make sure a valid card is on file — you will be billed automatically when the trial ends.`)
+        : (fr ? `Votre essai gratuit se termine bientôt. Ajoutez ou confirmez un moyen de paiement pour conserver vos fonctionnalités payantes sans interruption.` : `Your free trial is ending soon. Add or confirm a payment method to keep your paid features without interruption.`);
       await this.email.send({
         to: o.email,
-        subject: "Your Pulse trial is ending soon",
+        subject: fr ? 'Votre essai Pulse se termine bientôt' : 'Your Pulse trial is ending soon',
         html: emailWrap(`
 <h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
-<p style="margin:0 0 16px;color:#6B7280;font-size:14px">Hi ${esc(o.name)}, ${esc(body)}</p>
-<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">Manage billing →</a>
-`),
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Gérer la facturation' : 'Manage billing'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
       }).catch(() => {});
     }
-    await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
+    const endsEn = this.fmtDateCa(d.trialEndsAt);
+    await this.notifyOwners(businessId, {
+      kind: 'PAYMENT',
+      title: 'Your Pulse trial is ending soon',
+      body: endsEn
+        ? `Your free trial ends on ${endsEn}. To keep your paid features, make sure a valid card is on file — you will be billed automatically when the trial ends.`
+        : `Your free trial is ending soon. Add or confirm a payment method to keep your paid features without interruption.`,
+      linkUrl: '/dashboard/settings?tab=billing',
+    }).catch(() => {});
   }
 
   // Welcome receipt: the first subscription charge at signup succeeded.
