@@ -9,9 +9,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { LanguageToggle } from "@/components/marketing/LanguageToggle";
 import { clearSession } from "@/lib/auth";
 import { safeNextPath } from "@/lib/utils";
 import { useAuthLocale } from "@/lib/useAuthLocale";
+import { readStoredLocale } from "@/lib/locale-preference";
 
 async function readJson<T>(res: Response): Promise<T | null> {
   const text = await res.text();
@@ -29,6 +31,10 @@ function LoginForm() {
   const fr = useAuthLocale();
   const next = searchParams.get("next") ?? "/my/dashboard";
   const ssoError = searchParams.get("error");
+  const enHref = `/my/login${searchParams.toString() ? `?${new URLSearchParams(Array.from(searchParams.entries()).filter(([k]) => k !== "lang"))}` : ""}`;
+  const frParams = new URLSearchParams(searchParams.toString());
+  frParams.set("lang", "fr");
+  const frHref = `/my/login?${frParams}`;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -264,16 +270,31 @@ function LoginForm() {
   );
 }
 
-export default function ClientLoginPage() {
-  const [fr, setFr] = useState(false);
+function ClientLoginPageInner() {
+  const searchParams = useSearchParams();
+  const [fr, setFr] = useState(() => {
+    const lang = searchParams.get("lang");
+    if (lang === "fr" || lang === "en") return lang === "fr";
+    return readStoredLocale() === "fr";
+  });
   useEffect(() => {
-    try {
-      setFr(localStorage.getItem("pulse_dashboard_locale") === "fr");
-    } catch {}
-  }, []);
+    const lang = searchParams.get("lang");
+    if (lang === "fr" || lang === "en") {
+      setFr(lang === "fr");
+    } else {
+      setFr(readStoredLocale() === "fr");
+    }
+  }, [searchParams]);
+  const enParams = new URLSearchParams(searchParams.toString()); enParams.delete("lang");
+  const frParams = new URLSearchParams(searchParams.toString()); frParams.set("lang", "fr");
+  const enHref = `/my/login${enParams.toString() ? `?${enParams}` : ""}`;
+  const frHref = `/my/login?${frParams}`;
   return (
     <main id="main-content" className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
+        <div className="flex justify-center mb-4">
+          <LanguageToggle locale={fr ? "fr" : "en"} enHref={enHref} frHref={frHref} label={fr ? "Langue" : "Language"} />
+        </div>
         <div className="text-center mb-8">
           <Link href="/book" className="inline-block">
             <Image src="/logo.png" alt="Pulse Booking" width={80} height={80} className="w-20 h-auto mx-auto" />
@@ -295,4 +316,8 @@ export default function ClientLoginPage() {
       </div>
     </main>
   );
+}
+
+export default function ClientLoginPage() {
+  return <Suspense><ClientLoginPageInner /></Suspense>;
 }

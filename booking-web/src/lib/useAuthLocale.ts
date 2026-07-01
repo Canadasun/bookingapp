@@ -2,26 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { readStoredLocale } from "@/lib/locale-preference";
 
 // Decide whether an auth page (login/register) should render in French.
 //
-// FR is an explicit `?lang=fr`, or — when that is unset — inferred from the
-// visitor arriving via a /fr marketing page (same-origin referrer) or a prior
-// language-toggle choice (`pulse_dashboard_locale`). Explicit `?lang` always
-// wins so both languages stay shareable. This is the user's own context/choice,
-// not Accept-Language sniffing, so it stays consistent with the site's
-// "no silent auto-detect" rule.
+// FR is an explicit `?lang=fr`, or — when that is unset — the visitor's stored
+// preference from the language toggle. Explicit `?lang` always wins so both
+// languages stay shareable. This avoids hidden referrer-based switching and
+// keeps the auth flow deterministic.
 export function useAuthLocale(): boolean {
   const searchParams = useSearchParams();
   const langParam = searchParams.get("lang");
-  const [fr, setFr] = useState(langParam === "fr");
+  const [fr, setFr] = useState(() => {
+    if (langParam) return langParam === "fr";
+    const saved = readStoredLocale();
+    return saved === "fr";
+  });
   useEffect(() => {
-    if (langParam) { setFr(langParam === "fr"); return; }
-    try {
-      const ref = document.referrer ? new URL(document.referrer) : null;
-      const fromFrPage = !!ref && ref.origin === window.location.origin && ref.pathname.startsWith("/fr");
-      if (fromFrPage || localStorage.getItem("pulse_dashboard_locale") === "fr") setFr(true);
-    } catch { /* referrer/localStorage unavailable — stay English */ }
+    if (langParam) {
+      setFr(langParam === "fr");
+      return;
+    }
+    const saved = readStoredLocale();
+    if (saved) setFr(saved === "fr");
   }, [langParam]);
   return fr;
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format, isFuture } from "date-fns";
 import { Calendar, MessageSquare, Tag, LogOut, ChevronRight, Clock, AlertCircle, RefreshCw, Mail, CreditCard } from "lucide-react";
 import { toast } from "sonner";
@@ -14,11 +14,14 @@ import { getUser, clearSession, type SessionUser } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { LanguageToggle } from "@/components/marketing/LanguageToggle";
+import { readStoredLocale } from "@/lib/locale-preference";
 
 type Section = "upcoming" | "past" | "offers";
 
-export default function ClientDashboard() {
+function ClientDashboardInner() {
   const router = useRouter();
+  const search = useSearchParams();
   const [user, setUser]       = useState<SessionUser | null | undefined>(undefined); // undefined = not yet checked
   const [section, setSection] = useState<Section>("upcoming");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -33,13 +36,24 @@ export default function ClientDashboard() {
   const [hasCard, setHasCard] = useState(false);
   const [removingCard, setRemovingCard] = useState(false);
   const [removeCardDialog, setRemoveCardDialog] = useState(false);
-  const [french, setFrench] = useState(false);
+  const [french, setFrench] = useState(() => {
+    const lang = search.get("lang");
+    if (lang === "fr" || lang === "en") return lang === "fr";
+    return readStoredLocale() === "fr";
+  });
+  const enHref = "/my/dashboard";
+  const frHref = "/my/dashboard?lang=fr";
 
   useEffect(() => {
     try {
-      setFrench(localStorage.getItem("pulse_dashboard_locale") === "fr");
+      const lang = search.get("lang");
+      if (lang === "fr" || lang === "en") {
+        setFrench(lang === "fr");
+      } else {
+        setFrench(localStorage.getItem("pulse_dashboard_locale") === "fr");
+      }
     } catch {}
-  }, []);
+  }, [search]);
 
   async function removeCard() {
     setRemovingCard(true);
@@ -57,9 +71,9 @@ export default function ClientDashboard() {
     const u = getUser();
     setUser(u);
     if (!u || u.role !== "CLIENT") {
-      router.replace("/my/login?next=/my/dashboard");
+      router.replace(french ? "/my/login?next=/my/dashboard&lang=fr" : "/my/login?next=/my/dashboard");
     }
-  }, [router]);
+  }, [router, french]);
 
   const load = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -94,7 +108,7 @@ export default function ClientDashboard() {
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     clearSession();
-    router.replace("/my/login");
+    router.replace(french ? "/my/login?lang=fr" : "/my/login");
   }
 
   async function resend() {
@@ -107,8 +121,8 @@ export default function ClientDashboard() {
       toast.error(e instanceof Error ? e.message : (french ? "Impossible de renvoyer" : "Could not resend"));
     } finally {
       setResending(false);
-    }
   }
+}
 
   // Still checking auth
   if (user === undefined) {
@@ -166,7 +180,7 @@ export default function ClientDashboard() {
 
       {/* Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center">
               <Calendar className="w-4 h-4 text-white" />
@@ -189,6 +203,9 @@ export default function ClientDashboard() {
               className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
+          </div>
+          <div className="shrink-0">
+            <LanguageToggle locale={french ? "fr" : "en"} enHref={enHref} frHref={frHref} label={french ? "Langue" : "Language"} />
           </div>
         </div>
       </header>
@@ -323,6 +340,10 @@ export default function ClientDashboard() {
     </div>
     </>
   );
+}
+
+export default function ClientDashboard() {
+  return <Suspense><ClientDashboardInner /></Suspense>;
 }
 
 function AptCard({ apt }: { apt: Appointment }) {

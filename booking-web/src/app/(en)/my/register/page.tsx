@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { LanguageToggle } from "@/components/marketing/LanguageToggle";
 import { useAuthLocale } from "@/lib/useAuthLocale";
 
 async function readJson<T>(res: Response): Promise<T | null> {
@@ -36,6 +37,10 @@ function RegisterForm() {
   const [terms, setTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errs, setErrs] = useState<Partial<typeof form>>({});
+  const enParams = new URLSearchParams(params.toString()); enParams.delete("lang");
+  const frParams = new URLSearchParams(params.toString()); frParams.set("lang", "fr");
+  const enHref = `/my/register${enParams.toString() ? `?${enParams}` : ""}`;
+  const frHref = `/my/register?${frParams}`;
 
   function validate() {
     const e: Partial<typeof form> = {};
@@ -80,6 +85,9 @@ function RegisterForm() {
   return (
     <main id="main-content" className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA] px-4">
       <div className="w-full max-w-sm">
+        <div className="flex justify-center mb-4">
+          <LanguageToggle locale={fr ? "fr" : "en"} enHref={enHref} frHref={frHref} label={fr ? "Langue" : "Language"} />
+        </div>
 
         <div className="text-center mb-8">
           <Link href="/book" className="inline-block">

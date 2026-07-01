@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -11,11 +11,18 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { LanguageToggle } from "@/components/marketing/LanguageToggle";
+import { readStoredLocale } from "@/lib/locale-preference";
 
-export default function ClientMessagesPage() {
+function ClientMessagesPageInner() {
   const router = useRouter();
+  const search = useSearchParams();
   const user = getUser();
-  const [french, setFrench] = useState(false);
+  const [french, setFrench] = useState(() => {
+    const lang = search.get("lang");
+    if (lang === "fr" || lang === "en") return lang === "fr";
+    return readStoredLocale() === "fr";
+  });
   const [threads, setThreads] = useState<Array<{ businessId: string; businessName: string; clientId: string; messages: Array<{ id: string; content: string; fromClient: boolean; createdAt: string }> }>>([]);
   const [selected, setSelected] = useState<typeof threads[0] | null>(null);
   const [reply, setReply]   = useState("");
@@ -25,13 +32,18 @@ export default function ClientMessagesPage() {
 
   useEffect(() => {
     try {
-      setFrench(localStorage.getItem("pulse_dashboard_locale") === "fr");
+      const lang = search.get("lang");
+      if (lang === "fr" || lang === "en") {
+        setFrench(lang === "fr");
+      } else {
+        setFrench(localStorage.getItem("pulse_dashboard_locale") === "fr");
+      }
     } catch {}
-  }, []);
+  }, [search]);
 
   useEffect(() => {
-    if (!user || user.role !== "CLIENT") { router.replace("/my/login"); return; }
-  }, [user, router]);
+    if (!user || user.role !== "CLIENT") { router.replace(french ? "/my/login?lang=fr" : "/my/login"); return; }
+  }, [user, router, french]);
 
   const load = useCallback(async () => {
     try {
@@ -69,11 +81,14 @@ export default function ClientMessagesPage() {
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center gap-3">
+        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
           <Link href="/my/dashboard" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <h1 className="text-sm font-bold text-gray-900">{selected ? selected.businessName : (french ? "Messages" : "Messages")}</h1>
+          </div>
+          <LanguageToggle locale={french ? "fr" : "en"} enHref="/my/messages" frHref="/my/messages?lang=fr" label={french ? "Langue" : "Language"} />
         </div>
       </header>
 
@@ -128,4 +143,8 @@ export default function ClientMessagesPage() {
       )}
     </div>
   );
+}
+
+export default function ClientMessagesPage() {
+  return <Suspense><ClientMessagesPageInner /></Suspense>;
 }

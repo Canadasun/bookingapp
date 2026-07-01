@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { LanguageToggle } from "@/components/marketing/LanguageToggle";
 import { useAuthLocale } from "@/lib/useAuthLocale";
+import { writeStoredLocale } from "@/lib/locale-preference";
 import { trackEvent } from "@/lib/analytics";
 import { formatPhoneInput } from "@/lib/utils";
 import { storePendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/pendingCheckout";
@@ -117,6 +118,7 @@ function RegisterForm() {
         return;
       }
       toast.success(fr ? "Compte créé! Bienvenue." : "Account created! Welcome.");
+      writeStoredLocale(fr ? "fr" : "en");
       trackEvent("sign_up_complete", {
         method: "email",
         has_referral_code: /^PULSE-[A-Z0-9]{6}$/.test(referralCode),

@@ -23,6 +23,7 @@ import { readPendingCheckout, clearPendingCheckout, claimCheckout } from "@/lib/
 import { LOCATIONS_CHANGED_EVENT, LocationScopeContext } from "@/lib/location-scope";
 import { DashboardLocaleContext, useDashboardLocale } from "@/lib/dashboard-locale";
 import { FeatureDiscoveryTours } from "@/components/FeatureDiscoveryTours";
+import { readStoredLocale, writeStoredLocale } from "@/lib/locale-preference";
 
 interface NavItem {
   href: string;
@@ -733,19 +734,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [tourCatalogOpen, setTourCatalogOpen] = useState(false);
   const french = dashboardLocale === "fr";
 
-  useEffect(() => {
-    const saved = localStorage.getItem("pulse_dashboard_locale");
-    if (saved === "fr") setDashboardLocale("fr");
-  }, []);
-  useEffect(() => {
-    document.documentElement.lang = french ? "fr-CA" : "en-CA";
-    localStorage.setItem("pulse_dashboard_locale", dashboardLocale);
-  }, [dashboardLocale, french]);
-
   // Toggling the language persists it server-side so it follows the user across
   // devices and localizes their server-sent notifications (OTP, booking alerts).
   const changeLocale = (next: "en" | "fr") => {
     setDashboardLocale(next);
+    writeStoredLocale(next);
     api.users.updateMe({ locale: next }).catch(() => {});
   };
 
@@ -755,13 +748,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // minimal booking_user hint cookie no longer carries.
   const { user, loading } = useCurrentUser();
 
+  useEffect(() => {
+    const saved = readStoredLocale();
+    if (saved) {
+      setDashboardLocale(saved);
+      return;
+    }
+    if (user?.locale === "fr" || user?.locale === "en") {
+      setDashboardLocale(user.locale);
+      writeStoredLocale(user.locale);
+    }
+  }, [user?.id, user?.locale]);
+
+  useEffect(() => {
+    document.documentElement.lang = french ? "fr-CA" : "en-CA";
+    writeStoredLocale(dashboardLocale);
+  }, [dashboardLocale, french]);
+
   // Keep the avatar and business data fresh on every navigation.
   useEffect(() => {
     api.users.me().then((u) => {
       setAvatar(u.avatarUrl ?? null);
-      // Server-stored language is authoritative (syncs across devices); it also
-      // drives the staff-facing OTP / booking-alert notifications server-side.
-      if (u.locale === "fr" || u.locale === "en") setDashboardLocale(u.locale);
     }).catch(() => {});
   }, [pathname]);
   useEffect(() => {
@@ -893,7 +900,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     clearSession();
-    router.replace("/login");
+    router.replace(french ? "/login?lang=fr" : "/login");
   }
 
   // Redirect to change-password if the API says the user must reset first.

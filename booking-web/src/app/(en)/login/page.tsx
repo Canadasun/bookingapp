@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { LanguageToggle } from "@/components/marketing/LanguageToggle";
 import { useAuthLocale } from "@/lib/useAuthLocale";
+import { writeStoredLocale } from "@/lib/locale-preference";
 
 async function readJson<T>(res: Response): Promise<T | null> {
   const text = await res.text();
@@ -55,20 +56,8 @@ function LoginForm({ fr, langSuffix }: { fr: boolean; langSuffix: string }) {
 
   async function finishLogin() {
     const locale = fr ? "fr" : "en";
-    const remembered = localStorage.getItem("pulse_dashboard_locale");
-    const explicitChoice = searchParams.has("lang") || remembered === "en" || remembered === "fr";
-    if (explicitChoice) {
-      // Only an explicit choice may replace the server preference. Merely
-      // visiting the canonical English login page on a new device must not
-      // overwrite an existing French account preference.
-      localStorage.setItem("pulse_dashboard_locale", locale);
-      await api.users.updateMe({ locale }).catch(() => undefined);
-    } else {
-      const profile = await api.users.me().catch(() => null);
-      if (profile?.locale === "en" || profile?.locale === "fr") {
-        localStorage.setItem("pulse_dashboard_locale", profile.locale);
-      }
-    }
+    writeStoredLocale(locale);
+    await api.users.updateMe({ locale }).catch(() => undefined);
     invalidateCurrentUser();
     go();
   }
