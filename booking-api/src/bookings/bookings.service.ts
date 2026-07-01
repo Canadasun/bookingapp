@@ -309,6 +309,9 @@ export class BookingsService {
         }
       }
     }
+    // The branch this appointment is at: the explicitly chosen location, else the
+    // provider's primary/home branch. Drives availability validation + storage.
+    const effectiveLocationId = dto.locationId ?? staff.locationId ?? null;
     const client = await this.prisma.client.findFirst({ where: { id: dto.clientId, businessId } });
     if (!client) throw new NotFoundException('Client not found');
     // Blocked clients cannot book online. Return a neutral error that does not
@@ -370,7 +373,7 @@ export class BookingsService {
       if (startsAt.getTime() > now + maxAdvanceMs) {
         throw new BadRequestException('This time is too far in advance.');
       }
-      await this.assertStartsAtAvailable(dto.staffId, dto.serviceId, startsAt, endsAt, business?.timezone ?? 'UTC');
+      await this.assertStartsAtAvailable(dto.staffId, dto.serviceId, startsAt, endsAt, business?.timezone ?? 'UTC', effectiveLocationId);
     }
 
     // Append additional service names to notes for display
@@ -421,6 +424,7 @@ export class BookingsService {
               resourceIds: this.resourceIdsForServices([primaryService, ...additionalServices]),
               startsAt,
               endsAt,
+              locationId: effectiveLocationId,
             });
           }
 
@@ -440,8 +444,8 @@ export class BookingsService {
               ...((opts.confirmed || bizApprovalMode === 'AUTO') ? { status: 'CONFIRMED' as const } : {}),
               ...(opts.recurringGroupId ? { recurringGroupId: opts.recurringGroupId } : {}),
               ...(dto.intakeAnswers?.length ? { intakeAnswers: dto.intakeAnswers } : {}),
-              // Multi-location: the appointment inherits its provider's location.
-              ...((dto.locationId ?? staff.locationId) ? { locationId: dto.locationId ?? staff.locationId } : {}),
+              // Multi-location: the chosen branch, else the provider's primary.
+              ...(effectiveLocationId ? { locationId: effectiveLocationId } : {}),
               // Snapshot the service's delivery mode so reminders/confirmations
               // know whether this is in-person, virtual, mobile, or phone — and
               // carry the relevant link/address. Service edits won't rewrite it.
@@ -536,7 +540,7 @@ export class BookingsService {
     const base: CreateAppointmentDto = {
       staffId: dto.staffId, serviceId: dto.serviceId, additionalServiceIds: dto.additionalServiceIds,
       clientId: dto.clientId, startsAt: dto.startsAt, notes: dto.notes, allowOverride: dto.allowOverride,
-      meetingUrl: dto.meetingUrl,
+      meetingUrl: dto.meetingUrl, locationId: dto.locationId,
     };
     const baseStart = new Date(dto.startsAt);
     const groupId = randomUUID();
@@ -653,7 +657,7 @@ export class BookingsService {
       const maxAdvanceMs = this.maxAdvanceMs(biz);
       if (startsAt.getTime() < now + minNoticeMs) throw new BadRequestException('This time is too soon — please pick a later slot.');
       if (startsAt.getTime() > now + maxAdvanceMs) throw new BadRequestException('This time is too far in advance.');
-      await this.assertStartsAtAvailable(existing.staffId, existing.serviceId, startsAt, endsAt, biz?.timezone ?? 'UTC');
+      await this.assertStartsAtAvailable(existing.staffId, existing.serviceId, startsAt, endsAt, biz?.timezone ?? 'UTC', existing.locationId);
     }
 
     const runReschedule = () =>
@@ -667,6 +671,7 @@ export class BookingsService {
             startsAt,
             endsAt,
             excludeAppointmentId: id,
+            locationId: existing.locationId,
           });
 
           return tx.appointment.update({
@@ -1019,6 +1024,7 @@ export class BookingsService {
               startsAt,
               endsAt,
               excludeAppointmentId: id,
+              locationId: existing.locationId,
             });
           }
 
@@ -1071,12 +1077,18 @@ export class BookingsService {
   // Auto-fill: when a slot opens (cancellation), notify the oldest waiting
   // entry for this exact slot first. Day-level and general service waitlist
   // entries still work as a fallback.
-  private async notifyWaitlist(appointment: { businessId: string; serviceId: string; staffId: string; startsAt: Date; endsAt: Date }) {
+  private async notifyWaitlist(appointment: { businessId: string; serviceId: string; staffId: string; startsAt: Date; endsAt: Date; locationId?: string | null }) {
     const dayStart = new Date(appointment.startsAt);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
-    const baseWhere = { businessId: appointment.businessId, status: 'WAITING' as const };
+    // Multi-location: only notify people who waitlisted for THIS branch (or who
+    // didn't specify a branch). Don't offer a Vancouver opening to someone
+    // waiting for the Toronto branch.
+    const locationWhere = appointment.locationId
+      ? { OR: [{ locationId: appointment.locationId }, { locationId: null }] }
+      : {};
+    const baseWhere = { businessId: appointment.businessId, status: 'WAITING' as const, ...locationWhere };
     const candidates = [
       { serviceId: appointment.serviceId, staffId: appointment.staffId, desiredDate: appointment.startsAt },
       { serviceId: appointment.serviceId, staffId: null, desiredDate: appointment.startsAt },
@@ -1161,6 +1173,10 @@ export class BookingsService {
       startsAt: Date;
       endsAt: Date;
       excludeAppointmentId?: string;
+      // The branch this appointment is at. Hours, timezone and closures are
+      // anchored to it so a provider who works at multiple branches is validated
+      // against the correct branch — not their primary/home branch.
+      locationId?: string | null;
     },
   ) {
     const occupied = this.occupiedWindow(args.startsAt, args.endsAt, args.service);
@@ -1182,11 +1198,15 @@ export class BookingsService {
       excludeAppointmentId: args.excludeAppointmentId,
     });
 
-    const business = await tx.business.findUnique({
-      where: { id: args.businessId },
-      select: { timezone: true },
-    });
-    const timezone = business?.timezone ?? 'UTC';
+    const [business, branch] = await Promise.all([
+      tx.business.findUnique({ where: { id: args.businessId }, select: { timezone: true } }),
+      args.locationId
+        ? tx.location.findUnique({ where: { id: args.locationId }, select: { timezone: true } })
+        : Promise.resolve(null),
+    ]);
+    // Branch timezone wins over the business timezone (a Vancouver branch is
+    // validated in PT even if HQ is in ET).
+    const timezone = branch?.timezone ?? business?.timezone ?? 'UTC';
     const dayOfWeek = Number(formatInTimeZone(args.startsAt, timezone, 'i')) % 7;
     const localStartDay = formatInTimeZone(args.startsAt, timezone, 'yyyy-MM-dd');
     const localEndDay = formatInTimeZone(args.endsAt, timezone, 'yyyy-MM-dd');
@@ -1196,12 +1216,23 @@ export class BookingsService {
 
     const [rules, bizHours] = await Promise.all([
       tx.availabilityRule.findMany({ where: { staffId: args.staffId, dayOfWeek } }),
-      tx.businessHours.findMany({ where: { businessId: args.businessId, dayOfWeek } }),
+      tx.businessHours.findMany({
+        where: {
+          businessId: args.businessId,
+          dayOfWeek,
+          ...(args.locationId ? { OR: [{ locationId: args.locationId }, { locationId: null }] } : { locationId: null }),
+        },
+      }),
     ]);
+    // Prefer this branch's own hours when it has them; otherwise fall back to the
+    // business-wide (null-location) hours — same priority as the slots engine.
+    const branchHours = args.locationId && bizHours.some((h: { locationId: string | null }) => h.locationId === args.locationId)
+      ? bizHours.filter((h: { locationId: string | null }) => h.locationId === args.locationId)
+      : bizHours.filter((h: { locationId: string | null }) => h.locationId === null);
     const effectiveRules = rules.length
       ? rules
-      : bizHours.length
-        ? bizHours
+      : branchHours.length
+        ? branchHours
         : [{ startTime: '09:00', endTime: '17:00' }];
     const occupiedLocalStart = formatInTimeZone(occupied.start, timezone, 'HH:mm');
     const occupiedLocalEnd = formatInTimeZone(occupied.end, timezone, 'HH:mm');
@@ -1217,7 +1248,14 @@ export class BookingsService {
         where: { staffId: args.staffId, startsAt: { lt: occupied.end }, endsAt: { gt: occupied.start } },
       }),
       tx.businessClosure.findFirst({
-        where: { businessId: args.businessId, startsAt: { lt: occupied.end }, endsAt: { gt: occupied.start } },
+        where: {
+          businessId: args.businessId,
+          startsAt: { lt: occupied.end },
+          endsAt: { gt: occupied.start },
+          // Business-wide closures (null) always block; a branch's own closure
+          // blocks only that branch — a closure at another branch must not.
+          ...(args.locationId ? { OR: [{ locationId: null }, { locationId: args.locationId }] } : {}),
+        },
       }),
     ]);
     if (timeOff) throw new BadRequestException('This time overlaps staff time off.');
@@ -1287,35 +1325,54 @@ export class BookingsService {
     }
   }
 
-  private async assertStartsAtAvailable(staffId: string, serviceId: string, startsAt: Date, endsAt: Date, timezone: string) {
-    const day = formatInTimeZone(startsAt, timezone, 'yyyy-MM-dd');
+  private async assertStartsAtAvailable(staffId: string, serviceId: string, startsAt: Date, endsAt: Date, timezone: string, locationId?: string | null) {
+    // Branch hours are stored in the BRANCH's local time, so all local-time
+    // arithmetic here must use the branch timezone (a Vancouver branch of a
+    // Toronto business is evaluated in PT). Fall back to the business timezone.
+    const branch = locationId
+      ? await this.prisma.location.findFirst({ where: { id: locationId }, select: { timezone: true } })
+      : null;
+    const tz = branch?.timezone ?? timezone;
+    const day = formatInTimeZone(startsAt, tz, 'yyyy-MM-dd');
     const slots = await this.availability.getAvailableSlots({
       staffId,
       serviceId,
       startDate: day,
       endDate: day,
-      timezone,
+      timezone: tz,
+      // Anchor the slot set to the branch being booked so a multi-branch
+      // provider is validated against that branch's hours/timezone.
+      ...(locationId ? { locationId } : {}),
     });
     if (!slots.some((slot) => slot.startsAt.getTime() === startsAt.getTime())) {
       throw new BadRequestException('This time is outside the business availability. Please choose another slot.');
     }
-    const localStartDay = formatInTimeZone(startsAt, timezone, 'yyyy-MM-dd');
-    const localEndDay = formatInTimeZone(endsAt, timezone, 'yyyy-MM-dd');
+    const localStartDay = formatInTimeZone(startsAt, tz, 'yyyy-MM-dd');
+    const localEndDay = formatInTimeZone(endsAt, tz, 'yyyy-MM-dd');
     if (localStartDay !== localEndDay) {
       throw new BadRequestException('This appointment must fit within one business day.');
     }
 
-    const dayOfWeek = Number(formatInTimeZone(startsAt, timezone, 'i')) % 7;
-    const localStart = formatInTimeZone(startsAt, timezone, 'HH:mm');
-    const localEnd = formatInTimeZone(endsAt, timezone, 'HH:mm');
+    const dayOfWeek = Number(formatInTimeZone(startsAt, tz, 'i')) % 7;
+    const localStart = formatInTimeZone(startsAt, tz, 'HH:mm');
+    const localEnd = formatInTimeZone(endsAt, tz, 'HH:mm');
     const staff = await this.prisma.staff.findFirst({ where: { id: staffId }, select: { businessId: true } });
     const [rules, bizHours] = await Promise.all([
       this.prisma.availabilityRule.findMany({ where: { staffId, dayOfWeek } }),
       staff?.businessId && this.prisma.businessHours?.findMany
-        ? this.prisma.businessHours.findMany({ where: { businessId: staff.businessId, dayOfWeek } })
+        ? this.prisma.businessHours.findMany({
+            where: {
+              businessId: staff.businessId,
+              dayOfWeek,
+              ...(locationId ? { OR: [{ locationId }, { locationId: null }] } : { locationId: null }),
+            },
+          })
         : Promise.resolve([]),
     ]);
-    const effectiveRules = rules.length ? rules : bizHours.length ? bizHours : [{ startTime: '09:00', endTime: '17:00' }];
+    const branchHours = locationId && bizHours.some((h: { locationId: string | null }) => h.locationId === locationId)
+      ? bizHours.filter((h: { locationId: string | null }) => h.locationId === locationId)
+      : bizHours.filter((h: { locationId: string | null }) => h.locationId === null);
+    const effectiveRules = rules.length ? rules : branchHours.length ? branchHours : [{ startTime: '09:00', endTime: '17:00' }];
     const fitsRule = effectiveRules.some((rule) => localStart >= rule.startTime && localEnd <= rule.endTime);
     if (!fitsRule) {
       throw new BadRequestException('This appointment is longer than the available calendar window.');
