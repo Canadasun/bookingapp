@@ -67,13 +67,19 @@ const staticRoutes: SitemapRoute[] = [
   ];
 });
 
-async function fetchPublicSlugs(): Promise<{ slug: string; updatedAt: string }[]> {
+type PublicSlug = {
+  slug: string;
+  updatedAt: string;
+  locations?: { slug: string }[];
+};
+
+async function fetchPublicSlugs(): Promise<PublicSlug[]> {
   for (const apiUrl of API_CANDIDATES) {
     try {
       const response = await fetch(`${apiUrl}/api/businesses/public-slugs`, { cache: "no-store" });
       if (!response.ok) continue;
       const slugs = await response.json();
-      if (Array.isArray(slugs)) return slugs as { slug: string; updatedAt: string }[];
+      if (Array.isArray(slugs)) return slugs as PublicSlug[];
     } catch {
       // Try the next configured API URL.
     }
@@ -107,11 +113,17 @@ function renderUrl(route: SitemapRoute) {
 }
 
 export async function GET() {
-  const businessRoutes = (await fetchPublicSlugs()).flatMap(({ slug, updatedAt }) => {
+  const businessRoutes = (await fetchPublicSlugs()).flatMap(({ slug, updatedAt, locations = [] }) => {
     const lastModified = new Date(updatedAt).toISOString();
     return [
       { url: `${SITE_URL}/book/${slug}`, lastModified, changeFrequency: "weekly" as const, priority: 0.8 },
       { url: `${SITE_URL}/bio/${slug}`, lastModified, changeFrequency: "weekly" as const, priority: 0.7 },
+      ...locations.map((location) => ({
+        url: `${SITE_URL}/book/${slug}/${location.slug}`,
+        lastModified,
+        changeFrequency: "weekly" as const,
+        priority: 0.8,
+      })),
     ];
   });
 

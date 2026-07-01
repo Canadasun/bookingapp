@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, notFound } from "next/navigation";
 import { DayPicker } from "react-day-picker";
 import { format, startOfDay, addMinutes, parseISO, isBefore, isAfter } from "date-fns";
 import { frCA } from "date-fns/locale";
@@ -133,7 +133,7 @@ function CartBar({ services, onClear, locale = "en" }: { services: Service[]; on
   );
 }
 
-export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?: "slug" | "id" }) {
+export function BookPageInner({ slug, lookup = "slug", lockedLocationSlug }: { slug: string; lookup?: "slug" | "id"; lockedLocationSlug?: string }) {
   const router = useRouter();
   const searchParams  = useSearchParams();
   const locale: "en" | "fr" = searchParams.get("lang") === "fr" ? "fr" : "en";
@@ -175,6 +175,9 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const [activeStaff, setActiveStaff] = useState<StaffMember[]>([]);
   const [staffList, setStaffList]     = useState<StaffMember[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState("");
+  // Set when the branch page (/book/{slug}/{locationSlug}) references a branch
+  // that doesn't exist on the loaded business — render the not-found page.
+  const [lockedBranchMissing, setLockedBranchMissing] = useState(false);
   const [slots, setSlots]             = useState<BookingSlot[]>([]);
 
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
@@ -228,14 +231,23 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       .then((b) => {
         setBiz(b);
         setBizId(b.id);
-        if (b.locations?.length === 1) setSelectedLocationId(b.locations[0].id);
+        // A branch page pins one location: resolve its slug and lock it in. An
+        // unknown branch slug renders the not-found page (the server layout
+        // already guards this; this is defense-in-depth for a data mismatch).
+        if (lockedLocationSlug) {
+          const branch = b.locations?.find((l) => l.slug === lockedLocationSlug);
+          if (branch) setSelectedLocationId(branch.id);
+          else setLockedBranchMissing(true);
+        } else if (b.locations?.length === 1) {
+          setSelectedLocationId(b.locations[0].id);
+        }
         setLoadingBiz(false);
       })
       .catch(() => {
         toast.error(isFrench ? "Entreprise introuvable" : "Business not found");
         setLoadingBiz(false);
       });
-  }, [slug, isBusinessIdRef, isFrench]);
+  }, [slug, isBusinessIdRef, isFrench, lockedLocationSlug]);
 
   // Reviews and providers do not change when the selected branch changes.
   useEffect(() => {
@@ -299,13 +311,15 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     api.appointments.get(rescheduleId, rescheduleToken).then((apt) => {
       const svc = allServices.find((s) => s.id === apt.service.id);
       if (svc) setSelectedServices([svc]);
-      if (apt.location?.id) setSelectedLocationId(apt.location.id);
+      // A branch URL remains authoritative during rescheduling. Do not silently
+      // switch the booking context to the appointment's original branch.
+      if (apt.location?.id && !lockedLocationSlug) setSelectedLocationId(apt.location.id);
       setForm((p) => ({ ...p, name: apt.client.name, email: apt.client.email ?? "", phone: apt.client.phone ?? "" }));
       setWl({ name: apt.client.name, email: apt.client.email ?? "" });
       setStep(2);
       toast.success(isFrench ? "Choisissez une nouvelle date et une nouvelle heure" : "Select a new date and time");
     }).catch(() => {});
-  }, [fragmentReady, rescheduleId, rescheduleToken, allServices, isFrench]);
+  }, [fragmentReady, rescheduleId, rescheduleToken, allServices, isFrench, lockedLocationSlug]);
 
   function toggleService(svc: Service) {
     setSelectedServices((prev) =>
@@ -629,6 +643,11 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
     ? (multiProvider ? ["Services", "Professionnel", "Date et heure", "Coordonnées"] : ["Services", "Date et heure", "Coordonnées"])
     : (multiProvider ? ["Services", "Provider", "Date & Time", "Details"] : ["Services", "Date & Time", "Details"]);
   const visualStep  = multiProvider ? step : (step === 0 ? 0 : step - 1);
+  // On a branch page the location is fixed by the URL: skip the picker and show
+  // the branch as a fixed header instead of the multi-option chooser.
+  const locationLocked = !!lockedLocationSlug;
+
+  if (lockedBranchMissing) notFound();
 
   return (
     <div className={cn(isEmbed ? "bg-[#F8F9FA]" : "min-h-screen bg-[#F8F9FA]", fontClass)}>
@@ -901,24 +920,46 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
             {/* ── Step 0: Services ──────────────────────────────────────── */}
             {step === 0 && (
               <div className="px-6 pb-6">
-                {/* A branch choice is required when the business has multiple locations. */}
-                {(biz?.locations?.length ?? 0) > 1 && (
+                {/* Branch page: the location is fixed by the URL — show it as a
+                    header (with a link back to all locations) instead of a chooser. */}
+                {locationLocked && selectedLocation ? (
+                  <div className="mb-5 rounded-xl border border-gray-100 bg-gray-50/70 px-4 py-3">
+                    <p className="text-xs font-medium text-gray-400">{isFrench ? "Emplacement" : "Location"}</p>
+                    <p className="text-sm font-semibold text-gray-800">{selectedLocation.name}</p>
+                    {selectedLocation.address && <p className="text-xs text-gray-400">{selectedLocation.address}</p>}
+                    {(biz?.locations?.length ?? 0) > 1 && (
+                      <Link href={`/book/${slug}${isFrench ? "?lang=fr" : ""}`} className="mt-1 inline-block text-xs font-medium bk-brand-text hover:underline">
+                        {isFrench ? "Voir tous les emplacements" : "See all locations"}
+                      </Link>
+                    )}
+                  </div>
+                ) : (biz?.locations?.length ?? 0) > 1 && (
+                  /* A branch choice is required when the business has multiple locations. */
                   <div className="mb-5">
                     <p className="text-sm font-medium text-gray-700 mb-2">{isFrench ? "Choisir un emplacement" : "Choose a location"} <span className="text-red-500">*</span></p>
                     <div className="flex flex-wrap gap-2">
                       {biz!.locations!.map((l) => (
-                        <button key={l.id} onClick={() => {
-                          setSelectedLocationId(l.id);
-                          setSelectedServices([]);
-                          setSelectedStaff(null);
-                          setSelectedDate(undefined);
-                          setSelectedSlot(null);
-                        }}
-                          className={cn("rounded-xl border px-3 py-2 text-left transition-colors",
-                            selectedLocationId === l.id ? "bk-selected" : "border-gray-200 bk-option")}>
-                          <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "bk-selected-text" : "text-gray-800")}>{l.name}</span>
-                          {l.address && <span className="block text-xs text-gray-400">{l.address}</span>}
-                        </button>
+                        l.slug ? (
+                          <Link key={l.id} href={`/book/${slug}/${l.slug}${isFrench ? "?lang=fr" : ""}`}
+                            className={cn("rounded-xl border px-3 py-2 text-left transition-colors block",
+                              selectedLocationId === l.id ? "bk-selected" : "border-gray-200 bk-option")}>
+                            <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "bk-selected-text" : "text-gray-800")}>{l.name}</span>
+                            {l.address && <span className="block text-xs text-gray-400">{l.address}</span>}
+                          </Link>
+                        ) : (
+                          <button key={l.id} onClick={() => {
+                            setSelectedLocationId(l.id);
+                            setSelectedServices([]);
+                            setSelectedStaff(null);
+                            setSelectedDate(undefined);
+                            setSelectedSlot(null);
+                          }}
+                            className={cn("rounded-xl border px-3 py-2 text-left transition-colors",
+                              selectedLocationId === l.id ? "bk-selected" : "border-gray-200 bk-option")}>
+                            <span className={cn("block text-sm font-semibold", selectedLocationId === l.id ? "bk-selected-text" : "text-gray-800")}>{l.name}</span>
+                            {l.address && <span className="block text-xs text-gray-400">{l.address}</span>}
+                          </button>
+                        )
                       ))}
                     </div>
                   </div>

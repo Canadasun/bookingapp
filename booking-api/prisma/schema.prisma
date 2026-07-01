@@ -722,6 +722,10 @@ model Location {
   id         String   @id @default(cuid())
   businessId String
   name       String
+  // URL-safe branch identifier, unique within the business. Powers the public
+  // per-location booking page /book/{business.slug}/{location.slug}. Generated
+  // from the name on create and kept stable thereafter so indexed URLs persist.
+  slug       String?
   address    String?
   phone      String?
   timezone   String?
@@ -749,6 +753,7 @@ model Location {
   invoices Invoice[]
   locationServices LocationService[]
 
+  @@unique([businessId, slug])
   @@index([businessId])
 }
 
