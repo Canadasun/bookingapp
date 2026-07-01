@@ -1004,6 +1004,23 @@ model MigrationImportRow {
   @@index([duplicateClientId])
 }
 
+// Public "concierge migration" leads from the marketing site (/migrate). These
+// come from prospects with no account yet, so they are NOT tied to a Business —
+// unlike MigrationRequest, which is the in-app importer for existing accounts.
+model MigrationLead {
+  id             String   @id @default(cuid())
+  name           String
+  email          String
+  businessName   String
+  sourcePlatform String
+  notes          String?
+  status         String   @default("NEW") // NEW, CONTACTED, CONVERTED, CLOSED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
 model Appointment {
   id                    String            @id @default(cuid())
   businessId            String

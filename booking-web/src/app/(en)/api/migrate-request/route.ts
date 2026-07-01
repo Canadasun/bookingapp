@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin } from "@/lib/same-origin";
+import { apiBase } from "@/lib/server-api";
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL ?? "support@pulseappointments.com";
 
 function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Persist the lead in the backend so it can be triaged (and is never lost to a
+// dropped email). Returns true on success; false lets us fall back to Mailgun.
+async function persistLead(payload: {
+  name: string; email: string; business: string; platform: string; message: string;
+}): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiBase()}/public/migration-leads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -29,6 +47,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
   }
 
+  // Durable path: the backend persists the lead and alerts an admin. If it's
+  // reachable we're done — no need to also fire a Mailgun email (avoids dupes).
+  const persisted = await persistLead({ name, email, business, platform, message });
+  if (persisted) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Fallback: backend unreachable — email support directly so the lead survives.
   const mailgunDomain = process.env.MAILGUN_DOMAIN;
   const mailgunKey    = process.env.MAILGUN_API_KEY;
 
