@@ -31,8 +31,8 @@ const TIMEZONES = [
   ["America/St_Johns", "Newfoundland — St. John's (NT)"],
 ] as const;
 
-type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean; taxProvince: string; taxRatePercent: string };
-const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true, taxProvince: "", taxRatePercent: "" };
+type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean; taxProvince: string; taxRatePercent: string; depositMode: "" | "on" | "off"; depositPercent: string };
+const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true, taxProvince: "", taxRatePercent: "", depositMode: "", depositPercent: "" };
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -80,7 +80,9 @@ export default function LocationsPage() {
   function openEdit(l: Location) {
     setEditingId(l.id);
     setForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", active: l.active,
-      taxProvince: l.taxProvince ?? "", taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "" });
+      taxProvince: l.taxProvince ?? "", taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
+      depositMode: l.requireDeposit == null ? "" : l.requireDeposit ? "on" : "off",
+      depositPercent: l.depositPercent != null ? String(l.depositPercent) : "" });
     setModalOpen(true);
   }
 
@@ -91,6 +93,12 @@ export default function LocationsPage() {
     const taxRatePercent = form.taxRatePercent.trim() === "" ? null : Number(form.taxRatePercent);
     if (taxRatePercent != null && (Number.isNaN(taxRatePercent) || taxRatePercent < 0 || taxRatePercent > 100)) {
       toast.error(french ? "Taux de taxe invalide" : "Invalid tax rate"); return;
+    }
+    // Deposit: "" = inherit business default (null); "on"/"off" = branch override.
+    const requireDeposit = form.depositMode === "" ? null : form.depositMode === "on";
+    const depositPercent = form.depositMode === "on" && form.depositPercent.trim() !== "" ? Number(form.depositPercent) : null;
+    if (depositPercent != null && (Number.isNaN(depositPercent) || depositPercent < 1 || depositPercent > 100)) {
+      toast.error(french ? "Pourcentage de dépôt invalide" : "Invalid deposit percent"); return;
     }
     setSaving(true);
     try {
@@ -103,6 +111,8 @@ export default function LocationsPage() {
           active: form.active,
           taxProvince,
           taxRatePercent,
+          requireDeposit,
+          depositPercent,
         });
         toast.success(french ? "Emplacement mis à jour" : "Location updated");
       } else {
@@ -113,6 +123,8 @@ export default function LocationsPage() {
           timezone: form.timezone.trim() || undefined,
           taxProvince,
           taxRatePercent,
+          requireDeposit,
+          depositPercent,
         });
         toast.success(french ? "Emplacement ajouté" : "Location added");
       }
@@ -272,6 +284,24 @@ export default function LocationsPage() {
                     placeholder={french ? "Taux %" : "Rate %"} className="max-w-28" />
                   <span className="text-xs text-gray-400">{french ? "% appliqué aux factures de cette succursale (sinon celui de l’entreprise)." : "% applied to this branch's invoices (else the business rate)."}</span>
                 </div>
+              </div>
+              <div>
+                <label htmlFor="loc-deposit" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Dépôt" : "Deposit"}</label>
+                <select id="loc-deposit" value={form.depositMode}
+                  onChange={(e) => setForm((p) => ({ ...p, depositMode: e.target.value as LocForm["depositMode"] }))}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <option value="">{french ? "— Paramètre de l’entreprise —" : "— Business default —"}</option>
+                  <option value="on">{french ? "Exiger un dépôt" : "Require a deposit"}</option>
+                  <option value="off">{french ? "Aucun dépôt" : "No deposit"}</option>
+                </select>
+                {form.depositMode === "on" && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Input id="loc-deposit-pct" type="number" min="1" max="100" step="1" value={form.depositPercent}
+                      onChange={(e) => setForm((p) => ({ ...p, depositPercent: e.target.value }))}
+                      placeholder={french ? "% dépôt" : "Deposit %"} className="max-w-28" />
+                    <span className="text-xs text-gray-400">{french ? "% du prix (sinon celui de l’entreprise)." : "% of the price (else the business default)."}</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
                 <span className="text-sm text-gray-700">{french ? "Actif" : "Active"}</span>

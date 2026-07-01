@@ -38,7 +38,7 @@ export class LocationsService {
     });
   }
 
-  async create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null }) {
+  async create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null }) {
     // New locations are active by default, so the same guard must be used for
     // creation and reactivation. Otherwise deactivate → create → reactivate
     // bypasses the subscription limit.
@@ -53,11 +53,13 @@ export class LocationsService {
         timezone: data.timezone?.trim() || null,
         taxProvince: data.taxProvince?.trim() || null,
         taxRatePercent: data.taxRatePercent ?? null,
+        requireDeposit: data.requireDeposit ?? null,
+        depositPercent: data.depositPercent ?? null,
       },
     });
   }
 
-  async update(id: string, businessId: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null }) {
+  async update(id: string, businessId: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null }) {
     const location = await this.prisma.location.findFirst({ where: { id, businessId } });
     if (!location) throw new NotFoundException('Location not found');
     if (data.active === true && !location.active) {
@@ -72,6 +74,8 @@ export class LocationsService {
         ...(data.timezone !== undefined ? { timezone: data.timezone.trim() || null } : {}),
         ...(data.taxProvince !== undefined ? { taxProvince: data.taxProvince?.trim() || null } : {}),
         ...(data.taxRatePercent !== undefined ? { taxRatePercent: data.taxRatePercent ?? null } : {}),
+        ...(data.requireDeposit !== undefined ? { requireDeposit: data.requireDeposit } : {}),
+        ...(data.depositPercent !== undefined ? { depositPercent: data.depositPercent ?? null } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       },
     });

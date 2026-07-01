@@ -15,6 +15,8 @@ const CreateLocationSchema = z.object({
   timezone: z.string().trim().max(60).optional(),
   taxProvince: z.string().trim().max(2).nullable().optional(),
   taxRatePercent: z.number().min(0).max(100).nullable().optional(),
+  requireDeposit: z.boolean().nullable().optional(),
+  depositPercent: z.number().int().min(1).max(100).nullable().optional(),
 });
 const UpdateLocationSchema = CreateLocationSchema.partial().extend({ active: z.boolean().optional() });
 

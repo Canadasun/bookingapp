@@ -67,7 +67,7 @@ export class BookingsService {
     const [data, total] = await Promise.all([
       this.prisma.appointment.findMany({
         where,
-        include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true } } },
+        include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true, requireDeposit: true } } },
         orderBy: { startsAt: 'desc' },
         skip,
         take: limit,
@@ -102,7 +102,7 @@ export class BookingsService {
 
     const data = await this.prisma.appointment.findMany({
       where,
-      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true } } },
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true, requireDeposit: true } } },
       orderBy: { startsAt: 'asc' },
       take: 500,
     });
@@ -115,7 +115,7 @@ export class BookingsService {
         id,
         ...(businessId ? { businessId } : {})
       },
-      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true } } },
+      include: { client: true, service: true, staff: { include: { user: true } }, business: true, location: { select: { id: true, name: true, address: true, requireDeposit: true } } },
     });
     if (!apt) throw new NotFoundException('Appointment not found');
     return apt;
@@ -593,7 +593,7 @@ export class BookingsService {
   async confirm(id: string, businessId?: string, userId?: string, actor?: AuthActor) {
     const apt = await this.findOne(id, businessId);
     await this.assertStaffCanManageAppointment(apt, actor);
-    if (isPaidPlan(apt.business.plan) && apt.business.requireDeposit && apt.status === 'PENDING') {
+    if (isPaidPlan(apt.business.plan) && (apt.location?.requireDeposit ?? apt.business.requireDeposit) && apt.status === 'PENDING') {
       const paidDeposit = await this.prisma.payment.findFirst({
         where: {
           appointmentId: id,
@@ -777,7 +777,7 @@ export class BookingsService {
     // used to bypass the deposit requirement by sending status=CONFIRMED directly.
     if (dto.status === 'CONFIRMED') {
       const biz = existing.business;
-      if (isPaidPlan(biz.plan) && biz.requireDeposit && existing.status === 'PENDING') {
+      if (isPaidPlan(biz.plan) && (existing.location?.requireDeposit ?? biz.requireDeposit) && existing.status === 'PENDING') {
         const paidDeposit = await this.prisma.payment.findFirst({
           where: {
             appointmentId: id,
