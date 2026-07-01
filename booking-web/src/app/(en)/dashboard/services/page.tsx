@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Plus, Pencil, Trash2, Clock, DollarSign, Eye, EyeOff,
   FolderPlus, ChevronDown, ChevronRight, Tag, X, Check,
@@ -482,6 +482,16 @@ export default function ServicesPage() {
   }, [bizId, t.loadFailed, locationFilter]);
 
   useEffect(() => { load(); }, [load]);
+  // Deep-link: /dashboard/services?edit={id} opens that service's editor once
+  // the list has loaded (used by global search). One-shot.
+  const editedOnce = useRef(false);
+  useEffect(() => {
+    if (editedOnce.current || !services.length) return;
+    const eid = new URLSearchParams(window.location.search).get("edit");
+    if (!eid) return;
+    const svc = services.find((s) => s.id === eid);
+    if (svc) { setEditSvc(svc); editedOnce.current = true; }
+  }, [services]);
 
   async function toggleActive(svc: Service) {
     if (!bizId) return;

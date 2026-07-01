@@ -70,7 +70,7 @@ export class SearchService {
       id: c.id,
       label: c.name,
       sublabel: c.email ?? undefined,
-      href: `/dashboard/clients?search=${encodeURIComponent(c.name)}`,
+      href: `/dashboard/clients?focus=${c.id}`,
     })));
     push('staff', 'Staff', staff.map((s) => ({
       type: 'staff',
@@ -83,7 +83,7 @@ export class SearchService {
       id: s.id,
       label: s.name,
       sublabel: money(s.priceCents),
-      href: `/dashboard/services`,
+      href: `/dashboard/services?edit=${s.id}`,
     })));
     push('invoice', 'Invoices', invoices.map((i) => ({
       type: 'invoice',

@@ -150,6 +150,17 @@ export default function ClientsPage() {
 
   const bizId = currentUser?.businessId ?? "";
   const isOwner = currentUser?.role === "OWNER" || currentUser?.role === "ADMIN";
+  // Precise deep-link: /dashboard/clients?focus={id} opens that client's drawer
+  // (used by global search so duplicate names are unambiguous). One-shot.
+  const focusedOnce = useRef(false);
+  useEffect(() => {
+    if (focusedOnce.current || !bizId) return;
+    const fid = new URLSearchParams(window.location.search).get("focus");
+    if (!fid) return;
+    focusedOnce.current = true;
+    api.clients.get(bizId, fid).then((d) => openClient(d as unknown as ClientWithStats)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bizId]);
   const { selectedIds: scopedLocationIds, locations } = useLocationScope();
   const locationFilter = locations.length && scopedLocationIds.length < locations.length ? scopedLocationIds : undefined;
 
