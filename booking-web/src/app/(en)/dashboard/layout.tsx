@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard, Calendar, Users,
   LogOut, X, ChevronRight, ChevronDown,
@@ -94,6 +94,29 @@ const OWNER_NAV: NavItem[] = [
       { href: "/dashboard/memberships",  label: "Memberships" },
     ],
   },
+  {
+    // Settings surfaced as discrete, deep-linkable sections (mirrors the in-page
+    // tabs) so every setting is one click from the sidebar. The hub stays a
+    // clickable destination; each child jumps straight to its ?tab= section, so
+    // existing deep-links (emails, banners, "Deposits & fees") keep working.
+    href: "/dashboard/settings", label: "Settings", icon: SettingsIcon,
+    children: [
+      { group: "Business" },
+      { href: "/dashboard/settings?tab=profile",  label: "Business profile" },
+      { group: "Booking" },
+      { href: "/dashboard/settings?tab=booking",  label: "Booking rules" },
+      { href: "/dashboard/settings?tab=calendar", label: "Calendar sync" },
+      { group: "Booking page" },
+      { href: "/dashboard/settings?tab=online",   label: "Online booking" },
+      { href: "/dashboard/settings?tab=branding", label: "Branding" },
+      { group: "Payments" },
+      { href: "/dashboard/settings?tab=payments", label: "Deposits & fees" },
+      { href: "/dashboard/settings?tab=payouts",  label: "Payouts" },
+      { href: "/dashboard/settings?tab=billing",  label: "Billing & plan" },
+      { group: "Account" },
+      { href: "/dashboard/settings?tab=security", label: "Security" },
+    ],
+  },
 ];
 
 const STAFF_NAV: NavItem[] = [
@@ -124,6 +147,12 @@ const FR_LABELS: Record<string, string> = {
   Memberships: "Abonnements", "My Appointments": "Mes rendez-vous", "My Tasks": "Mes tâches",
   Notifications: "Notifications", Account: "Compte", Settings: "Paramètres",
   "Help & Support": "Aide et soutien",
+  // Settings dropdown — section links + group headers.
+  "Business profile": "Profil de l’entreprise", "Booking rules": "Règles de réservation",
+  "Calendar sync": "Synchro calendrier", "Online booking": "Réservation en ligne",
+  Branding: "Image de marque", Payouts: "Versements", "Billing & plan": "Facturation et forfait",
+  Security: "Sécurité",
+  Business: "Entreprise", Booking: "Réservation", "Booking page": "Page de réservation",
 };
 
 function translateNav(items: NavItem[], french: boolean): NavItem[] {
@@ -131,14 +160,26 @@ function translateNav(items: NavItem[], french: boolean): NavItem[] {
   return items.map((item) => ({
     ...item,
     label: FR_LABELS[item.label] ?? item.label,
-    children: item.children?.map((child) => child.label
-      ? { ...child, label: FR_LABELS[child.label] ?? child.label }
-      : child),
+    children: item.children?.map((child) =>
+      child.label
+        ? { ...child, label: FR_LABELS[child.label] ?? child.label }
+        : child.group
+          ? { ...child, group: FR_LABELS[child.group] ?? child.group }
+          : child),
   }));
 }
 
 function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose: () => void; unreadMessages?: number }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Children that deep-link to a ?tab= section (Settings) highlight only when
+  // that specific tab is current, not for every page sharing the pathname.
+  const childIsActive = (href: string) => {
+    const [base, query] = href.split("?");
+    if (pathname !== base) return false;
+    const tab = query ? new URLSearchParams(query).get("tab") : null;
+    return tab ? searchParams.get("tab") === tab : true;
+  };
   const childActive = item.children?.some((c) => {
     if (!c.href) return false;
     const base = c.href.split("?")[0];
@@ -187,7 +228,7 @@ function NavLink({ item, onClose, unreadMessages = 0 }: { item: NavItem; onClose
                 <Link key={c.href} href={c.href} onClick={onClose}
                   className={cn(
                     "flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                    pathname === c.href.split("?")[0]
+                    childIsActive(c.href)
                       ? "text-violet-800 font-semibold bg-violet-100"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
                   )}>
