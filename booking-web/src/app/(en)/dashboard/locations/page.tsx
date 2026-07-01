@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { notifyLocationsChanged, useLocationScope } from "@/lib/location-scope";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { CA_TAX, caRateForProvince } from "@/lib/ca-tax";
 
 // Canadian timezones offered for a location. Slot generation uses the
 // location's timezone (falling back to the business timezone) so a branch in
@@ -30,8 +31,8 @@ const TIMEZONES = [
   ["America/St_Johns", "Newfoundland — St. John's (NT)"],
 ] as const;
 
-type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean };
-const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true };
+type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean; taxProvince: string; taxRatePercent: string };
+const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true, taxProvince: "", taxRatePercent: "" };
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -78,13 +79,19 @@ export default function LocationsPage() {
   function openCreate() { setEditingId(null); setForm(emptyForm); setModalOpen(true); }
   function openEdit(l: Location) {
     setEditingId(l.id);
-    setForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", active: l.active });
+    setForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", active: l.active,
+      taxProvince: l.taxProvince ?? "", taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "" });
     setModalOpen(true);
   }
 
   async function save() {
     if (!bizId) return;
     if (!form.name.trim()) { toast.error(french ? "Le nom est requis" : "Name required"); return; }
+    const taxProvince = form.taxProvince || null;
+    const taxRatePercent = form.taxRatePercent.trim() === "" ? null : Number(form.taxRatePercent);
+    if (taxRatePercent != null && (Number.isNaN(taxRatePercent) || taxRatePercent < 0 || taxRatePercent > 100)) {
+      toast.error(french ? "Taux de taxe invalide" : "Invalid tax rate"); return;
+    }
     setSaving(true);
     try {
       if (editingId) {
@@ -94,6 +101,8 @@ export default function LocationsPage() {
           phone: form.phone.trim() || undefined,
           timezone: form.timezone.trim() || undefined,
           active: form.active,
+          taxProvince,
+          taxRatePercent,
         });
         toast.success(french ? "Emplacement mis à jour" : "Location updated");
       } else {
@@ -102,6 +111,8 @@ export default function LocationsPage() {
           address: form.address.trim() || undefined,
           phone: form.phone.trim() || undefined,
           timezone: form.timezone.trim() || undefined,
+          taxProvince,
+          taxRatePercent,
         });
         toast.success(french ? "Emplacement ajouté" : "Location added");
       }
@@ -242,6 +253,25 @@ export default function LocationsPage() {
                   {TIMEZONES.map(([tz, label]) => <option key={tz} value={tz}>{label}</option>)}
                 </select>
                 <p className="mt-1 text-xs text-gray-400">{french ? "La génération des créneaux utilise ce fuseau horaire pour le personnel de cet emplacement." : "Slot generation uses this timezone for staff at this location."}</p>
+              </div>
+              <div>
+                <label htmlFor="loc-tax" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Province (taxe)" : "Tax province"}</label>
+                <select id="loc-tax" value={form.taxProvince}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    const rate = caRateForProvince(code);
+                    setForm((p) => ({ ...p, taxProvince: code, taxRatePercent: rate != null ? String(rate) : p.taxRatePercent }));
+                  }}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500">
+                  <option value="">{french ? "— Identique à l’entreprise —" : "— Same as business —"}</option>
+                  {CA_TAX.map((p) => <option key={p.code} value={p.code}>{p.label} — {p.rate}%</option>)}
+                </select>
+                <div className="mt-2 flex items-center gap-2">
+                  <Input id="loc-tax-rate" type="number" step="0.001" min="0" max="100" value={form.taxRatePercent}
+                    onChange={(e) => setForm((p) => ({ ...p, taxRatePercent: e.target.value }))}
+                    placeholder={french ? "Taux %" : "Rate %"} className="max-w-28" />
+                  <span className="text-xs text-gray-400">{french ? "% appliqué aux factures de cette succursale (sinon celui de l’entreprise)." : "% applied to this branch's invoices (else the business rate)."}</span>
+                </div>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
                 <span className="text-sm text-gray-700">{french ? "Actif" : "Active"}</span>

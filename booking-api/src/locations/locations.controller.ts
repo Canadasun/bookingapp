@@ -13,6 +13,8 @@ const CreateLocationSchema = z.object({
   address: z.string().trim().max(300).optional(),
   phone: z.string().trim().max(40).optional(),
   timezone: z.string().trim().max(60).optional(),
+  taxProvince: z.string().trim().max(2).nullable().optional(),
+  taxRatePercent: z.number().min(0).max(100).nullable().optional(),
 });
 const UpdateLocationSchema = CreateLocationSchema.partial().extend({ active: z.boolean().optional() });
 
