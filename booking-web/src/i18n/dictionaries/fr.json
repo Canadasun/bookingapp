@@ -116,6 +116,14 @@
       "pill": "Flux de réservation automatisé"
     },
     "trust": ["Aucune carte de crédit requise", "Forfait gratuit pour toujours", "Annulez à tout moment"],
+    "videoProof": {
+      "eyebrow": "Voyez Pulse en action",
+      "title": "Un vrai parcours de réservation, du début à la fin",
+      "body": "Voyez comment une entreprise de services configure ses disponibilités, accepte une réservation en ligne, protège le rendez-vous avec les outils de paiement et tient le client informé.",
+      "playerTitle": "Présentation du produit Pulse Appointments",
+      "playLabel": "Lire la présentation du produit Pulse Appointments",
+      "privacyNote": "Le lecteur YouTube se charge uniquement lorsque vous lancez la vidéo."
+    },
     "tour": {
       "eyebrow": "Visite du produit",
       "title": "Voyez le parcours de réservation avant de vous engager",

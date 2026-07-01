@@ -66,6 +66,14 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
     ].join("; ");
 
+    // Public marketing pages may contain the optional click-to-load product
+    // walkthrough. The privacy-enhanced YouTube host is permitted for frames;
+    // no YouTube request occurs until the visitor explicitly presses play.
+    const marketingCsp = authCsp.replace(
+      "object-src 'none'",
+      "frame-src https://www.youtube-nocookie.com; object-src 'none'",
+    );
+
     // Build connect-src dynamically so it tracks the API URL env var instead of
     // a hardcoded Railway hostname that will break if the domain changes.
     const wsOrigin = (process.env.NEXT_PUBLIC_WS_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "")
@@ -156,10 +164,10 @@ const nextConfig: NextConfig = {
         ],
       })),
       // Marketing / legal pages: no Stripe, no framing.
-      ...["/", "/pricing", "/contact", "/faq", "/terms", "/privacy", "/accessibility", "/status", "/changelog", "/referrals", "/trust"].map((source) => ({
+      ...["/", "/fr", "/pricing", "/contact", "/faq", "/terms", "/privacy", "/accessibility", "/status", "/changelog", "/referrals", "/trust"].map((source) => ({
         source,
         headers: [
-          { key: "Content-Security-Policy", value: authCsp },
+          { key: "Content-Security-Policy", value: marketingCsp },
           { key: "X-Frame-Options", value: "DENY" },
         ],
       })),
