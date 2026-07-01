@@ -570,6 +570,52 @@ describe('BookingsService', () => {
       await expect(svc.confirm('apt1', 'biz1')).rejects.toThrow(BadRequestException);
     });
 
+    it('allows a branch to waive the business deposit requirement', async () => {
+      const { svc } = await buildService({
+        appointment: {
+          ...mockPrisma().appointment,
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({
+            location: { id: 'loc-1', requireDeposit: false },
+            business: {
+              id: 'biz1',
+              plan: 'BASIC',
+              requireDeposit: true,
+              minNoticeMinutes: 120,
+              maxAdvanceDays: 60,
+              allowClientReschedule: true,
+              cancellationWindowHours: 24,
+              cancellationFeeCents: 0,
+            },
+          })),
+        },
+      });
+
+      await expect(svc.confirm('apt1', 'biz1')).resolves.toBeDefined();
+    });
+
+    it('enforces a branch deposit requirement when the business default is off', async () => {
+      const { svc } = await buildService({
+        appointment: {
+          ...mockPrisma().appointment,
+          findFirst: jest.fn().mockResolvedValue(makeAppointment({
+            location: { id: 'loc-1', requireDeposit: true },
+            business: {
+              id: 'biz1',
+              plan: 'BASIC',
+              requireDeposit: false,
+              minNoticeMinutes: 120,
+              maxAdvanceDays: 60,
+              allowClientReschedule: true,
+              cancellationWindowHours: 24,
+              cancellationFeeCents: 0,
+            },
+          })),
+        },
+      });
+
+      await expect(svc.confirm('apt1', 'biz1')).rejects.toThrow(BadRequestException);
+    });
+
     it('prevents staff from confirming another provider appointment', async () => {
       const { svc } = await buildService({
         staff: {
@@ -610,6 +656,26 @@ describe('BookingsService', () => {
       await expect(
         svc.reschedule('apt1', { startsAt: SLOT_START.toISOString() }, undefined, { byClient: true }),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('uses the branch cancellation window instead of the business default', async () => {
+      const { svc } = await buildService();
+      const effectiveWindow = (svc as any).effectiveCancellationWindowMinutes({
+        business: { cancellationWindowMinutes: 1440 },
+        location: { cancellationWindowMinutes: 120 },
+      });
+
+      expect(effectiveWindow).toBe(120);
+    });
+
+    it('falls back to the business cancellation window when the branch inherits', async () => {
+      const { svc } = await buildService();
+      const effectiveWindow = (svc as any).effectiveCancellationWindowMinutes({
+        business: { cancellationWindowMinutes: 1440 },
+        location: { cancellationWindowMinutes: null },
+      });
+
+      expect(effectiveWindow).toBe(1440);
     });
 
     it('rejects public client reschedule when online rescheduling is disabled', async () => {

@@ -732,6 +732,8 @@ model Location {
   // Per-location deposit policy. NULL = fall back to the business deposit setting.
   requireDeposit Boolean? // does this branch collect a booking deposit?
   depositPercent Int?     // % of the price taken as the deposit at this branch
+  cancellationWindowMinutes Int? // NULL = fall back to the business cancellation window
+  cancellationPolicy String? @db.Text // NULL = fall back to the business policy copy
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

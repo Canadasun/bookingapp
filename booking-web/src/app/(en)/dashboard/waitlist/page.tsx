@@ -36,7 +36,7 @@ export default function WaitlistPage() {
     try { setEntries(await api.waitlist.list(bizId, locationFilter)); }
     catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement" : "Failed to load")); }
     finally { setLoading(false); }
-  }, [bizId, french, locationFilter?.join(",")]);
+  }, [bizId, french, locationFilter]);
   useEffect(() => { load(); }, [load]);
 
   async function remove() {

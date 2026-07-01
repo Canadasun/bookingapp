@@ -31,8 +31,8 @@ const TIMEZONES = [
   ["America/St_Johns", "Newfoundland — St. John's (NT)"],
 ] as const;
 
-type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean; taxProvince: string; taxRatePercent: string; depositMode: "" | "on" | "off"; depositPercent: string };
-const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true, taxProvince: "", taxRatePercent: "", depositMode: "", depositPercent: "" };
+type LocForm = { name: string; address: string; phone: string; timezone: string; active: boolean; taxProvince: string; taxRatePercent: string; depositMode: "" | "on" | "off"; depositPercent: string; cancellationWindowMinutes: string; cancellationPolicy: string };
+const emptyForm: LocForm = { name: "", address: "", phone: "", timezone: "", active: true, taxProvince: "", taxRatePercent: "", depositMode: "", depositPercent: "", cancellationWindowMinutes: "", cancellationPolicy: "" };
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -82,7 +82,9 @@ export default function LocationsPage() {
     setForm({ name: l.name, address: l.address ?? "", phone: l.phone ?? "", timezone: l.timezone ?? "", active: l.active,
       taxProvince: l.taxProvince ?? "", taxRatePercent: l.taxRatePercent != null ? String(l.taxRatePercent) : "",
       depositMode: l.requireDeposit == null ? "" : l.requireDeposit ? "on" : "off",
-      depositPercent: l.depositPercent != null ? String(l.depositPercent) : "" });
+      depositPercent: l.depositPercent != null ? String(l.depositPercent) : "",
+      cancellationWindowMinutes: l.cancellationWindowMinutes != null ? String(l.cancellationWindowMinutes) : "",
+      cancellationPolicy: l.cancellationPolicy ?? "" });
     setModalOpen(true);
   }
 
@@ -100,6 +102,11 @@ export default function LocationsPage() {
     if (depositPercent != null && (Number.isNaN(depositPercent) || depositPercent < 1 || depositPercent > 100)) {
       toast.error(french ? "Pourcentage de dépôt invalide" : "Invalid deposit percent"); return;
     }
+    const cancellationWindowMinutes = form.cancellationWindowMinutes.trim() === "" ? null : Number(form.cancellationWindowMinutes);
+    if (cancellationWindowMinutes != null && (!Number.isInteger(cancellationWindowMinutes) || cancellationWindowMinutes < 0 || cancellationWindowMinutes > 525600)) {
+      toast.error(french ? "Délai d’annulation invalide" : "Invalid cancellation window"); return;
+    }
+    const cancellationPolicy = form.cancellationPolicy.trim() || null;
     setSaving(true);
     try {
       if (editingId) {
@@ -113,6 +120,8 @@ export default function LocationsPage() {
           taxRatePercent,
           requireDeposit,
           depositPercent,
+          cancellationWindowMinutes,
+          cancellationPolicy,
         });
         toast.success(french ? "Emplacement mis à jour" : "Location updated");
       } else {
@@ -125,6 +134,8 @@ export default function LocationsPage() {
           taxRatePercent,
           requireDeposit,
           depositPercent,
+          cancellationWindowMinutes,
+          cancellationPolicy,
         });
         toast.success(french ? "Emplacement ajouté" : "Location added");
       }
@@ -302,6 +313,21 @@ export default function LocationsPage() {
                     <span className="text-xs text-gray-400">{french ? "% du prix (sinon celui de l’entreprise)." : "% of the price (else the business default)."}</span>
                   </div>
                 )}
+              </div>
+              <div>
+                <label htmlFor="loc-cancel-window" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Délai d’annulation (minutes)" : "Cancellation window (minutes)"}</label>
+                <Input id="loc-cancel-window" type="number" min="0" max="525600" step="1"
+                  value={form.cancellationWindowMinutes}
+                  onChange={(e) => setForm((p) => ({ ...p, cancellationWindowMinutes: e.target.value }))}
+                  placeholder={french ? "Paramètre de l’entreprise" : "Business default"} />
+              </div>
+              <div>
+                <label htmlFor="loc-cancel-policy" className="block text-xs font-medium text-gray-700 mb-1">{french ? "Politique d’annulation" : "Cancellation policy"}</label>
+                <textarea id="loc-cancel-policy" rows={3} maxLength={5000}
+                  value={form.cancellationPolicy}
+                  onChange={(e) => setForm((p) => ({ ...p, cancellationPolicy: e.target.value }))}
+                  placeholder={french ? "Vide = politique de l’entreprise" : "Blank = business policy"}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500" />
               </div>
               <div className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
                 <span className="text-sm text-gray-700">{french ? "Actif" : "Active"}</span>

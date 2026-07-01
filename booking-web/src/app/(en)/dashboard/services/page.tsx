@@ -479,7 +479,7 @@ export default function ServicesPage() {
       setResources(res);
     } catch (e) { setLoadError(e instanceof Error ? e.message : t.loadFailed); }
     finally { setLoading(false); }
-  }, [bizId, t.loadFailed, locationFilter?.join(",")]);
+  }, [bizId, t.loadFailed, locationFilter]);
 
   useEffect(() => { load(); }, [load]);
 
