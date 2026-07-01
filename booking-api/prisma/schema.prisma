@@ -86,7 +86,7 @@ model Business {
   slug                 String  @unique
   email                String
   phone                String?
-  timezone             String  @default("America/New_York")
+  timezone             String  @default("America/Toronto")
   address              String?
   logoUrl              String?
   websiteUrl           String?
@@ -708,6 +708,10 @@ model Location {
   phone      String?
   timezone   String?
   active     Boolean  @default(true)
+  // Per-location Canadian tax. A branch in BC collects BC's rate even if HQ is in
+  // ON. NULL = fall back to the business-level tax (single-province businesses).
+  taxProvince    String? // province/territory code (e.g. BC) the rate preset came from
+  taxRatePercent Float?  // combined GST/HST/PST/QST for this branch
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -718,6 +722,7 @@ model Location {
   businessHours BusinessHours[]
   businessClosures BusinessClosure[]
   waitlist WaitlistEntry[]
+  invoices Invoice[]
 
   @@index([businessId])
 }
@@ -728,6 +733,7 @@ model Invoice {
   id             String    @id @default(cuid())
   businessId     String
   clientId       String?
+  locationId     String? // branch this invoice is for — drives the applied tax rate
   number         Int // per-business sequence (from Business.invoiceSeq)
   status         String    @default("DRAFT") // DRAFT | SENT | PAID | VOID
   lineItems      Json      @default("[]") // [{ description, quantity, unitCents, amountCents }]
@@ -748,9 +754,11 @@ model Invoice {
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   client   Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([businessId])
   @@index([clientId])
+  @@index([locationId])
 }
 
 model SystemError {

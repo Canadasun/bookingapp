@@ -135,11 +135,12 @@ export interface ServiceCategory {
 
 export interface Resource { id: string; businessId: string; name: string; active: boolean; createdAt: string; updatedAt: string }
 
-export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; active: boolean; createdAt: string; updatedAt: string }
+export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; active: boolean; taxProvince?: string | null; taxRatePercent?: number | null; createdAt: string; updatedAt: string }
 
 export interface InvoiceLineItem { description: string; quantity: number; unitCents: number; amountCents: number }
 export interface Invoice {
   id: string; businessId: string; clientId?: string | null; number: number;
+  locationId?: string | null;
   status: "DRAFT" | "SENT" | "PAID" | "VOID"; lineItems: InvoiceLineItem[]; notes?: string | null;
   currency: string; subtotalCents: number; taxRatePercent: number; taxCents: number; totalCents: number;
   discountCents?: number; discountLabel?: string | null;
@@ -150,7 +151,7 @@ export interface Invoice {
 }
 
 export type InvoiceCreatePayload = {
-  clientId?: string | null; notes?: string | null; dueAt?: string | null;
+  clientId?: string | null; locationId?: string | null; notes?: string | null; dueAt?: string | null;
   lineItems: { description: string; quantity: number; unitCents: number }[];
   taxRatePercent?: number | null; discountCents?: number; discountLabel?: string | null;
   paymentTerms?: string | null; poNumber?: string | null; billingAddress?: string | null;
@@ -874,9 +875,9 @@ export const api = {
 
   locations: {
     list: (businessId: string) => req<Location[]>(`/businesses/${businessId}/locations`),
-    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string }) =>
+    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null }) =>
       req<Location>(`/businesses/${businessId}/locations`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean }) =>
+    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null }) =>
       req<Location>(`/businesses/${businessId}/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     remove: (businessId: string, id: string) =>
       req<{ ok: boolean }>(`/businesses/${businessId}/locations/${id}`, { method: "DELETE" }),

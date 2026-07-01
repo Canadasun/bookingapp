@@ -38,7 +38,7 @@ export class LocationsService {
     });
   }
 
-  async create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string }) {
+  async create(businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null }) {
     // New locations are active by default, so the same guard must be used for
     // creation and reactivation. Otherwise deactivate → create → reactivate
     // bypasses the subscription limit.
@@ -51,11 +51,13 @@ export class LocationsService {
         address: data.address?.trim() || null,
         phone: data.phone?.trim() || null,
         timezone: data.timezone?.trim() || null,
+        taxProvince: data.taxProvince?.trim() || null,
+        taxRatePercent: data.taxRatePercent ?? null,
       },
     });
   }
 
-  async update(id: string, businessId: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean }) {
+  async update(id: string, businessId: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null }) {
     const location = await this.prisma.location.findFirst({ where: { id, businessId } });
     if (!location) throw new NotFoundException('Location not found');
     if (data.active === true && !location.active) {
@@ -68,6 +70,8 @@ export class LocationsService {
         ...(data.address !== undefined ? { address: data.address.trim() || null } : {}),
         ...(data.phone !== undefined ? { phone: data.phone.trim() || null } : {}),
         ...(data.timezone !== undefined ? { timezone: data.timezone.trim() || null } : {}),
+        ...(data.taxProvince !== undefined ? { taxProvince: data.taxProvince?.trim() || null } : {}),
+        ...(data.taxRatePercent !== undefined ? { taxRatePercent: data.taxRatePercent ?? null } : {}),
         ...(data.active !== undefined ? { active: data.active } : {}),
       },
     });

@@ -35,14 +35,32 @@ export class InvoicesService {
     return { lines, subtotalCents, taxCents, totalCents };
   }
 
+  // The tax rate for an invoice: an explicit rate wins; otherwise the branch's
+  // own Canadian rate (a BC branch collects BC tax); otherwise the business rate.
+  private async resolveTaxRate(businessId: string, locationId: string | null | undefined, explicit: number | null | undefined, businessRate: number): Promise<number> {
+    if (explicit !== undefined) return explicit ?? 0;
+    if (locationId) {
+      const loc = await this.prisma.location.findFirst({
+        where: { id: locationId, businessId },
+        select: { taxRatePercent: true },
+      });
+      if (loc?.taxRatePercent != null) return loc.taxRatePercent;
+    }
+    return businessRate ?? 0;
+  }
+
   async create(businessId: string, dto: CreateInvoiceDto) {
     await this.assertClientOwnership(businessId, dto.clientId);
     const biz = await this.prisma.business.findUniqueOrThrow({
       where: { id: businessId },
       select: { taxRatePercent: true, currency: true },
     });
+    if (dto.locationId) {
+      const loc = await this.prisma.location.findFirst({ where: { id: dto.locationId, businessId }, select: { id: true } });
+      if (!loc) throw new NotFoundException('Location not found');
+    }
 
-    const taxRate = dto.taxRatePercent ?? biz.taxRatePercent ?? 0;
+    const taxRate = await this.resolveTaxRate(businessId, dto.locationId, dto.taxRatePercent, biz.taxRatePercent);
     const discount = dto.discountCents ?? 0;
     const { lines, subtotalCents, taxCents, totalCents } = this.calcTotals(dto.lineItems, taxRate, discount);
 
@@ -56,6 +74,7 @@ export class InvoicesService {
         data: {
           businessId,
           clientId: dto.clientId || null,
+          locationId: dto.locationId || null,
           number: b.invoiceSeq,
           lineItems: lines,
           notes: dto.notes ?? null,
@@ -88,8 +107,19 @@ export class InvoicesService {
       select: { taxRatePercent: true, currency: true },
     });
 
+    if (dto.locationId) {
+      const loc = await this.prisma.location.findFirst({ where: { id: dto.locationId, businessId }, select: { id: true } });
+      if (!loc) throw new NotFoundException('Location not found');
+    }
     const rawLineItems = dto.lineItems ?? (existing.lineItems as any[]);
-    const taxRate = dto.taxRatePercent !== undefined ? (dto.taxRatePercent ?? 0) : (existing.taxRatePercent ?? biz.taxRatePercent ?? 0);
+    // Re-resolve the rate when the branch changes (and no explicit rate is given),
+    // otherwise keep the explicit/existing rate.
+    const effectiveLocationId = dto.locationId !== undefined ? dto.locationId : existing.locationId;
+    const taxRate = dto.taxRatePercent !== undefined
+      ? (dto.taxRatePercent ?? 0)
+      : dto.locationId !== undefined
+        ? await this.resolveTaxRate(businessId, effectiveLocationId, undefined, biz.taxRatePercent)
+        : (existing.taxRatePercent ?? biz.taxRatePercent ?? 0);
     const discount = dto.discountCents !== undefined ? dto.discountCents : (existing.discountCents ?? 0);
     const { lines, subtotalCents, taxCents, totalCents } = this.calcTotals(rawLineItems, taxRate, discount);
 
@@ -97,6 +127,7 @@ export class InvoicesService {
       where: { id, businessId },
       data: {
         clientId: dto.clientId !== undefined ? (dto.clientId || null) : undefined,
+        locationId: dto.locationId !== undefined ? (dto.locationId || null) : undefined,
         lineItems: lines,
         notes: dto.notes !== undefined ? (dto.notes ?? null) : undefined,
         subtotalCents,

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Plus, X, Trash2, FileText, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { api, Invoice, ClientWithStats, Business, InvoiceCreatePayload } from "@/lib/api";
+import { api, Invoice, ClientWithStats, Business, InvoiceCreatePayload, Location } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ export default function InvoicesPage() {
   const bizId = user?.businessId ?? "";
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [biz, setBiz] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -38,14 +39,16 @@ export default function InvoicesPage() {
     setLoadError("");
     setLoading(true);
     try {
-      const [inv, cl, b] = await Promise.all([
+      const [inv, cl, b, locs] = await Promise.all([
         api.invoices.list(bizId),
         api.clients.list(bizId, undefined, 1, 500).catch(() => ({ data: [] as ClientWithStats[] })),
         api.business.get(bizId).catch(() => null),
+        api.locations.list(bizId).catch(() => [] as Location[]),
       ]);
       setInvoices(inv);
       setClients(cl.data);
       setBiz(b);
+      setLocations(locs.filter((l) => l.active));
     } catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des factures" : "Failed to load invoices")); }
     finally { setLoading(false); }
   }, [bizId, french]);
@@ -89,16 +92,17 @@ export default function InvoicesPage() {
       )}
 
       {showNew && (
-        <NewInvoiceModal bizId={bizId} clients={clients} currency={biz?.currency ?? "CAD"} onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
+        <NewInvoiceModal bizId={bizId} clients={clients} locations={locations} businessTaxRate={biz?.taxRatePercent ?? 0} currency={biz?.currency ?? "CAD"} onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); load(); }} />
       )}
     </div>
   );
 }
 
-function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
-  bizId: string; clients: ClientWithStats[]; currency: "CAD" | "USD"; onClose: () => void; onCreated: (inv: Invoice) => void;
+function NewInvoiceModal({ bizId, clients, locations, businessTaxRate, currency, onClose, onCreated }: {
+  bizId: string; clients: ClientWithStats[]; locations: Location[]; businessTaxRate: number; currency: "CAD" | "USD"; onClose: () => void; onCreated: (inv: Invoice) => void;
 }) {
   const [clientId, setClientId] = useState("");
+  const [locationId, setLocationId] = useState("");
   const [notes, setNotes] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [poNumber, setPoNumber] = useState("");
@@ -123,6 +127,7 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
     try {
       const payload: InvoiceCreatePayload = {
         clientId: clientId || undefined,
+        locationId: locationId || undefined,
         notes: notes.trim() || null,
         dueAt: dueAt ? new Date(`${dueAt}T00:00:00`).toISOString() : null,
         lineItems,
@@ -154,6 +159,20 @@ function NewInvoiceModal({ bizId, clients, currency, onClose, onCreated }: {
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+            {locations.length > 1 && (
+              <div>
+                <label htmlFor="inv-location" className="block text-sm font-medium text-gray-700 mb-1">{french ? "Emplacement (taxe)" : "Location (tax)"}</label>
+                <select id="inv-location" value={locationId} onChange={(e) => setLocationId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white text-gray-700">
+                  <option value="">{french ? "— Taxe de l’entreprise —" : "— Business tax —"}</option>
+                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  {french ? "Taxe appliquée : " : "Tax applied: "}
+                  {(locationId ? (locations.find((l) => l.id === locationId)?.taxRatePercent ?? businessTaxRate) : businessTaxRate)}%
+                </p>
+              </div>
+            )}
             <div>
               <label htmlFor="inv-due" className="block text-sm font-medium text-gray-700 mb-1">{french ? "Date d’échéance (facultatif)" : "Due date (optional)"}</label>
               <Input id="inv-due" type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
