@@ -97,7 +97,7 @@ export class SearchService {
       id: a.id,
       label: a.client?.name ?? 'Appointment',
       sublabel: [a.service?.name, a.startsAt.toLocaleDateString('en-CA', { dateStyle: 'medium' })].filter(Boolean).join(' · '),
-      href: `/dashboard/appointments`,
+      href: `/dashboard/appointments?focus=${a.id}`,
     })));
     push('location', 'Locations', locations.map((l) => ({
       type: 'location',

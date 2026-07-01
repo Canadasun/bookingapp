@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   format, isToday, isThisWeek,
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
@@ -941,6 +941,16 @@ function AppointmentsPage() {
   const [calMonth, setCalMonth] = useState<Date>(() => new Date());
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [selected, setSelected] = useState<Appointment | null>(null);
+  // Deep-link from global search: /dashboard/appointments?focus={id} opens that
+  // appointment's detail directly (owner-scoped fetch). One-shot, graceful no-op.
+  const focusedOnce = useRef(false);
+  useEffect(() => {
+    if (focusedOnce.current || !bizId) return;
+    const fid = new URLSearchParams(window.location.search).get("focus");
+    if (!fid) return;
+    focusedOnce.current = true;
+    api.appointments.getOne(bizId, fid).then(setSelected).catch(() => {});
+  }, [bizId]);
   const [showBlock, setShowBlock] = useState(false);
   const [showNewApt, setShowNewApt] = useState(false);
   const [staffList, setStaffList] = useState<{ id: string; user: { name: string }; locationId?: string | null }[]>([]);

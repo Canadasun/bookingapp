@@ -1027,7 +1027,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Bell className="w-4.5 h-4.5" />
               {unread > 0 && (
                 <span className="absolute -right-1 -top-1 min-w-5 h-5 rounded-full bg-red-500 px-1 text-[10px] leading-5 text-white text-center font-bold">
-                  {unread > 9 ? "9+" : unread}
+                  {unread > 99 ? "99+" : unread}
                 </span>
               )}
             </Link>

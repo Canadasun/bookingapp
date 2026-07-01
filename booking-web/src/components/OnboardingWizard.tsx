@@ -37,13 +37,16 @@ export function OnboardingWizard({ setup }: { setup?: { hasBooking: boolean } | 
       const hasServices = Array.isArray(services) && services.length > 0;
       const hasStaff = Array.isArray(staff) && staff.length > 0;
       const hasStripe = !!(biz as { stripeConnectOnboarded?: boolean } | null)?.stripeConnectOnboarded;
+      // "Share" can't be detected server-side, so it completes when the owner
+      // clicks it (persisted per business). Lets the checklist reach 100%.
+      const shared = typeof window !== "undefined" && localStorage.getItem(`pulse_ob_shared_${bizId}`) === "1";
 
       const built: Step[] = [
         { id: "services", title: "Add your first service", description: "Define what you offer — haircut, massage, cleaning, etc.", href: "/dashboard/services", done: hasServices },
         { id: "staff", title: "Set up your staff & hours", description: "Add yourself or team members and set working hours.", href: "/dashboard/staff", done: hasStaff },
         { id: "stripe", title: "Connect Stripe to get paid", description: "Accept deposits, card payments, and no-show fees.", href: "/dashboard/settings?tab=payouts", done: hasStripe },
         { id: "booking", title: "Take your first booking", description: "Add an appointment yourself, or share your link so a client can.", href: "/dashboard/appointments?new=1", done: hasBooking },
-        { id: "share", title: "Share your booking link", description: "Post it on Instagram, Google, or anywhere clients find you.", href: "/dashboard/settings?tab=online", done: false },
+        { id: "share", title: "Share your booking link", description: "Post it on Instagram, Google, or anywhere clients find you.", href: "/dashboard/settings?tab=online", done: shared },
       ];
 
       // Auto-hide once the four owner-controllable steps are done (the "share"
@@ -93,7 +96,13 @@ export function OnboardingWizard({ setup }: { setup?: { hasBooking: boolean } | 
         {steps.map(step => (
           <button
             key={step.id}
-            onClick={() => router.push(step.href)}
+            onClick={() => {
+              if (step.id === "share") {
+                try { localStorage.setItem(`pulse_ob_shared_${bizId}`, "1"); } catch { /* ignore */ }
+                setSteps((prev) => prev.map((s) => (s.id === "share" ? { ...s, done: true } : s)));
+              }
+              router.push(step.href);
+            }}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors",
               step.done ? "opacity-60" : "hover:bg-violet-50"
