@@ -3,10 +3,14 @@ import { Prisma, PlanTier } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 import { addMonths } from 'date-fns';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class VerificationService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async submit(businessId: string, input: {
     legalName: string;
@@ -367,6 +371,11 @@ export class VerificationService {
         changes: { from: biz.plan, to: plan, months, expiresAt: expiresAt.toISOString() },
       },
     });
+    // Tell the influencer/VIP what they received (email + in-app). Best-effort:
+    // a notification hiccup must never fail the grant itself.
+    await this.notifications
+      .sendCompPlanGranted(businessId, { plan, expiresAt: expiresAt.toISOString() })
+      .catch(() => {});
     return result;
   }
 

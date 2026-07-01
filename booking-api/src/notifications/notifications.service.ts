@@ -66,6 +66,11 @@ export class NotificationsService implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: true,
       });
+      await this.queue.add('comp-plan-expiry-scan', {}, {
+        repeat: { pattern: '30 13 * * *' }, // 13:30 UTC daily — 14/7/1-day countdown reminders
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     } catch (e) {
       this.logger.warn(`Could not schedule scans: ${e instanceof Error ? e.message : e}`);
     }
@@ -118,6 +123,17 @@ export class NotificationsService implements OnModuleInit {
       jobId: `trial-ending-${data.eventId}`,
       removeOnComplete: true,
       attempts: 2,
+    });
+  }
+
+  // Welcome an influencer/VIP who was just granted a complimentary plan. The
+  // 14/7/1-day expiry countdown and the post-expiry email are driven by the
+  // 'comp-plan-expiry-scan' cron and the 'expire-complimentary-plans' job.
+  async sendCompPlanGranted(businessId: string, data: { plan: string; expiresAt: string | null }) {
+    await this.queue.add('comp-plan-granted', { businessId, plan: data.plan, expiresAt: data.expiresAt }, {
+      jobId: `comp-granted-${businessId}-${Date.now()}`,
+      removeOnComplete: true,
+      attempts: 1,
     });
   }
 

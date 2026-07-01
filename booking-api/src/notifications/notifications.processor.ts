@@ -517,6 +517,133 @@ export class NotificationProcessor extends WorkerHost {
     await this.notifyOwners(businessId, { kind: 'PAYMENT', title, body, linkUrl: '/dashboard/settings?tab=billing' }).catch(() => {});
   }
 
+  // ── Complimentary / influencer plan lifecycle emails ─────────────────────
+  // Welcome: an influencer/VIP was just granted a complimentary plan.
+  private async sendCompPlanGrantedEmail(businessId: string, plan: string, expiresAtIso: string | null) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'comp-plan-granted';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
+    if (!owners.length) return;
+    for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const endStr = expiresAtIso ? new Date(expiresAtIso).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' }) : null;
+      const title = fr ? `Vous avez reçu l’accès ${plan} gratuit 🎉` : `You've been given complimentary ${plan} access 🎉`;
+      const body = fr
+        ? `Bonne nouvelle! Votre compte a été mis à niveau vers ${plan}${endStr ? ` jusqu’au ${endStr}` : ''}, gratuitement. Toutes les fonctionnalités ${plan} sont maintenant activées — explorez-les dès aujourd’hui.`
+        : `Great news — your account has been upgraded to ${plan}${endStr ? ` until ${endStr}` : ''}, on the house. All ${plan} features are now unlocked — dive in and explore them today.`;
+      await this.email.send({
+        to: o.email,
+        subject: title,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Ouvrir votre tableau de bord' : 'Open your dashboard'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
+      }).catch(() => {});
+    }
+    const enEnd = this.fmtDateCa(expiresAtIso);
+    await this.notifyOwners(businessId, {
+      kind: 'SYSTEM',
+      title: `Complimentary ${plan} access activated 🎉`,
+      body: enEnd ? `Active until ${enEnd}. Enjoy all ${plan} features.` : `Enjoy all ${plan} features.`,
+      linkUrl: '/dashboard',
+    }).catch(() => {});
+  }
+
+  // Expiry: a complimentary grant lapsed and the plan reverted — invite them to subscribe.
+  private async sendCompPlanExpiredEmail(businessId: string, restoredPlan: string) {
+    if (!businessId) return;
+    this.currentBusinessId = businessId;
+    this.currentType = 'comp-plan-expired';
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    const owners = await this.prisma.user.findMany({ where: { businessId, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
+    if (!owners.length) return;
+    for (const o of owners) {
+      const fr = o.locale === 'fr';
+      const planLabel = restoredPlan === 'FREE' ? (fr ? 'gratuit (Free)' : 'Free') : restoredPlan;
+      const title = fr ? 'Votre accès gratuit est terminé' : 'Your complimentary access has ended';
+      const body = fr
+        ? `Votre période d’accès gratuit est terminée et votre compte est revenu au forfait ${planLabel}. Abonnez-vous pour retrouver les fonctionnalités que vous utilisiez.`
+        : `Your complimentary access period has ended and your account has returned to the ${planLabel} plan. Subscribe now to regain the features you were using.`;
+      await this.email.send({
+        to: o.email,
+        subject: title,
+        html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Choisir un forfait' : 'Choose a plan'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
+      }).catch(() => {});
+    }
+    await this.notifyOwners(businessId, {
+      kind: 'PAYMENT',
+      title: 'Complimentary access ended',
+      body: 'Subscribe to keep the features you were using.',
+      linkUrl: '/dashboard/settings?tab=billing',
+    }).catch(() => {});
+  }
+
+  // Daily countdown: warn owners 14 / 7 / 1 days before a complimentary grant
+  // lapses. Each threshold fires at most once per business (deduped via the
+  // delivery log), so a business gets up to three reminders as it counts down.
+  private async runCompPlanExpiryScan() {
+    const now = Date.now();
+    const horizon = new Date(now + 14 * 86_400_000);
+    const businesses = await this.prisma.business.findMany({
+      where: { complimentaryPlanExpiresAt: { gt: new Date(now), lte: horizon } },
+      select: { id: true, plan: true, complimentaryPlanExpiresAt: true },
+    });
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    for (const b of businesses) {
+      if (!b.complimentaryPlanExpiresAt) continue;
+      const daysLeft = Math.ceil((b.complimentaryPlanExpiresAt.getTime() - now) / 86_400_000);
+      const bucket = daysLeft <= 1 ? 1 : daysLeft <= 7 ? 7 : 14;
+      const type = `comp-plan-expiring-${bucket}`;
+      const owners = await this.prisma.user.findMany({ where: { businessId: b.id, role: 'OWNER' }, select: { email: true, name: true, locale: true } });
+      if (!owners.length) continue;
+      this.currentBusinessId = b.id;
+      this.currentType = type;
+      let sentAny = false;
+      for (const o of owners) {
+        const already = await this.prisma.notificationDelivery.findFirst({
+          where: { businessId: b.id, recipient: o.email, type, status: 'SENT' },
+          select: { id: true },
+        });
+        if (already) continue;
+        const fr = o.locale === 'fr';
+        const endStr = b.complimentaryPlanExpiresAt.toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { dateStyle: 'medium' });
+        const dayWord = fr ? (daysLeft > 1 ? 'jours' : 'jour') : (daysLeft > 1 ? 'days' : 'day');
+        const title = fr ? `Votre accès ${b.plan} gratuit se termine bientôt` : `Your complimentary ${b.plan} access ends soon`;
+        const body = fr
+          ? `Il vous reste ${daysLeft} ${dayWord} d’accès ${b.plan} gratuit (jusqu’au ${endStr}). Abonnez-vous dès maintenant pour conserver vos fonctionnalités sans interruption.`
+          : `You have ${daysLeft} ${dayWord} of complimentary ${b.plan} access left (until ${endStr}). Subscribe now to keep your features without interruption.`;
+        await this.email.send({
+          to: o.email,
+          subject: title,
+          html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Choisir un forfait' : 'Choose a plan'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
+        }).catch(() => {});
+        sentAny = true;
+      }
+      // Only raise the in-app banner when a threshold was actually crossed, so
+      // owners don't get a daily nudge for every day inside the 14-day window.
+      if (sentAny) {
+        const word = daysLeft > 1 ? 'days' : 'day';
+        await this.notifyOwners(b.id, {
+          kind: 'PAYMENT',
+          title: `Complimentary ${b.plan} ends in ${daysLeft} ${word}`,
+          body: `Subscribe to keep your ${b.plan} features when the free period ends.`,
+          linkUrl: '/dashboard/settings?tab=billing',
+        }).catch(() => {});
+      }
+    }
+  }
+
   // In-app inbox notification to a business's owner(s). Best-effort.
   private async notifyOwners(
     businessId: string,
@@ -622,7 +749,7 @@ export class NotificationProcessor extends WorkerHost {
     } catch { /* push is best-effort */ }
   }
 
-  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number; amountDueCents?: number; amountPaidCents?: number; hostedInvoiceUrl?: string | null; nextAttempt?: string | null; periodEnd?: string | null; trialEndsAt?: string | null }>) {
+  async process(job: Job<{ appointmentId?: string; expectedStartsAt?: string; messageId?: string; dueId?: string; waitlistEntryId?: string; campaignId?: string; clientId?: string; giftCardId?: string; userId?: string; resetToken?: string; ip?: string; userAgent?: string; otpCode?: string; otpMethod?: string; otpPhone?: string; businessId?: string; plan?: string; feeCents?: number; amountDueCents?: number; amountPaidCents?: number; hostedInvoiceUrl?: string | null; nextAttempt?: string | null; periodEnd?: string | null; trialEndsAt?: string | null; expiresAt?: string | null }>) {
     // Access expiry is state maintenance, not a user notification, so it must
     // still run when outbound notifications are disabled.
     if (job.name === 'expire-complimentary-plans') {
@@ -650,6 +777,12 @@ export class NotificationProcessor extends WorkerHost {
             },
           }),
         ]);
+        // Notify the owner their complimentary access ended (email + in-app) and
+        // invite them to subscribe. The revert above is state maintenance and
+        // always runs; the notice honours NOTIFICATIONS_ENABLED like every other send.
+        if (process.env.NOTIFICATIONS_ENABLED !== 'false') {
+          await this.sendCompPlanExpiredEmail(business.id, restoredPlan).catch(() => {});
+        }
       }
       return;
     }
@@ -1105,6 +1238,22 @@ ${aptDetails(apt)}
       await this.sendTrialEndingEmail(String(job.data.businessId ?? ''), {
         trialEndsAt: job.data.trialEndsAt ?? null,
       });
+      return;
+    }
+
+    // Comp/influencer plan granted → welcome the owner (email + in-app).
+    if (job.name === 'comp-plan-granted') {
+      await this.sendCompPlanGrantedEmail(
+        String(job.data.businessId ?? ''),
+        String(job.data.plan ?? ''),
+        job.data.expiresAt ?? null,
+      );
+      return;
+    }
+
+    // Daily countdown scan → 14/7/1-day "your complimentary access is ending" reminders.
+    if (job.name === 'comp-plan-expiry-scan') {
+      await this.runCompPlanExpiryScan();
       return;
     }
 

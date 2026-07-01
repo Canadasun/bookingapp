@@ -13,11 +13,12 @@ describe('VerificationService complimentary plans', () => {
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
-    return { service: new VerificationService(prisma as never), prisma };
+    const notifications = { sendCompPlanGranted: jest.fn().mockResolvedValue(undefined) };
+    return { service: new VerificationService(prisma as never, notifications as never), prisma, notifications };
   }
 
   it('grants temporary access and records the previous plan', async () => {
-    const { service, prisma } = setup({
+    const { service, prisma, notifications } = setup({
       id: 'biz-1',
       plan: 'FREE',
       complimentaryPlanExpiresAt: null,
@@ -41,6 +42,10 @@ describe('VerificationService complimentary plans', () => {
         userId: 'admin-1',
       }),
     }));
+    expect(notifications.sendCompPlanGranted).toHaveBeenCalledWith(
+      'biz-1',
+      expect.objectContaining({ plan: 'UNLIMITED', expiresAt: expect.any(String) }),
+    );
   });
 
   it('preserves the original plan when extending an active grant', async () => {
