@@ -13,6 +13,23 @@ import { signAppointmentToken } from '../common/util/appointment-token';
 import { formatInTimeZone } from 'date-fns-tz';
 import { generateICalEvent, generateICalCancellation } from '../calendar-sync/ical.util';
 import { EventsGateway } from '../events/events.gateway';
+import Stripe from 'stripe';
+
+// A saved card is valid through the end of its exp_month. Returns how many days
+// remain until then and which reminder bucket (30 / 7 / expired) applies, or
+// null when the card is still more than 30 days out. Pure + exported for tests.
+export function cardExpiryInfo(
+  expMonth: number,
+  expYear: number,
+  now: Date = new Date(),
+): { daysLeft: number; bucket: 30 | 7 | 'expired' } | null {
+  // new Date(year, monthIndex, 0) → last day of the 1-indexed expMonth.
+  const expiresAt = new Date(expYear, expMonth, 0, 23, 59, 59, 999);
+  const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / 86_400_000);
+  if (daysLeft > 30) return null;
+  const bucket = daysLeft <= 0 ? 'expired' : daysLeft <= 7 ? 7 : 30;
+  return { daysLeft, bucket };
+}
 
 // Escape user-controlled text before interpolating into email HTML — prevents
 // HTML/markup injection via names, reasons, notes, gift-card messages, etc.
@@ -172,6 +189,9 @@ export class NotificationProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationProcessor.name);
   private email = new ResendEmailProvider();
   private sms   = new TwilioSmsProvider();
+  // Read-only Stripe client for the daily card-expiry scan. Lazily built from the
+  // primary key; the scan is best-effort so no failover is needed here.
+  private scanStripe: Stripe | null = null;
   // The job name currently being processed, used to label delivery-log rows.
   // (Worker concurrency is 1, so this is stable across a single job.)
   private currentType = '';
@@ -714,6 +734,119 @@ export class NotificationProcessor extends WorkerHost {
           body: `Subscribe to keep your ${b.plan} features when the free period ends.`,
           linkUrl: '/dashboard/settings?tab=billing',
         }).catch(() => {});
+      }
+    }
+  }
+
+  // Lazily build a read-only Stripe client for the card-expiry scan. Returns null
+  // (skip the scan) when no real key is configured, mirroring the admin-alert guard.
+  private getScanStripe(): Stripe | null {
+    const key = this.configService.get<string>('STRIPE_SECRET_KEY') ?? '';
+    if (!key || key.startsWith('sk_placeholder')) return null;
+    if (!this.scanStripe) this.scanStripe = new Stripe(key);
+    return this.scanStripe;
+  }
+
+  // Resolve the card backing a subscription: its own default payment method, else
+  // the customer's invoice-settings default. Returns null for non-card / missing PMs.
+  private async resolveDefaultCard(
+    stripe: Stripe,
+    subscriptionId: string | null,
+    customerId: string,
+  ): Promise<{ brand: string; last4: string; expMonth: number; expYear: number } | null> {
+    let pmId: string | null = null;
+    if (subscriptionId) {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId);
+      pmId = typeof sub.default_payment_method === 'string'
+        ? sub.default_payment_method
+        : sub.default_payment_method?.id ?? null;
+    }
+    if (!pmId) {
+      const cust = await stripe.customers.retrieve(customerId);
+      if (cust && !('deleted' in cust && cust.deleted)) {
+        const dpm = (cust as Stripe.Customer).invoice_settings?.default_payment_method;
+        pmId = typeof dpm === 'string' ? dpm : dpm?.id ?? null;
+      }
+    }
+    if (!pmId) return null;
+    const pm = await stripe.paymentMethods.retrieve(pmId);
+    if (pm.type !== 'card' || !pm.card) return null;
+    return { brand: pm.card.brand, last4: pm.card.last4, expMonth: pm.card.exp_month, expYear: pm.card.exp_year };
+  }
+
+  // Daily proactive scan: warn owners at 30 / 7 days before (and once after) the
+  // saved subscription card expires, so an expiring card doesn't silently lapse a
+  // paying customer. Deduped per card-expiry period + bucket via the delivery log,
+  // so replacing the card with a fresh expiry re-arms the reminders. Best-effort.
+  private async runCardExpiryScan() {
+    const stripe = this.getScanStripe();
+    if (!stripe) return;
+    const subs = await this.prisma.subscription.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PAST_DUE'] },
+        plan: { in: ['BASIC', 'PRO', 'UNLIMITED'] },
+        stripeCustomerId: { not: null },
+      },
+      select: { businessId: true, stripeCustomerId: true, stripeSubscriptionId: true },
+      take: 500,
+    });
+    const baseUrl = this.configService.get<string>('NEXT_PUBLIC_WEB_URL') ?? 'http://localhost:3000';
+    for (const s of subs) {
+      try {
+        const card = await this.resolveDefaultCard(stripe, s.stripeSubscriptionId, s.stripeCustomerId!);
+        if (!card) continue;
+        const info = cardExpiryInfo(card.expMonth, card.expYear);
+        if (!info) continue; // card is more than 30 days from expiry
+        const mmYY = `${String(card.expMonth).padStart(2, '0')}/${card.expYear}`;
+        const type = `card-expiring-${card.expYear}-${card.expMonth}-${info.bucket}`;
+        const owners = await this.prisma.user.findMany({
+          where: { businessId: s.businessId, role: 'OWNER' },
+          select: { email: true, name: true, locale: true },
+        });
+        if (!owners.length) continue;
+        this.currentBusinessId = s.businessId;
+        this.currentType = type;
+        let sentAny = false;
+        for (const o of owners) {
+          const already = await this.prisma.notificationDelivery.findFirst({
+            where: { businessId: s.businessId, recipient: o.email, type, status: 'SENT' },
+            select: { id: true },
+          });
+          if (already) continue;
+          const fr = o.locale === 'fr';
+          const cardLabel = `${card.brand ? card.brand.charAt(0).toUpperCase() + card.brand.slice(1) : (fr ? 'Carte' : 'Card')} •••• ${card.last4}`;
+          const expired = info.bucket === 'expired';
+          const title = expired
+            ? (fr ? 'Votre carte de paiement a expiré' : 'Your payment card has expired')
+            : (fr ? 'Votre carte de paiement expire bientôt' : 'Your payment card is expiring soon');
+          const body = expired
+            ? (fr
+              ? `Votre carte enregistrée (${cardLabel}, exp. ${mmYY}) a expiré. Mettez à jour votre moyen de paiement pour éviter l’interruption de votre forfait au prochain renouvellement.`
+              : `Your saved card (${cardLabel}, exp. ${mmYY}) has expired. Update your payment method to avoid your plan lapsing at the next renewal.`)
+            : (fr
+              ? `Votre carte enregistrée (${cardLabel}) expire le ${mmYY}. Mettez-la à jour dès maintenant pour que votre forfait Pulse continue sans interruption.`
+              : `Your saved card (${cardLabel}) expires on ${mmYY}. Update it now so your Pulse plan keeps running without interruption.`);
+          await this.email.send({
+            to: o.email,
+            subject: title,
+            html: emailWrap(`
+<h2 style="margin:0 0 4px;color:#111827;font-size:20px;font-weight:700">${esc(title)}</h2>
+<p style="margin:0 0 16px;color:#6B7280;font-size:14px">${fr ? 'Bonjour' : 'Hi'} ${esc(o.name)}, ${esc(body)}</p>
+<a href="${baseUrl}/dashboard/settings?tab=billing" style="display:inline-block;background:#E9A23C;color:#fff;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600">${fr ? 'Mettre à jour la carte' : 'Update card'} →</a>
+`, undefined, fr ? 'fr' : 'en'),
+          }).catch(() => {});
+          sentAny = true;
+        }
+        if (sentAny) {
+          await this.notifyOwners(s.businessId, {
+            kind: 'PAYMENT',
+            title: info.bucket === 'expired' ? 'Saved card expired' : 'Saved card expiring soon',
+            body: `Card ending ${card.last4} (exp. ${mmYY}). Update it to avoid a payment interruption.`,
+            linkUrl: '/dashboard/settings?tab=billing',
+          }).catch(() => {});
+        }
+      } catch (e) {
+        this.logger.warn(`card-expiry-scan: skipped business ${s.businessId}: ${e instanceof Error ? e.message : e}`);
       }
     }
   }
@@ -1344,6 +1477,12 @@ ${aptDetails(apt)}
     // Daily countdown scan → 14/7/1-day "your complimentary access is ending" reminders.
     if (job.name === 'comp-plan-expiry-scan') {
       await this.runCompPlanExpiryScan();
+      return;
+    }
+
+    // Daily card-expiry scan → proactive "your saved card is expiring" warnings.
+    if (job.name === 'card-expiry-scan') {
+      await this.runCardExpiryScan();
       return;
     }
 

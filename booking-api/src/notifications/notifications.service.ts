@@ -71,6 +71,11 @@ export class NotificationsService implements OnModuleInit {
         removeOnComplete: true,
         removeOnFail: true,
       });
+      await this.queue.add('card-expiry-scan', {}, {
+        repeat: { pattern: '0 12 * * *' }, // 12:00 UTC daily — proactive card-expiring warnings
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     } catch (e) {
       this.logger.warn(`Could not schedule scans: ${e instanceof Error ? e.message : e}`);
     }
