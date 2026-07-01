@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { deleteUploadByUrl } from '../uploads/upload-cleanup';
 
@@ -105,6 +105,60 @@ export class UsersService {
       })),
     });
     return this.privacyStatus(id);
+  }
+
+  featureTours(id: string) {
+    return this.prisma.featureTourProgress.findMany({
+      where: { userId: id },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        tourKey: true,
+        version: true,
+        status: true,
+        currentStep: true,
+        startedAt: true,
+        completedAt: true,
+        dismissedAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async updateFeatureTour(
+    id: string,
+    input: { tourKey: string; version: number; status: 'IN_PROGRESS' | 'COMPLETED' | 'DISMISSED'; currentStep: number },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { businessId: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.businessId) throw new BadRequestException('Feature tours require a business account');
+    const now = new Date();
+    return this.prisma.featureTourProgress.upsert({
+      where: {
+        userId_businessId_tourKey_version: {
+          userId: id,
+          businessId: user.businessId,
+          tourKey: input.tourKey,
+          version: input.version,
+        },
+      },
+      create: {
+        userId: id,
+        businessId: user.businessId,
+        ...input,
+        completedAt: input.status === 'COMPLETED' ? now : null,
+        dismissedAt: input.status === 'DISMISSED' ? now : null,
+      },
+      update: {
+        status: input.status,
+        currentStep: input.currentStep,
+        completedAt: input.status === 'COMPLETED' ? now : null,
+        dismissedAt: input.status === 'DISMISSED' ? now : null,
+      },
+      select: { tourKey: true, version: true, status: true, currentStep: true, updatedAt: true },
+    });
   }
 
   async requestErasure(id: string, reason?: string) {
