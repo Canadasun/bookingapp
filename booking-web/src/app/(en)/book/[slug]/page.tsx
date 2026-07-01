@@ -399,7 +399,7 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
       setBooking(apt);
       // If the business requires a deposit / card-on-file, collect it before
       // showing the confirmation. Otherwise (default) go straight to success.
-      const requiresDeposit = !!biz?.requireDeposit;
+      const requiresDeposit = selectedLocation?.requireDeposit ?? !!biz?.requireDeposit;
       const requiresCard = !!biz?.collectCardOnFile;
       if (!apt.manageToken) throw new Error(isFrench ? "Jeton de session de réservation manquant — impossible de configurer le paiement" : "Booking session token missing — cannot set up payment");
       const intent = await api.payments.bookingIntent(apt.id, bizId, apt.manageToken).catch((e) => {
@@ -576,7 +576,8 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
   const totalMins   = selectedServices.reduce((s, x) => s + x.durationMinutes, 0);
   const subtotalCents = selectedServices.reduce((s, x) => s + x.priceCents, 0);
   const totalCents  = Math.max(0, subtotalCents - (promoResult?.discountCents ?? 0));
-  const policy      = biz?.cancellationPolicy ?? (isFrench ? "Les rendez-vous annulés dans les 24 heures peuvent faire l’objet de frais d’annulation." : "Appointments cancelled within 24 hours may be subject to a cancellation fee.");
+  const selectedLocation = biz?.locations?.find((location) => location.id === selectedLocationId);
+  const policy      = selectedLocation?.cancellationPolicy ?? biz?.cancellationPolicy ?? (isFrench ? "Les rendez-vous annulés dans les 24 heures peuvent faire l’objet de frais d’annulation." : "Appointments cancelled within 24 hours may be subject to a cancellation fee.");
 
   // Sole-proprietor first: the provider step + per-person names only appear once
   // the business has an added non-owner provider. The owner-provider exists in
@@ -589,7 +590,6 @@ export function BookPageInner({ slug, lookup = "slug" }: { slug: string; lookup?
         (staff.staffServices.length === 0 || staff.staffServices.some((assignment) => assignment.serviceId === service.id)),
       ))
     : allServices;
-  const selectedLocation = biz?.locations?.find((location) => location.id === selectedLocationId);
   const salonName     = biz?.name ?? (isFrench ? "votre prestataire" : "your provider");
   function providerText(staffName?: string): string {
     if (!multiProvider) return salonName;

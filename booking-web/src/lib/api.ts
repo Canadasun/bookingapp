@@ -104,7 +104,7 @@ export interface Business {
   intakeQuestions?: IntakeQuestion[];
   taxRatePercent?: number;
   taxProvince?: string | null;
-  locations?: { id: string; name: string; address?: string | null }[];
+  locations?: { id: string; name: string; address?: string | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null; requireDeposit?: boolean | null; depositPercent?: number | null }[];
   suspectedDuplicateOfId?: string | null;
   stripeConnectOnboarded?: boolean;
   demoSeeded?: boolean;
@@ -135,7 +135,7 @@ export interface ServiceCategory {
 
 export interface Resource { id: string; businessId: string; name: string; active: boolean; createdAt: string; updatedAt: string }
 
-export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; active: boolean; taxProvince?: string | null; taxRatePercent?: number | null; createdAt: string; updatedAt: string }
+export interface Location { id: string; businessId: string; name: string; address?: string | null; phone?: string | null; timezone?: string | null; active: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null; createdAt: string; updatedAt: string }
 
 export interface InvoiceLineItem { description: string; quantity: number; unitCents: number; amountCents: number }
 export interface Invoice {
@@ -879,9 +879,9 @@ export const api = {
 
   locations: {
     list: (businessId: string) => req<Location[]>(`/businesses/${businessId}/locations`),
-    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null }) =>
+    create: (businessId: string, data: { name: string; address?: string; phone?: string; timezone?: string; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null }) =>
       req<Location>(`/businesses/${businessId}/locations`, { method: "POST", body: JSON.stringify(data) }),
-    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null }) =>
+    update: (businessId: string, id: string, data: { name?: string; address?: string; phone?: string; timezone?: string; active?: boolean; taxProvince?: string | null; taxRatePercent?: number | null; requireDeposit?: boolean | null; depositPercent?: number | null; cancellationWindowMinutes?: number | null; cancellationPolicy?: string | null }) =>
       req<Location>(`/businesses/${businessId}/locations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     remove: (businessId: string, id: string) =>
       req<{ ok: boolean }>(`/businesses/${businessId}/locations/${id}`, { method: "DELETE" }),

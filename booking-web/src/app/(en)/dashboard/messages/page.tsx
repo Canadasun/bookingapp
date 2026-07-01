@@ -55,7 +55,7 @@ export default function MessagesPage() {
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : (french ? "Échec du chargement des messages" : "Failed to load messages")); }
     finally { setLoading(false); }
-  }, [bizId, filter, channel, debouncedSearch, french, locationFilter?.join(",")]);
+  }, [bizId, filter, channel, debouncedSearch, french, locationFilter]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 

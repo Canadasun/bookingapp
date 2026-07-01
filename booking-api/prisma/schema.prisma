@@ -729,6 +729,11 @@ model Location {
   // ON. NULL = fall back to the business-level tax (single-province businesses).
   taxProvince    String? // province/territory code (e.g. BC) the rate preset came from
   taxRatePercent Float?  // combined GST/HST/PST/QST for this branch
+  // Per-location deposit policy. NULL = fall back to the business deposit setting.
+  requireDeposit Boolean? // does this branch collect a booking deposit?
+  depositPercent Int?     // % of the price taken as the deposit at this branch
+  cancellationWindowMinutes Int? // NULL = fall back to the business cancellation window
+  cancellationPolicy String? @db.Text // NULL = fall back to the business policy copy
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

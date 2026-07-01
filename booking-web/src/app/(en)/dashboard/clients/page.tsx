@@ -175,7 +175,7 @@ export default function ClientsPage() {
     }
     catch (e) { setLoadError(e instanceof Error ? e.message : t.toasts.loadFailed); }
     finally { setLoading(false); setLoadingMore(false); }
-  }, [bizId, isOwner, currentUser, t, locationFilter?.join(",")]);
+  }, [bizId, isOwner, currentUser, t, locationFilter]);
 
   useEffect(() => { load(); }, [load]);
 

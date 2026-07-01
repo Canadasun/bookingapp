@@ -259,7 +259,7 @@ export class PaymentsService {
   async createBookingIntent(appointmentId: string, callerBusinessId?: string) {
     const apt = await this.prisma.appointment.findFirst({
       where: { id: appointmentId, ...(callerBusinessId ? { businessId: callerBusinessId } : {}) },
-      include: { service: true, client: true, business: true },
+      include: { service: true, client: true, business: true, location: { select: { requireDeposit: true, depositPercent: true } } },
     });
     if (!apt) throw new BadRequestException('Appointment not found');
     if (apt.status !== 'PENDING') throw new BadRequestException('Payment can only be initiated for PENDING appointments');
@@ -272,9 +272,14 @@ export class PaymentsService {
 
     const customer = await this.ensureCustomer(apt.clientId);
 
-    if (b.requireDeposit) {
+    // Per-location deposit policy overrides the business default when the branch
+    // sets it; otherwise the business setting applies.
+    const requireDeposit = apt.location?.requireDeposit ?? b.requireDeposit;
+    const depositPercent = apt.location?.depositPercent ?? b.depositPercent;
+
+    if (requireDeposit) {
       const totalPriceCents = apt.totalPriceCents || apt.service.priceCents;
-      const depositCents = Math.max(50, Math.round(totalPriceCents * (b.depositPercent / 100)));
+      const depositCents = Math.max(50, Math.round(totalPriceCents * (depositPercent / 100)));
       const intent = await this.getStripe().paymentIntents.create({
         amount: depositCents,
         currency: this.currencyOf(b),

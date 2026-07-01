@@ -64,4 +64,46 @@ describe('LocationsService', () => {
     await expect(service.update('foreign-location', 'biz-1', { name: 'Nope' }))
       .rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('persists branch deposit and cancellation overrides', async () => {
+    const { service, prisma } = setup();
+
+    await service.create('biz-1', {
+      name: 'Downtown',
+      requireDeposit: true,
+      depositPercent: 30,
+      cancellationWindowMinutes: 2880,
+      cancellationPolicy: '  Give us 48 hours notice.  ',
+    });
+
+    expect(prisma.location.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        requireDeposit: true,
+        depositPercent: 30,
+        cancellationWindowMinutes: 2880,
+        cancellationPolicy: 'Give us 48 hours notice.',
+      }),
+    });
+  });
+
+  it('can clear branch policy overrides back to business defaults', async () => {
+    const { service, prisma } = setup();
+
+    await service.update('loc-1', 'biz-1', {
+      requireDeposit: null,
+      depositPercent: null,
+      cancellationWindowMinutes: null,
+      cancellationPolicy: null,
+    });
+
+    expect(prisma.location.update).toHaveBeenCalledWith({
+      where: { id: 'loc-1', businessId: 'biz-1' },
+      data: expect.objectContaining({
+        requireDeposit: null,
+        depositPercent: null,
+        cancellationWindowMinutes: null,
+        cancellationPolicy: null,
+      }),
+    });
+  });
 });
