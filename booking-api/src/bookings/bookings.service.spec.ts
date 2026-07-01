@@ -117,6 +117,9 @@ function mockPrisma(options: { conflictExists?: boolean; bufferConflict?: boolea
     staffLocation: {
       count: jest.fn().mockResolvedValue(0),
     },
+    locationService: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     location: {
       findFirst: jest.fn().mockResolvedValue({ id: 'location-a' }),
       count: jest.fn().mockResolvedValue(2),
@@ -164,6 +167,7 @@ function mockPrisma(options: { conflictExists?: boolean; bufferConflict?: boolea
     },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     promoCode,
+    __txMock: txMock, // test-only handle to assert what was written inside the tx
     $transaction: jest.fn().mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => {
       return fn(txMock);
     }),
@@ -290,6 +294,30 @@ describe('BookingsService', () => {
       expect(availability.getAvailableSlots).toHaveBeenCalledWith(
         expect.objectContaining({ locationId: 'location-b' }),
       );
+    });
+
+    // Phase A2: a branch can set its own price for a service.
+    it('applies the branch price override to the booking total', async () => {
+      const prisma = {
+        ...mockPrisma({}),
+        staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true, locationId: 'loc-a' }) },
+        locationService: { findMany: jest.fn().mockResolvedValue([{ serviceId: 'svc1', enabled: true, priceCents: 5000 }]) },
+      };
+      const { svc } = await buildService(prisma);
+      await svc.create('biz1', { staffId: 'staff1', serviceId: 'svc1', clientId: 'client1', startsAt: SLOT_START.toISOString(), locationId: 'loc-a' });
+      expect((prisma as any).__txMock.appointment.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ totalPriceCents: 5000 }) }),
+      );
+    });
+
+    // Phase A2: a branch can disable a service — it can't be booked there.
+    it('rejects booking a service disabled at the branch', async () => {
+      const { svc } = await buildService({
+        staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff1', businessId: 'biz1', active: true, locationId: 'loc-a' }) },
+        locationService: { findMany: jest.fn().mockResolvedValue([{ serviceId: 'svc1', enabled: false, priceCents: null }]) },
+      });
+      await expect(svc.create('biz1', { staffId: 'staff1', serviceId: 'svc1', clientId: 'client1', startsAt: SLOT_START.toISOString(), locationId: 'loc-a' }))
+        .rejects.toThrow('not offered at the selected location');
     });
 
     it('throws ConflictException when slot is taken', async () => {

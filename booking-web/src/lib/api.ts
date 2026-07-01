@@ -855,6 +855,10 @@ export const api = {
       return req<Service[]>(`/businesses/${businessId}/services/all${q}`);
     },
     get: (businessId: string, id: string) => req<Service>(`/businesses/${businessId}/services/${id}`),
+    locationOverrides: (businessId: string, id: string) =>
+      req<{ locationId: string; enabled: boolean; priceCents: number | null }[]>(`/businesses/${businessId}/services/${id}/locations`),
+    setLocationOverrides: (businessId: string, id: string, overrides: { locationId: string; enabled: boolean; priceCents: number | null }[]) =>
+      req<{ locationId: string; enabled: boolean; priceCents: number | null }[]>(`/businesses/${businessId}/services/${id}/locations`, { method: "PUT", body: JSON.stringify({ overrides }) }),
     create: (businessId: string, data: Omit<Partial<Service>, "id" | "businessId" | "createdAt" | "updatedAt">) =>
       req<Service>(`/businesses/${businessId}/services`, { method: "POST", body: JSON.stringify(data) }),
     update: (businessId: string, id: string, data: Omit<Partial<Service>, "id" | "businessId" | "createdAt" | "updatedAt">) =>

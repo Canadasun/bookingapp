@@ -20,8 +20,12 @@ export class ServicesService {
 
   // ── Services ────────────────────────────────────────────────────────────────
 
-  findAll(businessId: string, includeInactive = false, locationIds?: string[]) {
-    return this.prisma.service.findMany({
+  async findAll(businessId: string, includeInactive = false, locationIds?: string[]) {
+    // When exactly one branch is in scope, honour its per-service overrides:
+    // hide services it has disabled and apply its price override. With multiple
+    // branches in scope a single effective price is ambiguous, so we skip it.
+    const singleLocationId = locationIds?.length === 1 ? locationIds[0] : undefined;
+    const services = await this.prisma.service.findMany({
       where: {
         businessId,
         ...(includeInactive ? {} : { active: true }),
@@ -36,9 +40,23 @@ export class ServicesService {
             { locationId: { in: locationIds } },
           ] } } },
         } : {}),
+        // Hide services this branch has explicitly disabled.
+        ...(singleLocationId ? {
+          NOT: { locationServices: { some: { locationId: singleLocationId, enabled: false } } },
+        } : {}),
       },
-      include: { category: { select: { id: true, name: true, color: true, sortOrder: true } } },
+      include: {
+        category: { select: { id: true, name: true, color: true, sortOrder: true } },
+        ...(singleLocationId ? { locationServices: { where: { locationId: singleLocationId }, select: { priceCents: true, enabled: true } } } : {}),
+      },
       orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    if (!singleLocationId) return services;
+    // Apply the branch price override to the returned price, then drop the join.
+    return services.map((svc) => {
+      const override = (svc as typeof svc & { locationServices?: { priceCents: number | null }[] }).locationServices?.[0];
+      const { locationServices, ...rest } = svc as typeof svc & { locationServices?: unknown };
+      return { ...rest, priceCents: override?.priceCents != null ? override.priceCents : svc.priceCents };
     });
   }
 
@@ -76,6 +94,39 @@ export class ServicesService {
       },
       include: { category: { select: { id: true, name: true, color: true, sortOrder: true } } },
     });
+  }
+
+  // Per-location price/enablement overrides for one service.
+  async getLocationOverrides(serviceId: string, businessId: string) {
+    await this.findOne(serviceId, businessId); // tenant check
+    return this.prisma.locationService.findMany({
+      where: { serviceId, location: { businessId } },
+      select: { locationId: true, enabled: true, priceCents: true },
+    });
+  }
+
+  async setLocationOverrides(
+    serviceId: string,
+    businessId: string,
+    overrides: { locationId: string; enabled: boolean; priceCents: number | null }[],
+  ) {
+    await this.findOne(serviceId, businessId); // tenant check
+    const ids = [...new Set(overrides.map((o) => o.locationId))];
+    if (ids.length) {
+      const valid = await this.prisma.location.count({ where: { id: { in: ids }, businessId } });
+      if (valid !== ids.length) throw new NotFoundException('One or more locations do not belong to this business');
+    }
+    await this.prisma.$transaction([
+      this.prisma.locationService.deleteMany({ where: { serviceId, location: { businessId } } }),
+      // Only persist rows that actually diverge from the base (disabled or a price
+      // override) — an enabled row at the base price is the default, so skip it.
+      ...overrides
+        .filter((o) => !o.enabled || o.priceCents != null)
+        .map((o) => this.prisma.locationService.create({
+          data: { serviceId, locationId: o.locationId, enabled: o.enabled, priceCents: o.priceCents },
+        })),
+    ]);
+    return this.getLocationOverrides(serviceId, businessId);
   }
 
   async remove(id: string, businessId: string) {

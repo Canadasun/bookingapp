@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Put, Delete, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ServicesService } from './services.service';
 import {
   CreateServiceSchema, UpdateServiceSchema, CreateServiceDto, UpdateServiceDto,
   CreateCategorySchema, UpdateCategorySchema, CreateCategoryDto, UpdateCategoryDto,
+  SetLocationOverridesSchema, SetLocationOverridesDto,
 } from './dto/service.dto';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -47,6 +48,37 @@ export class ServicesController {
     @Param('businessId') businessId: string,
   ) {
     return this.serviceService.findOne(id, businessId);
+  }
+
+  // Per-location price/enablement overrides for a service.
+  @Get(':id/locations')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  getLocationOverrides(
+    @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.serviceService.getLocationOverrides(id, businessId);
+  }
+
+  @Put(':id/locations')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('MANAGE_SERVICES')
+  setLocationOverrides(
+    @Param('id') id: string,
+    @Param('businessId') businessId: string,
+    @Body(new ZodValidationPipe(SetLocationOverridesSchema)) dto: SetLocationOverridesDto,
+    @CurrentUser() user: { role: string; businessId: string | null },
+  ) {
+    if (user.role !== 'ADMIN' && user.businessId !== businessId) {
+      throw new ForbiddenException('You do not have access to this business');
+    }
+    return this.serviceService.setLocationOverrides(id, businessId, dto.overrides);
   }
 
   @Post()

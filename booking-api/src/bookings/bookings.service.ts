@@ -354,6 +354,28 @@ export class BookingsService {
       additionalServices = extras;
     }
 
+    // Per-location service overrides: a branch can disable a service or set its
+    // own price. Absence of a row = offered at the base price (unchanged).
+    if (effectiveLocationId) {
+      const selected: { id: string; priceCents: number }[] = [
+        { id: dto.serviceId, priceCents: primaryService.priceCents },
+        ...additionalServices.map((s) => { const x = s as unknown as { id: string; priceCents: number }; return { id: x.id, priceCents: x.priceCents }; }),
+      ];
+      const overrides = await this.prisma.locationService.findMany({
+        where: { locationId: effectiveLocationId, serviceId: { in: selected.map((s) => s.id) } },
+      });
+      const byService = new Map(overrides.map((o) => [o.serviceId, o]));
+      for (const s of selected) {
+        if (byService.get(s.id)?.enabled === false) {
+          throw new BadRequestException('This service is not offered at the selected location');
+        }
+      }
+      subtotalCents = selected.reduce((sum, s) => {
+        const o = byService.get(s.id);
+        return sum + (o?.priceCents != null ? o.priceCents : s.priceCents);
+      }, 0);
+    }
+
     const startsAt = new Date(dto.startsAt);
     const endsAt = addMinutes(startsAt, totalDurationMinutes);
 
