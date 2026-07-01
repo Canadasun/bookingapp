@@ -129,10 +129,12 @@ export default function OverviewPage() {
     setShowDemoBanner(false);
   }
 
-  // When the owner focuses a single branch in the location switcher, scope the
-  // home overview to it. "All" / multi-select stays business-wide.
+  // Any proper subset of branches scopes the overview. Selecting every branch
+  // is represented by no filter so legacy single-location accounts stay simple.
   const { selectedIds: scopedLocationIds, locations: scopedLocations } = useLocationScope();
-  const scopedLocationId = scopedLocations.length > 1 && scopedLocationIds.length === 1 ? scopedLocationIds[0] : undefined;
+  const locationFilterKey = scopedLocations.length > 0 && scopedLocationIds.length < scopedLocations.length
+    ? scopedLocationIds.join(",")
+    : "";
 
   const load = useCallback(async () => {
     if (userLoading) return;
@@ -142,13 +144,13 @@ export default function OverviewPage() {
     }
     setLoading(true); setError("");
     try {
-      setOverview(await api.business.dashboardOverview(bizId, scopedLocationId));
+      setOverview(await api.business.dashboardOverview(bizId, locationFilterKey ? locationFilterKey.split(",") : undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : copy.loadFailed);
     } finally { setLoading(false); }
   // React Compiler needs `user` here because `bizId` is derived from it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLoading, user, bizId, scopedLocationId]);
+  }, [userLoading, user, bizId, locationFilterKey]);
 
   useEvents(bizId || null, useCallback(() => {
     load();

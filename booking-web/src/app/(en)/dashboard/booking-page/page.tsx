@@ -10,6 +10,7 @@ import { api, type Business } from "@/lib/api";
 import { useCurrentUser } from "@/lib/auth";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useDashboardLocale } from "@/lib/dashboard-locale";
+import { toast } from "sonner";
 
 export default function BookingPageHub() {
   const { user } = useCurrentUser();
@@ -18,6 +19,7 @@ export default function BookingPageHub() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [savingLanguage, setSavingLanguage] = useState(false);
   const { french } = useDashboardLocale();
 
   const load = useCallback(async () => {
@@ -42,6 +44,20 @@ export default function BookingPageHub() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function changeDefaultLocale(defaultLocale: "en" | "fr") {
+    if (!bizId || !biz) return;
+    setSavingLanguage(true);
+    try {
+      const updated = await api.business.update(bizId, { defaultLocale });
+      setBiz(updated);
+      toast.success(french ? "Langue par défaut mise à jour" : "Default language updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : (french ? "Échec de la mise à jour" : "Update failed"));
+    } finally {
+      setSavingLanguage(false);
+    }
   }
 
   return (
@@ -92,6 +108,23 @@ export default function BookingPageHub() {
               </div>
               <p className="text-sm text-gray-500">{french ? "Imprimez-le pour la réception ou ajoutez-le à vos dépliants — les clients le numérisent pour réserver immédiatement." : "Print it for your front desk or add it to flyers — clients scan to book instantly."}</p>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <label htmlFor="booking-default-locale" className="block text-sm font-semibold text-gray-800">
+              {french ? "Langue de réservation par défaut" : "Default booking language"}
+            </label>
+            <p className="mt-1 text-xs text-gray-500">
+              {french
+                ? "Les clients peuvent toujours changer de langue. Chaque emplacement peut remplacer ce choix."
+                : "Clients can always switch languages. Individual locations can override this choice."}
+            </p>
+            <select id="booking-default-locale" value={biz?.defaultLocale ?? "en"} disabled={savingLanguage}
+              onChange={(event) => void changeDefaultLocale(event.target.value as "en" | "fr")}
+              className="mt-3 w-full max-w-xs rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 disabled:opacity-60">
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+            </select>
           </div>
 
           {/* Deeper customization → existing Settings editors */}

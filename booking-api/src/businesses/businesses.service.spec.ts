@@ -119,3 +119,45 @@ describe('BusinessesService.dashboardOverview', () => {
     });
   });
 });
+
+describe('BusinessesService public booking payload', () => {
+  it('includes the branch fields required to calculate booking policy and totals', async () => {
+    const business = {
+      id: 'biz1',
+      name: 'Pulse Test',
+      slug: 'pulse-test',
+      suspended: false,
+      taxRatePercent: 13,
+      cancellationWindowHours: 24,
+      cancellationWindowMinutes: 1440,
+      requireDeposit: false,
+      depositPercent: 20,
+      collectCardOnFile: false,
+      allowClientReschedule: true,
+      currency: 'CAD',
+      verificationStatus: 'VERIFIED',
+      stripeConnectOnboarded: true,
+    };
+    const prisma = {
+      business: { findUnique: jest.fn().mockResolvedValue(business) },
+      location: { findMany: jest.fn().mockResolvedValue([]) },
+      review: { aggregate: jest.fn().mockResolvedValue({ _avg: { rating: null }, _count: 0 }) },
+      businessHours: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new BusinessesService(prisma as unknown as PrismaService);
+
+    await service.findBySlugPublic('pulse-test');
+
+    expect(prisma.location.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        timezone: true,
+        taxProvince: true,
+        taxRatePercent: true,
+        requireDeposit: true,
+        depositPercent: true,
+        cancellationWindowMinutes: true,
+        cancellationPolicy: true,
+      }),
+    }));
+  });
+});

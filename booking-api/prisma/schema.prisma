@@ -87,6 +87,7 @@ model Business {
   email                String
   phone                String?
   timezone             String  @default("America/Toronto")
+  defaultLocale        String  @default("en") // public booking default: en | fr
   address              String?
   logoUrl              String?
   websiteUrl           String?
@@ -724,6 +725,7 @@ model Location {
   address    String?
   phone      String?
   timezone   String?
+  defaultLocale String? // NULL = inherit the business public-booking locale
   active     Boolean  @default(true)
   // Per-location Canadian tax. A branch in BC collects BC's rate even if HQ is in
   // ON. NULL = fall back to the business-level tax (single-province businesses).

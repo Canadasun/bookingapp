@@ -27,15 +27,19 @@ export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  // When a single branch is focused in the location switcher, show only its providers.
+  // When a proper subset is focused, show providers serving any selected branch.
   const { selectedIds: scopedIds, locations: scopeLocs } = useLocationScope();
-  const scopedLocationId = scopeLocs.length > 1 && scopedIds.length === 1 ? scopedIds[0] : undefined;
-  // A provider belongs to the focused branch if it's in their multi-location set
+  const scopedLocationIds = scopeLocs.length > 0 && scopedIds.length < scopeLocs.length ? new Set(scopedIds) : null;
+  // A provider belongs to the focused branches if it's in their multi-location set
   // (staffLocations) or is their primary/home branch.
-  const visibleStaff = scopedLocationId
-    ? staff.filter((s) => (s.staffLocations?.length ? s.staffLocations.some((sl) => sl.locationId === scopedLocationId) : s.locationId === scopedLocationId))
+  const visibleStaff = scopedLocationIds
+    ? staff.filter((s) => (s.staffLocations?.length
+      ? s.staffLocations.some((sl) => scopedLocationIds.has(sl.locationId))
+      : !!s.locationId && scopedLocationIds.has(s.locationId)))
     : staff;
-  const scopedLocationName = scopedLocationId ? (scopeLocs.find((l) => l.id === scopedLocationId)?.name ?? null) : null;
+  const scopedLocationName = scopedLocationIds?.size === 1
+    ? (scopeLocs.find((location) => scopedLocationIds.has(location.id))?.name ?? null)
+    : null;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [showModal, setShowModal] = useState(false);

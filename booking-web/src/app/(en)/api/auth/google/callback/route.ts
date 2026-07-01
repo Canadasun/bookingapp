@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await upstream.json() as SSOTokens;
-  await persistSSOLocale(API, data.accessToken, locale);
+  if (locale) await persistSSOLocale(API, data.accessToken, locale);
   let destination: string;
   if (intent === "owner" && !(data.user.role === "OWNER" && data.user.businessId)) {
     destination = "/register/complete";

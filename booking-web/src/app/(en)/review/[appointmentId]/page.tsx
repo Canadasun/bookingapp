@@ -12,8 +12,8 @@ import { useSearchParams } from "next/navigation";
 export default function ReviewPage({ params }: { params: Promise<{ appointmentId: string }> }) {
   const { appointmentId } = use(params);
   const searchParams = useSearchParams();
-  const fr = searchParams.get("lang") === "fr";
   const [apt, setApt] = useState<Appointment | null>(null);
+  const fr = searchParams.get("lang") === "fr" || apt?.business.defaultLocale === "fr" || apt?.location?.defaultLocale === "fr";
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);

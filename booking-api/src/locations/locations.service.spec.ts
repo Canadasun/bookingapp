@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LocationsService } from './locations.service';
 
 describe('LocationsService', () => {
@@ -22,6 +22,8 @@ describe('LocationsService', () => {
         delete: jest.fn(),
         findMany: jest.fn(),
       },
+      appointment: { count: jest.fn().mockResolvedValue(0) },
+      invoice: { count: jest.fn().mockResolvedValue(0) },
     };
     return { service: new LocationsService(prisma as never), prisma };
   }
@@ -63,6 +65,16 @@ describe('LocationsService', () => {
     const { service } = setup({ location: null });
     await expect(service.update('foreign-location', 'biz-1', { name: 'Nope' }))
       .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('preserves branch attribution by refusing to delete a location with history', async () => {
+    const { service, prisma } = setup({
+      location: { id: 'loc-1', businessId: 'biz-1', active: true },
+    });
+    prisma.appointment.count.mockResolvedValue(1);
+
+    await expect(service.remove('loc-1', 'biz-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.location.delete).not.toHaveBeenCalled();
   });
 
   it('persists branch deposit and cancellation overrides', async () => {

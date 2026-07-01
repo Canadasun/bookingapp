@@ -78,9 +78,12 @@ export class BusinessesController {
     @Param('id') id: string,
     @CurrentUser() user: User,
     @Query('locationId') locationId?: string,
+    @Query('locationIds') locationIds?: string,
   ) {
     this.assertTenantAccess(user, id);
-    return this.businessService.dashboardOverview(id, user, locationId?.trim() || undefined);
+    const ids = locationIds?.split(',').map((value) => value.trim()).filter(Boolean).slice(0, 5)
+      ?? (locationId?.trim() ? [locationId.trim()] : undefined);
+    return this.businessService.dashboardOverview(id, user, ids);
   }
 
   @Get(':id/reports')

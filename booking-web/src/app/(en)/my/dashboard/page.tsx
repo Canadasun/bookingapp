@@ -33,15 +33,22 @@ export default function ClientDashboard() {
   const [hasCard, setHasCard] = useState(false);
   const [removingCard, setRemovingCard] = useState(false);
   const [removeCardDialog, setRemoveCardDialog] = useState(false);
+  const [french, setFrench] = useState(false);
+
+  useEffect(() => {
+    try {
+      setFrench(localStorage.getItem("pulse_dashboard_locale") === "fr");
+    } catch {}
+  }, []);
 
   async function removeCard() {
     setRemovingCard(true);
     try {
       await api.clientPortal.removeCard();
       setHasCard(false);
-      toast.success("Card removed");
+      toast.success(french ? "Carte retirée" : "Card removed");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not remove card");
+      toast.error(e instanceof Error ? e.message : (french ? "Impossible de retirer la carte" : "Could not remove card"));
     } finally { setRemovingCard(false); }
   }
 
@@ -71,7 +78,7 @@ export default function ClientDashboard() {
       if (e instanceof Error && e.message.includes("EMAIL_NOT_VERIFIED")) {
         setNotVerified(true);
       } else {
-        toast.error(e instanceof Error ? e.message : "Failed to load — try refreshing");
+        toast.error(e instanceof Error ? e.message : (french ? "Échec du chargement — essayez de rafraîchir" : "Failed to load — try refreshing"));
       }
     } finally {
       setLoading(false);
@@ -94,10 +101,10 @@ export default function ClientDashboard() {
     setResending(true);
     try {
       const r = await api.auth.resendVerification();
-      toast.success(r.alreadyVerified ? "Already verified — try refreshing" : "Verification email sent");
+      toast.success(r.alreadyVerified ? (french ? "Déjà vérifié — essayez de rafraîchir" : "Already verified — try refreshing") : (french ? "Courriel de vérification envoyé" : "Verification email sent"));
       if (r.alreadyVerified) load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not resend");
+      toast.error(e instanceof Error ? e.message : (french ? "Impossible de renvoyer" : "Could not resend"));
     } finally {
       setResending(false);
     }
@@ -119,13 +126,13 @@ export default function ClientDashboard() {
           <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
             <Mail className="w-6 h-6 text-amber-600" />
           </div>
-          <h1 className="text-lg font-bold text-gray-900 mt-4">Verify your email</h1>
-          <p className="text-sm text-gray-500 mt-1">We sent a link to <strong>{user.email}</strong>. Confirm it to view your bookings and messages.</p>
+          <h1 className="text-lg font-bold text-gray-900 mt-4">{french ? "Vérifiez votre courriel" : "Verify your email"}</h1>
+          <p className="text-sm text-gray-500 mt-1">{french ? <>Nous avons envoyé un lien à <strong>{user.email}</strong>. Confirmez-le pour voir vos rendez-vous et messages.</> : <>We sent a link to <strong>{user.email}</strong>. Confirm it to view your bookings and messages.</>}</p>
           <button onClick={resend} disabled={resending}
             className="mt-6 w-full bg-violet-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors">
-            {resending ? "Sending…" : "Resend verification email"}
+            {resending ? (french ? "Envoi…" : "Sending…") : (french ? "Renvoyer le courriel de vérification" : "Resend verification email")}
           </button>
-          <button onClick={logout} className="mt-3 text-xs text-gray-500 hover:text-gray-700">Sign out</button>
+          <button onClick={logout} className="mt-3 text-xs text-gray-500 hover:text-gray-700">{french ? "Se déconnecter" : "Sign out"}</button>
         </div>
       </div>
     );
@@ -139,18 +146,18 @@ export default function ClientDashboard() {
   );
 
   const TABS: { id: Section; label: string; icon: React.ElementType; count?: number }[] = [
-    { id: "upcoming", label: "Upcoming",  icon: Calendar,  count: upcoming.length },
-    { id: "past",     label: "Past",      icon: Clock },
-    { id: "offers",   label: "Offers",    icon: Tag,       count: offers.length },
+    { id: "upcoming", label: french ? "À venir" : "Upcoming",  icon: Calendar,  count: upcoming.length },
+    { id: "past",     label: french ? "Passés" : "Past",      icon: Clock },
+    { id: "offers",   label: french ? "Offres" : "Offers",    icon: Tag,       count: offers.length },
   ];
 
   return (
     <>
     <ConfirmDialog
       open={removeCardDialog}
-      title="Remove saved card?"
-      description="Your card will be deleted and can no longer be charged for deposits, no-shows, or late cancellations."
-      confirmLabel="Remove card"
+      title={french ? "Retirer la carte enregistrée?" : "Remove saved card?"}
+      description={french ? "Votre carte sera supprimée et ne pourra plus être débitée pour les dépôts, absences ou annulations tardives." : "Your card will be deleted and can no longer be charged for deposits, no-shows, or late cancellations."}
+      confirmLabel={french ? "Retirer la carte" : "Remove card"}
       variant="destructive"
       onConfirm={() => { setRemoveCardDialog(false); removeCard(); }}
       onCancel={() => setRemoveCardDialog(false)}
@@ -165,7 +172,7 @@ export default function ClientDashboard() {
               <Calendar className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="text-sm font-bold text-gray-900 leading-none">My Bookings</span>
+              <span className="text-sm font-bold text-gray-900 leading-none">{french ? "Mes rendez-vous" : "My Bookings"}</span>
               <p className="text-xs text-gray-400 mt-0.5">{user.name}</p>
             </div>
           </div>
@@ -192,8 +199,8 @@ export default function ClientDashboard() {
         <Link href="/book"
           className="flex items-center justify-between bg-violet-600 text-white rounded-2xl p-5 hover:bg-violet-700 transition-colors group">
           <div>
-            <span className="font-bold text-lg leading-tight">Book an appointment</span>
-            <p className="text-violet-200 text-sm mt-0.5">Browse services and pick a time</p>
+            <span className="font-bold text-lg leading-tight">{french ? "Prendre un rendez-vous" : "Book an appointment"}</span>
+            <p className="text-violet-200 text-sm mt-0.5">{french ? "Parcourez les services et choisissez une heure" : "Browse services and pick a time"}</p>
           </div>
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-colors">
             <ChevronRight className="w-5 h-5" />
@@ -207,12 +214,12 @@ export default function ClientDashboard() {
               <CreditCard className="w-5 h-5 text-gray-500" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">Card on file</p>
-              <p className="text-xs text-gray-500 mt-0.5">A business has saved your card for deposits or no-show / late-cancellation protection. You can remove it anytime.</p>
+              <p className="text-sm font-semibold text-gray-900">{french ? "Carte enregistrée" : "Card on file"}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{french ? "Une entreprise a enregistré votre carte pour les dépôts ou la protection contre les absences / annulations tardives. Vous pouvez la retirer à tout moment." : "A business has saved your card for deposits or no-show / late-cancellation protection. You can remove it anytime."}</p>
             </div>
             <button onClick={() => setRemoveCardDialog(true)} disabled={removingCard}
               className="shrink-0 text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-60 transition-colors">
-              {removingCard ? "Removing…" : "Remove card"}
+              {removingCard ? (french ? "Retrait…" : "Removing…") : (french ? "Retirer la carte" : "Remove card")}
             </button>
           </div>
         )}
@@ -248,9 +255,9 @@ export default function ClientDashboard() {
                 <Card>
                   <CardContent className="py-12 text-center">
                     <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" aria-hidden="true" />
-                    <p className="text-sm font-medium text-gray-500">No upcoming appointments</p>
+                    <p className="text-sm font-medium text-gray-500">{french ? "Aucun rendez-vous à venir" : "No upcoming appointments"}</p>
                     <Link href="/book" className="text-violet-600 text-sm hover:underline mt-2 inline-block font-medium">
-                      Book your first appointment →
+                      {french ? "Prenez votre premier rendez-vous →" : "Book your first appointment →"}
                     </Link>
                   </CardContent>
                 </Card>
@@ -261,7 +268,7 @@ export default function ClientDashboard() {
               past.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <p className="text-sm text-gray-400">No past appointments</p>
+                    <p className="text-sm text-gray-400">{french ? "Aucun rendez-vous passé" : "No past appointments"}</p>
                   </CardContent>
                 </Card>
               ) : past.map((a) => <AptCard key={a.id} apt={a} />)
@@ -272,8 +279,8 @@ export default function ClientDashboard() {
                 <Card>
                   <CardContent className="py-12 text-center">
                     <Tag className="w-10 h-10 text-gray-200 mx-auto mb-3" aria-hidden="true" />
-                    <p className="text-sm text-gray-400">No active offers right now</p>
-                    <p className="text-xs text-gray-500 mt-1">Check back soon!</p>
+                    <p className="text-sm text-gray-400">{french ? "Aucune offre active pour le moment" : "No active offers right now"}</p>
+                    <p className="text-xs text-gray-500 mt-1">{french ? "Revenez bientôt!" : "Check back soon!"}</p>
                   </CardContent>
                 </Card>
               ) : offers.map((o) => (
@@ -297,13 +304,13 @@ export default function ClientDashboard() {
                       {o.expiresAt && (
                         <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3" />
-                          Expires {format(new Date(o.expiresAt), "MMM d, yyyy")}
+                          {french ? "Expire" : "Expires"} {format(new Date(o.expiresAt), "MMM d, yyyy")}
                         </p>
                       )}
                     </div>
                     <Link href="/book"
                       className="text-xs text-violet-600 font-semibold hover:underline shrink-0 mt-0.5">
-                      Book →
+                      {french ? "Réserver →" : "Book →"}
                     </Link>
                   </CardContent>
                 </Card>
